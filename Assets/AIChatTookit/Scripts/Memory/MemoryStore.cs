@@ -22,6 +22,8 @@ namespace AIChat.Memory
         private class FileFormat
         {
             public int version = 1;
+            //ISO 8601,上次全局衰减时间。老文件缺此字段 → 从当下开始计,不追溯扣分
+            public string last_decayed;
             public List<MemoryNode> nodes = new List<MemoryNode>();
             public List<MemoryEdge> edges = new List<MemoryEdge>();
         }
@@ -107,6 +109,46 @@ namespace AIChat.Memory
             {
                 Debug.LogError($"[MemoryStore] 保存失败: {e.Message}");
             }
+        }
+
+        /// <summary>
+        /// 全局权重衰减:按距上次衰减经过的天数,对所有节点乘同一半衰期因子,衰到 floor 为止。
+        /// 增量式——每段真实流逝的时间只被计入一次,频繁重启不会重复扣。
+        /// 相对排序不变(乘法),衰减的意义在于让 LLM 新写入的记忆能压过久不提及的旧节点。
+        /// </summary>
+        public void ApplyDecay(float halfLifeDays, float floor)
+        {
+            if (m_File == null || halfLifeDays <= 0f) return;
+
+            DateTime now = DateTime.UtcNow;
+            DateTime last;
+            bool hasLast = DateTime.TryParse(m_File.last_decayed, null,
+                System.Globalization.DateTimeStyles.RoundtripKind, out last);
+
+            if (!hasLast)
+            {
+                //老文件/首次:只打时间戳,不对历史追溯衰减
+                m_File.last_decayed = now.ToString("o");
+                Save();
+                return;
+            }
+
+            double days = (now - last.ToUniversalTime()).TotalDays;
+            if (days < 0.25) return;   //不到6小时不折腾,也不刷新时间戳
+
+            float factor = (float)Math.Pow(0.5, days / halfLifeDays);
+            int touched = 0;
+            for (int i = 0; i < m_File.nodes.Count; i++)
+            {
+                var n = m_File.nodes[i];
+                if (n == null) continue;
+                float w = Mathf.Max(floor, n.weight * factor);
+                if (Mathf.Abs(w - n.weight) > 0.0001f) { n.weight = w; touched++; }
+            }
+            m_File.last_decayed = now.ToString("o");
+            Save();
+            if (touched > 0)
+                Debug.Log($"[MemoryStore] 衰减: 距上次 {days:F1} 天,因子 {factor:F4},{touched} 个节点受影响");
         }
 
         public MemoryNode GetNode(string name)

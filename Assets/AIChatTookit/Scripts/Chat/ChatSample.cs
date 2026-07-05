@@ -690,12 +690,18 @@ public class ChatSample : MonoBehaviour
         //解析 agent 标签 — 从全文里抽出来 next/continue/silent/look，存到 m_Round*
         if (m_AgentRunning)
         {
+            //记忆写入标签先行提取并应用——只在全文完成时做一次(chunk 级会重复计),
+            //剥净后再交给 ParseAgentTags,保证 cleanFull 不残留记忆标签
+            string afterMemTags;
+            var memOps = MemoryTagParser.Extract(full ?? "", out afterMemTags);
+            if (memOps != null && m_MemoryHub != null) m_MemoryHub.ApplyMemoryOps(memOps);
+
             float? nextInSec;
             string focus;
             bool wantsContinue;
             bool wantsSilent;
             bool? wantsLook;
-            ParseAgentTags(full ?? "", out cleanFull, out nextInSec, out focus, out wantsContinue, out wantsSilent, out wantsLook);
+            ParseAgentTags(afterMemTags, out cleanFull, out nextInSec, out focus, out wantsContinue, out wantsSilent, out wantsLook);
             m_RoundNextInSec = nextInSec;
             m_RoundFocus = focus;
             m_RoundContinue = wantsContinue;
@@ -722,6 +728,7 @@ public class ChatSample : MonoBehaviour
                 string cleanTail;
                 float? _ni; string _f; bool _c; bool _s; bool? _l;
                 ParseAgentTags(tail, out cleanTail, out _ni, out _f, out _c, out _s, out _l);
+                cleanTail = MemoryTagParser.Strip(cleanTail);   //只剥不应用,操作已在全文提取过
                 m_SentenceBuffer.Length = 0;
                 if (!string.IsNullOrEmpty(cleanTail)) m_SentenceBuffer.Append(cleanTail);
             }
@@ -1715,6 +1722,7 @@ public class ChatSample : MonoBehaviour
         text = System.Text.RegularExpressions.Regex.Replace(text, @"<noop\s*/>", "", ic);
         text = System.Text.RegularExpressions.Regex.Replace(text, @"<look\s*/>", "", ic);
         text = System.Text.RegularExpressions.Regex.Replace(text, @"<unlook\s*/>", "", ic);
+        text = MemoryTagParser.Strip(text);
         return text.Trim();
     }
 
