@@ -1,6 +1,6 @@
 # NeEEvA
 
-基于 Unity 的 AI 虚拟角色语音伴侣。VRM 虚拟形象「アントネーワ（安托涅瓦，出自《永远的7日之都》）」在 3D 房间场景中与用户进行实时日语语音对话，支持流式回复、语音打断、口型同步与图谱式长期记忆。
+基于 Unity 的 AI 虚拟角色语音伴侣。VRM 虚拟形象「アントネーワ（安托涅瓦，出自《永远的7日之都》）」在 3D 房间场景中与用户进行实时日语语音对话，支持流式回复、语音打断、实时屏幕视觉、口型同步、图谱式长期记忆与 Agent Loop 自主行为调度。
 
 ## 主要特性
 
@@ -8,11 +8,37 @@
 - **实时语音对话链路**：麦克风 VAD 检测 → 本地 SenseVoice 语音识别（附带情绪 / 音频事件标签）→ LLM 流式生成 → 按句切分排队 TTS → 边合成边播放边显示
 - **低延迟交互**：支持对话打断（barge-in，约 0.3s 响应）、试探性断句（tentative EOU，0.6s 静默即预判句尾）以减少等待；`<continue/>` 无缝续写、`<silent/>` 内心独白（只记录不朗读）
 - **实时屏幕视觉**：主推的 qwen3.6 多模态模型可以"看"用户的电脑屏幕——角色自主输出 `<look/>` 睁眼后，每一帧感知都附最新桌面截图，能实时感知画面变化，`<unlook/>` 闭眼（详见下文「启用 Qwen3.6 与实时视觉」）
-- **图谱式长期记忆**：带权重的记忆节点 + 语义边构成知识网络（`seed_memory.json` 含 21 个种子节点），运行时持久化到本地，每轮对话将 Top-30 节点注入感知帧
+- **Agent Loop 自主行为**：角色不是被动应答机——她通过 `<next/>` 标签自主排定下一次"思考"时刻，可以主动搭话、安静等待，或被环境声响拉回注意力（详见「Agent Loop」一节）
+- **图谱式长期记忆**：带权重的记忆节点 + 语义边构成知识网络（`seed_memory.json` 含 21 个种子节点），运行时持久化到 `Application.persistentDataPath/memory.json`，每帧按"权重 × 新近度"把 Top-30（可调）节点注入感知帧
 - **多 LLM 后端可插拔**：DeepSeek、通义千问（DashScope 云端 / llama-server、Ollama 本地双后端）、OpenAI、智谱 ChatGLM、讯飞星火、RWKV
 - **多语音服务可选**：本地 SenseVoice ASR、GPT-SoVITS 声音克隆 TTS，以及 OpenAI / Azure / 讯飞 云端 TTS & STT
 - **Qwen-Omni 多模态**：文本 + 语音 + 摄像头 / 截图输入，流式文本与音频输出（`qwen-omni-turbo`）
 - **语音唤醒（WOV）**：通过语音触发激活对话
+
+## 系统架构
+
+```mermaid
+flowchart LR
+    MIC["🎤 麦克风"] --> VAD["VAD 检测<br/>RTSpeechHandler"]
+    VAD -->|WAV| ASR["SenseVoice ASR :9881<br/>文本 + 情绪 + 音频事件"]
+    ASR --> LOOP["ChatSample Agent Loop<br/>感知帧汇总"]
+    MEM["记忆网络 MemoryHub<br/>Top-30 节点"] --> LOOP
+    CAP["DesktopCapture 屏幕截图<br/>look 睁眼时"] --> LOOP
+    LOOP --> LLM["ChatQW qwen3.6<br/>DashScope 云端 / 本地 :8080"]
+    LLM -->|流式 token| SPLIT["按句切分排队"]
+    SPLIT --> TTS["GPT-SoVITS TTS :9880<br/>Antoneva 音色"]
+    TTS --> SPK["🔊 AudioSource 播放"]
+    SPK --> LIP["OVRLipSync 口型同步"]
+```
+
+默认端口一览（均可在对应组件 / 启动脚本中修改）：
+
+| 服务 | 默认地址 | 用途 |
+|---|---|---|
+| SenseVoice ASR | `127.0.0.1:9881` | 本地语音识别（附情绪 / 音频事件标签） |
+| GPT-SoVITS TTS | `127.0.0.1:9880` | 本地声音克隆语音合成 |
+| 本地 LLM（llama-server / Ollama） | `127.0.0.1:8080` | qwen3.6 本地推理（含视觉） |
+| DashScope（可选云端） | `dashscope.aliyuncs.com` | 千问云端推理 / Qwen-Omni |
 
 ## 环境要求
 
@@ -26,7 +52,7 @@
 
 1. 用 Unity Hub 打开本项目（首次导入会重新生成 `Library/`，耗时较长）。
 2. 打开主对话场景 `Assets/AIChatTookit/Scene/chatSample.unity`（包含 NeEEvA 形象与完整对话栈；`Assets/Scenes/NeEEvARoom.unity` 是由编辑器菜单 `NeEEvA > Build Room (White-box)` 生成的白盒房间场景）。
-3. 在场景内对应组件的 Inspector 中填入自己的 API Key（**仓库不包含任何密钥**）：
+3. 在场景内对应组件的 Inspector 中填入自己的 API Key（**仓库不包含任何密钥**；LLM 走本地 llama-server / Ollama 后端时无需密钥，可跳过）：
    - LLM：`ChatQW`（主推，见下节）/ `ChatDeepSeek` 等组件的 `api_key`
    - Qwen-Omni：`QwenOmni` 组件的 `api_key`（阿里云百炼 DashScope）
 4. （可选）启动本地语音识别服务（服务端代码已在仓库中，SenseVoiceSmall 模型权重首次启动时会自动从 ModelScope 下载）：
@@ -87,6 +113,19 @@
 
 限制：仅支持 Windows 平台（GDI P/Invoke 截屏）；只能看到屏幕，没有摄像头通道（单次的摄像头/截图问答请用 `QwenOmni` 模块）。
 
+## Agent Loop：角色的自主行为
+
+角色不是"一问一答"的被动应答机。`ChatSample` 以**感知帧**驱动 Agent Loop：每一帧把「用户最新发言、她自己最近说过什么、环境声响、会话阶段、视觉状态、记忆库 Top-N 节点」汇总给 LLM，由角色自己决定说话还是沉默、下次何时"想起来"。她通过在回复**末尾**输出标签控制自己的行为：
+
+| 标签 | 作用 |
+|---|---|
+| `<next in="10s" focus="…"/>` | 排定下一次自主思考的时刻，`focus` 是写给自己的注意力备忘 |
+| `<continue/>` | 立刻接着说下一帧（讲故事、长解释时的链式续写） |
+| `<silent/>` | 本轮只在心里想：文字进入记录但不朗读、不显示 |
+| `<look/>` / `<unlook/>` | 睁眼 / 闭眼，开关屏幕视觉（见上节） |
+
+配套机制：连续多轮无用户回应会强制等待用户开口（`m_MaxConsecutiveAITurns`，默认 8，防独白循环）；环境突发声响可把下一次思考拉前（`m_BringForwardOnSpike`），模拟"被动静拽回注意力"；感知帧还会回显她最近几条发言，提醒她避免重复车轱辘话。相关提示词约定见 `Assets/AIChatTookit/Prompts/behavior.txt`。
+
 ## 部署 GPT-SoVITS 声音克隆 TTS（可选）
 
 项目约定 GPT-SoVITS 服务端放在**项目根目录的 `GPT-SoVITS/` 文件夹**，一键启动：
@@ -115,6 +154,15 @@
    - `m_PostURL`：默认 `http://127.0.0.1:9880/tts`，服务端不在本机时改成对应地址
 5. 在 `ChatSample` 组件 Inspector 的 `Chat Settings` 里把 `m_TextToSpeech` 指向该 `GPTSoVITSFASTAPI` 组件即可。组件带 `WarmUp()` 预热：启动会话时自动发一条极短合成请求，把模型加载进显存，消除首次合成 2–4 秒的冷启动延迟。
 
+## 常见问题
+
+- **GPT-SoVITS 启动后 `tts_infer.yaml` 被改动了**：api_v2 加载权重时会自动规范化该文件（归一 `version` 字段、补全各版本默认段），属正常行为，音色配置不受影响，无需改回。
+- **没有 NVIDIA 显卡 / CUDA 报错**：SenseVoice 改用 `python sensevoice_server.py --device cpu`；GPT-SoVITS 把 `GPT-SoVITS/GPT_SoVITS/configs/tts_infer.yaml` 中 `custom` 段的 `device` 改为 `cpu`、`is_half` 改为 `false`（CPU 模式合成速度明显变慢）。
+- **她听不到我说话**：确认 SenseVoice 服务窗口在监听 `9881`；检查 Windows 设置 → 隐私 → 麦克风已允许桌面应用访问；再看 Unity Console 是否有 ASR 请求报错。
+- **有回复文字但没有声音**：确认 GPT-SoVITS 服务窗口在监听 `9880`；注意 `m_ReferWavPath` 按**服务端工作目录**的相对路径解析，移动过参考音频需两侧同步改。
+- **端口被占用**：三个本地服务的端口都可改（启动脚本参数 / Unity 组件里的 URL 字段），改完保持两侧一致。
+- **首次对话前几秒没反应**：模型冷启动所致。GPT-SoVITS 已内置 WarmUp 预热，SenseVoice 启动时也会自动预热，一般只影响服务刚启动后的第一句。
+
 ## 项目结构
 
 ```
@@ -140,14 +188,15 @@ GPT-SoVITS/           本地声音克隆 TTS 服务端（约 12GB，未入库，
 
 ## 致谢 / 第三方
 
-- [AIChatToolkit](https://github.com/zhangliwei7758/unity-AI-Chat-Toolkit) — Unity AI 对话框架，本项目在其基础上扩展
-- [UniVRM / UniGLTF](https://github.com/vrm-c/UniVRM) v0.129.1 — VRM Consortium
-- Oculus OVRLipSync — 口型同步
-- [SenseVoice / FunASR](https://github.com/FunAudioLLM/SenseVoice) — 阿里巴巴语音识别模型
-- [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) — 声音克隆 TTS
+- [AIChatToolkit](https://github.com/zhangliwei7758/unity-AI-Chat-Toolkit)（MIT，作者 zhangliwei7758）— Unity AI 对话框架，本项目在其基础上做了大量扩展（Agent Loop、屏幕视觉、记忆网络、SenseVoice/GPT-SoVITS 接入等）
+- [UniVRM / UniGLTF](https://github.com/vrm-c/UniVRM) v0.129.1（MIT）— VRM Consortium，VRM 1.0 运行时
+- Oculus OVRLipSync — 口型同步（Oculus SDK 许可）
+- [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) / [FunASR](https://github.com/modelscope/FunASR) — 阿里通义实验室语音识别模型与推理框架
+- [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)（MIT）— 少样本声音克隆 TTS
 
 ## 注意事项
 
 - 所有 API 密钥均不包含在仓库中，需自行申请并在 Inspector 中填写。
-- `Library/`、`Logs/`、`UserSettings/` 等 Unity 生成目录已被 `.gitignore` 排除，克隆后首次打开 Unity 会自动重新生成。
+- `Library/`、`Logs/`、`UserSettings/` 等 Unity 生成目录已被 `.gitignore` 排除，克隆后首次打开 Unity 会自动重新生成；`GPT-SoVITS/` 同样未入库（约 12GB）。
+- 本仓库未附带整体开源许可证；所引用的第三方组件遵循各自的原始许可证。
 - 角色与相关设定仅用于学习交流。
