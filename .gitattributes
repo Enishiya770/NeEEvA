@@ -1,0 +1,34 @@
+# Auto-normalize text file line endings
+* text=auto
+
+# Unity text assets (serialized as YAML)
+*.cs text diff=csharp
+*.meta text
+*.unity text
+*.prefab text
+*.asset text
+*.mat text
+*.anim text
+*.controller text
+*.shader text
+*.json text
+*.md text
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.psd binary
+*.tga binary
+*.tif binary
+*.fbx binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.mp4 binary
+*.ttf binary
+*.otf binary
+*.dll binary
+*.vrm binary
+*.bytes binary
+*.unitypackage binary
