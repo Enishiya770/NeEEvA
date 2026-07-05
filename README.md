@@ -17,10 +17,10 @@
 ## 环境要求
 
 - Unity **2022.3.22f1**
-- 可选的本地服务：
-  - 本地语音识别：Python 3.10+，见 `Server/SenseVoice`（FunASR SenseVoiceSmall，支持 CUDA / CPU）
-  - 本地声音克隆 TTS：GPT-SoVITS（默认 `127.0.0.1:9880`）
-  - 本地 LLM：llama-server / Ollama（默认 `127.0.0.1:8080`）
+- 可选的本地服务（按需启用）：
+  - **本地语音识别 SenseVoice**：✅ 服务端已包含在仓库中（`Server/SenseVoice`），Python 3.10+，`pip install` 后开箱即用，模型权重首次启动自动下载
+  - **本地声音克隆 TTS GPT-SoVITS**：⚠️ 仓库只包含 Unity 调用端，服务端程序与音色模型需自行部署（见下文「部署 GPT-SoVITS」），默认 `127.0.0.1:9880`
+  - **本地 LLM**：llama-server / Ollama（默认 `127.0.0.1:8080`），模型需自行下载
 
 ## 快速开始
 
@@ -29,7 +29,7 @@
 3. 在场景内对应组件的 Inspector 中填入自己的 API Key（**仓库不包含任何密钥**）：
    - LLM：`ChatQW`（主推，见下节）/ `ChatDeepSeek` 等组件的 `api_key`
    - Qwen-Omni：`QwenOmni` 组件的 `api_key`（阿里云百炼 DashScope）
-4. （可选）启动本地语音识别服务：
+4. （可选）启动本地语音识别服务（服务端代码已在仓库中，SenseVoiceSmall 模型权重首次启动时会自动从 ModelScope 下载）：
 
    ```bash
    cd Server/SenseVoice
@@ -38,7 +38,8 @@
    python sensevoice_server.py --device cpu # CPU 模式
    ```
 
-5. 运行场景，开始对话。
+5. （可选）部署 GPT-SoVITS 声音克隆 TTS（服务端不在仓库中，见下文「部署 GPT-SoVITS」）。
+6. 运行场景，开始对话。
 
 ## 启用 Qwen3.6 与实时视觉（屏幕感知）
 
@@ -46,7 +47,7 @@
 
 ### 1. 选择 Qwen 作为对话模型
 
-在 `chatSample.unity` 中找到挂有 `ChatSetting` 的对象，把 `m_ChatModel` 指向场景里的 `ChatQW` 组件。
+在 `chatSample.unity` 中选中挂有 `ChatSample` 的对象，在 Inspector 的 `Chat Settings` 里把 `m_ChatModel` 指向场景中的 `ChatQW` 组件。
 
 ### 2. 配置 ChatQW 后端（二选一）
 
@@ -85,6 +86,26 @@
 4. 她认为不需要再看时会输出 `<unlook/>` 闭眼，停止图像输入以节省视觉 token
 
 限制：仅支持 Windows 平台（GDI P/Invoke 截屏）；只能看到屏幕，没有摄像头通道（单次的摄像头/截图问答请用 `QwenOmni` 模块）。
+
+## 部署 GPT-SoVITS 声音克隆 TTS（可选）
+
+仓库中只包含 Unity 侧的调用脚本（`GPTSoVITSFASTAPI.cs` / `GPTSoVITSTextToSpeech.cs`），**GPT-SoVITS 服务端程序、底模和音色模型均需自行准备**：
+
+1. 下载并安装 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)（源码或官方整合包均可），准备好自己训练/下载的 GPT 与 SoVITS 音色权重。
+2. 以 **api_v2** 模式启动推理服务（Unity 端对接的是 `/tts` 接口）：
+
+   ```bash
+   python api_v2.py -a 127.0.0.1 -p 9880 -c GPT_SoVITS/configs/tts_infer.yaml
+   ```
+
+   在 `tts_infer.yaml`（或启动后通过 `/set_gpt_weights`、`/set_sovits_weights` 接口）指定要加载的音色权重。
+3. 准备一段 3–10 秒的参考音频，放在 **GPT-SoVITS 项目目录**下（`ref_audio_path` 按服务端的相对路径解析）。
+4. 在 Unity 场景中选中挂有 `GPTSoVITSFASTAPI` 的对象，在 Inspector 中配置：
+   - `m_ReferWavPath`：参考音频相对 GPT-SoVITS 项目目录的路径（如 `refs/neeeva_ref.wav`）
+   - `m_ReferenceText`：参考音频的文字内容
+   - `m_ReferenceTextLan` / `m_TargetTextLan`：参考音频语言 / 合成目标语言（中文 / 英文 / 日文）
+   - `m_PostURL`：默认 `http://127.0.0.1:9880/tts`，服务端不在本机时改成对应地址
+5. 在 `ChatSample` 组件 Inspector 的 `Chat Settings` 里把 `m_TextToSpeech` 指向该 `GPTSoVITSFASTAPI` 组件即可。组件带 `WarmUp()` 预热：启动会话时自动发一条极短合成请求，把模型加载进显存，消除首次合成 2–4 秒的冷启动延迟。
 
 ## 项目结构
 
