@@ -70,6 +70,10 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
 # ===== Project local =====
+# Bundled GPT-SoVITS runtime + models (~12GB, far beyond GitHub limits).
+# Keep the start script tracked so cloners see how the server is launched.
+/GPT-SoVITS/*
+!/GPT-SoVITS/start_tts_server.bat
 # Claude Code local session config
 .claude/
 # Local API key backup (removed from scenes before publishing)

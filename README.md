@@ -19,7 +19,7 @@
 - Unity **2022.3.22f1**
 - 可选的本地服务（按需启用）：
   - **本地语音识别 SenseVoice**：✅ 服务端已包含在仓库中（`Server/SenseVoice`），Python 3.10+，`pip install` 后开箱即用，模型权重首次启动自动下载
-  - **本地声音克隆 TTS GPT-SoVITS**：⚠️ 仓库只包含 Unity 调用端，服务端程序与音色模型需自行部署（见下文「部署 GPT-SoVITS」），默认 `127.0.0.1:9880`
+  - **本地声音克隆 TTS GPT-SoVITS**：⚠️ git 仓库只包含 Unity 调用端与启动脚本；完整服务端（含便携 runtime 与 Antoneva 音色）约定放在项目根目录 `GPT-SoVITS/`，双击 `start_tts_server.bat` 启动（默认 `127.0.0.1:9880`），克隆用户需自行部署（见下文「部署 GPT-SoVITS」）
   - **本地 LLM**：llama-server / Ollama（默认 `127.0.0.1:8080`），模型需自行下载
 
 ## 快速开始
@@ -38,7 +38,7 @@
    python sensevoice_server.py --device cpu # CPU 模式
    ```
 
-5. （可选）部署 GPT-SoVITS 声音克隆 TTS（服务端不在仓库中，见下文「部署 GPT-SoVITS」）。
+5. （可选）启动 GPT-SoVITS 声音克隆 TTS：双击 `GPT-SoVITS\start_tts_server.bat`（该文件夹在本机开发环境中已内置完整服务端与 Antoneva 音色；克隆用户需先按下文「部署 GPT-SoVITS」自行部署）。
 6. 运行场景，开始对话。
 
 ## 启用 Qwen3.6 与实时视觉（屏幕感知）
@@ -89,7 +89,15 @@
 
 ## 部署 GPT-SoVITS 声音克隆 TTS（可选）
 
-仓库中只包含 Unity 侧的调用脚本（`GPTSoVITSFASTAPI.cs` / `GPTSoVITSTextToSpeech.cs`），**GPT-SoVITS 服务端程序、底模和音色模型均需自行准备**：
+项目约定 GPT-SoVITS 服务端放在**项目根目录的 `GPT-SoVITS/` 文件夹**，一键启动：
+
+```
+双击 GPT-SoVITS\start_tts_server.bat    # 监听 127.0.0.1:9880，加载 Antoneva 音色
+```
+
+该文件夹包含便携 Python runtime、v2Pro 底模、Antoneva 音色权重（`GPT_weights_v2Pro/Antoneva-e15.ckpt` + `SoVITS_weights_v2Pro/Antoneva_e8_s96.pth`，已在 `GPT_SoVITS/configs/tts_infer.yaml` 的 `custom` 段配好）和参考音频 `sourceVoice/antoneva.wav`——Unity 场景中 `GPTSoVITSFASTAPI` 组件的参考音频路径、参考文本与语言均已按此预配置，启动服务即可直接对话。
+
+⚠️ 由于体积约 12GB，`GPT-SoVITS/` 未纳入 git 仓库（仅启动脚本入库）。克隆本仓库的用户需按下述步骤自行部署到同名文件夹：
 
 1. 下载并安装 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)（源码或官方整合包均可），准备好自己训练/下载的 GPT 与 SoVITS 音色权重。
 2. 以 **api_v2** 模式启动推理服务（Unity 端对接的是 `/tts` 接口）：
@@ -99,11 +107,11 @@
    ```
 
    在 `tts_infer.yaml`（或启动后通过 `/set_gpt_weights`、`/set_sovits_weights` 接口）指定要加载的音色权重。
-3. 准备一段 3–10 秒的参考音频，放在 **GPT-SoVITS 项目目录**下（`ref_audio_path` 按服务端的相对路径解析）。
-4. 在 Unity 场景中选中挂有 `GPTSoVITSFASTAPI` 的对象，在 Inspector 中配置：
-   - `m_ReferWavPath`：参考音频相对 GPT-SoVITS 项目目录的路径（如 `refs/neeeva_ref.wav`）
-   - `m_ReferenceText`：参考音频的文字内容
-   - `m_ReferenceTextLan` / `m_TargetTextLan`：参考音频语言 / 合成目标语言（中文 / 英文 / 日文）
+3. 准备一段 3–10 秒的参考音频，放在 **GPT-SoVITS 项目目录**下（`ref_audio_path` 按服务端工作目录的相对路径解析）。场景当前预配置的路径是 `sourceVoice/antoneva.wav`，按此放置可免改 Unity 侧配置。
+4. 如需换音色/参考音频，在 Unity 场景中选中挂有 `GPTSoVITSFASTAPI` 的对象，在 Inspector 中调整（场景已按 Antoneva 预填好）：
+   - `m_ReferWavPath`：参考音频相对 GPT-SoVITS 项目目录的路径（当前为 `sourceVoice\antoneva.wav`）
+   - `m_ReferenceText`：参考音频的文字内容（须与音频实际语音一致）
+   - `m_ReferenceTextLan` / `m_TargetTextLan`：参考音频语言 / 合成目标语言（当前均为日文）
    - `m_PostURL`：默认 `http://127.0.0.1:9880/tts`，服务端不在本机时改成对应地址
 5. 在 `ChatSample` 组件 Inspector 的 `Chat Settings` 里把 `m_TextToSpeech` 指向该 `GPTSoVITSFASTAPI` 组件即可。组件带 `WarmUp()` 预热：启动会话时自动发一条极短合成请求，把模型加载进显存，消除首次合成 2–4 秒的冷启动延迟。
 
@@ -127,6 +135,7 @@ Assets/
   VRM10/ UniGLTF/     UniVRM 0.129.1（VRM 1.0 运行时，内嵌源码）
 Server/
   SenseVoice/         本地语音识别服务（FastAPI + FunASR）
+GPT-SoVITS/           本地声音克隆 TTS 服务端（约 12GB，未入库，仅 start_tts_server.bat 在仓库中）
 ```
 
 ## 致谢 / 第三方
