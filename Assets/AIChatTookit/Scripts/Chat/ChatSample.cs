@@ -753,6 +753,9 @@ public class ChatSample : MonoBehaviour
                     m_RecentAIUtterances.Enqueue(new KeyValuePair<float, string>(nowT, display));
                     int cap = Mathf.Max(1, m_RecentAIUtterancesShown);
                     while (m_RecentAIUtterances.Count > cap) m_RecentAIUtterances.Dequeue();
+                    //她自己说出的(或心里想到的)记忆名字也算"想起"——触发提及激活
+                    if (m_MemoryHub != null && m_EnableMemoryRecall)
+                        m_MemoryHub.NotifyAIUtterance(trimmed);
                 }
                 else if (m_RoundSilent)
                 {
@@ -1480,6 +1483,9 @@ public class ChatSample : MonoBehaviour
     {
         m_LastUserTurnTime = Time.realtimeSinceStartup;
         m_LastUserMsg = userText ?? "";
+        //情境召回:提及扫描同步生效(本帧可见),语境嵌入异步、作用于后续帧
+        if (m_MemoryHub != null && m_EnableMemoryRecall)
+            m_MemoryHub.NotifyUserUtterance(m_LastUserMsg);
         m_AgentRoundInFlight = m_AgentRunning;
         m_AgentCurrentRoundIsTick = false;
         ClearRoundParsed();

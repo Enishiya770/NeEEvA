@@ -10,6 +10,7 @@
 - **实时屏幕视觉**：主推的 qwen3.6 多模态模型可以"看"用户的电脑屏幕——角色自主输出 `<look/>` 睁眼后，每一帧感知都附最新桌面截图，能实时感知画面变化，`<unlook/>` 闭眼（详见下文「启用 Qwen3.6 与实时视觉」）
 - **Agent Loop 自主行为**：角色不是被动应答机——她通过 `<next/>` 标签自主排定下一次"思考"时刻，可以主动搭话、安静等待，或被环境声响拉回注意力（详见「Agent Loop」一节）
 - **图谱式长期记忆（可读写）**：带权重的记忆节点 + 语义边构成知识网络（`seed_memory.json` 含 21 个种子节点），运行时持久化到 `Application.persistentDataPath/memory.json`，每帧按"权重 × 新近度"把 Top-30（可调）节点注入感知帧；角色可通过 `<memory_add/>` / `<memory_update/>` 标签自主写入新记忆，权重随时间半衰期衰减（默认 180 天减半，有下限保护）；Editor 菜单 `NeEEvA > Memory Graph` 提供记忆网络的力导向图查看与编辑（Play 模式可直连运行实例实时观察写入）
+- **情境记忆召回（"既视感"）**：当前对话与某段旧记忆语义相似时，即使它排不进核心 Top-30，也会作为「此刻被唤起的记忆」浮进感知帧——由语义嵌入检索 + 沿记忆网络边的扩散激活双机制驱动（详见「情境记忆召回」一节）
 - **多 LLM 后端可插拔**：DeepSeek、通义千问（DashScope 云端 / llama-server、Ollama 本地双后端）、OpenAI、智谱 ChatGLM、讯飞星火、RWKV
 - **多语音服务可选**：本地 SenseVoice ASR、GPT-SoVITS 声音克隆 TTS，以及 OpenAI / Azure / 讯飞 云端 TTS & STT
 - **Qwen-Omni 多模态**：文本 + 语音 + 摄像头 / 截图输入，流式文本与音频输出（`qwen-omni-turbo`）
@@ -153,6 +154,30 @@ llama-server.exe -m qwen36.gguf --mmproj mmproj-Q8_0.gguf --host 127.0.0.1 --por
 | `<memory_update name="…" desc="…" weight="…"/>` | 修正/强化已有记忆，并刷新其激活时间 |
 
 配套机制：连续多轮无用户回应会强制等待用户开口（`m_MaxConsecutiveAITurns`，默认 8，防独白循环）；环境突发声响可把下一次思考拉前（`m_BringForwardOnSpike`），模拟"被动静拽回注意力"；感知帧还会回显她最近几条发言，提醒她避免重复车轱辘话。相关提示词约定见 `Assets/AIChatTookit/Prompts/behavior.txt`。
+
+## 情境记忆召回（"既视感"）
+
+核心记忆 Top-30 之外的旧记忆平时是"休眠"的——感知帧的排序公式（权重 × 新近度）里没有任何一项和"当前在聊什么"有关，节点一多，久远的事就永远进不了她的视野。情境召回补上了这条"内容寻址"通路：当下的对话与某段旧记忆相似时，它会作为**「此刻被唤起的记忆」**（独立于核心列表的第二通道，默认最多 6 条）浮进感知帧，她会像人突然想起往事一样自然地接住它。
+
+三个召回信号源，按可用性分层：
+
+| 信号源 | 机制 | 时效 |
+|---|---|---|
+| 语义嵌入检索 | 用户发言 → 向量 → 对全库余弦相似度 Top-K（`EmbeddingClient`，需嵌入服务） | 异步，作用于紧随的续写/tick 帧（"说着说着想起来"） |
+| 名字提及扫描 | 任一方发言中出现节点名 → 立即激活并刷新记忆时间 | 同步，当帧生效 |
+| 扩散激活 | 被唤起/提及/写入的节点沿**有向边**把能量传给邻居（顺边全额、逆边打折、两跳衰减），激活值按半衰期（默认 3 分钟）自然消退 | 同步，"相关但不相似"的记忆也能被带热 |
+
+### 启用语义嵌入（可选但推荐）
+
+1. 部署一个 OpenAI 兼容的嵌入服务，二选一：
+   - **本地**：再开一个 llama-server 实例加载嵌入模型（如 [bge-m3 GGUF](https://huggingface.co/gpustack/bge-m3-GGUF)，仅几百 MB）：
+     ```bash
+     llama-server -m bge-m3-Q8_0.gguf --embeddings --port 8090
+     ```
+   - **云端**：阿里云百炼 `https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings`（模型如 `text-embedding-v4`，需 api_key）
+2. 在场景中 `MemoryHub` 所在的 GameObject 上 **Add Component → EmbeddingClient**，按需改地址/模型名（默认指向 `127.0.0.1:8090`）。
+
+不配嵌入服务也能用：语义检索自动停用，提及扫描和扩散激活照常工作。节点向量带磁盘缓存（`memory_embeddings.json`，与 memory.json 同目录），只有新增/被改写的节点会重新嵌入；换嵌入模型或服务地址时缓存整体自动失效重建。
 
 ## 部署 GPT-SoVITS 声音克隆 TTS（可选）
 

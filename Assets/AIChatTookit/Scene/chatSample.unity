@@ -234,6 +234,24 @@ MonoBehaviour:
   m_ForceReseedOnStart: 0
   m_MemoryMapTopN: 30
   m_LogMemoryMap: 1
+  m_EnableLLMWrite: 1
+  m_MaxNodes: 400
+  m_DefaultAddWeight: 0.6
+  m_LogMemoryWrites: 1
+  m_EnableDecay: 1
+  m_DecayHalfLifeDays: 180
+  m_DecayFloor: 0.15
+  m_EnableSemanticRecall: 1
+  m_Embedding: {fileID: 0}
+  m_RecallTopK: 6
+  m_RecallThreshold: 0.45
+  m_QueryMaxAgeSec: 300
+  m_LogRecall: 0
+  m_EnableActivation: 1
+  m_HopDecay: 0.6
+  m_ReverseFactor: 0.5
+  m_ActivationHalfLifeSec: 180
+  m_ActivationWeight: 0.35
 --- !u!4 &63693727
 Transform:
   m_ObjectHideFlags: 0
@@ -2183,7 +2201,7 @@ MonoBehaviour:
   m_HistoryKeepCount: 15
   m_DataList: []
   m_PromptFiles: []
-  api_key:
+  api_key: 
   m_SystemSetting: 
   m_ModelName: deepseek-chat
 --- !u!1 &664325342
@@ -2882,7 +2900,7 @@ MonoBehaviour:
   m_LocalModelName: antoneva
   m_SystemSetting: 
   m_ChatModelName: qwen3.6-35b-a3b
-  api_key:
+  api_key: 
   m_EnableThinking: 0
   m_KeepRecentImages: 2
 --- !u!1 &785927902
@@ -4789,10 +4807,10 @@ RectTransform:
   - {fileID: 1684937518}
   m_Father: {fileID: 1675399393}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 593.75, y: -22.5}
-  m_SizeDelta: {x: 1167.5, y: 45}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 593.75, y: 0}
+  m_SizeDelta: {x: 1167.5, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1423120622
 MonoBehaviour:
@@ -5722,10 +5740,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1423120621}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 583.75, y: -22.5}
-  m_SizeDelta: {x: 1157.5, y: 35}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1684937519
 CanvasRenderer:
