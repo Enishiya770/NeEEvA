@@ -194,7 +194,13 @@ public class ChatSample : MonoBehaviour
     /// <param name="_response"></param>
     private void CallBack(string _response)
     {
-        _response = _response.Trim();
+        _response = (_response ?? "").Trim();
+        //非流式路径同样处理标签:记忆标签提取应用,其余标签剥净——
+        //system prompt 无条件教标签,任何模式下模型都可能输出,漏剥会被念出来
+        string afterMem;
+        var memOps = MemoryTagParser.Extract(_response, out afterMem);
+        if (memOps != null && m_MemoryHub != null) m_MemoryHub.ApplyMemoryOps(memOps);
+        _response = StripAgentTagsForTTS(afterMem);
         m_TextBack.text = "";
 
         
@@ -685,23 +691,27 @@ public class ChatSample : MonoBehaviour
     /// </summary>
     private void OnStreamComplete(string full)
     {
-        string cleanFull = full ?? "";
+        //记忆写入标签的提取与应用不看 agent 开关——直接对话模式她也在记忆。
+        //只在全文完成时做一次(chunk 级会重复计),剥净后再做后续解析。
+        string afterMemTags;
+        var memOps = MemoryTagParser.Extract(full ?? "", out afterMemTags);
+        if (memOps != null && m_MemoryHub != null) m_MemoryHub.ApplyMemoryOps(memOps);
+
+        //非 agent 模式没有调度语义,但 system prompt 无条件教了标签——
+        //模型照样会输出,必须同样剥掉,否则进历史/字幕(此前这里漏了,标签被念出来)
+        string cleanFull = m_AgentRunning ? afterMemTags : StripAgentTagsForTTS(afterMemTags);
 
         //解析 agent 标签 — 从全文里抽出来 next/continue/silent/look，存到 m_Round*
         if (m_AgentRunning)
         {
-            //记忆写入标签先行提取并应用——只在全文完成时做一次(chunk 级会重复计),
-            //剥净后再交给 ParseAgentTags,保证 cleanFull 不残留记忆标签
-            string afterMemTags;
-            var memOps = MemoryTagParser.Extract(full ?? "", out afterMemTags);
-            if (memOps != null && m_MemoryHub != null) m_MemoryHub.ApplyMemoryOps(memOps);
-
             float? nextInSec;
             string focus;
             bool wantsContinue;
             bool wantsSilent;
             bool? wantsLook;
-            ParseAgentTags(afterMemTags, out cleanFull, out nextInSec, out focus, out wantsContinue, out wantsSilent, out wantsLook);
+            ParseAgentTags(cleanFull, out cleanFull, out nextInSec, out focus, out wantsContinue, out wantsSilent, out wantsLook);
+            //兜底:引号异形/格式畸变导致 ParseAgentTags 没认出的标签,别让它进历史和感知帧
+            cleanFull = StripAgentTagsForTTS(cleanFull);
             m_RoundNextInSec = nextInSec;
             m_RoundFocus = focus;
             m_RoundContinue = wantsContinue;
@@ -903,7 +913,8 @@ public class ChatSample : MonoBehaviour
             m_SentenceBuffer.Append(remaining);
             //过滤 agent 标签——LLM 把 <continue/> 单写一行时，"<continue/>\n" 会被
             //\n strong boundary 切出当成"一句"推进队列，TTS 就读出来了。这里兜底。
-            if (m_AgentRunning) completed = StripAgentTagsForTTS(completed);
+            //不看 agent 开关:system prompt 无条件教标签,直接对话模式模型也会输出。
+            completed = StripAgentTagsForTTS(completed);
             //过滤纯标点段(LLM偶尔会单独吐"…"或"。。。")，避免TTS 400
             if (!string.IsNullOrEmpty(completed) && !IsPurePunctuation(completed))
             {
@@ -920,7 +931,7 @@ public class ChatSample : MonoBehaviour
         {
             string tail = m_SentenceBuffer.ToString().Trim();
             m_SentenceBuffer.Length = 0;
-            if (m_AgentRunning) tail = StripAgentTagsForTTS(tail);
+            tail = StripAgentTagsForTTS(tail);
             if (!string.IsNullOrEmpty(tail) && !IsPurePunctuation(tail))
             {
                 m_PendingChunks.Enqueue(tail);
@@ -1718,18 +1729,18 @@ public class ChatSample : MonoBehaviour
         }
     }
 
+    //一条正则覆盖全部七个标签(+noop):属性用 [^>]* 而不是精确引号匹配——
+    //本地模型偶尔输出全角引号(＂/“)甚至漏掉自闭合斜杠,这里都要兜住,
+    //否则漏网的标签会被 TTS 念出来、显示在字幕上。
+    private static readonly System.Text.RegularExpressions.Regex s_AllAgentTagsRegex =
+        new System.Text.RegularExpressions.Regex(
+            @"<(?:next|continue|silent|noop|look|unlook|memory_add|memory_update)\b[^>]*>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
     private string StripAgentTagsForTTS(string text)
     {
         if (string.IsNullOrEmpty(text)) return text;
-        var ic = System.Text.RegularExpressions.RegexOptions.IgnoreCase;
-        text = System.Text.RegularExpressions.Regex.Replace(text, @"<next(?:\s+[^/>]*)?\s*/>", "", ic);
-        text = System.Text.RegularExpressions.Regex.Replace(text, @"<continue\s*/>", "", ic);
-        text = System.Text.RegularExpressions.Regex.Replace(text, @"<silent\s*/>", "", ic);
-        text = System.Text.RegularExpressions.Regex.Replace(text, @"<noop\s*/>", "", ic);
-        text = System.Text.RegularExpressions.Regex.Replace(text, @"<look\s*/>", "", ic);
-        text = System.Text.RegularExpressions.Regex.Replace(text, @"<unlook\s*/>", "", ic);
-        text = MemoryTagParser.Strip(text);
-        return text.Trim();
+        return s_AllAgentTagsRegex.Replace(text, "").Trim();
     }
 
     /// <summary>

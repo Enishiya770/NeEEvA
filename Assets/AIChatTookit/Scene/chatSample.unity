@@ -253,23 +253,7 @@ MonoBehaviour:
   m_ReverseFactor: 0.5
   m_ActivationHalfLifeSec: 180
   m_ActivationWeight: 0.35
---- !u!114 &63693728
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 63693725}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 17a42d74c97d9ba4cba13846d34a8d62, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  m_Url: http://127.0.0.1:8090/v1/embeddings
-  m_Model: bge-m3
-  m_ApiKey:
-  m_TimeoutSec: 10
-  m_LogRequests: 0
+  m_ActivationOnlyThreshold: 0.5
 --- !u!4 &63693727
 Transform:
   m_ObjectHideFlags: 0
@@ -285,6 +269,23 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &63693728
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 63693725}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 17a42d74c97d9ba4cba13846d34a8d62, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Url: http://127.0.0.1:8090/v1/embeddings
+  m_Model: bge-m3
+  m_ApiKey: 
+  m_TimeoutSec: 10
+  m_LogRequests: 0
 --- !u!1 &69301206
 GameObject:
   m_ObjectHideFlags: 0
@@ -2913,12 +2914,12 @@ MonoBehaviour:
   - {fileID: 4900000, guid: f88e7ad97dbd08049b97a017e7faeffd, type: 3}
   - {fileID: 4900000, guid: e7e8645f8194c8d4b9ea44884a4cb609, type: 3}
   - {fileID: 4900000, guid: 0c78d1db2ef151f4c8c147d9ada5082a, type: 3}
-  m_Backend: 1
+  m_Backend: 0
   m_LocalUrl: http://127.0.0.1:8080/v1/chat/completions
   m_LocalModelName: antoneva
   m_SystemSetting: 
-  m_ChatModelName: qwen3.6-35b-a3b
-  api_key: 
+  m_ChatModelName: qwen3.7-max
+  api_key: sk-46bd4ee60b3d48b0a526eeae8826b58a
   m_EnableThinking: 0
   m_KeepRecentImages: 2
 --- !u!1 &785927902
@@ -4827,8 +4828,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 593.75, y: 0}
-  m_SizeDelta: {x: 1167.5, y: 0}
+  m_AnchoredPosition: {x: 547, y: 0}
+  m_SizeDelta: {x: 1074, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1423120622
 MonoBehaviour:
