@@ -9,6 +9,9 @@ public class ChatQW : LLM
 {
     public enum BackendType { Cloud, Local }
 
+    private UnityWebRequest m_ActiveStreamRequest;
+    private int m_StreamRequestGeneration = 0;
+
     [Header("后端选择: Cloud=阿里云百炼API / Local=本机llama-server")]
     public BackendType m_Backend = BackendType.Cloud;
 
@@ -195,6 +198,22 @@ public class ChatQW : LLM
     [Tooltip("视觉 token 很贵，全保留会爆上下文。默认 2 让最近一两帧能精读，更早的留文字记忆")]
     public int m_KeepRecentImages = 2;
 
+    [Header("低延迟模式：请求中最多保留的非system历史消息数")]
+    [Tooltip("包含即将加入的本轮user和assistant。8约等于最近3轮完整对话+当前轮，能明显限制prefill耗时")]
+    [Range(4, 20)] public int m_LowLatencyHistoryLimit = 8;
+
+    [Header("Debug：打印LLM请求大小/消息数（不打印正文和密钥）")]
+    public bool m_LogRequestStats = true;
+
+    [Header("流式倾听临时草稿")]
+    [Tooltip("临时请求的最大输出 token。它不进入历史，并会在 EOU 时被撤销。")]
+    [Range(48, 256)] public int m_EphemeralMaxTokens = 128;
+    [Tooltip("临时请求最多携带多少条最近的非 system 消息。")]
+    [Range(0, 8)] public int m_EphemeralHistoryMessages = 4;
+
+    private UnityWebRequest m_EphemeralRequest;
+    private int m_EphemeralGeneration = 0;
+
     private void Start()
     {
         //运行时，添加AI设定
@@ -216,6 +235,7 @@ public class ChatQW : LLM
     /// <returns></returns>
     public override void PostMsg(string _msg, Action<string> _callback)
     {
+        CancelEphemeralMsg();
         base.PostMsg(_msg, _callback);
     }
 
@@ -274,6 +294,11 @@ public class ChatQW : LLM
     /// </summary>
     public override void PostMsgStream(string _msg, Action<string> _onDelta, Action<string> _onComplete, string imageDataUrl = null)
     {
+        CancelEphemeralMsg();
+        //同一时刻只允许一个正式回复。旧 user 消息保留在上下文中，作为用户继续补充
+        //的前半句；旧请求的 assistant 回调则必须彻底失效，避免回答乱序。
+        CancelActiveResponse();
+        int generation = m_StreamRequestGeneration;
         CheckHistory();
         string message;
         if (HasPromptFiles)
@@ -292,20 +317,154 @@ public class ChatQW : LLM
         var entry = new SendData("user", message);
         entry.imageDataUrl = imageDataUrl;
         m_DataList.Add(entry);
-        StartCoroutine(RequestStream(message, _onDelta, _onComplete));
+        StartCoroutine(RequestStream(message, generation, _onDelta, _onComplete));
     }
 
-    private IEnumerator RequestStream(string _postWord, Action<string> _onDelta, Action<string> _onComplete)
+    public override void CancelActiveResponse()
+    {
+        m_StreamRequestGeneration++;
+        if (m_ActiveStreamRequest != null)
+        {
+            try
+            {
+                if (!m_ActiveStreamRequest.isDone) m_ActiveStreamRequest.Abort();
+            }
+            catch (Exception) { }
+            m_ActiveStreamRequest = null;
+        }
+    }
+
+    /// <summary>
+    /// 用当前角色 system prompt 和少量最近对话生成可撤销草稿；不调用 CheckHistory、
+    /// 不向 m_DataList 添加 user/assistant，因此猜错的 partial 永远不会成为角色记忆。
+    /// </summary>
+    public override void PostEphemeralMsg(string prompt, Action<string> callback)
+    {
+        CancelEphemeralMsg();
+        int generation = m_EphemeralGeneration;
+        StartCoroutine(RequestEphemeral(prompt ?? "", generation, callback));
+    }
+
+    public override void CancelEphemeralMsg()
+    {
+        m_EphemeralGeneration++;
+        if (m_EphemeralRequest != null)
+        {
+            try { m_EphemeralRequest.Abort(); }
+            catch (Exception) { }
+            m_EphemeralRequest = null;
+        }
+    }
+
+    private IEnumerator RequestEphemeral(string prompt, int generation, Action<string> callback)
+    {
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            m_EphemeralRequest = request;
+            string json = BuildEphemeralRequestJson(prompt);
+            byte[] data = Encoding.UTF8.GetBytes(json);
+            request.uploadHandler = new UploadHandlerRaw(data);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader(
+                "Authorization",
+                string.Format("Bearer {0}", string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
+
+            yield return request.SendWebRequest();
+            if (generation != m_EphemeralGeneration) yield break;
+
+            string responseText = "";
+            if (request.responseCode == 200)
+            {
+                MessageBack response = JsonUtility.FromJson<MessageBack>(request.downloadHandler.text);
+                if (response != null && response.choices != null && response.choices.Count > 0 &&
+                    response.choices[0] != null && response.choices[0].message != null)
+                {
+                    responseText = response.choices[0].message.content ?? "";
+                }
+            }
+            else if (request.result != UnityWebRequest.Result.ConnectionError && m_LogRequestStats)
+            {
+                Debug.LogWarning($"[临时草稿] 请求失败 code={request.responseCode}: {request.error}");
+            }
+
+            if (generation == m_EphemeralGeneration)
+            {
+                m_EphemeralRequest = null;
+                if (callback != null) callback(responseText);
+            }
+        }
+    }
+
+    private string BuildEphemeralRequestJson(string prompt)
+    {
+        var selected = new List<SendData>();
+        for (int i = 0; i < m_DataList.Count; i++)
+        {
+            SendData item = m_DataList[i];
+            if (item != null && item.role == "system")
+                selected.Add(new SendData(item.role, item.content ?? ""));
+        }
+
+        int keep = Mathf.Max(0, m_EphemeralHistoryMessages);
+        int seen = 0;
+        int start = m_DataList.Count;
+        for (int i = m_DataList.Count - 1; i >= 0 && seen < keep; i--)
+        {
+            SendData item = m_DataList[i];
+            if (item == null || item.role == "system") continue;
+            seen++;
+            start = i;
+        }
+        for (int i = start; i < m_DataList.Count; i++)
+        {
+            SendData item = m_DataList[i];
+            if (item == null || item.role == "system") continue;
+            selected.Add(new SendData(item.role, item.content ?? ""));
+        }
+        selected.Add(new SendData("user", prompt));
+
+        var sb = new StringBuilder(2048);
+        sb.Append('{');
+        sb.Append("\"model\":");
+        AppendJsonString(sb, CurrentModelName);
+        sb.Append(",\"stream\":false,\"enable_thinking\":false");
+        sb.Append(",\"max_tokens\":").Append(Mathf.Clamp(m_EphemeralMaxTokens, 48, 256));
+        sb.Append(",\"temperature\":0.2");
+        sb.Append(",\"messages\":[");
+        for (int i = 0; i < selected.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            AppendMessage(sb, selected[i]);
+        }
+        sb.Append(']');
+        if (m_Backend == BackendType.Local)
+            sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        sb.Append('}');
+        return sb.ToString();
+    }
+
+    private IEnumerator RequestStream(
+        string _postWord,
+        int generation,
+        Action<string> _onDelta,
+        Action<string> _onComplete)
     {
         stopwatch.Restart();
 
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
+            m_ActiveStreamRequest = request;
             string _jsonText = BuildRequestJson(stream: true);
             byte[] data = System.Text.Encoding.UTF8.GetBytes(_jsonText);
+            if (m_LogRequestStats) LogRequestStats(data.Length);
             request.uploadHandler = new UploadHandlerRaw(data);
 
-            SSEDownloadHandler handler = new SSEDownloadHandler(_onDelta);
+            SSEDownloadHandler handler = new SSEDownloadHandler(delta =>
+            {
+                if (generation != m_StreamRequestGeneration) return;
+                if (_onDelta != null) _onDelta(delta);
+            });
             request.downloadHandler = handler;
 
             request.SetRequestHeader("Content-Type", "application/json");
@@ -314,6 +473,16 @@ public class ChatQW : LLM
             request.SetRequestHeader("Authorization", string.Format("Bearer {0}", string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
 
             yield return request.SendWebRequest();
+
+            //Abort 会以 code=0 返回。只要 generation 已变化，这就是用户主动接管后的
+            //正常过期请求：不报错、不写 assistant 历史，也不触发任何旧回调。
+            if (generation != m_StreamRequestGeneration)
+            {
+                if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null;
+                yield break;
+            }
+
+            if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null;
 
             if (request.responseCode == 200)
             {
@@ -335,6 +504,62 @@ public class ChatQW : LLM
             stopwatch.Stop();
             Debug.Log("Qwen流式总耗时：" + stopwatch.Elapsed.TotalSeconds);
         }
+    }
+
+    /// <summary>
+    /// base版CheckHistory每次只删一条、随后又添加user+assistant两条，历史会净增长一条。
+    /// Flash模型本身很快时，这个逐轮膨胀的prefill反而会成为首token主要成本。
+    /// 这里为本轮的user+assistant预留两个位置，并一次裁剪到低延迟上限。
+    /// </summary>
+    public override void CheckHistory()
+    {
+        int limit = Mathf.Max(4, m_LowLatencyHistoryLimit);
+        int targetBeforeRequest = Mathf.Max(2, limit - 2);
+        int nonSystemCount = 0;
+        for (int i = 0; i < m_DataList.Count; i++)
+        {
+            if (m_DataList[i] != null && m_DataList[i].role != "system") nonSystemCount++;
+        }
+
+        int removed = 0;
+        while (nonSystemCount > targetBeforeRequest)
+        {
+            int removeIndex = -1;
+            for (int i = 0; i < m_DataList.Count; i++)
+            {
+                if (m_DataList[i] != null && m_DataList[i].role != "system")
+                {
+                    removeIndex = i;
+                    break;
+                }
+            }
+            if (removeIndex < 0) break;
+            m_DataList.RemoveAt(removeIndex);
+            nonSystemCount--;
+            removed++;
+        }
+
+        if (removed > 0 && m_LogRequestStats)
+        {
+            Debug.Log($"[LLM请求] 低延迟历史裁剪: 移除{removed}条，保留{nonSystemCount}条旧消息");
+        }
+    }
+
+    private void LogRequestStats(int jsonBytes)
+    {
+        int chars = 0;
+        int images = 0;
+        int systemChars = 0;
+        for (int i = 0; i < m_DataList.Count; i++)
+        {
+            SendData message = m_DataList[i];
+            if (message == null) continue;
+            int length = string.IsNullOrEmpty(message.content) ? 0 : message.content.Length;
+            chars += length;
+            if (message.role == "system") systemChars += length;
+            if (!string.IsNullOrEmpty(message.imageDataUrl)) images++;
+        }
+        Debug.Log($"[LLM请求] model={CurrentModelName}, messages={m_DataList.Count}, chars={chars}, systemChars={systemChars}, images={images}, json={jsonBytes / 1024f:F1}KB, thinking={m_EnableThinking}");
     }
 
     /// <summary>

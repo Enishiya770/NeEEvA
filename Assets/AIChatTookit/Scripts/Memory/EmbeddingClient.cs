@@ -29,9 +29,12 @@ namespace AIChat.Memory
         [SerializeField] private string m_ApiKey = "";
         [Header("单次请求超时(秒)")]
         [SerializeField] private int m_TimeoutSec = 10;
+        [Tooltip("本地嵌入服务不可用时暂停重试，避免每个Agent轮次都额外等待连接失败。")]
+        [SerializeField] private float m_FailureCooldownSec = 30f;
         [SerializeField] private bool m_LogRequests = false;
 
         private bool m_WarnedOnce;
+        private float m_RetryAfterRealtime = -999f;
 
         /// <summary>模型标识——换模型或换服务地址时嵌入缓存整体失效。</summary>
         public string ModelId { get { return m_Model + "@" + m_Url; } }
@@ -48,6 +51,7 @@ namespace AIChat.Memory
         {
             if (texts == null || texts.Count == 0) { onDone(new List<float[]>()); return; }
             if (!isActiveAndEnabled) { onDone(null); return; }
+            if (Time.realtimeSinceStartup < m_RetryAfterRealtime) { onDone(null); return; }
             StartCoroutine(Request(texts, onDone));
         }
 
@@ -78,6 +82,7 @@ namespace AIChat.Memory
 
                 if (req.responseCode != 200)
                 {
+                    m_RetryAfterRealtime = Time.realtimeSinceStartup + Mathf.Max(1f, m_FailureCooldownSec);
                     if (!m_WarnedOnce)
                     {
                         m_WarnedOnce = true;
@@ -88,6 +93,7 @@ namespace AIChat.Memory
                     yield break;
                 }
 
+                m_RetryAfterRealtime = -999f;
                 var vecs = ParseVectors(req.downloadHandler.text, texts.Count);
                 if (m_LogRequests)
                     Debug.Log($"[Embedding] {texts.Count} 条, 耗时 {(Time.realtimeSinceStartup - t0) * 1000f:F0}ms" +
