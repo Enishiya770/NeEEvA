@@ -141,6 +141,28 @@ public class LLM:MonoBehaviour
     }
 
     /// <summary>
+    /// 临时推理：给“用户仍在说话”的可撤销草稿使用。
+    /// 实现必须保证请求和回答都不写入 m_DataList；不支持的 provider 返回空结果。
+    /// </summary>
+    public virtual void PostEphemeralMsg(string prompt, System.Action<string> callback)
+    {
+        if (callback != null) callback("");
+    }
+
+    /// <summary>用户继续说或 EOU 到达时撤销在飞的临时推理，正式回复拥有最高优先级。</summary>
+    public virtual void CancelEphemeralMsg()
+    {
+    }
+
+    /// <summary>
+    /// 撤销当前正式回复。用户重新开口或打断角色时调用。
+    /// 子类应同时停止网络请求，并保证过期回调不再写入历史或触发 TTS。
+    /// </summary>
+    public virtual void CancelActiveResponse()
+    {
+    }
+
+    /// <summary>
     /// 维护历史消息条数，避免上下文过长
     /// </summary>
     public virtual void CheckHistory()

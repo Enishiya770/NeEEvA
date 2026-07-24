@@ -74,9 +74,40 @@ crashlytics-build.properties
 # Keep the start script tracked so cloners see how the server is launched.
 /GPT-SoVITS/*
 !/GPT-SoVITS/start_tts_server.bat
+# User-created singing clips are private runtime data, never source assets.
+/Server/SenseVoice/song_library/
+/Server/SenseVoice/song_catalog.json
+/Server/RuntimeLogs/
+**/__pycache__/
+*.py[cod]
 # Claude Code local session config
 .claude/
 # Local API key backup (removed from scenes before publishing)
 LOCAL_API_KEYS.backup.txt
 # Stray empty git-init leftover folder
 /git/
+# Local Seed-VC runtime dependencies and downloaded model weights
+Server/SeedVC/python_packages/
+Server/SeedVC/vendor/
+Server/SeedVC/local_models/
+Server/SeedVC/**/__pycache__/
+Server/SeedVC/test_headers.txt
+Server/SeedVC/test_output.wav
+Server/SeedVC/last_conversion/
+Server/SeedVC/runtime/
+Server/SeedVC/quality_headers.txt
+Server/SeedVC/quality_output.wav
+Server/SeedVC/ab_*.wav
+Server/RVC/vendor/
+Server/RVC/.venv/
+Server/RVC/python_packages/
+Server/RVC/dataset/
+Server/RVC/training_output/
+Server/RVC/models/
+Server/RVC/quality_*.wav
+Server/RVC/parameter_*.wav
+Server/RVC/song_covers/
+Server/RVC/*_headers.txt
+# Local diagnostic reference generated during voice-conversion experiments.
+/Assets/Model/41041_svc_anchor.wav
+/Assets/Model/41041_svc_anchor.wav.meta
