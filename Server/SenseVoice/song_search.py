@@ -215,7 +215,9 @@ class SongSearchEngine:
             raise RuntimeError("singing analyzer unavailable")
         if not wav_bytes or len(wav_bytes) <= 44:
             raise ValueError("reference audio is empty")
-        analysis = self.analyzer.analyze(wav, lyrics=lyrics, thorough=True)
+        analysis = self.analyzer.analyze(
+            wav, lyrics=lyrics, thorough=True, force_score=True
+        )
         contour = analysis.get("pitch_contour_midi") or []
         if len(contour) < 8:
             raise ValueError("reference audio has no reliable melody contour")
@@ -290,6 +292,7 @@ class SongSearchEngine:
                 "pitch_timeline_frame_seconds": float(
                     analysis.get("pitch_timeline_frame_seconds", 0.10)
                 ),
+                "singing_score": analysis.get("singing_score"),
                 "duration_seconds": round(float(len(wav)) / 16000.0, 3),
                 "lyrics": (lyrics or "").strip(),
                 "created_at": now,
@@ -310,6 +313,7 @@ class SongSearchEngine:
                 "segment_group_id": reference["segment_group_id"],
                 "sequence_index": int(reference["sequence_index"]),
                 "segment_status": segment_status,
+                "score_available": bool(reference.get("singing_score")),
             })
             return result
 
@@ -732,6 +736,11 @@ class SongSearchEngine:
             "can_continue": len(groups) >= 2 or any(
                 bool(item.get("is_full_source")) for item in references if isinstance(item, dict)
             ),
+            "score_available": any(
+                bool(item.get("singing_score"))
+                for item in references
+                if isinstance(item, dict)
+            ),
             "updated_at": int(entry.get("updated_at", 0) or 0),
         }
 
@@ -739,7 +748,7 @@ class SongSearchEngine:
         os.makedirs(self.catalog_root, exist_ok=True)
         temp_path = self.catalog_path + ".tmp"
         with open(temp_path, "w", encoding="utf-8") as handle:
-            json.dump({"version": 3, "songs": self._catalog}, handle, ensure_ascii=False, indent=2)
+            json.dump({"version": 4, "songs": self._catalog}, handle, ensure_ascii=False, indent=2)
         os.replace(temp_path, self.catalog_path)
 
     def search(

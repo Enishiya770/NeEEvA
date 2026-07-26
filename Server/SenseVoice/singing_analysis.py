@@ -13,6 +13,7 @@ import threading
 from typing import Dict, Iterable, List, Tuple
 
 import numpy as np
+from singing_score import build_singing_score
 
 
 NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
@@ -93,6 +94,8 @@ class SingingAnalyzer:
         lyrics: str = "",
         audio_event: str = "",
         thorough: bool = False,
+        language: str = "",
+        force_score: bool = False,
     ) -> Dict:
         signal = np.asarray(wav, dtype=np.float32).reshape(-1)
         if signal.size > self.sample_rate * 45:
@@ -119,6 +122,10 @@ class SingingAnalyzer:
             lyrics,
             audio_event,
             backend="fft-autocorrelation",
+            signal=signal,
+            language=language,
+            include_score=thorough,
+            force_score=force_score,
         )
 
         # Normal speech stays on the cheap path.  A likely melodic clip gets a
@@ -142,6 +149,10 @@ class SingingAnalyzer:
                         lyrics,
                         audio_event,
                         backend="torchcrepe-tiny",
+                        signal=signal,
+                        language=language,
+                        include_score=thorough,
+                        force_score=force_score,
                     )
             except Exception as exc:
                 # A CUDA/driver mismatch must not break ASR.  Keep the already
@@ -228,6 +239,10 @@ class SingingAnalyzer:
         lyrics: str,
         audio_event: str,
         backend: str,
+        signal: np.ndarray,
+        language: str,
+        include_score: bool,
+        force_score: bool,
     ) -> Dict:
         pitch = np.asarray(pitch, dtype=np.float32).reshape(-1)
         periodicity = np.asarray(periodicity, dtype=np.float32).reshape(-1)
@@ -369,6 +384,23 @@ class SingingAnalyzer:
             "lyrics_chars_per_sec": round(chars_per_sec, 3),
         }
         result["summary"] = self._summary(result)
+        if include_score and (
+            force_score
+            or probability >= 0.30
+            or str(audio_event).lower() == "bgm"
+        ):
+            result["singing_score"] = build_singing_score(
+                pitch,
+                periodicity,
+                hop_seconds,
+                duration,
+                lyrics=lyrics,
+                language=language,
+                signal=signal,
+                sample_rate=self.sample_rate,
+                extractor_backend=backend,
+                confidence=probability,
+            )
         return result
 
     @staticmethod

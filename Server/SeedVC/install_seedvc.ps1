@@ -5,17 +5,43 @@ $projectRoot = Split-Path -Parent (Split-Path -Parent $seedVcRoot)
 $vendorRoot = Join-Path $seedVcRoot "vendor\seed-vc"
 $packageRoot = Join-Path $seedVcRoot "python_packages"
 $pythonCandidates = @(
+    $env:NEEEVA_SEEDVC_PYTHON,
+    (Join-Path $projectRoot "Server\SVS\.venv\Scripts\python.exe"),
     $env:NEEEVA_PYTHON_EXE,
     $(if ($env:NEEEVA_GPT_SOVITS_ROOT) {
         Join-Path $env:NEEEVA_GPT_SOVITS_ROOT "runtime\python.exe"
     }),
     (Join-Path $projectRoot "GPT-SoVITS\runtime\python.exe")
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-$pythonExe = $pythonCandidates |
-    Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
-    Select-Object -First 1
 
-if (-not $pythonExe -and (Get-Command py -ErrorAction SilentlyContinue)) {
+function Test-RunnablePython {
+    param(
+        [string]$Candidate,
+        [switch]$Launcher
+    )
+    try {
+        if ($Launcher) {
+            & $Candidate -3.10 -c "import sys" *> $null
+        } else {
+            & $Candidate -c "import sys" *> $null
+        }
+        return $LASTEXITCODE -eq 0
+    } catch {
+        return $false
+    }
+}
+
+$pythonExe = $null
+foreach ($candidate in $pythonCandidates) {
+    if ((Test-Path -LiteralPath $candidate -PathType Leaf) -and
+        (Test-RunnablePython -Candidate $candidate)) {
+        $pythonExe = $candidate
+        break
+    }
+}
+
+if (-not $pythonExe -and (Get-Command py -ErrorAction SilentlyContinue) -and
+    (Test-RunnablePython -Candidate "py" -Launcher)) {
     $pythonExe = "py"
 }
 if (-not $pythonExe) {
@@ -29,10 +55,10 @@ if (-not (Test-Path -LiteralPath $vendorRoot)) {
 
 New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 if ($pythonExe -eq "py") {
-    & $pythonExe -3.10 -m pip install --target $packageRoot munch==4.0.0 python-multipart==0.0.20
+    & $pythonExe -3.10 -m pip install --target $packageRoot fastapi uvicorn soundfile munch==4.0.0 python-multipart==0.0.20
     & $pythonExe -3.10 -m pip install --no-deps --target $packageRoot descript-audio-codec==1.0.0
 } else {
-    & $pythonExe -m pip install --target $packageRoot munch==4.0.0 python-multipart==0.0.20
+    & $pythonExe -m pip install --target $packageRoot fastapi uvicorn soundfile munch==4.0.0 python-multipart==0.0.20
     & $pythonExe -m pip install --no-deps --target $packageRoot descript-audio-codec==1.0.0
 }
 Write-Host "Seed-VC bridge installed. Start it with .\start_seedvc_server.ps1"

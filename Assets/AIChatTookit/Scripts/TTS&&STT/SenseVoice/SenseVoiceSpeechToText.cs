@@ -86,6 +86,7 @@ public class SenseVoiceSpeechToText : STT
     public string LastSingingSummary { get; private set; } = "";
     public float[] LastPitchTimelineMidi { get; private set; } = new float[0];
     public float LastPitchTimelineFrameSeconds { get; private set; } = 0.10f;
+    public SingingScore LastSingingScore { get; private set; } = null;
 
     #endregion
 
@@ -113,6 +114,7 @@ public class SenseVoiceSpeechToText : STT
     private float[] m_LastSingingPerformanceMidi = new float[0];
     private float m_LastSingingPerformanceFrameSeconds = 0.10f;
     private string m_LastSingingPerformanceLanguage = "";
+    private SingingScore m_LastSingingPerformanceScore = null;
     private int m_AsrRequestSerial = 0;
     private int m_LastCompletedAsrSerial = 0;
     private int m_LastSingingCacheSerial = -1;
@@ -123,6 +125,7 @@ public class SenseVoiceSpeechToText : STT
     private float[] m_RollbackSingingPerformanceMidi = new float[0];
     private float m_RollbackSingingPerformanceFrameSeconds = 0.10f;
     private string m_RollbackSingingPerformanceLanguage = "";
+    private SingingScore m_RollbackSingingPerformanceScore = null;
     // A practice session is intentionally separate from the persistent song catalogue.
     // It keeps only final-ASR-confirmed performances, in the order the user sang them,
     // so ChatSample can later render the practiced phrases as one continuous take.
@@ -157,6 +160,7 @@ public class SenseVoiceSpeechToText : STT
     private float m_LastPlayableCandidateTime = -999f;
     private float m_LastPlayableCandidateAudioCropSeconds = 0f;
     private float m_LastPlayableCandidateTimelineCropSeconds = 0f;
+    private float m_LastPlayableCandidateScoreCropSeconds = 0f;
 
     // WebSocket 的收发在后台线程；Unity UI/MonoBehaviour 回调统一排回主线程。
     private readonly ConcurrentQueue<Action> m_StreamMainThreadActions =
@@ -707,6 +711,7 @@ public class SenseVoiceSpeechToText : STT
                     LastPitchHighNote = _response.pitch_high_note ?? "";
                     LastNoteSequence = _response.note_sequence ?? "";
                     LastSingingSummary = _response.singing_summary ?? "";
+                    LastSingingScore = _response.singing_score;
                     LastPitchTimelineMidi = _response.pitch_timeline_midi != null &&
                         _response.pitch_timeline_midi.Length > 0
                         ? _response.pitch_timeline_midi
@@ -781,6 +786,7 @@ public class SenseVoiceSpeechToText : STT
                         m_LastPlayableCandidateTime = Time.realtimeSinceStartup;
                         m_LastPlayableCandidateAudioCropSeconds = audioCropSeconds;
                         m_LastPlayableCandidateTimelineCropSeconds = timelineCropSeconds;
+                        m_LastPlayableCandidateScoreCropSeconds = croppedContentSeconds;
                     }
 
                     if (LastIsSinging && !endsWithSpokenSingingExit)
@@ -788,7 +794,8 @@ public class SenseVoiceSpeechToText : STT
                         CacheLastSingingPerformance(
                             audioBytes,
                             audioCropSeconds,
-                            timelineCropSeconds);
+                            timelineCropSeconds,
+                            croppedContentSeconds);
                     }
                     else if (LastIsSinging && endsWithSpokenSingingExit)
                     {
@@ -921,7 +928,8 @@ public class SenseVoiceSpeechToText : STT
         CacheLastSingingPerformance(
             m_LastPlayableCandidateAudioBytes,
             m_LastPlayableCandidateAudioCropSeconds,
-            m_LastPlayableCandidateTimelineCropSeconds);
+            m_LastPlayableCandidateTimelineCropSeconds,
+            m_LastPlayableCandidateScoreCropSeconds);
         Debug.Log($"[SenseVoice/Singing] 最终判定由流式证据恢复为歌唱 " +
                   $"prob={LastSingingProbability:F2} stability={LastPitchStability:F2} " +
                   $"timeline={m_LastSingingPerformanceMidi.Length}");
@@ -1011,6 +1019,8 @@ public class SenseVoiceSpeechToText : STT
                 m_RollbackSingingPerformanceFrameSeconds;
             m_LastSingingPerformanceLanguage =
                 m_RollbackSingingPerformanceLanguage ?? "";
+            m_LastSingingPerformanceScore =
+                m_RollbackSingingPerformanceScore;
             m_LastSingingCacheSerial = -1;
             Debug.Log("[SenseVoice/Singing] 已回滚本轮误写入的歌声缓存，恢复上一段有效演唱");
         }
@@ -1031,7 +1041,8 @@ public class SenseVoiceSpeechToText : STT
     private void CacheLastSingingPerformance(
         byte[] audioBytes,
         float audioCropSeconds = 0f,
-        float timelineCropSeconds = 0f)
+        float timelineCropSeconds = 0f,
+        float scoreCropSeconds = 0f)
     {
         m_RollbackSingingAudioBytes = m_LastSingingAudioBytes;
         m_RollbackSingingLyrics = m_LastSingingLyrics;
@@ -1042,6 +1053,8 @@ public class SenseVoiceSpeechToText : STT
             m_LastSingingPerformanceFrameSeconds;
         m_RollbackSingingPerformanceLanguage =
             m_LastSingingPerformanceLanguage;
+        m_RollbackSingingPerformanceScore =
+            m_LastSingingPerformanceScore;
         m_LastSingingCacheSerial = m_LastCompletedAsrSerial;
 
         float now = Time.realtimeSinceStartup;
@@ -1080,6 +1093,8 @@ public class SenseVoiceSpeechToText : STT
         }
         m_LastSingingPerformanceFrameSeconds = LastPitchTimelineFrameSeconds;
         m_LastSingingPerformanceLanguage = LastLanguage ?? "";
+        m_LastSingingPerformanceScore =
+            CropSingingScore(LastSingingScore, scoreCropSeconds);
         m_LastSingingPerformanceTime = now;
         if (actualAudioCrop >= 0.05f || timelineStart > 0)
         {
@@ -1127,6 +1142,78 @@ public class SenseVoiceSpeechToText : STT
             cursor = chunkData + chunkLength + (chunkLength & 1);
         }
         return byteRate > 0 && dataLength > 0 ? dataLength / (float)byteRate : 0f;
+    }
+
+    private static SingingScore CropSingingScore(
+        SingingScore source,
+        float cropSeconds)
+    {
+        if (source == null || source.schema_version <= 0) return null;
+        SingingScore score = JsonUtility.FromJson<SingingScore>(
+            JsonUtility.ToJson(source));
+        if (score == null || cropSeconds <= 0.001f) return score;
+
+        float frameSeconds = Mathf.Max(0.001f, score.frame_seconds);
+        int frameOffset = Mathf.Max(0, Mathf.FloorToInt(cropSeconds / frameSeconds));
+        score.f0_hz = SliceFloatArray(score.f0_hz, frameOffset);
+        score.energy = SliceFloatArray(score.energy, frameOffset);
+        score.duration_seconds = Mathf.Max(0f, score.duration_seconds - cropSeconds);
+
+        var notes = new List<SingingNote>();
+        if (score.notes != null)
+        {
+            foreach (SingingNote note in score.notes)
+            {
+                if (note == null) continue;
+                float originalStart = note.start_seconds;
+                float originalEnd = originalStart + Mathf.Max(0f, note.duration_seconds);
+                if (originalEnd <= cropSeconds) continue;
+                note.start_seconds = Mathf.Max(0f, originalStart - cropSeconds);
+                note.duration_seconds = Mathf.Max(
+                    0f, originalEnd - Mathf.Max(cropSeconds, originalStart));
+                if (note.duration_seconds > 0.001f) notes.Add(note);
+            }
+        }
+        score.notes = notes.ToArray();
+
+        var breaths = new List<float>();
+        if (score.breath_positions_seconds != null)
+        {
+            foreach (float breath in score.breath_positions_seconds)
+            {
+                if (breath >= cropSeconds)
+                    breaths.Add(breath - cropSeconds);
+            }
+        }
+        score.breath_positions_seconds = breaths.ToArray();
+
+        var vibrato = new List<SingingVibrato>();
+        if (score.vibrato != null)
+        {
+            foreach (SingingVibrato region in score.vibrato)
+            {
+                if (region == null) continue;
+                float originalStart = region.start_seconds;
+                float originalEnd = originalStart + Mathf.Max(0f, region.duration_seconds);
+                if (originalEnd <= cropSeconds) continue;
+                region.start_seconds = Mathf.Max(0f, originalStart - cropSeconds);
+                region.duration_seconds = Mathf.Max(
+                    0f, originalEnd - Mathf.Max(cropSeconds, originalStart));
+                if (region.duration_seconds > 0.001f) vibrato.Add(region);
+            }
+        }
+        score.vibrato = vibrato.ToArray();
+        return score;
+    }
+
+    private static float[] SliceFloatArray(float[] source, int start)
+    {
+        if (source == null || source.Length == 0 || start >= source.Length)
+            return new float[0];
+        start = Mathf.Max(0, start);
+        float[] result = new float[source.Length - start];
+        Array.Copy(source, start, result, 0, result.Length);
+        return result;
     }
 
     private static byte[] TrimWavLeading(
@@ -1751,6 +1838,27 @@ public class SenseVoiceSpeechToText : STT
         return true;
     }
 
+    /// <summary>
+    /// Returns the symbolic score used by singing synthesis. It contains no source audio.
+    /// </summary>
+    public bool TryGetRecentSingingScoreJson(
+        out string scoreJson,
+        out string lyrics,
+        out string language)
+    {
+        scoreJson = "";
+        lyrics = m_LastSingingLyrics ?? "";
+        language = m_LastSingingPerformanceLanguage ?? "";
+        if (m_LastSingingPerformanceScore == null ||
+            m_LastSingingPerformanceScore.schema_version <= 0 ||
+            Time.realtimeSinceStartup - m_LastSingingPerformanceTime >
+                m_SingingAudioRetentionSeconds)
+            return false;
+
+        scoreJson = JsonUtility.ToJson(m_LastSingingPerformanceScore);
+        return !string.IsNullOrEmpty(scoreJson);
+    }
+
     public void RememberSong(
         string songId,
         string title,
@@ -2013,6 +2121,51 @@ public class SenseVoiceSpeechToText : STT
     #region 数据定义
 
     [Serializable]
+    public class SingingNote
+    {
+        public int midi = 0;
+        public string note_name = "";
+        public float start_seconds = 0f;
+        public float duration_seconds = 0f;
+        public string note_type = "";
+        public float confidence = 0f;
+    }
+
+    [Serializable]
+    public class SingingVibrato
+    {
+        public float start_seconds = 0f;
+        public float duration_seconds = 0f;
+        public float rate_hz = 0f;
+        public float depth_semitones = 0f;
+        public float confidence = 0f;
+    }
+
+    [Serializable]
+    public class SingingScore
+    {
+        public int schema_version = 0;
+        public string source = "";
+        public string extractor_backend = "";
+        public string language = "";
+        public string lyrics = "";
+        public string lyrics_reading = "";
+        public string lyrics_reading_source = "";
+        public bool lyrics_reading_complete = false;
+        public string[] lyrics_mora = null;
+        public string lyrics_alignment = "";
+        public bool lyrics_override = false;
+        public float duration_seconds = 0f;
+        public float frame_seconds = 0.01f;
+        public float confidence = 0f;
+        public SingingNote[] notes = null;
+        public float[] f0_hz = null;
+        public float[] energy = null;
+        public float[] breath_positions_seconds = null;
+        public SingingVibrato[] vibrato = null;
+    }
+
+    [Serializable]
     private class Response
     {
         public string text = "";
@@ -2053,6 +2206,7 @@ public class SenseVoiceSpeechToText : STT
         public float singing_start_seconds = 0f;
         public float pitch_timeline_start_seconds = 0f;
         public float audio_content_start_seconds = 0f;
+        public SingingScore singing_score = null;
     }
 
     [Serializable]

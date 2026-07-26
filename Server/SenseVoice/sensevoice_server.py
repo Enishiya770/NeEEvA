@@ -260,6 +260,7 @@ def singing_response_fields(analysis: Optional[dict], include_contour: bool = Tr
         fields["pitch_timeline_frame_seconds"] = float(
             analysis.get("pitch_timeline_frame_seconds", 0.10)
         )
+        fields["singing_score"] = analysis.get("singing_score")
     return fields
 
 
@@ -511,6 +512,7 @@ def health():
         "speaker_profiles": len(_speaker_store.list_profiles(False)) if _speaker_store else 0,
         "streaming_preview": True,
         "singing_analysis": _singing_analyzer is not None,
+        "singing_score_schema": 1 if _singing_analyzer is not None else 0,
         "song_search": _song_search_engine is not None,
         "local_song_catalog": _song_search_engine.catalog_count if _song_search_engine else 0,
         "external_audio_upload": False,
@@ -850,10 +852,17 @@ async def asr(
                 lyrics=text,
                 audio_event=audio_event,
                 thorough=True,
+                language=lang,
+                force_score=expect_singing,
             )
             if _singing_analyzer is not None
             else quick_singing
         )
+        # Keep the full-turn score even if armed sing-along recovery later
+        # chooses a tail-only acoustic classifier. Unity crops scores in the
+        # full post-VAD time base; a tail-relative score would otherwise lose
+        # the opening notes a second time.
+        full_turn_singing_score = (singing or {}).get("singing_score")
         expected_singing_override = False
         # In armed sing-along mode, recover a long acoustically melodic clip
         # before the transcript-free tail fallback. Keeping the full analysis
@@ -881,6 +890,8 @@ async def asr(
                 lyrics="",
                 audio_event=audio_event,
                 thorough=True,
+                language=lang,
+                force_score=True,
             )
             if is_expected_singing_performance(expected_analysis):
                 tail_offset = max(0.0, wav.size / 16000.0 - 12.0)
@@ -891,6 +902,8 @@ async def asr(
                     expected_analysis.get("pitch_timeline_start_seconds", 0.0)
                 )
                 singing = expected_analysis
+                if full_turn_singing_score:
+                    singing["singing_score"] = full_turn_singing_score
                 singing["is_singing"] = True
                 singing["summary"] = (
                     "待唱状态下由尾部多帧音高证据确认；" +
@@ -938,6 +951,48 @@ async def asr(
 
 
 # ------------------------------ 歌曲检索 ------------------------------
+
+
+@app.post("/singing/score")
+async def extract_singing_score(
+    audio_file: UploadFile = File(...),
+    lyrics: str = Form(""),
+    language: str = Form(""),
+):
+    """Extract a renderer-neutral singing score without running speech ASR."""
+    if _singing_analyzer is None:
+        return JSONResponse({"error": "singing analyzer not loaded"}, status_code=503)
+    try:
+        wav = decode_wav(await audio_file.read())
+        analysis = await asyncio.get_running_loop().run_in_executor(
+            None,
+            lambda: _singing_analyzer.analyze(
+                wav,
+                lyrics=lyrics,
+                language=language,
+                thorough=True,
+                force_score=True,
+            ),
+        )
+        score = analysis.get("singing_score")
+        if not score or not score.get("notes"):
+            return JSONResponse(
+                {"ok": False, "error": "no reliable singing score"},
+                status_code=422,
+            )
+        return {
+            "ok": True,
+            "is_singing": bool(analysis.get("is_singing", False)),
+            "singing_probability": float(
+                analysis.get("singing_probability", 0.0)
+            ),
+            "singing_score": score,
+        }
+    except Exception as exc:
+        import traceback
+
+        traceback.print_exc()
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
 
 
 @app.get("/songs/catalog")

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Networking;
@@ -164,6 +165,7 @@ public class ChatSample : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (m_ActiveSVSRequest != null) m_ActiveSVSRequest.Abort();
         if (m_ActiveHumSVCRequest != null) m_ActiveHumSVCRequest.Abort();
         if (m_HumBackPrefixSVCRequest != null) m_HumBackPrefixSVCRequest.Abort();
         //仅释放 Unity 持有的进程句柄，不终止本机服务；退出 Play Mode 后 9882 仍可复用。
@@ -171,6 +173,11 @@ public class ChatSample : MonoBehaviour
         {
             m_HumSVCServerProcess.Dispose();
             m_HumSVCServerProcess = null;
+        }
+        if (m_SVSServerProcess != null)
+        {
+            m_SVSServerProcess.Dispose();
+            m_SVSServerProcess = null;
         }
         if (m_ChatSettings != null && m_ChatSettings.m_TextToSpeech != null)
             m_ChatSettings.m_TextToSpeech.CancelPreparedSpeech();
@@ -198,6 +205,15 @@ public class ChatSample : MonoBehaviour
                 if (!m_LogHumBack) return;
                 if (ready) Debug.Log("[HumBack/SVC] 场景启动检查成功: " + detail);
                 else Debug.LogWarning("[HumBack/SVC] 场景启动检查失败: " + detail);
+            }));
+        }
+        if (m_EnableSingingVoiceSynthesis && m_AutoStartSVS)
+        {
+            StartCoroutine(EnsureSVSReady((ready, detail) =>
+            {
+                if (!m_LogHumBack) return;
+                if (ready) Debug.Log("[HumBack/SVS] 场景启动检查成功: " + detail);
+                else Debug.LogWarning("[HumBack/SVS] 场景启动检查失败: " + detail);
             }));
         }
     }
@@ -326,6 +342,12 @@ public class ChatSample : MonoBehaviour
         AgentSongSearchRequest songSearch = ExtractSongSearchTag(ref afterMem);
         AgentSongSingRequest songSing = ExtractSongSingTag(ref afterMem);
         AgentHumBackRequest humBack = ExtractHumBackTag(ref afterMem);
+        if (ShouldDiscardSongSingToolForCurrentTurn(songSing))
+        {
+            if (m_LogHumBack)
+                Debug.LogWarning("[SongSing] 模型把跟唱约定、当前演唱或失败陈述误写成曲库演唱；已丢弃该标签并重新分流");
+            songSing = null;
+        }
         if (humBack != null) m_ExplicitHumBackHandled = true;
         if (songSing != null) m_ExplicitSongSingHandled = true;
         if (songMemory != null)
@@ -348,14 +370,10 @@ public class ChatSample : MonoBehaviour
         else if (m_HoldSpeechForSongMemoryResult)
             CompleteSongMemoryImmediately("没有找到可用于保存的最近歌声音频，本次未写入本机曲库。");
         if (songSearch != null) BeginSongSearch(songSearch);
-        if (songSing == null && ShouldFallbackToExplicitSongSing())
+        AgentSongSingRequest fallbackSongSing;
+        if (songSing == null && TryCreateExplicitSongSingFallback(out fallbackSongSing))
         {
-            songSing = new AgentSongSingRequest
-            {
-                Title = ExtractRequestedSongTitle(m_LastUserMsg),
-                Mode = IsRememberedSongContinuationRequest(m_LastUserMsg) ? "continue" : "memory",
-                Reason = "用户明确要求演唱已记住的歌曲，但模型漏掉了 song_sing 标签",
-            };
+            songSing = fallbackSongSing;
             m_ExplicitSongSingHandled = true;
             if (m_LogHumBack)
                 Debug.LogWarning("[SongSing] 检测到明确曲库演唱请求，模型未调用 <song_sing/>，执行安全兜底");
@@ -2327,6 +2345,12 @@ public class ChatSample : MonoBehaviour
         AgentSongSearchRequest songSearch = ExtractSongSearchTag(ref cleanFull);
         AgentSongSingRequest songSing = ExtractSongSingTag(ref cleanFull);
         AgentHumBackRequest humBack = ExtractHumBackTag(ref cleanFull);
+        if (ShouldDiscardSongSingToolForCurrentTurn(songSing))
+        {
+            if (m_LogHumBack)
+                Debug.LogWarning("[SongSing] 模型把跟唱约定、当前演唱或失败陈述误写成曲库演唱；已丢弃该标签并重新分流");
+            songSing = null;
+        }
         if (humBack != null) m_ExplicitHumBackHandled = true;
         if (songSing != null) m_ExplicitSongSingHandled = true;
         if (m_SongMemoryAcknowledgementInFlight &&
@@ -2383,14 +2407,10 @@ public class ChatSample : MonoBehaviour
         else if (heldForSongMemory)
             CompleteSongMemoryImmediately("没有找到可用于保存的最近歌声音频，本次未写入本机曲库。");
         if (songSearch != null) BeginSongSearch(songSearch);
-        if (songSing == null && ShouldFallbackToExplicitSongSing())
+        AgentSongSingRequest fallbackSongSing;
+        if (songSing == null && TryCreateExplicitSongSingFallback(out fallbackSongSing))
         {
-            songSing = new AgentSongSingRequest
-            {
-                Title = ExtractRequestedSongTitle(m_LastUserMsg),
-                Mode = IsRememberedSongContinuationRequest(m_LastUserMsg) ? "continue" : "memory",
-                Reason = "用户明确要求演唱已记住的歌曲，但模型漏掉了 song_sing 标签",
-            };
+            songSing = fallbackSongSing;
             m_ExplicitSongSingHandled = true;
             if (m_LogHumBack)
                 Debug.LogWarning("[SongSing] 检测到明确曲库演唱请求，模型未调用 <song_sing/>，执行安全兜底");
@@ -3234,12 +3254,34 @@ public class ChatSample : MonoBehaviour
     [SerializeField] private bool m_EnforceExplicitSongRemember = true;
     [Tooltip("同一个歌曲记忆操作的防重复间隔。改名不会被刚才的保存操作阻塞。")]
     [Range(2f, 60f)] [SerializeField] private float m_SongMemoryDuplicateCooldownSeconds = 10f;
+    [Tooltip("“刚才那首/这段”没有明确歌名且近期原始歌声已过期时，可绑定到最近一次成功落盘歌曲 ID 的时限。")]
+    [Range(30f, 1800f)] [SerializeField] private float m_RecentRememberedSongReferenceSeconds = 900f;
 
     [Header("角色旋律回哼 — <hum_back/>")]
     [Tooltip("允许角色在听完歌唱/哼唱后，自主选择把最近一句旋律哼回来。")]
     [SerializeField] private bool m_EnableAutonomousHumBack = true;
     [Tooltip("允许角色从持久本地曲库选择已记住的歌曲片段，或根据刚听到的歌词/旋律可靠续唱后续已学段落。")]
     [SerializeField] private bool m_EnableAutonomousRememberedSongSinging = true;
+    [Tooltip("优先把识别到的歌词、音符、时值和连续音高交给独立歌声合成器，生成新的角色歌声；这不是变声。")]
+    [SerializeField] private bool m_EnableSingingVoiceSynthesis = true;
+    [Tooltip("独立 SVS 服务。中文/英语/粤语使用 SoulX 官方前端；日语使用项目内实验性假名音素适配。")]
+    [SerializeField] private string m_SVSURL = "http://127.0.0.1:9883/synthesize";
+    [Tooltip("首次需要时自动启动轻量 9883 桥；模型仍由请求进程按需加载并在完成后释放显存。")]
+    [SerializeField] private bool m_AutoStartSVS = true;
+    [Range(5f, 120f)] [SerializeField] private float m_SVSStartupTimeoutSeconds = 45f;
+    [SerializeField] private string m_SVSStartScriptRelativePath = "Server/SVS/start_svs_server.ps1";
+    [Range(30, 600)] [SerializeField] private int m_SVSTimeoutSeconds = 300;
+    [Tooltip("SoulX 流匹配推理步数。12 为低延迟默认；音质诊断可临时提高到 32。")]
+    [Range(4, 32)] [SerializeField] private int m_SVSInferenceSteps = 12;
+    [Tooltip("独立 SVS 专用角色提示音。与日常 TTS/SVC 参考分开，必须使用 SoulX 支持的语种和准确元数据。")]
+    [SerializeField] private string m_SVSPromptAudioPath =
+        "Server/SVS/prompts/41041_svs_zh_short.wav";
+    [Tooltip("SVS 专用角色提示音的真实语种。")]
+    [SerializeField] private string m_SVSPromptLanguage = "zh";
+    [Tooltip("可选高音质模式：独立 SVS 先从乐谱生成歌声，再用角色 RVC 轻度润色音色。关闭时完全不做音频转换；开启后日志会明确标记 svc-post-polish。")]
+    [SerializeField] private bool m_EnableSVSRVCPostPolish = false;
+    [Tooltip("SVS 未安装、语种不支持或合成失败时，明确降级到现有 9882 SVC，且日志会标明并非歌声生成。")]
+    [SerializeField] private bool m_AllowSVCFallbackFromSVS = true;
     [Tooltip("优先使用用户真实演唱作为源，通过 Seed-VC 转换成角色声线；保留音调、气息、咬字和微小变化。")]
     [SerializeField] private bool m_EnableNeuralHumSVC = true;
     [Tooltip("本机角色歌声转换桥（专属 RVC 优先，Seed-VC 回退）。先运行 Server/SeedVC/start_seedvc_server.ps1。")]
@@ -3327,6 +3369,8 @@ public class ChatSample : MonoBehaviour
     private string m_LastSongMemoryResult = "";
     private float m_LastSongMemoryRequestTime = -999f;
     private string m_LastSongMemorySignature = "";
+    private string m_LastRememberedSongId = "";
+    private float m_LastRememberedSongResultTime = -999f;
     private int m_SongMemoryGeneration = 0;
     private bool m_ExplicitSongRememberHandled = false;
     private Coroutine m_SongMemoryAcknowledgementCoroutine;
@@ -3343,6 +3387,7 @@ public class ChatSample : MonoBehaviour
     private string m_PendingHumLanguage = "";
     private string m_PendingHumReason = "";
     private string m_PendingHumMode = "echo";
+    private string m_PendingHumLyricsOverride = "";
     private byte[] m_PendingHumSourceWav;
     private bool m_PendingHumIsPracticeComposition = false;
     private bool m_PendingHumIsCatalogSong = false;
@@ -3353,9 +3398,12 @@ public class ChatSample : MonoBehaviour
     private float m_PendingHumRmsMixRate = 0.25f;
     private float m_PendingHumProtect = 0.33f;
     private string m_PendingHumVariationDiagnostic = "";
+    private string m_PendingHumRenderer = "pending";
     private int m_HumPerformanceCounter = 0;
     private AudioClip m_GeneratedHumCarrierClip;
     private AudioClip m_ActiveHumBackClip;
+    private UnityWebRequest m_ActiveSVSRequest;
+    private string m_ActiveSVSRequestId = "";
     private UnityWebRequest m_ActiveHumSVCRequest;
     private string m_ActiveHumSVCRequestId = "";
     private UnityWebRequest m_HumBackPrefixSVCRequest;
@@ -3385,6 +3433,10 @@ public class ChatSample : MonoBehaviour
     private AudioClip m_FastHumBackFullClip;
     private Coroutine m_FastHumBackStartCoroutine;
     private Coroutine m_FastHumBackPlaybackCoroutine;
+    private System.Diagnostics.Process m_SVSServerProcess;
+    private bool m_SVSStartupInProgress = false;
+    private bool m_SVSStartupSucceeded = false;
+    private string m_SVSStartupDetail = "尚未检查";
     private System.Diagnostics.Process m_HumSVCServerProcess;
     private bool m_HumSVCStartupInProgress = false;
     private bool m_HumSVCStartupSucceeded = false;
@@ -4054,9 +4106,160 @@ public class ChatSample : MonoBehaviour
         return false;
     }
 
+    private static string StripSingingPerceptionMetadata(string utterance)
+    {
+        if (string.IsNullOrWhiteSpace(utterance)) return "";
+        return System.Text.RegularExpressions.Regex.Replace(
+            utterance,
+            @"\[(?:演唱片段|混合歌唱转说话)[^\]]*\]",
+            " ",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+    }
+
+    private static bool IsSingingFailureReport(string utterance)
+    {
+        string lower = StripSingingPerceptionMetadata(utterance).ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(lower)) return false;
+        string[] failureReports =
+        {
+            "唱不出来了", "唱不出来", "没唱出来", "没有唱出来", "没能唱出来",
+            "还是没唱", "又没唱", "根本没唱", "唱不了", "没有听到你唱",
+            "没听到你唱", "没有听见你唱", "没听见你唱",
+            "couldn't sing", "could not sing", "didn't sing", "did not sing",
+            "歌えなかった", "歌えてない", "歌っていない"
+        };
+        bool hasFailure = false;
+        foreach (string phrase in failureReports)
+        {
+            if (!lower.Contains(phrase)) continue;
+            hasFailure = true;
+            break;
+        }
+        if (!hasFailure) return false;
+
+        // “我唱不出来，你来唱一遍”仍是明确请求；只有清晰的命令结构才覆盖失败陈述。
+        string[] explicitCommands =
+        {
+            "你来唱", "姐姐来唱", "请你唱", "麻烦你唱", "唱给我听",
+            "能不能唱", "可以唱一", "试着唱", "再唱一遍",
+            "please sing", "you sing it", "try singing",
+            "歌ってください", "歌ってみて"
+        };
+        foreach (string command in explicitCommands)
+            if (lower.Contains(command)) return false;
+        return true;
+    }
+
+    private static bool IsRecentSingingReference(string utterance)
+    {
+        string lower = StripSingingPerceptionMetadata(utterance).ToLowerInvariant();
+        string[] references =
+        {
+            "刚才", "刚刚", "方才", "这首", "这一首", "这段", "这一段",
+            "我刚唱", "我们刚唱", "最近那首", "recent song", "just sang",
+            "that phrase", "this phrase", "さっき", "この曲", "このフレーズ"
+        };
+        foreach (string reference in references)
+            if (lower.Contains(reference)) return true;
+        return false;
+    }
+
+    private static bool IsSingingCapabilityQuestion(string utterance)
+    {
+        string lower = StripSingingPerceptionMetadata(utterance).ToLowerInvariant().Trim();
+        if (string.IsNullOrWhiteSpace(lower)) return false;
+        string[] actualPerformanceRequests =
+        {
+            "唱给我听", "唱一首", "唱一下", "唱一遍", "你来唱", "试着唱",
+            "sing it", "sing a song for me", "try singing", "歌ってみて"
+        };
+        foreach (string request in actualPerformanceRequests)
+            if (lower.Contains(request)) return false;
+
+        string[] capabilityQuestions =
+        {
+            "会唱歌吗", "能唱歌吗", "会不会唱歌", "能不能唱歌",
+            "有唱歌的能力", "唱歌的能力", "是否会唱歌",
+            "are you able to sing", "do you know how to sing",
+            "歌えるの", "歌えますか", "歌う能力"
+        };
+        foreach (string question in capabilityQuestions)
+            if (lower.Contains(question)) return true;
+        return System.Text.RegularExpressions.Regex.IsMatch(
+            lower,
+            @"^\s*can you sing(?:\s+a song)?\s*[?？]?\s*$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    private static bool HasRememberedSongCue(string utterance)
+    {
+        string lower = StripSingingPerceptionMetadata(utterance).ToLowerInvariant();
+        string[] memoryCues =
+        {
+            "记住的歌", "已经记住", "你记得的歌", "曲库", "以前学", "之前学",
+            "remembered song", "from memory", "song library", "覚えた歌", "記憶の歌"
+        };
+        foreach (string cue in memoryCues)
+            if (lower.Contains(cue)) return true;
+        return false;
+    }
+
+    private static bool IsPlausibleUnquotedSongTitle(string title)
+    {
+        string generic = (title ?? "").Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(generic)) return false;
+        string[] genericTitles =
+        {
+            "歌", "这首歌", "这首", "这一首", "那首", "那一首",
+            "这段", "这一段", "那段", "片段", "演唱片段", "刚才",
+            "接下来", "能力", "出来", "出来了", "不出来了", "不出来", "不了",
+            "一下", "一遍", "一段", "一首",
+            "the song", "this song", "that song", "it", "the phrase", "this phrase"
+        };
+        foreach (string genericTitle in genericTitles)
+            if (generic == genericTitle) return false;
+
+        string[] instructionFragments =
+        {
+            "跟着我", "跟我唱", "跟我哼", "我们唱", "我唱出来", "你唱出来",
+            "唱出来", "唱一遍", "给我听", "能不能", "可以吗", "会不会",
+            "怎么唱", "什么情况", "sing along", "sing with me", "you sing",
+            "一緒に歌", "真似して歌"
+        };
+        foreach (string fragment in instructionFragments)
+            if (generic.Contains(fragment)) return false;
+
+        // 捕获发生在“唱”之后；这种短尾巴是失败语法，不可能是可靠的曲库选择器。
+        if (System.Text.RegularExpressions.Regex.IsMatch(
+            generic,
+            @"^(?:不|没|没有)(?:能|会)?(?:唱|哼)?(?:出)?(?:来|去)?(?:了|啦|啊)?$"))
+            return false;
+        if (System.Text.RegularExpressions.Regex.IsMatch(
+            generic,
+            @"^的?(?:这|那)(?:一)?(?:首|段)(?:歌|曲)?(?:呢|呃|啊|呀)?$"))
+            return false;
+        return true;
+    }
+
     private static string ExtractRequestedSongTitle(string utterance)
     {
         if (string.IsNullOrWhiteSpace(utterance)) return "";
+        string semanticText = StripSingingPerceptionMetadata(utterance);
+        if (IsSingingFailureReport(semanticText) ||
+            IsSingingCapabilityQuestion(semanticText))
+            return "";
+
+        // 明确书名号/引号优先；标题本身可能长得像普通句子，不应用未加引号的启发式过滤。
+        var quoted = System.Text.RegularExpressions.Regex.Match(
+            semanticText,
+            @"[《“""'「『](?<title>[^》”""'」』\r\n]{1,80})[》”""'」』]",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (quoted.Success)
+        {
+            string quotedTitle = quoted.Groups["title"].Value.Trim();
+            if (!string.IsNullOrWhiteSpace(quotedTitle)) return quotedTitle;
+        }
+
         string[] patterns =
         {
             @"(?:唱|演唱|哼)(?:一下|一遍|一段|一首|出来|给我听|给我唱)?\s*[《“""'「『]?(?<title>[A-Za-z0-9\p{L}][^，,。！？!?；;\r\n《》“”""'「」『』]{0,59})",
@@ -4075,10 +4278,7 @@ public class ChatSample : MonoBehaviour
                 "",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
             string generic = title.ToLowerInvariant();
-            if (string.IsNullOrWhiteSpace(title) || generic == "歌" || generic == "这首歌" ||
-                generic == "这段" || generic == "刚才" || generic == "接下来" ||
-                generic == "the song" || generic == "it")
-                continue;
+            if (!IsPlausibleUnquotedSongTitle(generic)) continue;
             return title;
         }
         return "";
@@ -4086,27 +4286,94 @@ public class ChatSample : MonoBehaviour
 
     private static bool IsExplicitRememberedSongSingRequest(string utterance)
     {
-        string lower = (utterance ?? "").ToLowerInvariant();
+        string semanticText = StripSingingPerceptionMetadata(utterance);
+        string lower = semanticText.ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(lower) || IsHumBackCancellation(lower)) return false;
+        if (IsSingingFailureReport(lower) || IsSingingCapabilityQuestion(lower) ||
+            IsSingAlongInvitation(lower))
+            return false;
         bool hasSingIntent = lower.Contains("唱") || lower.Contains("哼") ||
             lower.Contains("sing") || lower.Contains("hum") || lower.Contains("歌って") ||
             lower.Contains("続きを歌");
         if (!hasSingIntent) return false;
         if (IsRememberedSongContinuationRequest(lower)) return true;
-        string[] memoryCues =
-        {
-            "记住的歌", "已经记住", "你记得的歌", "曲库", "以前学", "之前学",
-            "remembered song", "from memory", "song library", "覚えた歌", "記憶の歌"
-        };
-        foreach (string cue in memoryCues)
-            if (lower.Contains(cue)) return true;
-        return !string.IsNullOrWhiteSpace(ExtractRequestedSongTitle(utterance));
+        if (HasRememberedSongCue(lower)) return true;
+        return !string.IsNullOrWhiteSpace(ExtractRequestedSongTitle(semanticText));
     }
 
-    private bool ShouldFallbackToExplicitSongSing()
+    private bool HasRecentRememberedSongReference()
     {
-        return m_EnableAutonomousRememberedSongSinging && !m_ExplicitSongSingHandled &&
-            !m_AgentCurrentRoundIsTick && IsExplicitRememberedSongSingRequest(m_LastUserMsg);
+        return !string.IsNullOrWhiteSpace(m_LastRememberedSongId) &&
+            Time.realtimeSinceStartup - m_LastRememberedSongResultTime <=
+                m_RecentRememberedSongReferenceSeconds;
+    }
+
+    private bool ShouldDiscardSongSingToolForCurrentTurn(AgentSongSingRequest request)
+    {
+        if (request == null) return false;
+        string semanticText = StripSingingPerceptionMetadata(m_LastUserMsg);
+        if (IsSingingFailureReport(semanticText) ||
+            IsSingingCapabilityQuestion(semanticText) ||
+            IsSingAlongInvitation(semanticText))
+            return true;
+        if (IsCurrentTurnConfirmedSinging() && !HasRememberedSongCue(semanticText))
+            return true;
+
+        // 模糊指代和 ASR 元数据不允许被模型自行填成曲库标题；若有近期歌声，
+        // 后面的 hum_back 兜底会接管，若只剩落盘记忆则使用可靠的最近歌曲 ID。
+        bool hasSelector = !string.IsNullOrWhiteSpace(request.SongId) ||
+            IsPlausibleUnquotedSongTitle(request.Title);
+        return !hasSelector && IsRecentSingingReference(semanticText);
+    }
+
+    private bool TryCreateExplicitSongSingFallback(out AgentSongSingRequest request)
+    {
+        request = null;
+        if (!m_EnableAutonomousRememberedSongSinging || m_ExplicitSongSingHandled ||
+            m_AgentCurrentRoundIsTick)
+            return false;
+
+        string semanticText = StripSingingPerceptionMetadata(m_LastUserMsg);
+        if (IsSingingFailureReport(semanticText) ||
+            IsSingingCapabilityQuestion(semanticText) ||
+            IsSingAlongInvitation(semanticText))
+            return false;
+
+        bool recentReference = IsRecentSingingReference(semanticText);
+        bool hasRecentPerformance = HasRecentPlayableSingingPerformance();
+        if (recentReference && hasRecentPerformance && IsExplicitHumBackRequest(semanticText))
+        {
+            // “把刚才这段唱出来”应使用仍在保留期内的真实歌声/旋律；让 hum_back
+            // 处理，不要把“刚才这段”猜成曲库歌名。
+            return false;
+        }
+
+        bool explicitRememberedRequest = IsExplicitRememberedSongSingRequest(semanticText);
+        bool canBindRecentId = recentReference && HasRecentRememberedSongReference();
+        if (!explicitRememberedRequest && !canBindRecentId) return false;
+
+        string title = ExtractRequestedSongTitle(semanticText);
+        string songId = "";
+        if (string.IsNullOrWhiteSpace(title) &&
+            HasRecentRememberedSongReference() &&
+            (recentReference || HasRememberedSongCue(semanticText) ||
+             IsRememberedSongContinuationRequest(semanticText)))
+        {
+            songId = m_LastRememberedSongId;
+        }
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(songId))
+            return false;
+
+        request = new AgentSongSingRequest
+        {
+            SongId = songId,
+            Title = title,
+            Mode = IsRememberedSongContinuationRequest(semanticText) ? "continue" : "memory",
+            Reason = string.IsNullOrWhiteSpace(songId)
+                ? "用户明确要求按歌名演唱已记住的歌曲，但模型漏掉了 song_sing 标签"
+                : "用户用模糊指代要求演唱刚落盘歌曲，已绑定最近一次成功保存的歌曲ID",
+        };
+        return true;
     }
 
     private bool IsCurrentTurnSpokenSingingExit()
@@ -4380,6 +4647,7 @@ public class ChatSample : MonoBehaviour
     private class AgentHumBackRequest
     {
         public string Mode = "echo";
+        public string Lyrics = "";
         public string Reason = "";
     }
 
@@ -4428,6 +4696,7 @@ public class ChatSample : MonoBehaviour
         AgentHumBackRequest request = new AgentHumBackRequest
         {
             Mode = ReadToolAttribute(attrs, "mode"),
+            Lyrics = ReadToolAttribute(attrs, "lyrics"),
             Reason = ReadToolAttribute(attrs, "reason"),
         };
         if (string.IsNullOrWhiteSpace(request.Mode)) request.Mode = "echo";
@@ -4551,6 +4820,8 @@ public class ChatSample : MonoBehaviour
                 string name = string.IsNullOrWhiteSpace(result.DisplayName)
                     ? "未命名旋律"
                     : result.DisplayName;
+                m_LastRememberedSongId = result.SongId ?? "";
+                m_LastRememberedSongResultTime = Time.realtimeSinceStartup;
                 m_LastSongMemoryResult =
                     $"已在本机记住“{name}”，歌曲ID={result.SongId}，" +
                     $"录音样本数={result.ReferenceCount}，独立歌曲段数={result.UniqueSegmentCount}。";
@@ -4577,6 +4848,11 @@ public class ChatSample : MonoBehaviour
             }
             else if (result.Action == "forget")
             {
+                if (string.Equals(m_LastRememberedSongId, result.SongId, StringComparison.Ordinal))
+                {
+                    m_LastRememberedSongId = "";
+                    m_LastRememberedSongResultTime = -999f;
+                }
                 m_LastSongMemoryResult =
                     $"已从本机曲库删除歌曲ID={result.SongId}（{result.DisplayName}）及其受管WAV。";
             }
@@ -4757,10 +5033,12 @@ public class ChatSample : MonoBehaviour
     public bool CanPrepareStreamingHumBackPrefix()
     {
         return m_EnableStreamingHumBackPrefix && m_EnableAutonomousHumBack &&
-            m_EnableNeuralHumSVC && m_IsVoiceMode && HasActiveSingAlongRequest() &&
+            m_EnableNeuralHumSVC && !m_EnableSingingVoiceSynthesis &&
+            m_IsVoiceMode && HasActiveSingAlongRequest() &&
             !HasStrongSpeculativeSpeechVeto() &&
             !m_HumBackPrefixPreparing && m_PreparedHumBackPrefixClip == null &&
             !m_FastHumBackEouStaged && !m_FastHumBackActive &&
+            m_ActiveSVSRequest == null &&
             m_ActiveHumSVCRequest == null;
     }
 
@@ -5411,8 +5689,14 @@ public class ChatSample : MonoBehaviour
         unchecked
         {
             m_HumPerformanceCounter++;
-            return (Environment.TickCount * 397) ^ (m_HumPerformanceCounter * 7919) ^
+            int mixed = (Environment.TickCount * 397) ^
+                (m_HumPerformanceCounter * 7919) ^
                 Guid.NewGuid().GetHashCode();
+            // Unity's int hash can be negative, while NumPy's legacy RNG accepts
+            // only unsigned 32-bit seeds. Keep the shared tool seed in the
+            // positive Int32 range so every renderer receives the same valid value.
+            int seed = mixed & 0x7FFFFFFF;
+            return seed == 0 ? 1 : seed;
         }
     }
 
@@ -5521,6 +5805,7 @@ public class ChatSample : MonoBehaviour
                 m_PendingHumLanguage = "";
                 m_PendingHumReason = request.Reason ?? "";
                 m_PendingHumMode = result.Continuation ? "continue" : "memory";
+                m_PendingHumLyricsOverride = "";
                 m_PendingHumSourceWav = result.WavBytes;
                 m_PendingHumIsPracticeComposition = false;
                 m_PendingHumIsCatalogSong = true;
@@ -5687,6 +5972,9 @@ public class ChatSample : MonoBehaviour
         m_PendingHumLanguage = language ?? "";
         m_PendingHumReason = request.Reason ?? "";
         m_PendingHumMode = composePractice ? "practice" : "echo";
+        m_PendingHumLyricsOverride = composePractice
+            ? ""
+            : (request.Lyrics ?? "").Trim();
         m_PendingHumSourceWav = sourceWav;
         m_PendingHumIsPracticeComposition = composePractice;
         m_PendingHumIsCatalogSong = false;
@@ -5697,6 +5985,7 @@ public class ChatSample : MonoBehaviour
         m_PendingHumRmsMixRate = rmsMixRate;
         m_PendingHumProtect = protect;
         m_PendingHumVariationDiagnostic = variationDiagnostic ?? "";
+        m_PendingHumRenderer = "pending";
         m_HumBackPending = true;
         if (m_LogHumBack)
         {
@@ -5714,6 +6003,80 @@ public class ChatSample : MonoBehaviour
     /// 在当前文字回复完全播放后启动旋律回哼。准备载体的阶段也算角色正在回应，
     /// 因而实时 VAD 会继续走 barge-in 路径，用户可以随时打断。
     /// </summary>
+    private bool TryBuildPendingTimelineScoreJson(out string scoreJson)
+    {
+        scoreJson = "";
+        if (m_PendingHumTimeline == null || m_PendingHumTimeline.Length == 0)
+            return false;
+        float frameSeconds = Mathf.Clamp(m_PendingHumFrameSeconds, 0.02f, 0.25f);
+        var notes = new List<SenseVoiceSpeechToText.SingingNote>();
+        var f0 = new float[m_PendingHumTimeline.Length];
+        var energy = new float[m_PendingHumTimeline.Length];
+        var breaths = new List<float>();
+        int start = 0;
+        while (start < m_PendingHumTimeline.Length)
+        {
+            int label = m_PendingHumTimeline[start] > 1f
+                ? Mathf.RoundToInt(m_PendingHumTimeline[start])
+                : 0;
+            int end = start + 1;
+            while (end < m_PendingHumTimeline.Length)
+            {
+                int next = m_PendingHumTimeline[end] > 1f
+                    ? Mathf.RoundToInt(m_PendingHumTimeline[end])
+                    : 0;
+                if (next != label) break;
+                end++;
+            }
+            float duration = (end - start) * frameSeconds;
+            notes.Add(new SenseVoiceSpeechToText.SingingNote
+            {
+                midi = label,
+                note_name = "",
+                start_seconds = start * frameSeconds,
+                duration_seconds = duration,
+                note_type = label > 0 ? "note" : "rest",
+                confidence = label > 0 ? 0.72f : 1f,
+            });
+            if (label == 0 && start > 0 && end < m_PendingHumTimeline.Length &&
+                duration >= 0.12f)
+                breaths.Add((start + end) * 0.5f * frameSeconds);
+            start = end;
+        }
+        for (int i = 0; i < m_PendingHumTimeline.Length; i++)
+        {
+            float midi = m_PendingHumTimeline[i];
+            if (midi > 1f)
+            {
+                f0[i] = 440f * Mathf.Pow(2f, (midi - 69f) / 12f);
+                energy[i] = 1f;
+            }
+        }
+        var score = new SenseVoiceSpeechToText.SingingScore
+        {
+            schema_version = 1,
+            source = m_PendingHumIsCatalogSong
+                ? "remembered_song"
+                : (m_PendingHumIsPracticeComposition
+                    ? "practice_composition"
+                    : "playable_timeline"),
+            extractor_backend = "unity-playable-timeline",
+            language = m_PendingHumLanguage ?? "",
+            lyrics = "",
+            lyrics_alignment = "backend_transcription_required",
+            duration_seconds = m_PendingHumTimeline.Length * frameSeconds,
+            frame_seconds = frameSeconds,
+            confidence = 0.72f,
+            notes = notes.ToArray(),
+            f0_hz = f0,
+            energy = energy,
+            breath_positions_seconds = breaths.ToArray(),
+            vibrato = new SenseVoiceSpeechToText.SingingVibrato[0],
+        };
+        scoreJson = JsonUtility.ToJson(score);
+        return !string.IsNullOrWhiteSpace(scoreJson);
+    }
+
     private bool TryBeginPendingHumBack()
     {
         if (!m_HumBackPending || m_HumBackPreparingCarrier || m_HumBackPlaying) return false;
@@ -5735,27 +6098,114 @@ public class ChatSample : MonoBehaviour
         m_TextBack.text = "♪ …";
         SetAnimator("state", 1);
 
-        if (m_EnableNeuralHumSVC)
-        {
-            SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
-                ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
-                : null;
-            GPTSoVITSFASTAPI characterVoice = m_ChatSettings != null
-                ? m_ChatSettings.m_TextToSpeech as GPTSoVITSFASTAPI
-                : null;
-            byte[] sourceWav = m_PendingHumSourceWav;
-            string targetPath = characterVoice != null
-                ? characterVoice.GetReferenceAudioPathForVoiceConversion()
-                : "";
-            if ((sourceWav != null ||
-                 (senseVoice != null && senseVoice.TryGetRecentSingingAudio(out sourceWav))) &&
-                sourceWav != null && sourceWav.Length > 44 && !string.IsNullOrWhiteSpace(targetPath))
-            {
-                m_HumBackPreparingCarrier = true;
-                StartCoroutine(RequestNeuralHumBack(generation, sourceWav, targetPath));
-                return true;
-            }
+        SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+            : null;
+        GPTSoVITSFASTAPI characterVoice = m_ChatSettings != null
+            ? m_ChatSettings.m_TextToSpeech as GPTSoVITSFASTAPI
+            : null;
+        byte[] sourceWav = m_PendingHumSourceWav;
+        string targetPath = characterVoice != null
+            ? characterVoice.GetReferenceAudioPathForVoiceConversion()
+            : "";
+        string svsPromptPath = ResolveSVSPromptAudioPath(targetPath);
+        bool hasNeuralInputs =
+            (sourceWav != null ||
+             (senseVoice != null &&
+              senseVoice.TryGetRecentSingingAudio(out sourceWav))) &&
+            sourceWav != null && sourceWav.Length > 44 &&
+            !string.IsNullOrWhiteSpace(targetPath);
 
+        string scoreJson = "";
+        string scoreLyrics = "";
+        string scoreLanguage = "";
+        bool hasSingingScore = false;
+        if (!m_PendingHumIsPracticeComposition && !m_PendingHumIsCatalogSong &&
+            senseVoice != null)
+        {
+            hasSingingScore = senseVoice.TryGetRecentSingingScoreJson(
+                out scoreJson, out scoreLyrics, out scoreLanguage);
+        }
+        if (!hasSingingScore)
+        {
+            hasSingingScore = TryBuildPendingTimelineScoreJson(out scoreJson);
+            scoreLanguage = m_PendingHumLanguage ?? "";
+        }
+        if (hasSingingScore &&
+            !string.IsNullOrWhiteSpace(m_PendingHumLyricsOverride))
+        {
+            try
+            {
+                var correctedScore =
+                    JsonUtility.FromJson<SenseVoiceSpeechToText.SingingScore>(
+                        scoreJson);
+                if (correctedScore != null)
+                {
+                    correctedScore.lyrics = m_PendingHumLyricsOverride;
+                    correctedScore.lyrics_alignment =
+                        "explicit-user-or-agent-correction";
+                    correctedScore.lyrics_override = true;
+                    // A lyric correction invalidates the kana derived from the
+                    // previous SenseVoice transcript. The Japanese 9883
+                    // adapter will regenerate it from the corrected text.
+                    if (string.Equals(
+                        correctedScore.language, "ja",
+                        StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(
+                            correctedScore.language, "japanese",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        correctedScore.lyrics_reading = "";
+                        correctedScore.lyrics_reading_source = "";
+                        correctedScore.lyrics_reading_complete = false;
+                        correctedScore.lyrics_mora = null;
+                    }
+                    scoreJson = JsonUtility.ToJson(correctedScore);
+                    scoreLyrics = m_PendingHumLyricsOverride;
+                    if (m_LogHumBack)
+                        Debug.Log(
+                            "[HumBack/SVS] 使用明确歌词修正: " +
+                            m_PendingHumLyricsOverride);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (m_LogHumBack)
+                    Debug.LogWarning(
+                        "[HumBack/SVS] 歌词修正写入乐谱失败: " + ex.Message);
+            }
+        }
+
+        if (m_EnableSingingVoiceSynthesis && hasNeuralInputs && hasSingingScore)
+        {
+            string svsLanguage = !string.IsNullOrWhiteSpace(scoreLanguage)
+                ? scoreLanguage
+                : m_PendingHumLanguage;
+            // Language support belongs to the pluggable 9883 backend. The
+            // router sends Japanese to a configured kana-score renderer and
+            // keeps SoulX limited to the languages it actually supports.
+            m_HumBackPreparingCarrier = true;
+            StartCoroutine(RequestSingingVoiceSynthesis(
+                generation,
+                sourceWav,
+                svsPromptPath,
+                targetPath,
+                scoreJson,
+                scoreLyrics,
+                svsLanguage));
+            return true;
+        }
+
+        if (m_EnableNeuralHumSVC && hasNeuralInputs)
+        {
+            m_PendingHumRenderer = "svc";
+            m_HumBackPreparingCarrier = true;
+            StartCoroutine(RequestNeuralHumBack(generation, sourceWav, targetPath));
+            return true;
+        }
+
+        if (m_EnableNeuralHumSVC || m_EnableSingingVoiceSynthesis)
+        {
             const string missingInput = "歌声转换服务缺少仍在保留期内的原始歌声音频或角色参考音频";
             if (!m_AllowLegacyHumFallback)
             {
@@ -5774,6 +6224,7 @@ public class ChatSample : MonoBehaviour
     private void BeginLegacyHumBack(int generation)
     {
         if (generation != m_HumBackGeneration) return;
+        m_PendingHumRenderer = "legacy";
 
         AudioClip carrier = m_CharacterHumCarrierClip != null
             ? m_CharacterHumCarrierClip
@@ -5816,6 +6267,223 @@ public class ChatSample : MonoBehaviour
             }
             BuildAndPlayHumBack(generation, clip);
         });
+    }
+
+    [Serializable]
+    private class SVSHealthResponse
+    {
+        public bool ok = false;
+        public bool backend_available = false;
+        public string backend = "";
+        public string[] missing = null;
+    }
+
+    private string GetSVSBaseURL()
+    {
+        string url = (m_SVSURL ?? "").Trim().TrimEnd('/');
+        int scheme = url.IndexOf("://", StringComparison.Ordinal);
+        int lastSlash = url.LastIndexOf('/');
+        if (lastSlash > scheme + 2) url = url.Substring(0, lastSlash);
+        return url.TrimEnd('/');
+    }
+
+    private IEnumerator ProbeSVSHealth(Action<bool, string> completed)
+    {
+        string healthURL = GetSVSBaseURL() + "/health";
+        using (UnityWebRequest request = UnityWebRequest.Get(healthURL))
+        {
+            request.timeout = 2;
+            yield return request.SendWebRequest();
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                completed(false,
+                    $"{healthURL} HTTP={request.responseCode} error={request.error}");
+                yield break;
+            }
+            SVSHealthResponse health = null;
+            try
+            {
+                health = JsonUtility.FromJson<SVSHealthResponse>(
+                    request.downloadHandler.text);
+            }
+            catch (Exception)
+            {
+                // A malformed health response is treated as unavailable.
+            }
+            bool ready = health != null && health.ok && health.backend_available;
+            string missing = health != null && health.missing != null
+                ? string.Join(",", health.missing)
+                : "unknown";
+            completed(ready, ready
+                ? $"{health.backend} ready"
+                : "BACKEND_UNAVAILABLE: missing=" + missing);
+        }
+    }
+
+    private bool TryLaunchSVS(out string detail)
+    {
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+        try
+        {
+            string projectRoot = System.IO.Directory.GetParent(Application.dataPath)?.FullName;
+            if (string.IsNullOrWhiteSpace(projectRoot))
+            {
+                detail = "无法定位 Unity 项目根目录";
+                return false;
+            }
+            string relative = (m_SVSStartScriptRelativePath ?? "")
+                .Replace('/', System.IO.Path.DirectorySeparatorChar);
+            string scriptPath = System.IO.Path.GetFullPath(
+                System.IO.Path.Combine(projectRoot, relative));
+            if (!System.IO.File.Exists(scriptPath))
+            {
+                detail = "SVS 启动脚本不存在: " + scriptPath;
+                return false;
+            }
+            string scriptDirectory = System.IO.Path.GetDirectoryName(scriptPath);
+            string runtimeDirectory = System.IO.Path.Combine(scriptDirectory, "runtime");
+            System.IO.Directory.CreateDirectory(runtimeDirectory);
+            string logPath = System.IO.Path.Combine(runtimeDirectory, "svs_server.log");
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File " +
+                            QuoteProcessArgument(scriptPath) + " -LogPath " +
+                            QuoteProcessArgument(logPath),
+                WorkingDirectory = scriptDirectory,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+            };
+            if (m_SVSServerProcess != null)
+            {
+                m_SVSServerProcess.Dispose();
+                m_SVSServerProcess = null;
+            }
+            m_SVSServerProcess = System.Diagnostics.Process.Start(startInfo);
+            if (m_SVSServerProcess == null)
+            {
+                detail = "Windows 未能创建 9883 启动进程";
+                return false;
+            }
+            detail = $"已启动 PID={m_SVSServerProcess.Id}, log={logPath}";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            detail = "SVS 自动启动异常: " + ex.Message;
+            return false;
+        }
+#else
+        detail = "当前平台不支持自动启动 PowerShell；请手工运行 Server/SVS/start_svs_server.ps1";
+        return false;
+#endif
+    }
+
+    private void SetSVSStartupResult(bool succeeded, string detail)
+    {
+        m_SVSStartupSucceeded = succeeded;
+        m_SVSStartupDetail = detail ?? "";
+        m_SVSStartupInProgress = false;
+    }
+
+    private IEnumerator EnsureSVSReady(Action<bool, string> completed)
+    {
+        float timeout = Mathf.Clamp(m_SVSStartupTimeoutSeconds, 5f, 120f);
+        if (m_SVSStartupInProgress)
+        {
+            float waitDeadline = Time.realtimeSinceStartup + timeout;
+            while (m_SVSStartupInProgress &&
+                   Time.realtimeSinceStartup < waitDeadline)
+                yield return null;
+            completed(m_SVSStartupSucceeded, m_SVSStartupDetail);
+            yield break;
+        }
+
+        m_SVSStartupInProgress = true;
+        bool healthy = false;
+        string healthDetail = "";
+        yield return ProbeSVSHealth((ok, detail) =>
+        {
+            healthy = ok;
+            healthDetail = detail;
+        });
+        if (healthy)
+        {
+            SetSVSStartupResult(true, healthDetail);
+            completed(true, m_SVSStartupDetail);
+            yield break;
+        }
+        if (healthDetail.StartsWith("BACKEND_UNAVAILABLE", StringComparison.Ordinal))
+        {
+            SetSVSStartupResult(false, healthDetail);
+            completed(false, m_SVSStartupDetail);
+            yield break;
+        }
+        if (!m_AutoStartSVS)
+        {
+            SetSVSStartupResult(false, "9883 未运行且自动启动已关闭: " + healthDetail);
+            completed(false, m_SVSStartupDetail);
+            yield break;
+        }
+
+        bool processRunning = false;
+        try
+        {
+            processRunning = m_SVSServerProcess != null &&
+                             !m_SVSServerProcess.HasExited;
+        }
+        catch (Exception)
+        {
+            processRunning = false;
+        }
+        string launchDetail = "已有 SVS 启动进程";
+        if (!processRunning && !TryLaunchSVS(out launchDetail))
+        {
+            SetSVSStartupResult(false, launchDetail);
+            completed(false, m_SVSStartupDetail);
+            yield break;
+        }
+
+        float deadline = Time.realtimeSinceStartup + timeout;
+        while (Time.realtimeSinceStartup < deadline)
+        {
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return ProbeSVSHealth((ok, detail) =>
+            {
+                healthy = ok;
+                healthDetail = detail;
+            });
+            if (healthy)
+            {
+                SetSVSStartupResult(true, "自动启动成功: " + healthDetail);
+                completed(true, m_SVSStartupDetail);
+                yield break;
+            }
+            if (healthDetail.StartsWith("BACKEND_UNAVAILABLE",
+                StringComparison.Ordinal))
+            {
+                SetSVSStartupResult(false, healthDetail);
+                completed(false, m_SVSStartupDetail);
+                yield break;
+            }
+            try
+            {
+                if (m_SVSServerProcess != null && m_SVSServerProcess.HasExited)
+                {
+                    SetSVSStartupResult(false,
+                        $"SVS 启动进程提前退出(code={m_SVSServerProcess.ExitCode})");
+                    completed(false, m_SVSStartupDetail);
+                    yield break;
+                }
+            }
+            catch (Exception)
+            {
+                // Health remains authoritative.
+            }
+        }
+        SetSVSStartupResult(false, "等待 9883 就绪超时: " + healthDetail);
+        completed(false, m_SVSStartupDetail);
     }
 
     private string GetHumSVCBaseURL()
@@ -6012,11 +6680,60 @@ public class ChatSample : MonoBehaviour
         completed(false, m_HumSVCStartupDetail);
     }
 
-    private IEnumerator RequestNeuralHumBack(int generation, byte[] sourceWav, string targetPath)
+    private void FallbackFromSVS(
+        int generation,
+        byte[] sourceWav,
+        string targetPath,
+        string failure)
+    {
+        if (generation != m_HumBackGeneration) return;
+        if (m_LogHumBack)
+            Debug.LogWarning("[HumBack/SVS] " + failure);
+        if (m_AllowSVCFallbackFromSVS && m_EnableNeuralHumSVC)
+        {
+            m_PendingHumRenderer = "svc-fallback";
+            m_HumBackPreparingCarrier = true;
+            if (m_LogHumBack)
+                Debug.LogWarning("[HumBack/SVS] 明确降级：改用 9882 SVC（非歌声生成）");
+            StartCoroutine(RequestNeuralHumBack(generation, sourceWav, targetPath));
+            return;
+        }
+        m_HumBackPreparingCarrier = false;
+        if (m_AllowLegacyHumFallback) BeginLegacyHumBack(generation);
+        else FinishHumBack(generation, false, failure);
+    }
+
+    private string ResolveSVSPromptAudioPath(string fallbackPath)
+    {
+        string configured = (m_SVSPromptAudioPath ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(configured)) return fallbackPath;
+        if (Path.IsPathRooted(configured))
+            return Path.GetFullPath(configured).Replace('\\', '/');
+
+        string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? "";
+        if (!string.IsNullOrWhiteSpace(projectRoot))
+        {
+            string projectPath = Path.GetFullPath(Path.Combine(projectRoot, configured));
+            if (File.Exists(projectPath)) return projectPath.Replace('\\', '/');
+        }
+        string assetPath = Path.GetFullPath(Path.Combine(Application.dataPath, configured));
+        return File.Exists(assetPath)
+            ? assetPath.Replace('\\', '/')
+            : fallbackPath;
+    }
+
+    private IEnumerator RequestSingingVoiceSynthesis(
+        int generation,
+        byte[] sourceWav,
+        string promptPath,
+        string svcFallbackPath,
+        string scoreJson,
+        string scoreLyrics,
+        string language)
     {
         bool serviceReady = false;
         string serviceDetail = "";
-        yield return EnsureHumSVCReady((ready, detail) =>
+        yield return EnsureSVSReady((ready, detail) =>
         {
             serviceReady = ready;
             serviceDetail = detail;
@@ -6024,10 +6741,214 @@ public class ChatSample : MonoBehaviour
         if (generation != m_HumBackGeneration) yield break;
         if (!serviceReady)
         {
+            FallbackFromSVS(
+                generation,
+                sourceWav,
+                svcFallbackPath,
+                "独立歌声合成服务未就绪: " + serviceDetail);
+            yield break;
+        }
+
+        string requestId = Guid.NewGuid().ToString("N");
+        WWWForm form = new WWWForm();
+        form.AddBinaryData("audio_file", sourceWav, "recognized_singing.wav", "audio/wav");
+        form.AddField("score_json", scoreJson ?? "");
+        form.AddField("prompt_audio_path", promptPath ?? "");
+        form.AddField("language", language ?? "");
+        form.AddField("prompt_language", m_SVSPromptLanguage ?? "en");
+        form.AddField("seed", m_PendingHumPerformanceSeed);
+        form.AddField("request_id", requestId);
+        form.AddField("max_seconds", m_HumBackMaxSeconds.ToString(
+            "0.###", System.Globalization.CultureInfo.InvariantCulture));
+        form.AddField("inference_steps", Mathf.Clamp(m_SVSInferenceSteps, 4, 32));
+
+        using (UnityWebRequest request = UnityWebRequest.Post(m_SVSURL, form))
+        {
+            request.downloadHandler = new DownloadHandlerAudioClip(m_SVSURL, AudioType.WAV);
+            request.timeout = Mathf.Clamp(m_SVSTimeoutSeconds, 30, 600);
+            m_ActiveSVSRequest = request;
+            m_ActiveSVSRequestId = requestId;
+            float startedAt = Time.realtimeSinceStartup;
+            if (m_LogHumBack)
+                Debug.Log($"[HumBack/SVS] 开始真正歌声生成 sourceBytes={sourceWav.Length} " +
+                          $"scoreBytes={(scoreJson ?? "").Length} lyrics={scoreLyrics?.Length ?? 0} " +
+                          $"language={language} seed={m_PendingHumPerformanceSeed}");
+
+            yield return request.SendWebRequest();
+            if (m_ActiveSVSRequest == request)
+            {
+                m_ActiveSVSRequest = null;
+                m_ActiveSVSRequestId = "";
+            }
+            if (generation != m_HumBackGeneration) yield break;
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                string failure =
+                    $"SVS 请求失败 HTTP={request.responseCode} error={request.error}";
+                try
+                {
+                    byte[] responseBytes = request.downloadHandler != null
+                        ? request.downloadHandler.data
+                        : null;
+                    if (responseBytes != null && responseBytes.Length > 0)
+                    {
+                        string body = System.Text.Encoding.UTF8.GetString(responseBytes);
+                        if (!string.IsNullOrWhiteSpace(body))
+                            failure += " detail=" + TruncateForFrame(body, 800);
+                    }
+                }
+                catch (Exception)
+                {
+                    // Audio download handlers may hide an error JSON body.
+                }
+                FallbackFromSVS(generation, sourceWav, svcFallbackPath, failure);
+                yield break;
+            }
+
+            string complete = request.GetResponseHeader("X-SVS-Complete") ?? "";
+            if (complete != "1" &&
+                !string.Equals(complete, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                FallbackFromSVS(
+                    generation,
+                    sourceWav,
+                    svcFallbackPath,
+                    "SVS 返回结果没有通过完成标记校验");
+                yield break;
+            }
+
+            AudioClip synthesized = null;
+            try
+            {
+                synthesized = DownloadHandlerAudioClip.GetContent(request);
+            }
+            catch (Exception ex)
+            {
+                if (m_LogHumBack)
+                    Debug.LogWarning("[HumBack/SVS] WAV 解码失败: " + ex.Message);
+            }
+            if (synthesized == null || synthesized.length <= 0.05f)
+            {
+                if (synthesized != null) Destroy(synthesized);
+                FallbackFromSVS(
+                    generation,
+                    sourceWav,
+                    svcFallbackPath,
+                    "SVS 返回了空音频或无法解码的音频");
+                yield break;
+            }
+
+            synthesized.name = "NeEEvA_Synthesized_Singing";
+            string backend = request.GetResponseHeader("X-SVS-Backend") ??
+                "singing-voice-synthesis";
+            string sourceSeconds = request.GetResponseHeader("X-SVS-Source-Seconds") ?? "?";
+            string outputSeconds = request.GetResponseHeader("X-SVS-Output-Seconds") ?? "?";
+            string serverElapsed = request.GetResponseHeader("X-SVS-Elapsed") ?? "?";
+            string promptCache = request.GetResponseHeader("X-SVS-Prompt-Cache") ?? "?";
+            string targetMetadata = request.GetResponseHeader("X-SVS-Target-Metadata") ?? "?";
+            string alignment = request.GetResponseHeader("X-SVS-Alignment") ?? "?";
+            string lyricsSource = request.GetResponseHeader("X-SVS-Lyrics-Source") ?? "?";
+            string alignmentCache =
+                request.GetResponseHeader("X-SVS-Alignment-Cache") ?? "?";
+            string preprocessSeconds =
+                request.GetResponseHeader("X-SVS-Preprocess-Seconds") ?? "?";
+            string modelSeconds =
+                request.GetResponseHeader("X-SVS-Model-Load-Seconds") ?? "?";
+            string transferSeconds =
+                request.GetResponseHeader("X-SVS-Model-Transfer-Seconds") ?? "?";
+            string inferenceSeconds =
+                request.GetResponseHeader("X-SVS-Inference-Seconds") ?? "?";
+            string inferenceSteps =
+                request.GetResponseHeader("X-SVS-Inference-Steps") ?? "?";
+            string persistentWorker =
+                request.GetResponseHeader("X-SVS-Persistent-Worker") ?? "?";
+            string captureId =
+                request.GetResponseHeader("X-SVS-Capture") ?? "?";
+            float unityElapsed = Time.realtimeSinceStartup - startedAt;
+            string svsDiagnostic =
+                $"independent SVS complete source={sourceSeconds}s output={outputSeconds}s, " +
+                $"backend={backend}, promptCache={promptCache}, target={targetMetadata}, " +
+                $"alignment={alignment}, lyrics={lyricsSource}, " +
+                $"alignmentCache={alignmentCache}, " +
+                $"preprocess={preprocessSeconds}s, model={modelSeconds}s, " +
+                $"transfer={transferSeconds}s, worker={persistentWorker}, " +
+                $"inference={inferenceSeconds}s/{inferenceSteps}steps, " +
+                $"server={serverElapsed}s, capture={captureId}, " +
+                $"total={unityElapsed:F2}s";
+
+            if (m_EnableSVSRVCPostPolish)
+            {
+                byte[] generatedWav = null;
+                try
+                {
+                    generatedWav = WavUtility.FromAudioClip(synthesized);
+                }
+                catch (Exception ex)
+                {
+                    if (m_LogHumBack)
+                        Debug.LogWarning(
+                            "[HumBack/SVS→RVC] 独立结果编码失败，直接播放未润色版本: " +
+                            ex.Message);
+                }
+                if (generatedWav != null && generatedWav.Length > 44)
+                {
+                    m_PendingHumRenderer = "svc-post-polish";
+                    StartCoroutine(RequestNeuralHumBack(
+                        generation,
+                        generatedWav,
+                        svcFallbackPath,
+                        synthesized,
+                        svsDiagnostic));
+                    yield break;
+                }
+            }
+
+            m_HumBackPreparingCarrier = false;
+            m_PendingHumRenderer = "independent-svs";
+            ApplyHumBackGain(synthesized);
+            PlayHumBackClip(
+                generation,
+                synthesized,
+                svsDiagnostic);
+        }
+    }
+
+    private IEnumerator RequestNeuralHumBack(
+        int generation,
+        byte[] sourceWav,
+        string targetPath,
+        AudioClip independentFallback = null,
+        string independentDiagnostic = "")
+    {
+        bool isSVSPostPolish = independentFallback != null;
+        bool serviceReady = false;
+        string serviceDetail = "";
+        yield return EnsureHumSVCReady((ready, detail) =>
+        {
+            serviceReady = ready;
+            serviceDetail = detail;
+        });
+        if (generation != m_HumBackGeneration)
+        {
+            if (independentFallback != null) Destroy(independentFallback);
+            yield break;
+        }
+        if (!serviceReady)
+        {
             m_HumBackPreparingCarrier = false;
             string failure = "歌声转换服务未就绪: " + serviceDetail;
             if (m_LogHumBack) Debug.LogWarning("[HumBack/SVC] " + failure);
-            if (m_AllowLegacyHumFallback) BeginLegacyHumBack(generation);
+            if (isSVSPostPolish)
+            {
+                m_PendingHumRenderer = "independent-svs";
+                ApplyHumBackGain(independentFallback);
+                PlayHumBackClip(
+                    generation,
+                    independentFallback,
+                    independentDiagnostic + "; RVC post-polish skipped: " + failure);
+            }
+            else if (m_AllowLegacyHumFallback) BeginLegacyHumBack(generation);
             else FinishHumBack(generation, false, failure);
             yield break;
         }
@@ -6038,9 +6959,17 @@ public class ChatSample : MonoBehaviour
         form.AddField("target_path", targetPath);
         form.AddField("request_id", requestId);
         form.AddField("diffusion_steps", Mathf.Clamp(m_HumSVCDiffusionSteps, 4, 30));
-        form.AddField("auto_f0_adjust", m_HumSVCAutoF0Adjust ? "true" : "false");
-        form.AddField("semitone_shift", Mathf.Clamp(
-            m_HumSVCSemitoneShift + m_PendingHumSemitoneOffset, -12, 12));
+        form.AddField(
+            "auto_f0_adjust",
+            !isSVSPostPolish && m_HumSVCAutoF0Adjust ? "true" : "false");
+        form.AddField(
+            "semitone_shift",
+            isSVSPostPolish
+                ? 0
+                : Mathf.Clamp(
+                    m_HumSVCSemitoneShift + m_PendingHumSemitoneOffset,
+                    -12,
+                    12));
         form.AddField("performance_seed", m_PendingHumPerformanceSeed);
         form.AddField("rms_mix_rate", InvariantFloat(m_PendingHumRmsMixRate));
         form.AddField("protect", InvariantFloat(m_PendingHumProtect));
@@ -6056,7 +6985,9 @@ public class ChatSample : MonoBehaviour
             float startedAt = Time.realtimeSinceStartup;
             if (m_LogHumBack)
                 Debug.Log($"[HumBack/SVC] 开始转换 sourceBytes={sourceWav.Length} " +
-                          $"steps={m_HumSVCDiffusionSteps} autoF0={m_HumSVCAutoF0Adjust} " +
+                          $"mode={(isSVSPostPolish ? "svc-post-polish" : "svc")} " +
+                          $"steps={m_HumSVCDiffusionSteps} " +
+                          $"autoF0={!isSVSPostPolish && m_HumSVCAutoF0Adjust} " +
                           $"seed={m_PendingHumPerformanceSeed} rms={m_PendingHumRmsMixRate:F2} " +
                           $"protect={m_PendingHumProtect:F2} " +
                           $"target=\"{targetPath}\"");
@@ -6068,7 +6999,11 @@ public class ChatSample : MonoBehaviour
                 m_ActiveHumSVCRequestId = "";
             }
 
-            if (generation != m_HumBackGeneration) yield break;
+            if (generation != m_HumBackGeneration)
+            {
+                if (independentFallback != null) Destroy(independentFallback);
+                yield break;
+            }
             m_HumBackPreparingCarrier = false;
             if (request.result != UnityWebRequest.Result.Success)
             {
@@ -6090,7 +7025,16 @@ public class ChatSample : MonoBehaviour
                     // DownloadHandlerAudioClip 在错误响应上不保证能暴露正文；保留基础错误即可。
                 }
                 if (m_LogHumBack) Debug.LogWarning("[HumBack/SVC] " + failure);
-                if (m_AllowLegacyHumFallback) BeginLegacyHumBack(generation);
+                if (isSVSPostPolish)
+                {
+                    m_PendingHumRenderer = "independent-svs";
+                    ApplyHumBackGain(independentFallback);
+                    PlayHumBackClip(
+                        generation,
+                        independentFallback,
+                        independentDiagnostic + "; RVC post-polish failed: " + failure);
+                }
+                else if (m_AllowLegacyHumFallback) BeginLegacyHumBack(generation);
                 else FinishHumBack(generation, false, failure);
                 yield break;
             }
@@ -6108,7 +7052,16 @@ public class ChatSample : MonoBehaviour
             {
                 if (converted != null) Destroy(converted);
                 const string failure = "Seed-VC 返回的音频为空或无法解码";
-                if (m_AllowLegacyHumFallback) BeginLegacyHumBack(generation);
+                if (isSVSPostPolish)
+                {
+                    m_PendingHumRenderer = "independent-svs";
+                    ApplyHumBackGain(independentFallback);
+                    PlayHumBackClip(
+                        generation,
+                        independentFallback,
+                        independentDiagnostic + "; RVC post-polish failed: " + failure);
+                }
+                else if (m_AllowLegacyHumFallback) BeginLegacyHumBack(generation);
                 else FinishHumBack(generation, false, failure);
                 yield break;
             }
@@ -6122,12 +7075,29 @@ public class ChatSample : MonoBehaviour
                 string failure =
                     $"歌声转换没有通过完整性校验 source={sourceSeconds}s output={outputSeconds}s";
                 if (m_LogHumBack) Debug.LogWarning("[HumBack/SVC] " + failure);
-                if (m_AllowLegacyHumFallback) BeginLegacyHumBack(generation);
+                if (isSVSPostPolish)
+                {
+                    m_PendingHumRenderer = "independent-svs";
+                    ApplyHumBackGain(independentFallback);
+                    PlayHumBackClip(
+                        generation,
+                        independentFallback,
+                        independentDiagnostic + "; RVC post-polish failed: " + failure);
+                }
+                else if (m_AllowLegacyHumFallback) BeginLegacyHumBack(generation);
                 else FinishHumBack(generation, false, failure);
                 yield break;
             }
 
+            if (isSVSPostPolish)
+            {
+                Destroy(independentFallback);
+                m_PendingHumRenderer = "svc-post-polish";
+            }
             converted.name = "NeEEvA_Neural_HumBack";
+            if (string.IsNullOrEmpty(m_PendingHumRenderer) ||
+                m_PendingHumRenderer == "pending")
+                m_PendingHumRenderer = "svc";
             ApplyHumBackGain(converted);
             string backend = request.GetResponseHeader("X-SVC-Backend") ?? "seed-vc";
             string device = request.GetResponseHeader("X-SVC-Device") ?? "unknown";
@@ -6138,7 +7108,10 @@ public class ChatSample : MonoBehaviour
             PlayHumBackClip(
                 generation,
                 converted,
-                $"neural SVC complete source={sourceSeconds}s output={outputSeconds}s, " +
+                (isSVSPostPolish
+                    ? independentDiagnostic + "; RVC post-polish complete "
+                    : "neural SVC complete ") +
+                $"source={sourceSeconds}s output={outputSeconds}s, " +
                 $"backend={backend}, device={device}, autoF0={autoF0}, seed={seed}, " +
                 $"server={serverElapsed}s, total={unityElapsed:F2}s");
         }
@@ -6256,6 +7229,7 @@ public class ChatSample : MonoBehaviour
         bool wasCatalogSong = m_PendingHumIsCatalogSong;
         bool wasCatalogContinuation = m_PendingHumIsCatalogContinuation;
         string catalogSongName = m_PendingCatalogSongName;
+        string renderer = m_PendingHumRenderer ?? "unknown";
         m_HumBackNeedsHistoryEntry = false;
         m_HumBackPending = false;
         m_HumBackPreparingCarrier = false;
@@ -6264,12 +7238,14 @@ public class ChatSample : MonoBehaviour
         m_PendingHumLanguage = "";
         m_PendingHumReason = "";
         m_PendingHumMode = "echo";
+        m_PendingHumLyricsOverride = "";
         m_PendingHumSourceWav = null;
         m_PendingHumIsPracticeComposition = false;
         m_PendingHumIsCatalogSong = false;
         m_PendingHumIsCatalogContinuation = false;
         m_PendingCatalogSongName = "";
         m_PendingHumVariationDiagnostic = "";
+        m_PendingHumRenderer = "pending";
         m_FastHumBackEouStaged = false;
         m_FastHumBackActive = false;
         m_FastHumBackFinalDecisionReceived = false;
@@ -6306,14 +7282,23 @@ public class ChatSample : MonoBehaviour
         if (needsHistory && m_ChatHistory != null) m_ChatHistory.Add(actionText);
         if (completed)
         {
+            string rendererFact = renderer == "independent-svs"
+                ? " 渲染事实：本次由独立 SVS 根据歌词/旋律重新生成，不是变声。"
+                : (renderer == "svc-post-polish"
+                    ? " 渲染事实：本次先由独立 SVS 生成，再使用角色 RVC 做了音色转换润色。"
+                    : (renderer == "svc-fallback" || renderer == "svc"
+                    ? " 渲染事实：本次使用 SVC 音色转换，不得描述成独立歌声生成。"
+                    : (renderer == "legacy"
+                        ? " 渲染事实：本次使用旧式本地哼声合成。"
+                        : "")));
             RecordHumBackResult(
                 wasCatalogSong
                     ? (wasCatalogContinuation
-                        ? $"成功：已经从本地歌曲记忆中定位并真实播放了“{catalogSongName}”当前片段之后的已学内容。"
-                        : $"成功：已经从本地歌曲记忆中取出“{catalogSongName}”并用角色声线真实播放完成。")
+                        ? $"成功：已经从本地歌曲记忆中定位并真实播放了“{catalogSongName}”当前片段之后的已学内容。{rendererFact}"
+                        : $"成功：已经从本地歌曲记忆中取出“{catalogSongName}”并用角色声线真实播放完成。{rendererFact}")
                     : (wasPracticeComposition
-                        ? "成功：练唱会话中的片段已经按原顺序合成为一次连续演唱，并真实播放完成。每次演绎的呼吸间隔、轻微速度和力度可以不同。"
-                        : "成功：回哼音频已经真实播放完成。现在可以自然评价刚才的回哼，但不要夸大为同步合唱。"),
+                        ? "成功：练唱会话中的片段已经按原顺序合成为一次连续演唱，并真实播放完成。每次演绎的呼吸间隔、轻微速度和力度可以不同。" + rendererFact
+                        : "成功：回哼音频已经真实播放完成。现在可以自然评价刚才的回哼，但不要夸大为同步合唱。" + rendererFact),
                 false);
             float now = Time.realtimeSinceStartup;
             m_LastAITurnTime = now;
@@ -6340,7 +7325,8 @@ public class ChatSample : MonoBehaviour
     private void CancelPendingHumBack(string reason, bool recordInterrupted)
     {
         bool hadWork = m_SongSingInFlight || m_HumBackPending || m_HumBackPreparingCarrier || m_HumBackPlaying ||
-            m_ActiveHumBackClip != null || m_ActiveHumSVCRequest != null ||
+            m_ActiveHumBackClip != null || m_ActiveSVSRequest != null ||
+            m_ActiveHumSVCRequest != null ||
             m_HumBackPrefixPreparing || m_PreparedHumBackPrefixClip != null ||
             m_FastHumBackEouStaged || m_FastHumBackActive || m_FastHumBackFullClip != null;
         if (!hadWork) return;
@@ -6348,7 +7334,17 @@ public class ChatSample : MonoBehaviour
         m_SongSingGeneration++;
         m_SongSingInFlight = false;
         m_HumBackGeneration++;
-        bool wasNeuralRequest = m_ActiveHumSVCRequest != null;
+        bool wasNeuralRequest = m_ActiveSVSRequest != null ||
+            m_ActiveHumSVCRequest != null;
+        if (m_ActiveSVSRequest != null)
+        {
+            string requestId = m_ActiveSVSRequestId;
+            m_ActiveSVSRequest.Abort();
+            m_ActiveSVSRequest = null;
+            m_ActiveSVSRequestId = "";
+            if (!string.IsNullOrEmpty(requestId))
+                StartCoroutine(CancelSingingVoiceSynthesis(requestId));
+        }
         if (m_ActiveHumSVCRequest != null)
         {
             string requestId = m_ActiveHumSVCRequestId;
@@ -6408,12 +7404,14 @@ public class ChatSample : MonoBehaviour
         m_PendingHumLanguage = "";
         m_PendingHumReason = "";
         m_PendingHumMode = "echo";
+        m_PendingHumLyricsOverride = "";
         m_PendingHumSourceWav = null;
         m_PendingHumIsPracticeComposition = false;
         m_PendingHumIsCatalogSong = false;
         m_PendingHumIsCatalogContinuation = false;
         m_PendingCatalogSongName = "";
         m_PendingHumVariationDiagnostic = "";
+        m_PendingHumRenderer = "pending";
         m_FastHumBackEouStaged = false;
         m_FastHumBackActive = false;
         m_FastHumBackFinalDecisionReceived = false;
@@ -6442,6 +7440,20 @@ public class ChatSample : MonoBehaviour
             yield return request.SendWebRequest();
             if (m_LogHumBack && request.result == UnityWebRequest.Result.Success)
                 Debug.Log("[HumBack/SVC] 已请求终止后台转换 requestId=" + requestId);
+        }
+    }
+
+    private IEnumerator CancelSingingVoiceSynthesis(string requestId)
+    {
+        WWWForm form = new WWWForm();
+        form.AddField("request_id", requestId ?? "");
+        string cancelURL = GetSVSBaseURL() + "/cancel";
+        using (UnityWebRequest request = UnityWebRequest.Post(cancelURL, form))
+        {
+            request.timeout = 3;
+            yield return request.SendWebRequest();
+            if (m_LogHumBack && request.result == UnityWebRequest.Result.Success)
+                Debug.Log("[HumBack/SVS] 已请求终止后台歌声生成 requestId=" + requestId);
         }
     }
 

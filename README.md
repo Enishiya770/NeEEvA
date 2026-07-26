@@ -37,7 +37,9 @@ flowchart LR
     SONG --> LOOP
     LLM -->|song_remember / rename / forget| SONGMEM["本地歌曲记忆<br/>未命名 WAV / 多参考片段"]
     SONGMEM --> LOOP
-    LLM -->|hum_back / song_sing| HUM["角色歌声转换 :9882<br/>RVC 专属模型优先 / Seed-VC 回退"]
+    LLM -->|hum_back / song_sing| SVS["独立歌声合成 :9883<br/>SingingScore → 语种路由"]
+    SVS -->|未安装 / 语种不支持 / 失败时明确降级| HUM["角色歌声转换 :9882<br/>RVC 专属模型优先 / Seed-VC 回退"]
+    SVS --> AUDIO
     HUM --> AUDIO["声音仲裁<br/>语音与歌声单路播放"]
     LLM -->|流式 token| SPLIT["按句切分排队"]
     SPLIT --> TTS["GPT-SoVITS TTS :9880<br/>Antoneva 音色"]
@@ -52,6 +54,7 @@ flowchart LR
 |---|---|---|
 | SenseVoice ASR / 歌唱感知 | `127.0.0.1:9881` | 本地语音识别、音高/旋律分析与歌曲检索编排 |
 | GPT-SoVITS TTS | `127.0.0.1:9880` | 本地声音克隆语音合成 |
+| 独立歌声合成 SVS | `127.0.0.1:9883` | 读取歌词、音符、F0 与力度，重新生成角色歌声；不是音频变声 |
 | 角色歌声转换（RVC 优先） | `127.0.0.1:9882` | 用专属角色模型转换用户演唱；Seed-VC 作为无专属模型时的回退 |
 | 本地 LLM（llama-server / Ollama） | `127.0.0.1:8080` | qwen3.6 本地推理（含视觉） |
 | 本地嵌入服务（可选） | `127.0.0.1:8090` | 为情境记忆提供语义向量；不启动时自动退回名字提及与扩散激活 |
@@ -63,6 +66,7 @@ flowchart LR
 - 可选的本地服务（按需启用）：
   - **本地语音识别 SenseVoice**：✅ 服务端已包含在仓库中（`Server/SenseVoice`），Python 3.10+，`pip install` 后开箱即用，模型权重首次启动自动下载
   - **本地声音克隆 TTS GPT-SoVITS**：⚠️ git 仓库只包含 Unity 调用端与启动脚本；完整服务端（含便携 runtime 与 Antoneva 音色）约定放在项目根目录 `GPT-SoVITS/`，双击 `start_tts_server.bat` 启动（默认 `127.0.0.1:9880`），克隆用户需自行部署（见下文「部署 GPT-SoVITS」）
+  - **独立歌声合成 SoulX-Singer（可选）**：桥接位于 `Server/SVS`，SenseVoice 会先生成 renderer-neutral 的 `SingingScore`，SoulX 再从歌词/音符/F0 重新合成歌声。模型与预处理权重体积较大，需手工运行 `install_soulx.cmd`；安装器会准备 Python 3.10，并在 Git 克隆被重置时改走官方 ZIP。官方前端支持普通话、英语和粤语；项目另带明确标为实验性的日语假名音素适配
   - **本地歌声转换 RVC / Seed-VC**：✅ 桥接服务位于 `Server/SeedVC`，有 `Server/RVC/models/neeeva_character.pth` 时优先使用角色专属 RVC v2 模型，否则回退到 Seed-VC；首次使用 Seed-VC 可能下载约 2.4 GB 权重
   - **本地 LLM qwen3.6-35b-a3b**：llama.cpp llama-server（默认 `127.0.0.1:8080`），模型与视觉投影 GGUF 需自行下载（见「本地部署 qwen3.6-35b-a3b」小节）
 
@@ -88,11 +92,12 @@ flowchart LR
    `requirements.txt` 同时安装 torchcrepe；未安装或运行失败时会自动回落到内置 FFT 音高跟踪器，普通 ASR 不受影响。
 
 5. （可选）启动 GPT-SoVITS 声音克隆 TTS：双击 `GPT-SoVITS\start_tts_server.bat`（该文件夹在本机开发环境中已内置完整服务端与 Antoneva 音色；克隆用户需先按下文「部署 GPT-SoVITS」自行部署）。
-6. （可选，角色真人感演唱）首次运行 `Server\SeedVC\install_seedvc.ps1`。之后 Unity 会在场景启动及每次演唱前检查 `9882`，服务未运行时自动静默启动 `Server\SeedVC\start_seedvc_server.ps1`；也可手工运行该脚本。自动启动日志位于 `Server\SeedVC\runtime\seedvc_server.log`。
+6. （可选，真正的歌声生成）运行 `Server\SVS\install_soulx.cmd` 安装官方 SoulX-Singer 代码、环境与权重，再运行 `Server\SVS\start_svs_server.cmd`。`.cmd` 只为本次子进程绕过 PowerShell 脚本限制，不会永久修改系统执行策略。Unity 会优先检查 `9883`：普通话/英语/粤语由 SoulX 官方前端处理，日语由内置的实验性假名音素适配处理；只有返回完整可播放 WAV 才记为 SVS 成功。未安装模型或推理失败会在日志中明确标为降级，不会把 `9882` 变声冒充成歌声生成。详细说明见 [`Server/SVS/README.md`](Server/SVS/README.md)。
+7. （可选，角色真人感歌声转换回退）首次运行 `Server\SeedVC\install_seedvc.ps1`。之后 Unity 会在场景启动及每次演唱前检查 `9882`，服务未运行时自动静默启动 `Server\SeedVC\start_seedvc_server.ps1`；也可手工运行该脚本。自动启动日志位于 `Server\SeedVC\runtime\seedvc_server.log`。
    脚本会依次寻找 `NEEEVA_PYTHON_EXE`、`NEEEVA_GPT_SOVITS_ROOT\runtime\python.exe`、项目内 `GPT-SoVITS\runtime\python.exe` 和系统 `py -3.10`，无需修改源码。只有重新训练角色专属模型时才需要执行 `Server\RVC\install_rvc.ps1`；已有导出权重可直接由 `9882` 使用。
-7. 运行场景，开始对话。
+8. 运行场景，开始对话。
 
-推荐按 `9881`（ASR）→ `9880`（TTS）→ `8080` 或云端 LLM 的顺序准备基础服务。`9882` 只在角色需要回唱、练唱或从曲库演唱时使用，默认可交给 Unity 按需拉起。可分别访问 `/health` 检查 `9881`、`9882` 和本地 LLM 是否已经就绪。
+推荐按 `9881`（ASR）→ `9880`（TTS）→ `8080` 或云端 LLM 的顺序准备基础服务。`9883` 只在需要独立歌声生成时使用，`9882` 是语种不支持或 SVS 不可用时的兼容回退。可分别访问 `/health` 检查 `9881`、`9882`、`9883` 和本地 LLM 是否已经就绪。
 
 ## 启用 Qwen3.6 与实时视觉（屏幕感知）
 
@@ -259,11 +264,17 @@ llama-server.exe -m qwen36.gguf --mmproj mmproj-Q8_0.gguf --host 127.0.0.1 --por
 
 `continue` 不会凭空生成角色从未听过的旋律；所谓“完整演唱”目前是把已经学到且顺序明确的片段连续组织起来。每次演唱会使用不同的推理种子和受控的细微音高、力度等变化，所以同一首不会只是逐字节重放，但也不会为了制造差异而破坏原旋律。
 
-Unity 会把 SenseVoice 保留的**真实原始演唱 WAV**交给本机 `9882` 转换桥。桥接服务优先使用由角色语音与哼声素材训练的专属 RVC v2 模型；专属模型不存在时，才使用 GPT-SoVITS 参考音频做 Seed-VC 零样本回退。音调关系、节奏、歌词/哼声、换气和细微抖动会尽量保留，音色则向角色靠近。只有服务返回可解码 WAV 且实际播放完成后，工具才报告成功；失败时默认不退回机械 TD-PSOLA，角色也不得用普通 TTS 念歌词来假装唱过。
+最终歌唱识别现在会生成 `SingingScore v1`：全局歌词、带休止的音符与时值、10ms 级连续 F0、力度包络、换气位置和颤音提示。日语继续由 SenseVoice 识别，不运行第二套歌词 ASR；乐谱保留原始 `lyrics` 供对话理解，同时生成纯假名 `lyrics_reading` 与按音拍拆分的 `lyrics_mora` 供日语歌声渲染。该结构随最终 ASR 返回，并在新保存的本地曲库片段中一起落盘；快速 partial 不生成大体积乐谱，因此不会拖慢流式倾听。也可调用 `POST /singing/score` 单独提取。Unity 对最近有效歌声保留一份与裁剪后音频对齐的乐谱快照。
+
+当 `9883` 的 SoulX-Singer 后端已安装且语种为普通话、英语或粤语时，Unity 优先提交 SingingScore、目标歌唱片段和角色音色提示。默认角色提示为 `Server/SVS/prompts/41041_svs_zh_short.wav`：它是约 3 秒、带准确普通话音素元数据的专用角色声线样本，不再把旧日语台词误按英语解析。若最终 ASR 已提供歌词，服务会把歌词、音符与连续 F0 直接转换为 SoulX 元数据，不再重复识别用户音频；缺少可用歌词时才回退到官方对齐预处理。真正的 renderer 只读取元数据重新生成波形，因而不是把用户歌声直接换音色。只有响应包含 `X-SVS-Complete: 1`、WAV 可解码并实际播放完成，工具才报告“歌声生成成功”。
+
+SoulX-Singer 官方前端不支持日语；项目内置的 `soulx-ja-phone-adapter-experimental` 会将 SenseVoice 给出的纯假名音拍直接映射到 SoulX 已有音素，处理促音、拨音、长音、拗音及常见外来音。它只使用假名、音拍、音符和 F0 乐谱生成新波形，不靠用户源音频承载音色；遇到无法安全映射的音拍会明确失败。若以后配置完整的 `NEEEVA_JA_SVS_RUNNER`、`NEEEVA_JA_SVS_MODEL` 与可选 Python，外部原生日语乐谱后端会优先。SoulX 约 2.62 GB 的模型在 6 GB 显卡上可能无法与对话 TTS 常驻共存，所以 `9883` 只把 FP16 权重常驻在系统内存，推理时临时搬到 CUDA，结束后立即退回 CPU 并释放显存。普通话/粤语另有一个常驻 CPU 歌唱 ASR：先按真实人声间隙分段，再提取逐字时间戳，避免把歌词按平均发声时长硬摊到音符上；同一字的拖腔最多扩展一个续音，不会把颤音误当作反复咬字。若用户明确纠正歌词，`<hum_back lyrics="正确歌词" .../>` 会替换错字但保留声学时间戳。生成前还会修正孤立八度/谐波尖峰、合并不足 80ms 的碎音；合成保持用户原调，不再按提示声线自动整体移调。角色提示和歌词时间戳均按内容缓存，默认使用 12 步低延迟推理；可通过 `NEEEVA_SVS_INFERENCE_STEPS=4..32` 调整速度/质量。持久化 worker 异常退出时会自动更换并重试一次。后端未安装、语种不支持或推理失败时，若 `Allow SVC Fallback From SVS` 开启，Unity 会**明确记录降级**后把真实原始演唱 WAV 交给 `9882`；后者仍是 RVC / Seed-VC 音频转换，不会被记作独立生成。失败时默认不退回机械 TD-PSOLA，角色也不得用普通 TTS 念歌词来假装唱过。
+
+每次成功 SVS 都会自动在 `Server/SVS/runtime/captures/` 留下最近 20 份诊断包，包含原始片段、SingingScore、角色提示/目标元数据、生成 WAV 和耗时结果；可用 `NEEEVA_SVS_SAVE_CAPTURES=0` 关闭。Unity 日志会记录响应的 `X-SVS-Capture` 编号，便于直接定位“这一次究竟唱了什么”。
 
 转换等待和播放都可被 barge-in 打断，角色自己的歌声也不会被重新识别成用户输入。当前不支持严格同步的双人合唱：倾听和认知准备可以并行，真正可听见的说话与歌唱仍由同一声音仲裁器单路播放。
 
-`ChatSample > 角色旋律回哼` 默认 `Enable Neural Hum SVC=true`、`Diffusion Steps=20`、`Auto F0 Adjust=true`、`Allow Legacy Hum Fallback=false`。Unity 日志中的 `backend=rvc-character-v2` 表示走角色专属模型；`backend=seed-vc` 表示走零样本回退。最近一次成功的 A/B 样本与元数据保存在 `Server/SeedVC/last_conversion/`（Git 忽略）。专属模型的训练与原曲翻唱流程见 [`Server/RVC/README.md`](Server/RVC/README.md)；桥接服务说明见 [`Server/SeedVC/README.md`](Server/SeedVC/README.md)。
+`ChatSample > 角色旋律回哼` 默认 `Enable Singing Voice Synthesis=true`、`Enable SVSRVC Post Polish=false`、`Allow SVC Fallback From SVS=true`、`Enable Neural Hum SVC=true`、`Allow Legacy Hum Fallback=false`。`independent SVS complete` 表示独立重新合成；可选的 `svc-post-polish` 表示先独立生成、再用角色 RVC 润色，属于音色转换后处理；`明确降级：改用 9882 SVC` 则表示直接转换原始演唱。`backend=rvc-character-v2` 表示角色专属转换模型，`backend=seed-vc` 表示零样本转换回退。SVS 说明见 [`Server/SVS/README.md`](Server/SVS/README.md)；专属转换模型训练见 [`Server/RVC/README.md`](Server/RVC/README.md)；转换桥见 [`Server/SeedVC/README.md`](Server/SeedVC/README.md)。
 
 手工添加仍可使用兼容接口，歌名同样可省略：
 
@@ -318,10 +329,12 @@ curl.exe -X POST "http://127.0.0.1:9881/songs/catalog/remember" `
 - **答应跟唱后，我改成说话却被原样复读**：应先看到最终普通 ASR 或日志中的临时 `mode=speech`，随后歌唱动作被 `speechVeto=True` 否决，且最终感知帧不再含 `[演唱片段]`。若仍复读，先确认 Unity 已重新编译最新脚本并重启 Play Mode；旧场景进程不会热切换已经运行中的门控状态。
 - **她查不到歌名**：空的本地曲库只能使用文字目录候选；哼唱匹配需先向本地曲库加入参考歌曲。旋律片段太短、跑调较大或背景伴奏过强时只能返回低置信候选。
 - **她说已经唱了，但没有声音 / 只是念歌词**：文字承诺不算演唱成功。检查 Unity Console 的 `[HumBack]` / `[SongSing]` 结果以及 `http://127.0.0.1:9882/health`；只有 `9882` 返回可解码 WAV 并实际播放完成，工具才会向角色报告成功。普通 GPT-SoVITS TTS 只能说话，不能代替有音调的演唱。
+- **`9883` 显示 `backend_available: false`**：轻量桥已经启动，但 SoulX 仓库、SVS 模型或预处理模型未装齐。运行 `Server\SVS\install_soulx.cmd`，再查看 `Server\SVS\runtime\svs_server.log`。`missing` 数组会指出缺少项。
+- **中文/英语能生成，日语仍走 `9882`**：重启 `9883` 后检查 `/health` 的 `backends.ja`，正常应显示 `soulx-ja-phone-adapter-experimental` 且 `backend_available=true`。若仍显示旧的 `diffsinger-ja` 缺少 runner/model，说明正在运行的是更新前进程。假名读音不完整或包含未支持字符时也会明确拒绝，不会复读源音频。
 - **`9882` 没有自动启动**：查看 `Server/SeedVC/runtime/seedvc_server.log`；如 Python 未被自动找到，可设置 `NEEEVA_PYTHON_EXE` 为解释器完整路径，或设置 `NEEEVA_GPT_SOVITS_ROOT` 为 GPT-SoVITS 根目录。Unity 默认在场景启动和每次演唱前探测并按需启动；也可手工运行脚本后再访问 `/health`。
 - **只唱到后半段，或连续两段间隔很久**：曲库会把相同歌词/旋律的多次录音当作同一段的不同版本，它们不能构成前后顺序。请按顺序教角色真正不同的片段并保存到同一歌曲 ID；`practice` 会尽量一次合成连续片段，`continue` 只接唱顺序明确的已学后续。
 - **有回复文字但没有声音**：确认 GPT-SoVITS 服务窗口在监听 `9880`；注意 `m_ReferWavPath` 按**服务端工作目录**的相对路径解析，移动过参考音频需两侧同步改。
-- **其他端口被占用**：`9880`、`9881`、`9882`、`8080`（以及可选 `8090`）都可在启动参数 / 脚本和 Unity 组件 URL 中修改，改完必须保持服务端与调用端一致。
+- **其他端口被占用**：`9880`、`9881`、`9882`、`9883`、`8080`（以及可选 `8090`）都可在启动参数 / 脚本和 Unity 组件 URL 中修改，改完必须保持服务端与调用端一致。
 - **首次对话前几秒没反应**：模型冷启动所致。GPT-SoVITS 已内置 WarmUp 预热，SenseVoice 启动时也会自动预热，一般只影响服务刚启动后的第一句。
 
 ## 项目结构
@@ -345,6 +358,7 @@ Assets/
   VRM10/ UniGLTF/     UniVRM 0.129.1（VRM 1.0 运行时，内嵌源码）
 Server/
   SenseVoice/         本地语音识别服务（FastAPI + FunASR）
+  SVS/                独立歌声合成桥（SingingScore + SoulX-Singer）
   SeedVC/             角色歌声转换桥（FastAPI；RVC 优先 / Seed-VC 回退）
   RVC/                角色专属 RVC v2 训练、导出与原曲翻唱工具
 GPT-SoVITS/           本地声音克隆 TTS 服务端（约 12GB，未入库，仅 start_tts_server.bat 在仓库中）
@@ -359,6 +373,7 @@ GPT-SoVITS/           本地声音克隆 TTS 服务端（约 12GB，未入库，
 - [torchcrepe](https://github.com/maxrmorrison/torchcrepe)（MIT）— 歌唱音高与周期性提取
 - [MusicBrainz](https://musicbrainz.org/doc/MusicBrainz_API) — 公开歌曲元数据检索
 - [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)（MIT）— 少样本声音克隆 TTS
+- [SoulX-Singer](https://github.com/Soul-AILab/SoulX-Singer)（Apache-2.0）— 零样本、歌词/旋律/乐谱条件歌声合成
 - [Seed-VC](https://github.com/Plachtaa/seed-vc)（GPL-3.0）— 零样本语音/歌声转换
 - [Retrieval-based Voice Conversion WebUI](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI)（MIT）— 角色专属 RVC v2 歌声音色模型训练与推理
 

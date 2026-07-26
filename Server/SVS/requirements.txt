@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-multipart
+soundfile
+lightning
+fiddle
+nemo_toolkit[asr]==2.6.1

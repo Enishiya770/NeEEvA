@@ -12,11 +12,16 @@ from singing_analysis import SingingAnalyzer
 
 
 class _FakeSingingAnalyzer:
-    def analyze(self, wav, lyrics="", thorough=False):
+    def analyze(self, wav, lyrics="", thorough=False, **kwargs):
         return {
             "pitch_contour_midi": [60, 60, 62, 64, 64, 65, 67, 67, 69, 67, 65, 64],
             "pitch_timeline_midi": [0, 60, 60, 62, 64, 0, 65, 67, 69, 67, 65, 64, 0],
             "pitch_timeline_frame_seconds": 0.1,
+            "singing_score": {
+                "schema_version": 1,
+                "notes": [{"midi": 60, "start_seconds": 0.0, "duration_seconds": 1.0}],
+                "f0_hz": [261.63],
+            },
         }
 
 
@@ -24,7 +29,7 @@ class _SequenceSingingAnalyzer:
     def __init__(self, contours):
         self.contours = list(contours)
 
-    def analyze(self, wav, lyrics="", thorough=False):
+    def analyze(self, wav, lyrics="", thorough=False, **kwargs):
         contour = self.contours.pop(0)
         return {
             "pitch_contour_midi": contour,
@@ -80,6 +85,8 @@ class SongMemoryTests(unittest.TestCase):
             first_reference = first_catalog["songs"][0]["references"][0]
             self.assertIn(0, first_reference["pitch_timeline_midi"])
             self.assertEqual(first_reference["pitch_timeline_frame_seconds"], 0.1)
+            self.assertEqual(first_reference["singing_score"]["schema_version"], 1)
+            self.assertTrue(remembered["score_available"])
 
             renamed = engine.rename_song(
                 song_id,
@@ -93,7 +100,7 @@ class SongMemoryTests(unittest.TestCase):
 
             with open(catalog_path, "r", encoding="utf-8") as handle:
                 catalog_text = handle.read()
-            self.assertIn('"version": 3', catalog_text)
+            self.assertIn('"version": 4', catalog_text)
             self.assertNotIn(os.path.basename(old_path), catalog_text)
             self.assertFalse(os.path.exists(old_path))
 

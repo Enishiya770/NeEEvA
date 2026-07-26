@@ -1,0 +1,107 @@
+import unittest
+
+import numpy as np
+
+from singing_analysis import SingingAnalyzer
+from singing_score import build_singing_score
+from japanese_lyrics import normalise_japanese_lyrics, split_japanese_mora
+
+
+class SingingScoreTests(unittest.TestCase):
+    def test_japanese_kana_is_normalised_without_second_asr(self):
+        result = normalise_japanese_lyrics("キミノコトガ、スキ。")
+        self.assertEqual(result["lyrics_reading"], "きみのことがすき")
+        self.assertEqual(
+            result["lyrics_mora"],
+            ["き", "み", "の", "こ", "と", "が", "す", "き"],
+        )
+        self.assertEqual(result["lyrics_reading_source"], "sensevoice-kana")
+        self.assertTrue(result["lyrics_reading_complete"])
+
+    def test_japanese_mora_rules_keep_timing_information(self):
+        self.assertEqual(
+            split_japanese_mora("きょうって"),
+            ["きょ", "う", "っ", "て"],
+        )
+
+    def test_sensevoice_kanji_transcript_gets_kana_pronunciation(self):
+        result = normalise_japanese_lyrics("君のことが好き")
+        self.assertEqual(result["lyrics_reading"], "きみのことがすき")
+        self.assertEqual(result["lyrics_reading_source"], "sensevoice+pyopenjtalk")
+        self.assertTrue(result["lyrics_reading_complete"])
+
+    def test_non_kana_tokens_are_not_silently_sent_to_renderer(self):
+        result = normalise_japanese_lyrics("きみ Lemon")
+        self.assertFalse(result["lyrics_reading_complete"])
+        self.assertEqual(result["lyrics_reading"], "")
+
+    def test_japanese_score_preserves_semantic_lyrics_and_adds_kana_view(self):
+        score = build_singing_score(
+            np.full(20, 220.0, dtype=np.float32),
+            np.full(20, 0.9, dtype=np.float32),
+            0.01,
+            0.2,
+            lyrics="キミガスキ",
+            language="ja",
+        )
+        self.assertEqual(score["lyrics"], "キミガスキ")
+        self.assertEqual(score["lyrics_reading"], "きみがすき")
+        self.assertEqual(score["lyrics_mora"], ["き", "み", "が", "す", "き"])
+
+    def test_score_contains_timed_notes_rests_and_expression(self):
+        hop = 0.01
+        pitch = np.concatenate(
+            (
+                np.full(50, 440.0, dtype=np.float32),
+                np.zeros(20, dtype=np.float32),
+                np.full(60, 493.88, dtype=np.float32),
+            )
+        )
+        periodicity = np.where(pitch > 0, 0.92, 0.0).astype(np.float32)
+        samples = np.arange(int(1.3 * 16000), dtype=np.float32)
+        signal = 0.2 * np.sin(2.0 * np.pi * 440.0 * samples / 16000.0)
+
+        score = build_singing_score(
+            pitch,
+            periodicity,
+            hop,
+            1.3,
+            lyrics="la la",
+            language="en",
+            signal=signal,
+            extractor_backend="test",
+            confidence=0.9,
+        )
+
+        self.assertEqual(score["schema_version"], 1)
+        self.assertEqual(score["language"], "en")
+        self.assertEqual(len(score["f0_hz"]), len(pitch))
+        self.assertEqual(len(score["energy"]), len(pitch))
+        self.assertTrue(any(note["note_type"] == "rest" for note in score["notes"]))
+        sung = [note for note in score["notes"] if note["note_type"] == "note"]
+        self.assertEqual(sung[0]["midi"], 69)
+        self.assertEqual(sung[-1]["midi"], 71)
+        self.assertTrue(score["breath_positions_seconds"])
+
+    def test_thorough_analysis_attaches_score_but_fast_probe_does_not(self):
+        sample_rate = 16000
+        time = np.arange(sample_rate * 2, dtype=np.float32) / sample_rate
+        signal = (0.18 * np.sin(2.0 * np.pi * 220.0 * time)).astype(np.float32)
+        analyzer = SingingAnalyzer(enable_torchcrepe=False)
+
+        fast = analyzer.analyze(signal, thorough=False)
+        thorough = analyzer.analyze(
+            signal,
+            lyrics="啊",
+            language="zh",
+            thorough=True,
+        )
+
+        self.assertNotIn("singing_score", fast)
+        self.assertEqual(thorough["singing_score"]["schema_version"], 1)
+        self.assertEqual(thorough["singing_score"]["language"], "zh")
+        self.assertGreater(len(thorough["singing_score"]["notes"]), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

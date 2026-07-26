@@ -77,6 +77,7 @@ crashlytics-build.properties
 # User-created singing clips are private runtime data, never source assets.
 /Server/SenseVoice/song_library/
 /Server/SenseVoice/song_catalog.json
+/Server/SenseVoice/runtime/
 /Server/RuntimeLogs/
 **/__pycache__/
 *.py[cod]
@@ -98,6 +99,10 @@ Server/SeedVC/runtime/
 Server/SeedVC/quality_headers.txt
 Server/SeedVC/quality_output.wav
 Server/SeedVC/ab_*.wav
+Server/SVS/.venv/
+Server/SVS/vendor/
+Server/SVS/last_synthesis/
+Server/SVS/runtime/
 Server/RVC/vendor/
 Server/RVC/.venv/
 Server/RVC/python_packages/
@@ -111,3 +116,7 @@ Server/RVC/*_headers.txt
 # Local diagnostic reference generated during voice-conversion experiments.
 /Assets/Model/41041_svc_anchor.wav
 /Assets/Model/41041_svc_anchor.wav.meta
+# Incorrect English-sidecar experiment for the older Japanese dialogue clip.
+# The checked Mandarin SVS prompt has its own accurate metadata instead.
+/Assets/Model/41041.json
+/Assets/Model/41041.json.meta

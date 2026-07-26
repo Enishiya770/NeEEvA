@@ -27,8 +27,11 @@ Automatic-start output is written to `runtime/seedvc_server.log`.
 The visible process chain is `powershell.exe` running this script and the
 resolved Python interpreter running `seedvc_server.py --port 9882`, with
 `Server/SeedVC` as its working directory. Resolution checks
+`NEEEVA_SEEDVC_PYTHON`, the isolated `Server/SVS/.venv` runtime,
 `NEEEVA_PYTHON_EXE`, `NEEEVA_GPT_SOVITS_ROOT`, the project-local
-`GPT-SoVITS/runtime/python.exe`, and finally the Python launcher.
+`GPT-SoVITS/runtime/python.exe`, and finally the Python launcher. Candidates
+that cannot import `soundfile`, `uvicorn`, `fastapi`, and multipart support are
+skipped instead of starting a bridge that immediately exits.
 The first Seed-VC fallback conversion can still download the official singing
 checkpoint and take several minutes; the preferred dedicated RVC path reuses its
 local trained model.
