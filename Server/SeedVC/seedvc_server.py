@@ -32,6 +32,9 @@ RVC_VENV_PYTHON = RVC_ROOT / ".venv" / "Scripts" / "python.exe"
 RVC_RUNNER = RVC_ROOT / "rvc_convert.py"
 RVC_MODEL = RVC_ROOT / "models" / "neeeva_character.pth"
 RVC_INDEX = RVC_ROOT / "models" / "neeeva_character.index"
+# rvc_convert.py 会 chdir 到这里；缺了它推理必然崩。vendor/ 与 models/ 都不在 git 内，
+# 迁移时很容易只带回模型而漏掉 vendor，所以必须纳入就绪判定，否则 /health 会绿灯诈骗。
+RVC_VENDOR = RVC_ROOT / "vendor" / "rvc"
 sys.path.insert(0, str(LOCAL_PACKAGES))
 
 import soundfile as sf
@@ -163,10 +166,25 @@ def _rvc_python() -> Path | None:
     return None
 
 
+def _rvc_missing() -> list[str]:
+    """列出 RVC 角色转换缺少的组件，供 /health 如实上报。"""
+    missing: list[str] = []
+    if _rvc_python() is None:
+        missing.append("python")
+    for label, path in (
+        ("runner", RVC_RUNNER),
+        ("model", RVC_MODEL),
+        ("index", RVC_INDEX),
+    ):
+        if not path.is_file():
+            missing.append(label)
+    if not RVC_VENDOR.is_dir():
+        missing.append("vendor")
+    return missing
+
+
 def _rvc_ready() -> bool:
-    return _rvc_python() is not None and all(
-        path.is_file() for path in (RVC_RUNNER, RVC_MODEL, RVC_INDEX)
-    )
+    return not _rvc_missing()
 
 
 def _parse_rvc_metadata(stdout: str) -> dict[str, object]:
@@ -188,6 +206,7 @@ def _run_rvc_conversion(
     performance_seed: int,
     rms_mix_rate: float,
     protect: float,
+    index_rate: float,
     max_seconds: float,
     request_id: str,
 ) -> tuple[bytes, dict[str, str]]:
@@ -229,6 +248,9 @@ def _run_rvc_conversion(
             str(rms_mix_rate),
             "--protect",
             str(protect),
+            # 不传的话 rvc_convert.py 会退回默认值，角色索引权重可能为 0 → 音色偏离且沙哑
+            "--index-rate",
+            str(index_rate),
         ]
         attempts = [True, False] if prefer_cuda else [False]
         runner_metadata: dict[str, object] = {}
@@ -328,6 +350,7 @@ def _run_rvc_conversion(
             "requested_performance_seed": performance_seed,
             "requested_rms_mix_rate": rms_mix_rate,
             "requested_protect": protect,
+            "requested_index_rate": index_rate,
             "device": runner_metadata.get("device", "cuda" if used_cuda else "cpu-low-vram"),
             "free_vram_mib_before": free_mib,
             "gpu_min_free_mib": RVC_GPU_MIN_FREE_MIB,
@@ -353,6 +376,7 @@ def _run_rvc_conversion(
         "X-SVC-Seed": str(runner_metadata.get("seed", "unknown")),
         "X-SVC-RMS-Mix-Rate": str(runner_metadata.get("rms_mix_rate", rms_mix_rate)),
         "X-SVC-Protect": str(runner_metadata.get("protect", protect)),
+        "X-SVC-Index-Rate": str(runner_metadata.get("index_rate", index_rate)),
     }
 
 
@@ -391,6 +415,7 @@ def _run_conversion(
     performance_seed: int,
     rms_mix_rate: float,
     protect: float,
+    index_rate: float,
     max_seconds: float,
     request_id: str,
 ) -> tuple[bytes, dict[str, str]]:
@@ -408,6 +433,7 @@ def _run_conversion(
             performance_seed,
             rms_mix_rate,
             protect,
+            index_rate,
             max_seconds,
             request_id,
         )
@@ -532,11 +558,15 @@ def _run_conversion(
 @app.get("/health")
 def health() -> dict[str, object]:
     free_mib = _cuda_free_mib()
-    backend = "rvc-character-v2" if _rvc_ready() else "seed-vc-f0"
-    threshold = RVC_GPU_MIN_FREE_MIB if _rvc_ready() else 3400
+    rvc_missing = _rvc_missing()
+    rvc_ok = not rvc_missing
+    backend = "rvc-character-v2" if rvc_ok else "seed-vc-f0"
+    threshold = RVC_GPU_MIN_FREE_MIB if rvc_ok else 3400
     return {
-        "ok": _rvc_ready() or VENDOR.joinpath("inference.py").is_file(),
+        "ok": rvc_ok or VENDOR.joinpath("inference.py").is_file(),
         "backend": backend,
+        # 角色专属 RVC 缺件时在这里列明，避免"绿灯但一转换就 500"
+        "rvc_missing": rvc_missing,
         "busy": _conversion_lock.locked(),
         "cuda_free_mib": free_mib,
         "cuda_min_free_mib": threshold,
@@ -555,6 +585,8 @@ async def convert(
     performance_seed: int = Form(1234),
     rms_mix_rate: float = Form(0.25),
     protect: float = Form(0.33),
+    # 角色索引权重。0 = 不用 .index，音色偏离且沙哑；0.75 为实测较优值
+    index_rate: float = Form(0.75),
     max_seconds: float = Form(60.0),
 ) -> Response:
     if _conversion_lock.locked():
@@ -565,6 +597,7 @@ async def convert(
     performance_seed = int(performance_seed) & 0x7FFFFFFF
     rms_mix_rate = max(0.0, min(1.0, rms_mix_rate))
     protect = max(0.0, min(0.5, protect))
+    index_rate = max(0.0, min(1.0, index_rate))
     max_seconds = max(1.0, min(120.0, max_seconds))
     request_id = (request_id or "anonymous")[:128]
 
@@ -579,6 +612,7 @@ async def convert(
                 performance_seed,
                 rms_mix_rate,
                 protect,
+                index_rate,
                 max_seconds,
                 request_id,
             )

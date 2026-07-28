@@ -3279,7 +3279,10 @@ public class ChatSample : MonoBehaviour
     [Tooltip("SVS 专用角色提示音的真实语种。")]
     [SerializeField] private string m_SVSPromptLanguage = "zh";
     [Tooltip("可选高音质模式：独立 SVS 先从乐谱生成歌声，再用角色 RVC 轻度润色音色。关闭时完全不做音频转换；开启后日志会明确标记 svc-post-polish。")]
-    [SerializeField] private bool m_EnableSVSRVCPostPolish = false;
+    //默认开启：SoulX 官方不支持日语，内置假名音素适配出来的音色不像角色本人。
+    //过一遍角色 RVC 才能把音色拉回来。注意场景 YAML 里没有序列化这批 SVS 字段
+    //(场景是在这些字段加入之前保存的)，所以运行时取的就是这里的默认值。
+    [SerializeField] private bool m_EnableSVSRVCPostPolish = true;
     [Tooltip("SVS 未安装、语种不支持或合成失败时，明确降级到现有 9882 SVC，且日志会标明并非歌声生成。")]
     [SerializeField] private bool m_AllowSVCFallbackFromSVS = true;
     [Tooltip("优先使用用户真实演唱作为源，通过 Seed-VC 转换成角色声线；保留音调、气息、咬字和微小变化。")]
@@ -3294,6 +3297,9 @@ public class ChatSample : MonoBehaviour
     [SerializeField] private string m_HumSVCStartScriptRelativePath = "Server/SeedVC/start_seedvc_server.ps1";
     [Tooltip("4-10 步偏速度，20-30 步偏质量。角色音色优先时建议 20。")]
     [Range(4, 30)] [SerializeField] private int m_HumSVCDiffusionSteps = 20;
+    [Tooltip("角色 RVC 索引(.index)权重。0 = 完全不用索引，音色会偏离且明显沙哑；" +
+             "实测 0.75 沙哑显著减轻、音色贴合。此前整条链路都没传该参数，等同于恒为 0。")]
+    [Range(0f, 1f)] [SerializeField] private float m_HumSVCIndexRate = 0.75f;
     [Tooltip("把用户旋律整体平移到角色参考声线的自然音区，同时保留音程与节奏。跨性别/跨音区转换应开启。")]
     [SerializeField] private bool m_HumSVCAutoF0Adjust = true;
     [Tooltip("整体升降调；0 会严格保留用户原调。")]
@@ -6973,6 +6979,7 @@ public class ChatSample : MonoBehaviour
         form.AddField("performance_seed", m_PendingHumPerformanceSeed);
         form.AddField("rms_mix_rate", InvariantFloat(m_PendingHumRmsMixRate));
         form.AddField("protect", InvariantFloat(m_PendingHumProtect));
+        form.AddField("index_rate", InvariantFloat(Mathf.Clamp01(m_HumSVCIndexRate)));
         form.AddField("max_seconds", m_HumBackMaxSeconds.ToString(
             "0.###", System.Globalization.CultureInfo.InvariantCulture));
 

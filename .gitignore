@@ -105,6 +105,10 @@ Server/SVS/last_synthesis/
 Server/SVS/runtime/
 Server/RVC/vendor/
 Server/RVC/.venv/
+# 手工下载的 torch wheel 缓存（约 2.7GB）
+Server/RVC/.wheels/
+# 曲库目录的本地备份
+Server/SenseVoice/song_catalog.json.bak
 Server/RVC/python_packages/
 Server/RVC/dataset/
 Server/RVC/training_output/

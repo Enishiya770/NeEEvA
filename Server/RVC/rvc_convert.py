@@ -51,7 +51,8 @@ def main() -> None:
     parser.add_argument("--target-median-f0", type=float, default=275.0)
     # On held-out humming, the trained voice itself was markedly closer to the
     # character than nearest-neighbour feature mixing.  Keep retrieval opt-in.
-    parser.add_argument("--index-rate", type=float, default=0.0)
+    # 0.0 等于完全不用角色索引(.index)，实测音色偏离且明显沙哑；0.75 沙哑显著减轻
+    parser.add_argument("--index-rate", type=float, default=0.75)
     parser.add_argument("--rms-mix-rate", type=float, default=0.25)
     parser.add_argument("--protect", type=float, default=0.33)
     parser.add_argument("--seed", type=int, default=1234)

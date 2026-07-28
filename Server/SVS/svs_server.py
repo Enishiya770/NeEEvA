@@ -145,6 +145,20 @@ def _japanese_runner_python() -> Path:
     return _runner_python()
 
 
+def _allow_experimental_japanese() -> bool:
+    """内置假名适配是否可以对外声明"支持日语"。
+
+    该适配把假名逐个映射到 SoulX 的**英语**音素表（SoulX 官方不支持日语），
+    听感是"英语口音的日语"。默认不声明支持，让语种路由把日语降级到 9882 的
+    角色歌声转换——那条路用的是用户真实演唱，咬字自然、音色由 RVC 负责。
+    想试验这个近似实现时设 NEEEVA_SVS_ALLOW_EXPERIMENTAL_JA=1。
+    配置了外部日语渲染器(NEEEVA_JA_SVS_RUNNER/MODEL)时本开关无关紧要。
+    """
+    return os.environ.get(
+        "NEEEVA_SVS_ALLOW_EXPERIMENTAL_JA", "0"
+    ).strip().lower() not in {"", "0", "false", "no", "off"}
+
+
 def _japanese_backend_state() -> dict:
     runner = _japanese_runner_path()
     model = _japanese_model_path()
@@ -179,14 +193,20 @@ def _japanese_backend_state() -> dict:
     builtin_missing = [
         name for name, path in builtin_required.items() if not path.is_file()
     ]
+    # 文件齐全 ≠ 应当对外声明支持日语：这是英语音素近似，默认不参与语种路由，
+    # 好让日语降级到更自然的真实演唱转换。
+    opt_in = _allow_experimental_japanese()
     return {
         "backend": "soulx-ja-phone-adapter-experimental",
         "implementation": "builtin-soulx-phone-adapter",
-        "backend_available": not builtin_missing,
+        "backend_available": (not builtin_missing) and opt_in,
+        "experimental_opt_in": opt_in,
+        "experimental_opt_in_env": "NEEEVA_SVS_ALLOW_EXPERIMENTAL_JA",
         "runner": str(RUNNER),
         "model": str(_model_path(root)),
         "runner_python": str(_runner_python()),
-        "missing": [f"soulx:{name}" for name in builtin_missing],
+        "missing": [f"soulx:{name}" for name in builtin_missing]
+        + ([] if opt_in else ["experimental-ja-not-opted-in"]),
         "input": "kana-mora-score",
         "audio_to_audio_conversion": False,
         "experimental": True,
@@ -1288,6 +1308,17 @@ async def synthesize(
         else _inference_steps()
     )
     if target_code == "ja":
+        # 语种路由：日语后端不可用时明确拒绝，让 Unity 降级到 9882 的角色歌声转换
+        # （用户真实演唱 → 角色音色），而不是用英语音素近似硬唱。
+        ja_state = _japanese_backend_state()
+        if not ja_state.get("backend_available"):
+            raise HTTPException(
+                422,
+                "unsupported_language: 日语渲染后端不可用 ("
+                + ", ".join(ja_state.get("missing") or ["unknown"])
+                + ")。配置 NEEEVA_JA_SVS_RUNNER/MODEL 使用外部日语渲染器，"
+                + "或设 NEEEVA_SVS_ALLOW_EXPERIMENTAL_JA=1 启用内置英语音素近似。",
+            )
         try:
             score = prepare_japanese_score(score)
         except ValueError as exc:

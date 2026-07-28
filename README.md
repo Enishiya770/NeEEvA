@@ -94,7 +94,8 @@ flowchart LR
 5. （可选）启动 GPT-SoVITS 声音克隆 TTS：双击 `GPT-SoVITS\start_tts_server.bat`（该文件夹在本机开发环境中已内置完整服务端与 Antoneva 音色；克隆用户需先按下文「部署 GPT-SoVITS」自行部署）。
 6. （可选，真正的歌声生成）运行 `Server\SVS\install_soulx.cmd` 安装官方 SoulX-Singer 代码、环境与权重，再运行 `Server\SVS\start_svs_server.cmd`。`.cmd` 只为本次子进程绕过 PowerShell 脚本限制，不会永久修改系统执行策略。Unity 会优先检查 `9883`：普通话/英语/粤语由 SoulX 官方前端处理，日语由内置的实验性假名音素适配处理；只有返回完整可播放 WAV 才记为 SVS 成功。未安装模型或推理失败会在日志中明确标为降级，不会把 `9882` 变声冒充成歌声生成。详细说明见 [`Server/SVS/README.md`](Server/SVS/README.md)。
 7. （可选，角色真人感歌声转换回退）首次运行 `Server\SeedVC\install_seedvc.ps1`。之后 Unity 会在场景启动及每次演唱前检查 `9882`，服务未运行时自动静默启动 `Server\SeedVC\start_seedvc_server.ps1`；也可手工运行该脚本。自动启动日志位于 `Server\SeedVC\runtime\seedvc_server.log`。
-   脚本会依次寻找 `NEEEVA_PYTHON_EXE`、`NEEEVA_GPT_SOVITS_ROOT\runtime\python.exe`、项目内 `GPT-SoVITS\runtime\python.exe` 和系统 `py -3.10`，无需修改源码。只有重新训练角色专属模型时才需要执行 `Server\RVC\install_rvc.ps1`；已有导出权重可直接由 `9882` 使用。
+   脚本会依次寻找 `NEEEVA_PYTHON_EXE`、`NEEEVA_GPT_SOVITS_ROOT\runtime\python.exe`、项目内 `GPT-SoVITS\runtime\python.exe` 和系统 `py -3.10`，无需修改源码。
+   ⚠️ **要用角色专属 RVC 音色（而不是 Seed-VC 通用回退），必须先执行 `Server\RVC\install_rvc.ps1`**——它安装的 `Server/RVC/vendor/rvc` 是**推理**运行时，不只是训练才需要。该目录与 `models/` 都被 gitignore，换机器时只带回 `.pth`/`.index` 会导致转换在运行时崩溃（症状：`/health` 显示 `rvc-character-v2` 正常，但一转换就返回 500 且报 `vendor\rvc` 找不到；歌声因此退化成没有角色音色的原始 SVS 输出）。
 8. 运行场景，开始对话。
 
 推荐按 `9881`（ASR）→ `9880`（TTS）→ `8080` 或云端 LLM 的顺序准备基础服务。`9883` 只在需要独立歌声生成时使用，`9882` 是语种不支持或 SVS 不可用时的兼容回退。可分别访问 `/health` 检查 `9881`、`9882`、`9883` 和本地 LLM 是否已经就绪。
