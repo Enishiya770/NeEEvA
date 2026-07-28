@@ -1,0 +1,119 @@
+diff --git a/api_v2.py b/api_v2.py
+index 8708207..2c412c6 100644
+--- a/api_v2.py
++++ b/api_v2.py
+@@ -121,6 +121,38 @@ from tools.i18n.i18n import I18nAuto
+ from GPT_SoVITS.TTS_infer_pack.TTS import TTS, TTS_Config
+ from GPT_SoVITS.TTS_infer_pack.text_segmentation_method import get_method_names as get_cut_method_names
+ from pydantic import BaseModel
++from typing import Union
++
++# ---------------------------------------------------------------------------
++# NeEEvA 适配（见 Server/GPT-SoVITS-patch/README.md）
++#
++# Unity 端 GPTSoVITSFASTAPI 把 streaming_mode 当**整数模式**发送（2 / 3），
++# 而上游 api_v2 把它声明为 bool。pydantic v2 只接受 0/1 作为布尔，收到 3 会
++# 直接返回 422 Unprocessable Entity —— 表现为流式 TTS 全部静音。
++# 这里把该字段放宽为 Union[bool, int] 并给出模式语义，同时兼容旧的 true/false。
++#
++#   0 / False  非流式，一次性返回整段音频（原行为）
++#   1 / True   流式：按 TTS 语义片段逐块下发（原行为）
++#   2          同 1，Unity 端的"语义块"模式
++#   3          流式 + 把 PCM 再切成固定小块下发，首包更快、节奏更稳
++#
++# 响应格式对以上流式模式都不变：先 44 字节标准 WAV 头，其后持续追加 16-bit PCM，
++# 正是 Unity PcmStreamingDownloadHandler 期望的契约。
++# ---------------------------------------------------------------------------
++
++# 模式 3 的固定块时长（毫秒）。32kHz/16bit/单声道下 40ms ≈ 2560 字节。
++NEEEVA_FIXED_CHUNK_MS = 40
++
++
++def _neeeva_stream_level(raw) -> int:
++    """把 streaming_mode 原始值归一成整数档位，非法值一律按非流式处理。"""
++    if isinstance(raw, bool):
++        return 2 if raw else 0
++    try:
++        level = int(raw)
++    except (TypeError, ValueError):
++        return 0
++    return level if level > 0 else 0
+ 
+ # print(sys.path)
+ i18n = I18nAuto()
+@@ -165,7 +197,11 @@ class TTS_Request(BaseModel):
+     fragment_interval: float = 0.3
+     seed: int = -1
+     media_type: str = "wav"
+-    streaming_mode: bool = False
++    # NeEEvA: 放宽为 Union[bool, int]，接受 Unity 端发来的模式 2 / 3
++    streaming_mode: Union[bool, int] = False
++    # NeEEvA: Unity 端会一并发送该字段。上游 TTS 管线没有对应的切分钩子，
++    # 这里显式声明只为避免被当成非法字段；当前不影响文本切分。
++    min_chunk_length: int = 0
+     parallel_infer: bool = True
+     repetition_penalty: float = 1.35
+     sample_steps: int = 32
+@@ -331,7 +367,12 @@ async def tts_handle(req: dict):
+         StreamingResponse: audio stream response.
+     """
+ 
+-    streaming_mode = req.get("streaming_mode", False)
++    # NeEEvA: streaming_mode 可能是 bool 或整数模式(2/3)，先归一成档位
++    stream_level = _neeeva_stream_level(req.get("streaming_mode", False))
++    streaming_mode = stream_level > 0
++    # 归一后写回，避免下游再拿到 3 这种非布尔值
++    req["streaming_mode"] = streaming_mode
++    req.pop("min_chunk_length", None)  # 上游管线不认识该字段
+     return_fragment = req.get("return_fragment", False)
+     media_type = req.get("media_type", "wav")
+ 
+@@ -347,20 +388,36 @@ async def tts_handle(req: dict):
+ 
+         if streaming_mode:
+ 
+-            def streaming_generator(tts_generator: Generator, media_type: str):
++            def streaming_generator(tts_generator: Generator, media_type: str, level: int):
++                # level>=3 时把 PCM 再切成固定小块，让客户端更早拿到首个可播放片段
++                fixed_bytes = 0
+                 if_frist_chunk = True
++                pending = b""
+                 for sr, chunk in tts_generator:
+                     if if_frist_chunk and media_type == "wav":
+                         yield wave_header_chunk(sample_rate=sr)
+                         media_type = "raw"
+                         if_frist_chunk = False
+-                    yield pack_audio(BytesIO(), chunk, sr, media_type).getvalue()
++                        if level >= 3:
++                            # 16-bit 单声道：字节数 = 采样率 × 时长 × 2，并对齐到偶数
++                            fixed_bytes = max(2, int(sr * NEEEVA_FIXED_CHUNK_MS / 1000) * 2)
++                    data = pack_audio(BytesIO(), chunk, sr, media_type).getvalue()
++                    if fixed_bytes <= 0:
++                        yield data
++                        continue
++                    pending += data
++                    while len(pending) >= fixed_bytes:
++                        yield pending[:fixed_bytes]
++                        pending = pending[fixed_bytes:]
++                if pending:
++                    yield pending
+ 
+             # _media_type = f"audio/{media_type}" if not (streaming_mode and media_type in ["wav", "raw"]) else f"audio/x-{media_type}"
+             return StreamingResponse(
+                 streaming_generator(
+                     tts_generator,
+                     media_type,
++                    stream_level,
+                 ),
+                 media_type=f"audio/{media_type}",
+             )
+@@ -399,7 +456,8 @@ async def tts_get_endpoint(
+     fragment_interval: float = 0.3,
+     seed: int = -1,
+     media_type: str = "wav",
+-    streaming_mode: bool = False,
++    # NeEEvA: GET 端点与 POST 保持一致，同样接受整数模式
++    streaming_mode: Union[bool, int] = False,
+     parallel_infer: bool = True,
+     repetition_penalty: float = 1.35,
+     sample_steps: int = 32,

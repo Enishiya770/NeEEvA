@@ -320,6 +320,7 @@ curl.exe -X POST "http://127.0.0.1:9881/songs/catalog/remember" `
 
 ## 常见问题
 
+- **有回复文字、非流式预热有声音，但实时对话完全静音**（日志里成片的 `[TTS流式] 失败(code=422) ... unsupported WAV: riff=False`）：GPT-SoVITS 的 `api_v2.py` 需要打适配补丁——Unity 端把 `streaming_mode` 当整数模式（2/3）发送，上游把它声明为 bool，pydantic v2 会拒绝。`GPT-SoVITS/` 不在 git 仓库内，**换机器或重装后必须重新打补丁**，见 [`Server/GPT-SoVITS-patch/README.md`](Server/GPT-SoVITS-patch/README.md)。
 - **GPT-SoVITS 启动后 `tts_infer.yaml` 被改动了**：api_v2 加载权重时会自动规范化该文件（归一 `version` 字段、补全各版本默认段），属正常行为，音色配置不受影响，无需改回。
 - **没有 NVIDIA 显卡 / CUDA 报错**：SenseVoice 改用 `python sensevoice_server.py --device cpu`；GPT-SoVITS 把 `GPT-SoVITS/GPT_SoVITS/configs/tts_infer.yaml` 中 `custom` 段的 `device` 改为 `cpu`、`is_half` 改为 `false`（CPU 模式合成速度明显变慢）。
 - **她听不到我说话**：确认 SenseVoice 服务窗口在监听 `9881`；检查 Windows 设置 → 隐私 → 麦克风已允许桌面应用访问；再看 Unity Console 是否有 ASR 请求报错。
