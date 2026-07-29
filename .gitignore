@@ -101,6 +101,13 @@ Server/SeedVC/quality_output.wav
 Server/SeedVC/ab_*.wav
 Server/SVS/.venv/
 Server/SVS/vendor/
+# DiffSinger 日语渲染器：音源与声码器权重约 1.4GB，按官方渠道重新下载即可
+Server/DiffSinger/.venv/
+Server/DiffSinger/voicebank/
+Server/DiffSinger/vocoder/
+Server/DiffSinger/runtime/
+Server/DiffSinger/*.zip
+Server/DiffSinger/*.oudep
 Server/SVS/last_synthesis/
 Server/SVS/runtime/
 Server/RVC/vendor/
