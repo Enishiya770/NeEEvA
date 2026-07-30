@@ -5,8 +5,10 @@
 原生日语音素集的 DiffSinger 音源生成，角色音色再由 Unity 侧的 svc-post-polish
 （9882 的 RVC）负责。
 
-> 状态：**未完成**。runner 已写好且假名映射验证通过，但 ONNX 推理存在一个未解决的
-> 崩溃问题，见文末「已知问题」。
+> 状态：**功能可用，音质待调**。全链路已跑通（DiffSinger 5.4s + RVC 转音色），
+> 日语发音经人工确认正常，音色也确实变成角色本人；但转换后仍有偏沙哑的残留，
+> 见文末「已知问题：沙哑」。
+> ⚠️ onnxruntime 必须锁 1.23.x 且用纯 CPU 包，原因见「运行时版本（关键）」。
 
 ## 为什么这样分工
 
@@ -52,8 +54,10 @@ curl -L -o nsf_hifigan.oudep https://github.com/xunmengshe/OpenUtau/releases/dow
 
 # 3) 独立 venv（避免与 RVC 的依赖固定冲突）
 py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install onnxruntime numpy soundfile pyyaml
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
+
+`requirements.txt` 把 onnxruntime 锁在 `1.23.2`，**不要**改成其他版本或 `onnxruntime-gpu`。
 
 ## 启用
 
@@ -87,19 +91,64 @@ runner **有意跳过 dur/pitch 两个 variance 模型**：项目的 `SingingSco
 - 音素集：NNSVS/ENUNU 系日语音素（か→`k a`、し→`sh i`、ん→`N`、っ→`cl`、拗音→`ky a` 等）
   `dictionary.txt` 是恒等映射，假名→音素必须由 runner 自己完成（已实现并验证）
 
-## 已知问题（阻塞项）
+## 运行时版本（关键）
 
-`acoustic.onnx` 推理在**帧数超过约 200 时触发 Windows access violation**（原生崩溃，
-非 Python 异常）。已确认：
+一开始 `acoustic.onnx` 推理会在**帧数超过约 200 时触发 access violation**（原生崩溃，
+不是 Python 异常），期间还导致过两次系统级崩溃。根因是**运行时版本错配**，与模型和
+硬件都无关：
 
-- 与音素内容无关：单音素 `a` 拉长到 511 帧同样崩；20/50/100/150/200 帧均正常
-- 与 onnxruntime 版本强相关：`1.18.1` 和 `1.22.0` 连**加载**都崩；`1.28.0` 能加载并在
-  ≤200 帧下正常推理
-- 200 帧只有约 2.3 秒，而 OpenUtau 能渲染整首歌，所以这**不像是模型的固有限制**，
-  更像特定 onnxruntime 构建的问题
+| onnxruntime | 结果 |
+|---|---|
+| 1.18.1 | 创建 InferenceSession 即崩 |
+| 1.22.0 | 同上 |
+| 1.28.0 | 能加载，>200 帧崩 |
+| **1.23.2（纯 CPU）** | ✅ 511 帧 3.1s |
 
-下一步可尝试：改用 CUDA/DirectML 执行提供器绕开 CPU 内核；或换用 OpenUtau 实际使用的
-onnxruntime 版本；或分段推理后拼接（每段 ≤200 帧，在静音处切分）。
+1.23.x 正是 [OpenUtau 的 `OpenUtau.Core.csproj`](https://github.com/stakira/OpenUtau/blob/master/OpenUtau.Core/OpenUtau.Core.csproj) 锁定的版本
+（Windows `Microsoft.ML.OnnxRuntime.DirectML 1.23.0` / 其他平台 `Microsoft.ML.OnnxRuntime 1.23.2`），
+也就是这些社区音源实际被验证过的运行时。排查时应当**先对齐参考实现的版本**，而不是
+把长序列崩溃当成模型限制去做分段——OpenUtau 本身就是整个 phrase 一次性渲染的。
 
-⚠️ 排查期间本机发生过一次蓝屏（`HYPERVISOR_ERROR 0x00020001`）。该机器的事件日志显示
-在此之前也有多次异常关机记录，未必由本工作引起，但继续排查时建议避免长时间满载。
+另外**不要用 `onnxruntime-gpu`**：即使显式传 `providers=["CPUExecutionProvider"]`，
+导入时仍会加载 CUDA/TensorRT 的驱动层库，没有必要。纯 CPU 包下
+`get_available_providers()` 里不再出现 CUDA/TensorRT。CPU 速度已足够
+（约 4s 出 6s 音频），本渲染器也不与占用显存的 LLM/TTS 抢资源。
+
+## 已知问题：沙哑
+
+RVC 转换后音色确实变成角色本人，但仍有偏沙哑的残留。已排查与已确认的部分：
+
+**已修复的一项**：nsf-hifigan 输出电平极低（峰值约 0.17 / RMS 0.03，比 SoulX 输出低约
+14dB），而 RVC 的 HuBERT 特征提取与 F0 跟踪在这种电平下会明显劣化。runner 现在做峰值
+归一化（默认 0.9，`--target-peak` 可调，设 0 关闭），这一项带来了可听出的改善，但**没有
+完全消除**沙哑。
+
+**当前最佳参数**（送入 9882 之前）：
+
+| 项 | 值 | 说明 |
+|---|---|---|
+| 源采样率 | 降到 32000 | 匹配角色 RVC 模型的训练采样率（DiffSinger 原生输出 44100） |
+| `index_rate` | 0.75 | 角色索引权重。0 等于不用 `.index`，沙哑会明显加重 |
+| `protect` | 0.38 | 越低对清辅音/气息保护越强（0.5=关闭） |
+| `rms_mix_rate` | 0.31 | 与既有回唱路径保持一致 |
+| `auto_f0_adjust` / `semitone_shift` | false / 0 | 润色分支不应改变歌曲调性 |
+
+单变量对比（44.1k 原样 / 32k / 24k / protect 0.20 / index 0.90）实测**差异都不明显**，
+说明沙哑主要来自 DiffSinger 输出本身的频谱特性，而不是 RVC 侧参数。
+
+**未验证的下一步方向**（按优先级）：
+
+1. **音域**：DiffSinger 输出中位 F0 约 329Hz，角色 RVC 模型中位约 288Hz，高约 2.3 个半音。
+   在训练音域边缘运行是紧绷感的常见来源。可生成中位 ~294Hz 的乐谱做对照
+   （`scratchpad` 里有现成的双音域样本生成思路：同一旋律 tonic 取 MIDI 62 vs 67）。
+2. **源头而非补救**：调 runner 的 `--depth` / `--speedup`（现为 400 / 10，即 100 步），
+   或改用音源自带的 `dspitch/pitch.onnx` 生成更自然的 F0 曲线，而不是直接用乐谱 F0。
+3. 若仍无改善，考虑换一个日语音源——本项目选 波音リツ 是因为许可宽松，音质并非首要标准。
+
+⚠️ **调优前先确认机器状态**：本机为 13th Gen i9-13900KF，系统日志中有 **47 次 WHEA
+Id=19（Processor Core / Corrected Machine Check / Internal parity error）**，且最早的
+记录（2026-06-19）远早于本项目的 ONNX 工作。排查期间发生过多次蓝屏，bugcheck 码高度
+分散（0x50 / 0x20001 / 0x1e+0xC0000096 非法特权指令 / 0x1e+0xC0000005），而**没有任何
+显卡驱动错误记录**——指向 CPU 层面的硬件不稳定，与 Intel 13/14 代高端型号的已知问题
+表现一致。持续 AVX 满载的推理负载最容易触发它。继续做音质调优前，建议先更新含新微码的
+BIOS 并取消一切超频。

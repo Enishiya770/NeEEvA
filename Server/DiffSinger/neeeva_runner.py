@@ -248,7 +248,8 @@ def build_inputs(score: dict, vb: VoiceBank, hop_seconds: float,
 
 # ---------------------------------------------------------------- 推理
 def synthesize(model_dir: Path, score: dict, out_path: Path, seed: int,
-               depth: int, speedup: int, consonant_frames: int) -> dict:
+               depth: int, speedup: int, consonant_frames: int,
+               target_peak: float = 0.9) -> dict:
     vb = VoiceBank(model_dir)
     root = Path(__file__).resolve().parent
     vocoder_path = root / "vocoder" / "nsf_hifigan.onnx"
@@ -293,7 +294,17 @@ def synthesize(model_dir: Path, score: dict, out_path: Path, seed: int,
     vocoder = ort.InferenceSession(str(vocoder_path), providers=providers)
     wave_out = vocoder.run(["waveform"], {"mel": mel, "f0": f0})[0]
 
-    audio = np.clip(np.asarray(wave_out, dtype=np.float32).reshape(-1), -1.0, 1.0)
+    audio = np.asarray(wave_out, dtype=np.float32).reshape(-1)
+
+    # 峰值归一化：nsf-hifigan 出来的电平很低（实测峰值约 0.17 / RMS 0.03，比
+    # SoulX 输出低约 14dB）。下游 RVC 的 HuBERT 特征与 F0 提取在这种电平下会
+    # 明显劣化，听感就是沙哑。这里抬到接近满量程，保留动态不做压缩。
+    peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+    gain = 1.0
+    if peak > 1e-6 and target_peak > 0:
+        gain = target_peak / peak
+        audio = audio * gain
+    audio = np.clip(audio, -1.0, 1.0)
     pcm = (audio * 32767.0).astype("<i2")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(out_path), "wb") as fh:
@@ -310,6 +321,8 @@ def synthesize(model_dir: Path, score: dict, out_path: Path, seed: int,
         "seconds": round(len(audio) / sample_rate, 3),
         "phonemes": int(tokens.shape[1]),
         "providers": providers,
+        "raw_peak": round(peak, 4),
+        "normalize_gain": round(gain, 3),
     }
 
 
@@ -324,6 +337,8 @@ def main() -> int:
     parser.add_argument("--depth", type=int, default=1000)
     parser.add_argument("--speedup", type=int, default=10)
     parser.add_argument("--consonant-frames", type=int, default=3)
+    # 归一化目标峰值；设 0 可关闭（下游若自带增益处理时用）
+    parser.add_argument("--target-peak", type=float, default=0.9)
     args = parser.parse_args()
 
     score = json.loads(args.score.read_text(encoding="utf-8"))
@@ -331,6 +346,7 @@ def main() -> int:
         info = synthesize(
             args.model, score, args.output, args.seed,
             args.depth, args.speedup, args.consonant_frames,
+            args.target_peak,
         )
     except Exception as exc:  # 让服务端能在日志里看到确切原因
         print(json.dumps({"error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False), flush=True)

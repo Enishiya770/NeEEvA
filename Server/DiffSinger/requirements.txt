@@ -1,0 +1,17 @@
+# onnxruntime 版本必须锁定在 1.23.x —— 这不是可选偏好，换版本会崩。
+#
+# 实测（波音リツ DiffSinger 1.0.1 的 acoustic.onnx，Windows）：
+#   1.18.1  创建 InferenceSession 即 access violation
+#   1.22.0  同上
+#   1.28.0  能加载，但帧数超过约 200 时 access violation
+#   1.23.2  正常（511 帧 3.1s）
+# 1.23.x 正是 OpenUtau 锁定的版本（Windows 用 1.23.0 DirectML / 其他平台 1.23.2），
+# 也就是这些音源实际被验证过的运行时。
+#
+# 必须用纯 CPU 包，不要用 onnxruntime-gpu：后者即使显式指定 CPUExecutionProvider，
+# 导入时仍会加载 CUDA/TensorRT 驱动层库；排查期间的两次系统级崩溃都发生在装了
+# onnxruntime-gpu 的环境里。本渲染器在 CPU 上已经足够快（约 4s / 6s 音频）。
+onnxruntime==1.23.2
+numpy
+soundfile
+pyyaml
