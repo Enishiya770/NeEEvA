@@ -571,7 +571,7 @@ def _acoustic_alignment(
     return alignment, "miss-generated"
 
 
-def _backend_state() -> dict:
+def _soulx_missing() -> list[str]:
     root = _soulx_root()
     required = {
         "repository": root / "cli" / "inference.py",
@@ -582,12 +582,21 @@ def _backend_state() -> dict:
             root / "pretrained_models" / "SoulX-Singer-Preprocess"
         ),
     }
-    missing = [
+    return [
         name
         for name, path in required.items()
         if not (path.is_dir() if name == "preprocess_models" else path.is_file())
     ]
-    soulx_available = not missing and RUNNER.is_file()
+
+
+def _soulx_available() -> bool:
+    return not _soulx_missing() and RUNNER.is_file()
+
+
+def _backend_state() -> dict:
+    root = _soulx_root()
+    missing = _soulx_missing()
+    soulx_available = _soulx_available()
     japanese = _japanese_backend_state()
     supported_languages = (
         ["zh", "en", "yue"] if soulx_available else []
@@ -764,6 +773,53 @@ def _save_capture(
     return capture_id
 
 
+def _run_japanese_via_kana(
+    source_bytes: bytes,
+    score: dict,
+    prompt_path: Path,
+    prompt_language: str,
+    seed: int,
+    request_id: str,
+    max_seconds: float,
+    inference_steps: int,
+) -> tuple[bytes, dict]:
+    """用 SoulX 唱日语：假名 mora 直接映射到音素，不经过罗马音。
+
+    先前试过把假名转罗马音再当英文送进去，吐字不清——英语 g2p 会按英语拼写规则重新
+    解释 "shi zu ka na"，音节边界和元音都被改写。这里改用 japanese_phonemes 适配器：
+    每个 mora 直接产出一个音素组（促音取下一音节首辅音，拨音按后接辅音同化为 M/NG/N，
+    长音延长前一元音），绕开英语词级 g2p，音节边界由我们自己决定。
+
+    与 DiffSinger 的区别仍在于没有一 mora 一音符的硬性契约，所以适合跟唱。
+    """
+    units = [str(u) for u in (score.get("renderer_lyric_units") or []) if str(u)]
+    if not units:
+        raise HTTPException(422, "Japanese score has no usable kana mora")
+
+    print(
+        f"[SVS/JA] request={request_id} 假名适配 {len(units)} mora: "
+        f"{''.join(units[:16])}{'…' if len(units) > 16 else ''}",
+        flush=True,
+    )
+    wav_bytes, metadata = _run_synthesis(
+        source_bytes,
+        score,
+        prompt_path,
+        "JapaneseAdapter",
+        prompt_language,
+        seed,
+        request_id,
+        max_seconds,
+        inference_steps,
+        backend_name="soulx-kana-adapter",
+        use_acoustic_alignment=False,
+    )
+    metadata["backend"] = "soulx-kana-adapter"
+    metadata["target_language"] = "Japanese (kana mora → SoulX phones)"
+    metadata["resolved_lyrics"] = str(score.get("lyrics_reading", ""))
+    return wav_bytes, metadata
+
+
 def _run_japanese_synthesis(
     source_bytes: bytes,
     score: dict,
@@ -773,6 +829,7 @@ def _run_japanese_synthesis(
     request_id: str,
     max_seconds: float,
     inference_steps: int,
+    renderer: str = "auto",
 ) -> tuple[bytes, dict]:
     """Run a score-only Japanese renderer.
 
@@ -800,6 +857,45 @@ def _run_japanese_synthesis(
             inference_steps,
             backend_name="soulx-ja-phone-adapter-experimental",
             use_acoustic_alignment=False,
+        )
+
+    # DiffSinger 只适合乐谱驱动的演唱（她自己作曲、自己想唱的歌），那种乐谱天生就是
+    # 一 mora 一音符。跟唱的乐谱来自对歌声的声学切分，音符数通常是 mora 数的两三倍，
+    # 强行归并等于把真实旋律揉碎重拼，实测效果很差。这里不再改写乐谱：只有乐谱本身已
+    # 满足契约时才交给 DiffSinger，否则走 SoulX 假名适配路径。
+    # 判据是"这份乐谱来自哪里"，不是音符数是否恰好等于 mora 数。跟唱的乐谱由 ASR
+    # 从用户真实演唱里提取（lyrics_reading_source = sensevoice+pyopenjtalk），旋律与
+    # 时值都是真实的、音符切分是声学的；而她自己作曲/记谱的歌是 score-kana，天生一
+    # mora 一音符。实测跟唱交给 DiffSinger 效果很差，一律走 SoulX 假名适配。
+    mora_count = len(score.get("lyrics_mora") or [])
+    sung_count = sum(
+        1 for n in (score.get("notes") or []) if str(n.get("note_type")) != "rest"
+    )
+    from_user_singing = str(
+        score.get("lyrics_reading_source", "")
+    ).lower().startswith("sensevoice")
+    auto_kana = from_user_singing or mora_count != sung_count
+    if renderer == "soulx-kana" or (renderer != "diffsinger" and auto_kana):
+        reason = (
+            "显式指定"
+            if renderer == "soulx-kana"
+            else "跟唱乐谱(来自用户演唱)"
+            if from_user_singing
+            else f"乐谱非一 mora 一音符 ({mora_count} mora / {sung_count} 音符)"
+        )
+        print(
+            f"[SVS/JA] request={request_id} {reason} → SoulX 假名适配",
+            flush=True,
+        )
+        return _run_japanese_via_kana(
+            source_bytes,
+            score,
+            prompt_path,
+            prompt_language,
+            seed,
+            request_id,
+            max_seconds,
+            inference_steps,
         )
 
     runner = Path(state["runner"])
@@ -867,6 +963,29 @@ def _run_japanese_synthesis(
             if was_cancelled:
                 raise HTTPException(499, "Japanese SVS synthesis was cancelled")
             details = (stderr or stdout or "runner produced no output").strip()
+            # DiffSinger 失败不应让整次演唱变成"没有声音"。SoulX 不受一 mora 一音符
+            # 约束，可以唱同一份乐谱，只是不带日语音素建模。宁可音质降级也要出声。
+            if _soulx_available():
+                print(
+                    f"[SVS/JA] request={request_id} DiffSinger 失败，降级 SoulX: "
+                    f"{details[-300:]}",
+                    flush=True,
+                )
+                wav_bytes, metadata = _run_synthesis(
+                    source_bytes,
+                    score,
+                    prompt_path,
+                    "JapaneseAdapter",
+                    prompt_language,
+                    seed,
+                    request_id,
+                    max_seconds,
+                    inference_steps,
+                    backend_name="soulx-fallback-from-diffsinger-ja",
+                    use_acoustic_alignment=False,
+                )
+                metadata["diffsinger_fallback_reason"] = details[-300:]
+                return wav_bytes, metadata
             raise HTTPException(500, details[-1200:])
 
         wav_bytes, output_seconds = _normalise_result(output_path)
@@ -1294,6 +1413,8 @@ async def synthesize(
     request_id: str = Form(""),
     max_seconds: float = Form(60.0),
     inference_steps: int = Form(0),
+    # 仅用于 A/B 对比：留空按乐谱形态自动路由。Unity 不发送此字段。
+    renderer: str = Form(""),
 ):
     score = _validate_score(score_json)
     requested_language = language or str(score.get("language", ""))
@@ -1352,6 +1473,7 @@ async def synthesize(
                     effective_request_id,
                     max_seconds,
                     effective_steps,
+                    (renderer or "auto").strip().lower(),
                 )
                 if target_code == "ja"
                 else _run_synthesis(

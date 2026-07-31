@@ -26,9 +26,13 @@ namespace AIChat.Memory
         [SerializeField] private bool m_ForceReseedOnStart = false;
 
         [Header("注入感知帧的 top-N 节点数")]
-        [Tooltip("每帧把 top-N 核心节点放进感知帧。N 应控制在使 token 占用 < 30% ctx,典型值 20-40")]
+        [Tooltip("每帧把 top-N 核心节点放进感知帧。这一块会随整帧留在对话历史里、被反复重放，" +
+                 "所以它撑大的不是一帧而是整个上下文——实测 N=30 时记忆块占感知帧 77%，" +
+                 "历史很快填满触发裁剪，而裁剪会让 llama.cpp 前缀缓存失效、整段重算 5-10 秒" +
+                 "(加载 --mmproj 后 KV 位移复用被禁用，没有部分复用的余地)。" +
+                 "情境唤起走 m_RecallTopK 那条独立通道，不受此值影响。")]
         [Range(0, 200)]
-        [SerializeField] private int m_MemoryMapTopN = 30;
+        [SerializeField] private int m_MemoryMapTopN = 12;
 
         [Header("调试日志")]
         [Tooltip("勾上后,启动时会打印一次注入哪些节点(避免每帧刷屏)")]

@@ -95,6 +95,10 @@ _KATA_TO_HIRA = {chr(c): chr(c - 0x60) for c in range(0x30A1, 0x30F7)}
 REST_PHONE = "SP"
 BREATH_PHONE = "AP"
 
+# 低于此值视为无声帧。人声基频不会低于这个量级，variance 模型在休止段
+# 输出的 6-16Hz 属于"此处无音高"的表示，不能当作真实基频送进声码器。
+UNVOICED_HZ = 50.0
+
 
 def _to_hiragana(text: str) -> str:
     return "".join(_KATA_TO_HIRA.get(ch, ch) for ch in text)
@@ -149,6 +153,13 @@ class VoiceBank:
         self.acoustic = root / "acoustic.onnx"
         if not self.acoustic.is_file():
             raise FileNotFoundError(f"missing acoustic.onnx under {root}")
+        # variance 模型可选：有就能生成带真人音高微动的 F0，没有则退回乐谱 F0
+        self.linguistic = root / "linguistic.onnx"
+        self.pitch = root / "dspitch" / "pitch.onnx"
+
+    @property
+    def has_pitch_model(self) -> bool:
+        return self.linguistic.is_file() and self.pitch.is_file()
 
     def token(self, phone: str) -> int:
         if phone not in self.token_of:
@@ -185,7 +196,13 @@ def _resample_f0(f0: list[float], src_dt: float, dst_dt: float, dst_len: int) ->
 
 
 def build_inputs(score: dict, vb: VoiceBank, hop_seconds: float,
-                 consonant_frames: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+                 consonant_frames: int, transpose: int = 0) -> dict:
+    """把 SingingScore 展开成模型输入。
+
+    返回 dict 而不是元组：除 acoustic 需要的 tokens/durations/f0 外，
+    variance(pitch) 模型还需要词级切分与音符级数据。
+    这里的"词"就是一个音符（一 mora 一音符），休止符自成一词。
+    """
     notes = score.get("notes") or []
     mora = list(score.get("lyrics_mora") or [])
     if not notes:
@@ -200,15 +217,24 @@ def build_inputs(score: dict, vb: VoiceBank, hop_seconds: float,
 
     phones: list[str] = []
     frames: list[int] = []
+    word_div: list[int] = []      # 每个"词"(音符)含几个音素
+    word_dur: list[int] = []      # 每个"词"占几帧
+    note_midi: list[float] = []   # 每个音符的 MIDI（休止=0）
+    note_dur: list[int] = []
     prev_vowel: str | None = None
     mora_iter = iter(mora)
 
     for note in notes:
         dur_s = float(note.get("duration_seconds") or 0.0)
         n_frames = max(1, int(round(dur_s / hop_seconds)))
+        raw_midi = float(note.get("midi") or 0)
+        note_midi.append(raw_midi + transpose if raw_midi > 0 else 0.0)
+        note_dur.append(n_frames)
+        word_dur.append(n_frames)
         if str(note.get("note_type")) == "rest":
             phones.append(REST_PHONE)
             frames.append(n_frames)
+            word_div.append(1)
             continue
 
         unit = next(mora_iter)
@@ -222,6 +248,7 @@ def build_inputs(score: dict, vb: VoiceBank, hop_seconds: float,
         if len(seq) == 1:
             phones.append(seq[0])
             frames.append(n_frames)
+            word_div.append(1)
         else:
             # 辅音占固定短帧，剩余给母音；音符太短时按比例压缩辅音
             c_frames = min(consonant_frames, max(1, n_frames // 2))
@@ -229,6 +256,18 @@ def build_inputs(score: dict, vb: VoiceBank, hop_seconds: float,
             frames.append(c_frames)
             phones.append(seq[1])
             frames.append(max(1, n_frames - c_frames))
+            word_div.append(2)
+
+    # 休止符的 note_midi 不能填 0：音源的 dspitch 配置是 use_note_rest=false，
+    # 模型不认识"休止"这个概念，会把 MIDI 0 当成真实音符渲染（0 号音 ≈ 8.18Hz），
+    # 在每个休止处生成荒谬的音高过渡，污染整条 F0 曲线。改为沿用相邻实音的音高，
+    # 让曲线在休止处保持连续。
+    for i, m in enumerate(note_midi):
+        if m > 0:
+            continue
+        prev_m = next((note_midi[j] for j in range(i - 1, -1, -1) if note_midi[j] > 0), 0.0)
+        next_m = next((note_midi[j] for j in range(i + 1, len(note_midi)) if note_midi[j] > 0), 0.0)
+        note_midi[i] = prev_m or next_m or 60.0
 
     tokens = np.array([[vb.token(p) for p in phones]], dtype=np.int64)
     durations = np.array([frames], dtype=np.int64)
@@ -236,20 +275,79 @@ def build_inputs(score: dict, vb: VoiceBank, hop_seconds: float,
 
     src_dt = float(score.get("frame_seconds") or 0.01)
     f0 = _resample_f0(list(score.get("f0_hz") or []), src_dt, hop_seconds, total_frames)
+    if transpose:
+        f0 = np.where(f0 > 0, f0 * (2.0 ** (transpose / 12.0)), f0).astype(np.float32)
     # 无声帧补一个低频占位，nsf-hifigan 对全 0 的 F0 会产生爆音
     voiced = f0 > 0
-    if voiced.any():
-        fill = float(np.median(f0[voiced]))
-    else:
-        fill = 220.0
+    fill = float(np.median(f0[voiced])) if voiced.any() else 220.0
     f0 = np.where(voiced, f0, fill).astype(np.float32)
-    return tokens, durations, f0[None, :]
+
+    return {
+        "tokens": tokens,
+        "durations": durations,
+        "f0": f0[None, :],
+        "word_div": np.array([word_div], dtype=np.int64),
+        "word_dur": np.array([word_dur], dtype=np.int64),
+        "note_midi": np.array([note_midi], dtype=np.float32),
+        "note_dur": np.array([note_dur], dtype=np.int64),
+        "total_frames": total_frames,
+    }
+
+
+def predict_f0(vb: VoiceBank, inp: dict, providers: list[str],
+               speedup: int) -> np.ndarray | None:
+    """用音源自带的 variance 模型生成带真人音高微动的 F0（Hz）。
+
+    直接照搬乐谱里那条规整的 F0 会让演唱听起来发死（"像机器人"），
+    因为它缺少起音滑入、音间过渡和自然抖动。pitch.onnx 正是为此而生。
+    失败时返回 None，由调用方退回乐谱 F0。
+    """
+    try:
+        ling = ort.InferenceSession(str(vb.linguistic), providers=providers)
+        encoder_out, _ = ling.run(
+            ["encoder_out", "x_masks"],
+            {"tokens": inp["tokens"], "word_div": inp["word_div"],
+             "word_dur": inp["word_dur"]},
+        )
+        n_frames = inp["total_frames"]
+        pitch_sess = ort.InferenceSession(str(vb.pitch), providers=providers)
+        pred = pitch_sess.run(
+            ["pitch_pred"],
+            {
+                "encoder_out": encoder_out,
+                "ph_dur": inp["durations"],
+                "note_midi": inp["note_midi"],
+                "note_dur": inp["note_dur"],
+                # retake 全 True = 整条曲线都由模型生成；pitch 传乐谱曲线作基准
+                "pitch": inp["f0"],
+                "retake": np.ones((1, n_frames), dtype=bool),
+                "speedup": np.array(speedup, dtype=np.int64),
+            },
+        )[0]
+        out = np.asarray(pred, dtype=np.float32).reshape(1, -1)
+        # 输出可能是 MIDI 半音也可能是 Hz，按量级判断后统一成 Hz
+        median = float(np.median(out[out > 0])) if (out > 0).any() else 0.0
+        if 0 < median < 130:
+            out = (440.0 * 2.0 ** ((out - 69.0) / 12.0)).astype(np.float32)
+
+        # 休止段模型会输出 6-16Hz 这种次声值。直接喂给 nsf-hifigan 会产生低频
+        # 轰鸣/杂音，所以按有声阈值判定后统一填成有声段中位值——与乐谱 F0 的
+        # 处理保持一致（声码器不喜欢 0 或极低的 F0）。
+        voiced = out >= UNVOICED_HZ
+        if voiced.any():
+            out = np.where(voiced, out, float(np.median(out[voiced]))).astype(np.float32)
+        return out
+    except Exception as exc:
+        print(json.dumps({"warning": f"pitch model unavailable: {exc}"},
+                         ensure_ascii=False), flush=True)
+        return None
 
 
 # ---------------------------------------------------------------- 推理
 def synthesize(model_dir: Path, score: dict, out_path: Path, seed: int,
                depth: int, speedup: int, consonant_frames: int,
-               target_peak: float = 0.9) -> dict:
+               target_peak: float = 0.9, use_pitch_model: bool = True,
+               transpose: int = 0) -> dict:
     vb = VoiceBank(model_dir)
     root = Path(__file__).resolve().parent
     vocoder_path = root / "vocoder" / "nsf_hifigan.onnx"
@@ -265,11 +363,20 @@ def synthesize(model_dir: Path, score: dict, out_path: Path, seed: int,
 
     np.random.seed(seed & 0x7FFFFFFF)
 
-    tokens, durations, f0 = build_inputs(score, vb, hop_seconds, consonant_frames)
+    inp = build_inputs(score, vb, hop_seconds, consonant_frames, transpose)
+    tokens, durations = inp["tokens"], inp["durations"]
+    f0 = inp["f0"]
 
     providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
     available = set(ort.get_available_providers())
     providers = [p for p in providers if p in available] or ["CPUExecutionProvider"]
+
+    f0_source = "score"
+    if use_pitch_model and vb.has_pitch_model:
+        predicted = predict_f0(vb, inp, providers, speedup)
+        if predicted is not None and predicted.shape[1] == inp["total_frames"]:
+            f0 = predicted
+            f0_source = "variance-model"
 
     acoustic = ort.InferenceSession(str(vb.acoustic), providers=providers)
     mel = acoustic.run(
@@ -323,6 +430,8 @@ def synthesize(model_dir: Path, score: dict, out_path: Path, seed: int,
         "providers": providers,
         "raw_peak": round(peak, 4),
         "normalize_gain": round(gain, 3),
+        "f0_source": f0_source,
+        "transpose": transpose,
     }
 
 
@@ -339,6 +448,11 @@ def main() -> int:
     parser.add_argument("--consonant-frames", type=int, default=3)
     # 归一化目标峰值；设 0 可关闭（下游若自带增益处理时用）
     parser.add_argument("--target-peak", type=float, default=0.9)
+    # 用音源自带的 variance 模型生成 F0（更自然）；--no-pitch-model 退回乐谱 F0
+    parser.add_argument("--no-pitch-model", dest="use_pitch_model",
+                        action="store_false", default=True)
+    # 整体移调(半音)。角色 RVC 模型中位约 288Hz，乐谱明显偏高时下移能减轻紧绷
+    parser.add_argument("--transpose", type=int, default=0)
     args = parser.parse_args()
 
     score = json.loads(args.score.read_text(encoding="utf-8"))
@@ -346,7 +460,7 @@ def main() -> int:
         info = synthesize(
             args.model, score, args.output, args.seed,
             args.depth, args.speedup, args.consonant_frames,
-            args.target_peak,
+            args.target_peak, args.use_pitch_model, args.transpose,
         )
     except Exception as exc:  # 让服务端能在日志里看到确切原因
         print(json.dumps({"error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False), flush=True)

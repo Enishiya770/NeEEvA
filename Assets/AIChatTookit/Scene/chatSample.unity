@@ -233,7 +233,7 @@ MonoBehaviour:
   m_SeedJson: {fileID: 4900000, guid: c5a9fe402aed53949a569756e57c00e5, type: 3}
   m_RuntimeFileName: memory.json
   m_ForceReseedOnStart: 0
-  m_MemoryMapTopN: 30
+  m_MemoryMapTopN: 12
   m_LogMemoryMap: 1
   m_EnableLLMWrite: 1
   m_MaxNodes: 400
@@ -2965,10 +2965,11 @@ MonoBehaviour:
   api_key: 
   m_EnableThinking: 0
   m_KeepRecentImages: 2
-  m_LowLatencyHistoryLimit: 8
+  m_LowLatencyHistoryLimit: 32
   m_LogRequestStats: 1
   m_EphemeralMaxTokens: 128
-  m_EphemeralHistoryMessages: 4
+  m_EphemeralHistoryMessages: 0
+  m_PrewarmPrefixOnStart: 1
 --- !u!1 &785927902
 GameObject:
   m_ObjectHideFlags: 0
@@ -5128,6 +5129,7 @@ MonoBehaviour:
   m_HumSVCStartupTimeoutSeconds: 45
   m_HumSVCStartScriptRelativePath: Server/SeedVC/start_seedvc_server.ps1
   m_HumSVCDiffusionSteps: 20
+  m_HumSVCIndexRate: 0.75
   m_HumSVCAutoF0Adjust: 1
   m_HumSVCSemitoneShift: 0
   m_HumSVCTimeoutSeconds: 600

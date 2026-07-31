@@ -74,6 +74,13 @@ public class ChatQW : LLM
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, msg);
         }
+        // 易变上下文放最末尾：前面的 system + 历史是稳定前缀，可被完整复用，
+        // 本段每轮变化也只需重算它自己。放在中间会让其后的所有 token 一起失效。
+        if (!string.IsNullOrEmpty(TrailingContext))
+        {
+            if (sb[sb.Length - 1] != '[') sb.Append(',');
+            AppendMessage(sb, new SendData("system", TrailingContext));
+        }
         sb.Append(']');
         if (m_Backend == BackendType.Local)
         {
@@ -200,7 +207,7 @@ public class ChatQW : LLM
 
     [Header("低延迟模式：请求中最多保留的非system历史消息数")]
     [Tooltip("包含即将加入的本轮user和assistant。8约等于最近3轮完整对话+当前轮，能明显限制prefill耗时")]
-    [Range(4, 20)] public int m_LowLatencyHistoryLimit = 8;
+    [Range(4, 64)] public int m_LowLatencyHistoryLimit = 32;
 
     [Header("Debug：打印LLM请求大小/消息数（不打印正文和密钥）")]
     public bool m_LogRequestStats = true;
@@ -208,11 +215,36 @@ public class ChatQW : LLM
     [Header("流式倾听临时草稿")]
     [Tooltip("临时请求的最大输出 token。它不进入历史，并会在 EOU 时被撤销。")]
     [Range(48, 256)] public int m_EphemeralMaxTokens = 128;
-    [Tooltip("临时请求最多携带多少条最近的非 system 消息。")]
-    [Range(0, 8)] public int m_EphemeralHistoryMessages = 4;
+    [Tooltip("临时请求携带多少条最近的非 system 消息。\n" +
+             "0 = 携带完整历史(推荐)：草稿 prompt 因此成为主对话 prompt 的严格延长，" +
+             "两者共享同一段长前缀，llama.cpp 只需重算末尾的指令部分。\n" +
+             "取正数会从历史中间截取一段，token 序列与主对话对不上，只能共享 system " +
+             "提示词——实测每轮要多重算约 2800 token(约 2.5 秒)，且草稿记得更少。")]
+    [Range(0, 8)] public int m_EphemeralHistoryMessages = 0;
+
+    [Header("开场预热")]
+    [Tooltip("场景启动时发一发空请求，把 7000+ token 的系统提示词提前灌进 llama.cpp 的 " +
+             "KV 缓存。实测会话第一轮首 token 要 5-8 秒(前缀全冷)，暖机后同样的轮次只需 " +
+             "0.7-2.1 秒。这一项把那笔一次性开销挪到用户开口之前，不产生任何可见输出。")]
+    public bool m_PrewarmPrefixOnStart = true;
 
     private UnityWebRequest m_EphemeralRequest;
     private int m_EphemeralGeneration = 0;
+    private UnityWebRequest m_PrewarmRequest;
+
+    /// <summary>
+    /// 预热还在飞就立刻放弃它。场景启动时各服务都在抢资源，实测预热要 12 秒才回来
+    /// (单独测只要 2 秒)；用户若在这期间开口，真实请求会排在预热后面，首轮反而更慢
+    /// ——实测首 token 被拖到 10.48s。llama-server 在客户端断开时会取消任务，
+    /// 所以抢占是干净的：已经算好的前缀仍留在 KV 缓存里，不会白做。
+    /// </summary>
+    private void AbortPrewarmIfRunning()
+    {
+        if (m_PrewarmRequest == null) return;
+        try { m_PrewarmRequest.Abort(); } catch (Exception) { }
+        m_PrewarmRequest = null;
+        if (m_LogRequestStats) Debug.Log("[LLM预热] 用户已开口，放弃预热");
+    }
 
     private void Start()
     {
@@ -227,6 +259,63 @@ public class ChatQW : LLM
             //回落：使用Inspector上的m_SystemSetting
             m_DataList.Add(new SendData("system", m_SystemSetting));
         }
+
+        if (m_PrewarmPrefixOnStart) StartCoroutine(PrewarmPrefix());
+    }
+
+    /// <summary>
+    /// 开场先把系统提示词灌进 llama.cpp 的 KV 缓存。
+    ///
+    /// 系统提示词有 7000+ token，会话第一轮必须现算，实测首 token 要 5-8 秒；暖机之后
+    /// 同样的轮次只要 0.7-2.1 秒。这一发空请求把那笔一次性开销挪到用户开口之前。
+    /// 只发 [system] + 一个极短的 user，max_tokens=1，不写进 m_DataList、不触发任何回调。
+    /// </summary>
+    private IEnumerator PrewarmPrefix()
+    {
+        //等一帧，确保 system 消息已经装好
+        yield return null;
+        string sys = null;
+        for (int i = 0; i < m_DataList.Count; i++)
+            if (m_DataList[i] != null && m_DataList[i].role == "system") { sys = m_DataList[i].content; break; }
+        if (string.IsNullOrEmpty(sys)) yield break;
+
+        var sb = new StringBuilder(sys.Length + 256);
+        sb.Append('{');
+        sb.Append("\"model\":"); AppendJsonString(sb, CurrentModelName);
+        sb.Append(",\"stream\":false,\"enable_thinking\":false");
+        sb.Append(",\"max_tokens\":1,\"temperature\":0");
+        sb.Append(",\"messages\":[");
+        AppendMessage(sb, new SendData("system", sys));
+        sb.Append(',');
+        AppendMessage(sb, new SendData("user", "."));
+        sb.Append(']');
+        if (m_Backend == BackendType.Local)
+            sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        sb.Append('}');
+
+        float t0 = Time.realtimeSinceStartup;
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            m_PrewarmRequest = request;
+            request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(sb.ToString()));
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader(
+                "Authorization",
+                string.Format("Bearer {0}", string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
+            yield return request.SendWebRequest();
+            bool aborted = m_PrewarmRequest == null;   //被真实请求抢占
+            m_PrewarmRequest = null;
+
+            if (m_LogRequestStats && !aborted)
+            {
+                float dt = Time.realtimeSinceStartup - t0;
+                if (request.responseCode == 200)
+                    Debug.Log($"[LLM预热] 系统提示词前缀已入缓存 ({sys.Length} 字符, {dt:F2}s)");
+                else
+                    Debug.LogWarning($"[LLM预热] 失败 code={request.responseCode}: {request.error}");
+            }
+        }
     }
 
     /// <summary>
@@ -235,6 +324,7 @@ public class ChatQW : LLM
     /// <returns></returns>
     public override void PostMsg(string _msg, Action<string> _callback)
     {
+        AbortPrewarmIfRunning();
         CancelEphemeralMsg();
         base.PostMsg(_msg, _callback);
     }
@@ -340,6 +430,7 @@ public class ChatQW : LLM
     /// </summary>
     public override void PostEphemeralMsg(string prompt, Action<string> callback)
     {
+        AbortPrewarmIfRunning();
         CancelEphemeralMsg();
         int generation = m_EphemeralGeneration;
         StartCoroutine(RequestEphemeral(prompt ?? "", generation, callback));
@@ -406,15 +497,22 @@ public class ChatQW : LLM
                 selected.Add(new SendData(item.role, item.content ?? ""));
         }
 
-        int keep = Mathf.Max(0, m_EphemeralHistoryMessages);
-        int seen = 0;
-        int start = m_DataList.Count;
-        for (int i = m_DataList.Count - 1; i >= 0 && seen < keep; i--)
+        // keep <= 0：携带完整历史。草稿 prompt 于是成为主对话 prompt 的严格延长，
+        // 两者共享同一段长前缀，KV 缓存对双方都几乎完全命中。截取中间一段反而会让
+        // token 序列与主对话错位，只剩 system 可复用。
+        int keep = m_EphemeralHistoryMessages;
+        int start = 0;
+        if (keep > 0)
         {
-            SendData item = m_DataList[i];
-            if (item == null || item.role == "system") continue;
-            seen++;
-            start = i;
+            int seen = 0;
+            start = m_DataList.Count;
+            for (int i = m_DataList.Count - 1; i >= 0 && seen < keep; i--)
+            {
+                SendData item = m_DataList[i];
+                if (item == null || item.role == "system") continue;
+                seen++;
+                start = i;
+            }
         }
         for (int i = start; i < m_DataList.Count; i++)
         {
@@ -422,12 +520,18 @@ public class ChatQW : LLM
             if (item == null || item.role == "system") continue;
             selected.Add(new SendData(item.role, item.content ?? ""));
         }
+        // 顺序必须与主对话一致：[system][历史][记忆块]，草稿只在其后多一条指令。
+        // 这样草稿 prompt 是主对话 prompt 的严格延长，两者共享同一段长前缀。
+        if (!string.IsNullOrEmpty(TrailingContext))
+            selected.Add(new SendData("system", TrailingContext));
         selected.Add(new SendData("user", prompt));
 
         var sb = new StringBuilder(2048);
         sb.Append('{');
         sb.Append("\"model\":");
         AppendJsonString(sb, CurrentModelName);
+        // 非流式即可：实测 llama-server 在客户端断开时会取消任务，流式与否没有差别
+        // （中断后紧接着的探测请求耗时与空闲基线一致，均为 0.25s）。
         sb.Append(",\"stream\":false,\"enable_thinking\":false");
         sb.Append(",\"max_tokens\":").Append(Mathf.Clamp(m_EphemeralMaxTokens, 48, 256));
         sb.Append(",\"temperature\":0.2");
@@ -507,22 +611,37 @@ public class ChatQW : LLM
     }
 
     /// <summary>
-    /// base版CheckHistory每次只删一条、随后又添加user+assistant两条，历史会净增长一条。
-    /// Flash模型本身很快时，这个逐轮膨胀的prefill反而会成为首token主要成本。
-    /// 这里为本轮的user+assistant预留两个位置，并一次裁剪到低延迟上限。
+    /// 历史裁剪采用高低水位，而不是每轮裁到固定条数。
+    ///
+    /// 旧实现把 targetBeforeRequest 定为 limit-2、每次请求都裁到这个数，而每轮正好新增
+    /// user+assistant 两条，于是每轮都恰好删掉最老的两条——system 之后的 token 序列每轮
+    /// 整体平移。对云端 Flash 模型这样做没错(prefill 按量计费、无缓存)，但本地 llama.cpp
+    /// 有前缀缓存：稳定的长历史几乎免费，逐轮平移的短历史反而每轮全量重算。实测复用固定
+    /// 停在 7368 token(= system prompt 长度)，其后 2600-4100 token 每轮重算，prompt 处理
+    /// 5-10 秒。加载 --mmproj 后 KV 位移复用被禁用，所以没有部分复用的退路。
+    ///
+    /// 改法：只有超过高水位才裁，且一次裁到低水位，中间若干轮都是纯追加、可完整命中。
     /// </summary>
     public override void CheckHistory()
     {
         int limit = Mathf.Max(4, m_LowLatencyHistoryLimit);
-        int targetBeforeRequest = Mathf.Max(2, limit - 2);
         int nonSystemCount = 0;
         for (int i = 0; i < m_DataList.Count; i++)
         {
             if (m_DataList[i] != null && m_DataList[i].role != "system") nonSystemCount++;
         }
+        //高水位：没超过就一条都不动，让这一轮成为纯追加
+        if (nonSystemCount <= limit) return;
+        //低水位。设每条消息 t 个 token，裁剪一次要重算 target*t，而涨回高水位需要
+        //(limit-target)/2 轮，故平均每轮重算 2*t*target/(limit-target)。按固定比例取
+        //target 时这个值与 limit 无关(0.6 倍 => 恒为 3t)，所以单纯抬高上限没有收益——
+        //实测把上限 8 提到 12，中位数没怎么动，反而多出几次 11 秒的尖峰。要降的是比值：
+        //低水位压低、高水位抬高。上下文扩到 32k 后 limit=32、0.25 倍 => 0.67t，
+        //且裁剪间隔拉长到约 12 轮，双峰里那个慢峰因此变得罕见。
+        int target = Mathf.Max(2, Mathf.RoundToInt(limit * 0.25f));
 
         int removed = 0;
-        while (nonSystemCount > targetBeforeRequest)
+        while (nonSystemCount > target)
         {
             int removeIndex = -1;
             for (int i = 0; i < m_DataList.Count; i++)
@@ -541,7 +660,8 @@ public class ChatQW : LLM
 
         if (removed > 0 && m_LogRequestStats)
         {
-            Debug.Log($"[LLM请求] 低延迟历史裁剪: 移除{removed}条，保留{nonSystemCount}条旧消息");
+            Debug.Log($"[LLM请求] 历史裁剪(高水位{limit}→低水位{target}): " +
+                      $"移除{removed}条，保留{nonSystemCount}条旧消息");
         }
     }
 

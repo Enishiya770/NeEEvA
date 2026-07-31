@@ -1914,8 +1914,10 @@ public class ChatSample : MonoBehaviour
         //发起LLM流式请求
         if (m_LogStreamTimings)
         {
-            //有EOU锚点时额外打"EOU→LLM出发"合计——这等于 ASR + 文本入队的总耗时
-            if (m_EouTime > 0f)
+            //有EOU锚点时额外打"EOU→LLM出发"合计——这等于 ASR + 文本入队的总耗时。
+            //必须排除 tick 触发的轮次：那是 Agent 自己排的时钟，与用户何时停止说话无关，
+            //拿上一次 EOU 当锚点会得到荒谬的数字(实测记到过 24.73s，实为 24 秒前的旧锚点)。
+            if (m_EouTime > 0f && !m_AgentCurrentRoundIsTick)
             {
                 float eouToLlm = Time.realtimeSinceStartup - m_EouTime;
                 Debug.Log($"[Timing] EOU→LLM-request: {eouToLlm:F2}s (ASR+排队总和)");
@@ -2905,11 +2907,14 @@ public class ChatSample : MonoBehaviour
                 if (m_LogStreamTimings)
                 {
                     Debug.Log($"[Stream] T+{Elapsed():F2}s 流式首音开始播放");
-                    if (m_EouTime > 0f)
+                    if (m_EouTime > 0f && !m_AgentCurrentRoundIsTick)
                     {
                         float total = Time.realtimeSinceStartup - m_EouTime;
                         Debug.Log($"[Timing] ★ EOU→流式首音 总延迟: {total:F2}s");
                     }
+                    //锚点用过即弃：一次 EOU 只对应一次体感延迟，留着会被后续
+                    //自发轮次重复计入，把统计彻底污染。
+                    m_EouTime = 0f;
                 }
             }
 
@@ -3011,11 +3016,12 @@ public class ChatSample : MonoBehaviour
                 {
                     Debug.Log($"[Stream] T+{Elapsed():F2}s 首音开始播放");
                     //EOU→首音 = 用户主观感受到的"响应延迟"——评测的核心指标
-                    if (m_EouTime > 0f)
+                    if (m_EouTime > 0f && !m_AgentCurrentRoundIsTick)
                     {
                         float total = Time.realtimeSinceStartup - m_EouTime;
                         Debug.Log($"[Timing] ★ EOU→首音 总延迟: {total:F2}s (核心体感指标，<1.5s 像人)");
                     }
+                    m_EouTime = 0f;   //同上：锚点用过即弃
                 }
             }
             yield return StartCoroutine(TypeSentence(text, clip.length, responseGeneration));
@@ -3401,7 +3407,8 @@ public class ChatSample : MonoBehaviour
     private string m_PendingCatalogSongName = "";
     private int m_PendingHumPerformanceSeed = 1234;
     private int m_PendingHumSemitoneOffset = 0;
-    private float m_PendingHumRmsMixRate = 0.25f;
+    private float m_PendingHumRmsMixRate = 0.85f;
+    private float m_PendingHumInterpretation = 0.5f;
     private float m_PendingHumProtect = 0.33f;
     private string m_PendingHumVariationDiagnostic = "";
     private string m_PendingHumRenderer = "pending";
@@ -3423,7 +3430,8 @@ public class ChatSample : MonoBehaviour
     private bool m_PreparedHumBackPrefixWasCpu = false;
     private int m_StreamingHumPerformanceSeed = 1234;
     private int m_StreamingHumSemitoneOffset = 0;
-    private float m_StreamingHumRmsMixRate = 0.25f;
+    private float m_StreamingHumRmsMixRate = 0.85f;
+    private float m_StreamingHumInterpretation = 0.5f;
     private float m_StreamingHumProtect = 0.33f;
     private bool m_FastHumBackEouStaged = false;
     private bool m_FastHumBackActive = false;
@@ -3907,8 +3915,14 @@ public class ChatSample : MonoBehaviour
             }
             else
             {
+                // 记忆块不再拼进感知帧，而是交给 LLM 层在消息列表**末尾**单独发送。
+                // 帧会随对话留在历史里，把记忆写进帧等于每轮复制一份——实测帧 1266 字符
+                // 里有 922 是记忆，历史里存了十几份几乎相同的内容，白白吃掉约 5000 token
+                // 上下文，逼得历史更早被裁剪，而每次裁剪都要全量重算。
+                // 放到末尾后：每轮重算量不变(记忆本来就是新文本)，但历史增长慢约 3.7 倍。
                 string memBlock = m_MemoryHub.BuildMemoryMap();
-                if (!string.IsNullOrEmpty(memBlock)) sb.Append(memBlock);
+                if (m_ChatSettings != null && m_ChatSettings.m_ChatModel != null)
+                    m_ChatSettings.m_ChatModel.TrailingContext = memBlock ?? "";
             }
         }
 
@@ -5090,7 +5104,8 @@ public class ChatSample : MonoBehaviour
             m_StreamingHumPerformanceSeed,
             out m_StreamingHumSemitoneOffset,
             out m_StreamingHumRmsMixRate,
-            out m_StreamingHumProtect);
+            out m_StreamingHumProtect,
+            out m_StreamingHumInterpretation);
         int generation = ++m_HumBackPrefixGeneration;
         m_HumBackPrefixPreparing = true;
         StartCoroutine(RequestStreamingHumBackPrefix(
@@ -5137,6 +5152,7 @@ public class ChatSample : MonoBehaviour
         form.AddField("performance_seed", m_StreamingHumPerformanceSeed);
         form.AddField("rms_mix_rate", InvariantFloat(m_StreamingHumRmsMixRate));
         form.AddField("protect", InvariantFloat(m_StreamingHumProtect));
+        form.AddField("interpretation", InvariantFloat(m_StreamingHumInterpretation));
         form.AddField("max_seconds", Mathf.Min(m_HumBackMaxSeconds, sourceSeconds + 1f).ToString(
             "0.###", System.Globalization.CultureInfo.InvariantCulture));
 
@@ -5360,6 +5376,7 @@ public class ChatSample : MonoBehaviour
         form.AddField("performance_seed", m_StreamingHumPerformanceSeed);
         form.AddField("rms_mix_rate", InvariantFloat(m_StreamingHumRmsMixRate));
         form.AddField("protect", InvariantFloat(m_StreamingHumProtect));
+        form.AddField("interpretation", InvariantFloat(m_StreamingHumInterpretation));
         form.AddField("max_seconds", m_HumBackMaxSeconds.ToString(
             "0.###", System.Globalization.CultureInfo.InvariantCulture));
 
@@ -5678,8 +5695,9 @@ public class ChatSample : MonoBehaviour
         m_PreparedHumBackPrefixWasCpu = false;
         m_StreamingHumPerformanceSeed = 1234;
         m_StreamingHumSemitoneOffset = 0;
-        m_StreamingHumRmsMixRate = 0.25f;
+        m_StreamingHumRmsMixRate = 0.85f;
         m_StreamingHumProtect = 0.33f;
+        m_StreamingHumInterpretation = 0.5f;
         if (!m_FastHumBackActive)
         {
             m_FastHumBackEouStaged = false;
@@ -5710,15 +5728,23 @@ public class ChatSample : MonoBehaviour
         int seed,
         out int semitoneOffset,
         out float rmsMixRate,
-        out float protect)
+        out float protect,
+        out float interpretation)
     {
         System.Random random = new System.Random(seed);
         // Most human repeats stay in the same key. Rare +/-1 semitone variants add a
         // different placement without changing the melody; dynamics/timbre vary every take.
         double keyChoice = random.NextDouble();
         semitoneOffset = keyChoice < 0.10 ? -1 : keyChoice > 0.90 ? 1 : 0;
-        rmsMixRate = 0.19f + (float)random.NextDouble() * 0.14f;
+        // rms_mix_rate 决定输出音量包络多大程度上采用角色模型自己的包络。取值偏低时
+        // 输出跟随合成源那条几乎无起伏的包络，听感是"有气无力"。实测 0.31 比 0.85 低
+        // 约 2dB，主观差异明显；0.85 起听感恢复正常，故把随机区间整体抬到高位。
+        rmsMixRate = 0.80f + (float)random.NextDouble() * 0.12f;
         protect = 0.29f + (float)random.NextDouble() * 0.09f;
+        // 演唱表情强度：变声器方案保留用户的节奏与咬字，这一项让音高表现换成她自己的
+        // （持续音上的揉音、更准的音准、缓慢的音高游移）。0 等于逐帧复刻用户的演唱。
+        // 实测 0.35 与 0.7 都自然，故每次演唱在这个区间内取值，让每一遍都是新的一次。
+        interpretation = 0.33f + (float)random.NextDouble() * 0.40f;
     }
 
     private static string InvariantFloat(float value)
@@ -5770,8 +5796,10 @@ public class ChatSample : MonoBehaviour
         int semitoneOffset;
         float rmsMixRate;
         float protect;
+        float interpretation;
         CreateHumPerformanceProfile(
-            performanceSeed, out semitoneOffset, out rmsMixRate, out protect);
+            performanceSeed, out semitoneOffset, out rmsMixRate, out protect,
+            out interpretation);
         int generation = ++m_SongSingGeneration;
         m_SongSingInFlight = true;
         m_HumBackResultPending = false;
@@ -5823,6 +5851,7 @@ public class ChatSample : MonoBehaviour
                 m_PendingHumSemitoneOffset = semitoneOffset;
                 m_PendingHumRmsMixRate = rmsMixRate;
                 m_PendingHumProtect = protect;
+                m_PendingHumInterpretation = interpretation;
                 m_PendingHumVariationDiagnostic =
                     $"catalog={m_PendingCatalogSongName}, unique={result.UniqueSegmentCount}, " +
                     $"variants={result.DuplicateVariantCount}, selected={result.SelectedSegmentCount}, " +
@@ -5919,8 +5948,10 @@ public class ChatSample : MonoBehaviour
         int semitoneOffset;
         float rmsMixRate;
         float protect;
+        float interpretation;
         CreateHumPerformanceProfile(
-            performanceSeed, out semitoneOffset, out rmsMixRate, out protect);
+            performanceSeed, out semitoneOffset, out rmsMixRate, out protect,
+            out interpretation);
 
         float[] timeline;
         float frameSeconds;
@@ -5990,6 +6021,7 @@ public class ChatSample : MonoBehaviour
         m_PendingHumSemitoneOffset = semitoneOffset;
         m_PendingHumRmsMixRate = rmsMixRate;
         m_PendingHumProtect = protect;
+        m_PendingHumInterpretation = interpretation;
         m_PendingHumVariationDiagnostic = variationDiagnostic ?? "";
         m_PendingHumRenderer = "pending";
         m_HumBackPending = true;
@@ -5999,7 +6031,8 @@ public class ChatSample : MonoBehaviour
             Debug.Log($"[HumBack] 已排队 mode={m_PendingHumMode} phrases={phraseCount} " +
                       $"frames={timeline.Length} melody={duration:F1}s source={sourceDuration:F1}s " +
                       $"seed={performanceSeed} shiftOffset={semitoneOffset} " +
-                      $"rms={rmsMixRate:F2} protect={protect:F2} language={m_PendingHumLanguage} " +
+                      $"rms={rmsMixRate:F2} protect={protect:F2} interp={interpretation:F2} " +
+                      $"language={m_PendingHumLanguage} " +
                       $"variation=\"{m_PendingHumVariationDiagnostic}\" " +
                       $"reason=\"{m_PendingHumReason}\"");
         }
@@ -6979,6 +7012,7 @@ public class ChatSample : MonoBehaviour
         form.AddField("performance_seed", m_PendingHumPerformanceSeed);
         form.AddField("rms_mix_rate", InvariantFloat(m_PendingHumRmsMixRate));
         form.AddField("protect", InvariantFloat(m_PendingHumProtect));
+        form.AddField("interpretation", InvariantFloat(m_PendingHumInterpretation));
         form.AddField("index_rate", InvariantFloat(Mathf.Clamp01(m_HumSVCIndexRate)));
         form.AddField("max_seconds", m_HumBackMaxSeconds.ToString(
             "0.###", System.Globalization.CultureInfo.InvariantCulture));

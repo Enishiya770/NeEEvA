@@ -34,6 +34,15 @@ public class LLM:MonoBehaviour
     /// 对话消息列表(运行时滚动刷新)
     /// </summary>
     [SerializeField] public List<SendData> m_DataList = new List<SendData>();
+
+    /// <summary>
+    /// 每次请求追加到消息列表**最末尾**的易变上下文（当前用于拓扑记忆网络的记忆块）。
+    ///
+    /// 它不进 m_DataList，因此不会随对话沉淀进历史。放在末尾是关键：前面的
+    /// system + 历史构成稳定前缀，llama.cpp 的前缀缓存可以完整命中，只需重算这一段。
+    /// 若把它拼进感知帧，帧会留在历史里，等于每轮复制一份，白白占用上下文并加速触发裁剪。
+    /// </summary>
+    [System.NonSerialized] public string TrailingContext = "";
     /// <summary>
     /// 计算方法调用耗时
     /// </summary>
@@ -163,17 +172,30 @@ public class LLM:MonoBehaviour
     }
 
     /// <summary>
-    /// 维护历史消息条数，避免上下文过长
+    /// 维护历史消息条数，避免上下文过长。
+    ///
+    /// 到上限后一次腾出一批，而不是每轮删一条。原先每轮删一条会让 system 之后的
+    /// token 序列每轮整体平移，llama.cpp 的前缀缓存于是每轮只能命中 system prompt
+    /// 本身，其后数千 token 全部重算——实测固定命中 7356 token、每轮重算约 5000
+    /// token，光 prompt 处理就多花 5 秒多。批量腾挪后，缓存只在腾挪的那一轮失效，
+    /// 中间几轮都是纯追加，可以完整命中。
     /// </summary>
     public virtual void CheckHistory()
     {
-        if(m_DataList.Count> m_HistoryKeepCount)
-        {
-            //跳过system消息(人设)，从第一条非system消息开始删，避免删掉人设导致角色失忆
-            int startIdx = (m_DataList.Count > 0 && m_DataList[0] != null && m_DataList[0].role == "system") ? 1 : 0;
-            if (m_DataList.Count > startIdx)
-                m_DataList.RemoveAt(startIdx);
-        }
+        if (m_DataList.Count <= m_HistoryKeepCount) return;
+
+        //跳过system消息(人设)，从第一条非system消息开始删，避免删掉人设导致角色失忆
+        int startIdx = (m_DataList.Count > 0 && m_DataList[0] != null && m_DataList[0].role == "system") ? 1 : 0;
+        int capacity = Mathf.Max(1, m_HistoryKeepCount - startIdx);
+        //留出约三成空位，够接下来几轮纯追加
+        int target = startIdx + Mathf.Max(1, Mathf.RoundToInt(capacity * 0.7f));
+        int removeCount = m_DataList.Count - target;
+        if (removeCount <= 0) return;
+        //成对删除，避免历史以 assistant 开头
+        if (removeCount % 2 != 0) removeCount++;
+        removeCount = Mathf.Min(removeCount, m_DataList.Count - startIdx);
+        if (removeCount > 0)
+            m_DataList.RemoveRange(startIdx, removeCount);
     }
 
     [Serializable]

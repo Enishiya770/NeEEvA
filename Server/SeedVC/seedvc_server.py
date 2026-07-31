@@ -207,6 +207,7 @@ def _run_rvc_conversion(
     rms_mix_rate: float,
     protect: float,
     index_rate: float,
+    interpretation: float,
     max_seconds: float,
     request_id: str,
 ) -> tuple[bytes, dict[str, str]]:
@@ -248,6 +249,8 @@ def _run_rvc_conversion(
             str(rms_mix_rate),
             "--protect",
             str(protect),
+            "--interpretation",
+            str(interpretation),
             # 不传的话 rvc_convert.py 会退回默认值，角色索引权重可能为 0 → 音色偏离且沙哑
             "--index-rate",
             str(index_rate),
@@ -416,6 +419,7 @@ def _run_conversion(
     rms_mix_rate: float,
     protect: float,
     index_rate: float,
+    interpretation: float,
     max_seconds: float,
     request_id: str,
 ) -> tuple[bytes, dict[str, str]]:
@@ -434,6 +438,7 @@ def _run_conversion(
             rms_mix_rate,
             protect,
             index_rate,
+            interpretation,
             max_seconds,
             request_id,
         )
@@ -583,10 +588,12 @@ async def convert(
     auto_f0_adjust: bool = Form(True),
     semitone_shift: int = Form(0),
     performance_seed: int = Form(1234),
-    rms_mix_rate: float = Form(0.25),
+    rms_mix_rate: float = Form(0.85),
     protect: float = Form(0.33),
     # 角色索引权重。0 = 不用 .index，音色偏离且沙哑；0.75 为实测较优值
     index_rate: float = Form(0.75),
+    # 0 = 逐帧复刻用户演唱；>0 让角色带上自己的颤音/音准/音高游移
+    interpretation: float = Form(0.0),
     max_seconds: float = Form(60.0),
 ) -> Response:
     if _conversion_lock.locked():
@@ -598,6 +605,7 @@ async def convert(
     rms_mix_rate = max(0.0, min(1.0, rms_mix_rate))
     protect = max(0.0, min(0.5, protect))
     index_rate = max(0.0, min(1.0, index_rate))
+    interpretation = max(0.0, min(1.0, interpretation))
     max_seconds = max(1.0, min(120.0, max_seconds))
     request_id = (request_id or "anonymous")[:128]
 
@@ -613,6 +621,7 @@ async def convert(
                 rms_mix_rate,
                 protect,
                 index_rate,
+                interpretation,
                 max_seconds,
                 request_id,
             )

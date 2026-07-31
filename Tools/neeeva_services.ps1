@@ -61,7 +61,20 @@ $Services = [ordered]@{
         File = Join-Path $LlamaRoot 'llama-server.exe'
         Args = @('-m', 'qwen36.gguf', '--mmproj', 'mmproj-Q8_0.gguf',
                  '--host', '127.0.0.1', '--port', '8080',
-                 '-c', '16384', '--parallel', '1', '-ngl', '99',
+                 # Unity 侧有两条并发请求流：主对话，以及用户说话期间的投机草稿
+                 # (PostEphemeralMsg，自带短 prompt)。单槽时两者互相冲掉对方的 KV 缓存，
+                 # 主对话每轮只能复用系统提示词、其余数千 token 全部重算——这才是首字
+                 # 延迟的主因，比历史裁剪影响大得多。两个槽让两条流各自保有缓存。
+                 #
+                 # --slot-prompt-similarity 必须抬到 0.8：草稿的 prompt 是主对话的前缀
+                 # (共享那段长系统提示词)，默认阈值 0.5 下会被判为"最匹配"而抢占主槽。
+                 # 主对话对自己的槽相似度为 1.0，不受影响。实测主对话 4.87s → 0.73s。
+                 #
+                 # KV 只占 320MiB/16k（本模型仅 10 层带 KV），49152 总量按槽平分为
+                 # 24576，KV 共 960MiB。加载 --mmproj 后 KV 位移复用被禁用，所以更大的
+                 # 上下文同时让历史裁剪变罕见。
+                 '-c', '49152', '--parallel', '2',
+                 '--slot-prompt-similarity', '0.8', '-ngl', '99',
                  '--jinja', '--flash-attn', 'on') + $LlmExtraArgs
         WorkDir = $LlamaRoot
         Note = 'GPU 大户（约 20GB 显存）'
