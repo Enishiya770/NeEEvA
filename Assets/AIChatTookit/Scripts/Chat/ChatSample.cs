@@ -3370,6 +3370,8 @@ public class ChatSample : MonoBehaviour
     private float m_AgentSessionStartTime = -1f;
     private float m_LastSpikePeakRms = 0f;
     private float m_LastSpikeTime = -1f;
+    //本段沉默里是否已经因 spike 拉前过一次 tick，用户一开口就清零
+    private bool m_SpikePulledForwardThisSilence = false;
     private bool m_SongSearchInFlight = false;
     private bool m_SongSearchResultPending = false;
     private string m_LastSongSearchResult = "";
@@ -3505,6 +3507,7 @@ public class ChatSample : MonoBehaviour
         m_ConsecutiveAITurns = 0;
         m_LastSpikeTime = -1f;
         m_LastSpikePeakRms = 0f;
+        m_SpikePulledForwardThisSilence = false;
         m_SongSearchGeneration++;
         m_SongSearchInFlight = false;
         m_SongSearchResultPending = false;
@@ -3607,6 +3610,18 @@ public class ChatSample : MonoBehaviour
         if (m_AgentRoundInFlight) return;        //已经在等 LLM 了，spike 自然会出现在下帧的环境字段里
         if (IsAISpeaking) return;                //角色正在说话，spike 不算打扰
         if (m_PendingTickCo == null) return;     //没有待办 tick，不存在"拉前"
+
+        //一段沉默里只允许被拽回一次注意力。否则 LLM 排的节奏会被反复架空：
+        //实测它要求 20s 后再醒，却被 1s 拉前，每约 10s 醒一次面对完全相同的情境
+        //(用户仍沉默)，于是连说数遍几乎一样的话。用户开口时清零。
+        if (m_SpikePulledForwardThisSilence)
+        {
+            if (m_LogAgentLoop)
+                Debug.Log($"[Agent] 环境 spike(rms={peakRms:F4}) 本段沉默已拉前过，忽略");
+            return;
+        }
+        m_SpikePulledForwardThisSilence = true;
+
         if (m_LogAgentLoop) Debug.Log($"[Agent] 环境 spike(rms={peakRms:F4}) → 拉前下次 tick");
         StopCoroutine(m_PendingTickCo);
         m_PendingTickCo = null;
@@ -3636,6 +3651,7 @@ public class ChatSample : MonoBehaviour
             m_PendingTickCo = null;
         }
         m_ConsecutiveAITurns = 0;
+        m_SpikePulledForwardThisSilence = false;   //新一段沉默重新允许被拽回一次
         if (m_LogAgentLoop) Debug.Log("[Agent] 用户开口 → 待 tick 撤销, 连续 AI 轮次清零");
     }
 

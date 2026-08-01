@@ -960,7 +960,7 @@ MonoBehaviour:
   m_LocalEchoVetoCorrelation: 0.35
   m_LocalEchoVetoResidualRatio: 0.55
   m_NeuralVadCandidateResetSeconds: 0.5
-  m_RmsSpikeThreshold: 0.005
+  m_RmsSpikeThreshold: 0.012
   m_EnvSpikeMinGapSec: 2
   m_EnableStreamingRecognition: 1
   m_StreamAudioFrameSeconds: 0.1

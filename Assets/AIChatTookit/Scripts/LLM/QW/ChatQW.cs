@@ -384,6 +384,10 @@ public class ChatQW : LLM
     /// </summary>
     public override void PostMsgStream(string _msg, Action<string> _onDelta, Action<string> _onComplete, string imageDataUrl = null)
     {
+        //Agent loop 的正式回复走这条流式路径，所以抢占预热必须放在这里——只加在
+        //PostMsg/PostEphemeralMsg 上会漏掉它，实测首轮排在 14.82s 的预热后面，
+        //首 token 被拖到 11.76s。
+        AbortPrewarmIfRunning();
         CancelEphemeralMsg();
         //同一时刻只允许一个正式回复。旧 user 消息保留在上下文中，作为用户继续补充
         //的前半句；旧请求的 assistant 回调则必须彻底失效，避免回答乱序。

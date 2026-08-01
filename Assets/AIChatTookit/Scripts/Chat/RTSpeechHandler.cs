@@ -196,9 +196,11 @@ public class RTSpeechHandler : MonoBehaviour
     private float m_CurrentSingingProbability = 0f;
 
     [Header("Agent感知 — 环境扰动通知 (Agent Loop 用)")]
-    [Tooltip("非语音 spike 的 RMS 阈值。低于 m_SilenceThreshold(语音阈值)、用来识别咳嗽/翻身/叹息/键盘声等。" +
-        "高于这个值就 ping 一下 ChatSample.OnEnvironmentSpike，让 agent loop 决定要不要把下次 tick 拉前。")]
-    public float m_RmsSpikeThreshold = 0.005f;
+    [Tooltip("非语音 spike 的 RMS 阈值。用来识别咳嗽/翻身/叹息/键盘声等。" +
+        "高于这个值就 ping 一下 ChatSample.OnEnvironmentSpike，让 agent loop 决定要不要把下次 tick 拉前。\n" +
+        "原为 0.005，实测触发的 11 次 spike 全部落在 0.0050-0.0068，紧贴阈值——那是房间" +
+        "本底噪声在阈值线上下抖，不是真实动静。抬到 0.012 才能只捕捉到确实发生了什么。")]
+    public float m_RmsSpikeThreshold = 0.012f;
     [Tooltip("两次环境 spike 通知之间的最小间隔(秒)，防止持续噪音刷屏")]
     public float m_EnvSpikeMinGapSec = 2f;
 
