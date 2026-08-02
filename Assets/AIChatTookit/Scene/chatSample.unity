@@ -5077,6 +5077,8 @@ MonoBehaviour:
   m_SingingSpeculativeMinRequestInterval: 2.4
   m_SingingBridgeMinConfidence: 0.62
   m_SingingBridgeMaxChars: 28
+  m_EnableSpeechBridge: 1
+  m_SpeechBridgeMinConfidence: 0.7
   m_SpeculativeSpeechVetoConfidence: 0.82
   m_SpeculativeSingingSupportConfidence: 0.7
   m_VoiceInputBotton: {fileID: 985290567}

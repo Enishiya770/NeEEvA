@@ -189,6 +189,12 @@ function Start-One {
     $out = Join-Path $LogDir ("{0}.out.log" -f $Key)
     $err = Join-Path $LogDir ("{0}.err.log" -f $Key)
 
+    # Python 的 stdout 被重定向到文件时，默认用系统代码页(本机 GBK)而非 UTF-8。
+    # ASR 日志里的中日文因此以 GBK 落盘，按 UTF-8 读就是乱码——排查噪音误识时
+    # 一度看不清识别结果到底是什么。Start-Process 继承当前进程环境，这里统一设一次。
+    $env:PYTHONUTF8 = '1'
+    $env:PYTHONIOENCODING = 'utf-8'
+
     try {
         $proc = Start-Process -FilePath $Svc.File -ArgumentList $Svc.Args `
             -WorkingDirectory $Svc.WorkDir `

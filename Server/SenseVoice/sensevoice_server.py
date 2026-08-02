@@ -483,6 +483,27 @@ def unknown_speaker_meta():
     }
 
 
+#: 幻听残片的判定门槛。低于这个字数(去标点后)且情绪为 EMO_UNKNOWN 的陌生人语音
+#: 视为噪音。实测真实语音最短 6 字且一律带 NEUTRAL，噪音最长 5 字且一律 EMO_UNKNOWN。
+HALLUCINATION_MAX_CHARS = int(os.environ.get("NEEEVA_ASR_HALLUCINATION_MAX_CHARS", "5"))
+
+
+def _is_hallucinated_transcript(text: str, emotion: str, speaker_meta: dict) -> bool:
+    """识别结果是否更像非语音噪音而非真人短句。
+
+    三个条件必须同时成立，缺一不可：
+      1. 情绪为 EMO_UNKNOWN —— 真人语音会被判出具体情绪(实测 34/34 是 NEUTRAL)
+      2. 去掉标点空白后极短 —— 噪音残片是 'I.' '.' 这类
+      3. 未被认作主人 —— 主人的短应答("うん")能匹配到已注册声纹，不该被拒
+    """
+    if str(emotion or "").upper() != "EMO_UNKNOWN":
+        return False
+    stripped = re.sub(r"[\s\W_]+", "", str(text or ""), flags=re.UNICODE)
+    if len(stripped) > max(0, HALLUCINATION_MAX_CHARS):
+        return False
+    return str((speaker_meta or {}).get("speaker_kind", "")) != "owner"
+
+
 def identify_speaker(wav: np.ndarray, speech_ms: int, learn: bool = True):
     if _speaker_store is None:
         return unknown_speaker_meta(), 0.0
@@ -846,6 +867,45 @@ async def asr(
 
         raw = res[0]["text"] if res else ""
         text, lang, emotion, audio_event = parse_output(raw)
+
+        # 识别后的幻听闸。SenseVoice 在非语音音频上会吐出极短的固定残片——实测同一段
+        # 环境噪音反复被识别成 'I.' / '.'，语种判成 en(而对话是中日文)，情绪一律
+        # EMO_UNKNOWN，且都被归给陌生说话人。43 条样本里两类完全不重叠：
+        #   NEUTRAL(真实语音) n=34  长度中位 20  最短 6
+        #   EMO_UNKNOWN(噪音) n= 9  长度中位  2  最短 1
+        # 三个条件同时成立才拒，避免误伤真人的短应答("うん"这类会带 NEUTRAL，
+        # 且通常能匹配到 owner 声纹)。
+        # 哼唱必须豁免：它本来就没有词，识别结果天然极短、情绪 EMO_UNKNOWN，声纹也
+        # 与说话时不同而被判成陌生人——三个条件全部命中，会被当成噪音丢掉(实测把
+        # 'Da.' 'The.' 这类哼唱残片全拦了，角色对哼曲子不再有反应)。
+        # is_tonal_vocal 就是为"放行哼唱、挡住噪音"设计的：要求歌唱概率≥0.45 且
+        # 周期性≥0.60 且有声比≥0.34，噪音那批实测只有 0.35-0.44 且周期性不足。
+        tonal = is_tonal_vocal(quick_singing)
+        if (not expect_singing and not tonal and not singing_vad_override
+                and _is_hallucinated_transcript(text, emotion, speaker_meta)):
+            print(
+                f"[ASR] rejected hallucination emo={emotion} lang={lang} "
+                f"spk={speaker_meta.get('speaker_id')} "
+                f"sing={float((quick_singing or {}).get('singing_probability', 0.0)):.2f} "
+                f"period={float((quick_singing or {}).get('periodicity_mean', 0.0)):.2f} "
+                f"voiced={float((quick_singing or {}).get('voiced_ratio', 0.0)):.2f} "
+                f"text={text!r}"
+            )
+            result = {
+                "text": "",
+                "language": "",
+                "emotion": "",
+                "audio_event": "NoSpeech",
+                "no_speech": True,
+                "speech_ms": speech_ms,
+                "vad_elapsed": round(vad_dt, 3),
+                "speaker_elapsed": round(speaker_dt, 3),
+                "elapsed": round(vad_dt + speaker_dt + dt, 3),
+            }
+            result.update(singing_response_fields(quick_singing))
+            result.update(unknown_speaker_meta())
+            return result
+
         singing = (
             _singing_analyzer.analyze(
                 wav,

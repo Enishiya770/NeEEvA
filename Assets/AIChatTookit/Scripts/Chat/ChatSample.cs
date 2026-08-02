@@ -464,6 +464,15 @@ public class ChatSample : MonoBehaviour
     [Range(0.4f, 0.95f)] [SerializeField] private float m_SingingBridgeMinConfidence = 0.62f;
     [Tooltip("预合成开场的最大字符数；过长候选会放弃，避免抢占正式回答。")]
     [Range(8, 48)] [SerializeField] private int m_SingingBridgeMaxChars = 28;
+    [Tooltip("普通说话轮次是否也预合成草稿开场。关闭时 EOU 只播通用缓存语。\n" +
+             "投机草稿本来就在用户说话期间生成好了，此前只有唱歌那条路会用它预合成，" +
+             "说话轮次白白丢弃——实测 14 个草稿里 11 个置信度≥0.85 且内容切题，" +
+             "EOU 时却播的是「なるほど……」这类四句通用语循环。")]
+    [SerializeField] private bool m_EnableSpeechBridge = true;
+    [Tooltip("说话轮次的预合成置信度门槛。0.85 实测把 9 个草稿拦下 5 个(0.70-0.80 那批" +
+             "内容其实可用)，命中率过低；重复问题已由提示词侧解决，说错的代价降为" +
+             "'开场略偏题'，正式回复紧接着会纠正，故放宽到 0.70。")]
+    [Range(0.5f, 0.98f)] [SerializeField] private float m_SpeechBridgeMinConfidence = 0.70f;
     [Tooltip("临时心里话明确判断为普通说话时，达到此置信度即可否决预回唱。它只是否决依据，不会单独确认歌唱。")]
     [Range(0.65f, 0.98f)] [SerializeField] private float m_SpeculativeSpeechVetoConfidence = 0.82f;
     [Tooltip("临时心里话判断为歌唱达到此置信度时，可与流式声学证据一起请求最终歌唱分析；仍不能绕过最终声学确认。")]
@@ -499,6 +508,13 @@ public class ChatSample : MonoBehaviour
     private string m_PreparedSingingBridgeText = "";
     private float m_PreparedSingingBridgeConfidence = 0f;
     private bool m_PreparedSingingBridgePlayedThisTurn = false;
+    //预合成的这段开场是给唱歌轮次还是说话轮次准备的。两者不能互用：
+    //歌唱开场("うん、ちゃんと聴いていたわ")接在普通提问后面会很怪，反之亦然。
+    private bool m_PreparedBridgeIsSinging = false;
+    //正在合成中的那一段。与"已就绪"分开存放，这样刷新草稿时旧的仍然可播。
+    private string m_PendingBridgeText = "";
+    private float m_PendingBridgeConfidence = 0f;
+    private bool m_PendingBridgeIsSinging = false;
     /// <summary>
     /// 语音输入的按钮
     /// </summary>
@@ -891,6 +907,9 @@ public class ChatSample : MonoBehaviour
                 if (m_LogSpeculativeListening)
                     Debug.Log($"[流式倾听] 临时草稿就绪 confidence={parsed.confidence:F2} " +
                               $"mode={parsed.observed_mode}/{parsed.mode_confidence:F2}: \"{parsed.draft}\"");
+                //草稿本来就在用户说话期间生成好了，顺手把开场静默预合成，
+                //EOU 时就能说一句切题的话，而不是通用的"なるほど……"。
+                if (!m_StreamingTurnIsSinging) PrepareSingingBridge(parsed);
             }
             ScheduleSpeculativeRefreshIfNeeded();
         });
@@ -1100,56 +1119,118 @@ public class ChatSample : MonoBehaviour
 
     private void PrepareSingingBridge(SpeculativeDraft draft)
     {
-        if (draft == null || !draft.isSinging ||
-            draft.confidence < m_SingingBridgeMinConfidence ||
-            string.IsNullOrWhiteSpace(draft.draft) ||
+        //唱歌与说话共用同一套预合成，只是门槛不同。说话那条门槛更高：草稿说错话的
+        //代价比唱歌应声更直接，用户最后半句随时可能改变语义。
+        bool singing = draft != null && draft.isSinging;
+        float minConfidence = singing ? m_SingingBridgeMinConfidence : m_SpeechBridgeMinConfidence;
+        if (draft == null ||
+            (!singing && !m_EnableSpeechBridge) ||
+            draft.confidence < minConfidence ||
             m_ChatSettings == null || m_ChatSettings.m_TextToSpeech == null)
             return;
 
-        if (draft.draft == m_PreparedSingingBridgeText &&
-            (m_PreparedSingingBridgeClip != null || m_SingingBridgeTtsInFlight))
+        //歌唱那条在 SanitizeSingingBridge 里已经清理并限长；说话那条只过了标签剥离，
+        //这里补上同样的净化：去引号、只取第一行。
+        string bridgeText = (draft.draft ?? "").Trim().Trim('"', '\'', '“', '”');
+        int lineBreak = bridgeText.IndexOfAny(new[] { '\r', '\n' });
+        if (lineBreak >= 0) bridgeText = bridgeText.Substring(0, lineBreak).Trim();
+
+        //说话草稿是完整开场白，天然 30-40 字，会被为歌唱短应声设计的 28 字上限全部
+        //拦下(实测 conf 0.90/0.95 两条就是这样丢的)。截到第一句即可：既落回上限内，
+        //也天然减少与正式回复的重叠——后半句本来就该留给正式回答去说。
+        if (!singing && bridgeText.Length > m_SingingBridgeMaxChars)
+        {
+            for (int i = 0; i < bridgeText.Length; i++)
+            {
+                if (!IsStrongBoundary(bridgeText[i])) continue;
+                string head = bridgeText.Substring(0, i + 1).Trim();
+                if (head.Length >= 4) { bridgeText = head; }
+                break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(bridgeText) ||
+            bridgeText.Length > Mathf.Max(8, m_SingingBridgeMaxChars) ||
+            IsPurePunctuation(bridgeText))
             return;
 
-        ReleasePreparedSingingBridge(false);
+        if ((bridgeText == m_PreparedSingingBridgeText && m_PreparedSingingBridgeClip != null) ||
+            (bridgeText == m_PendingBridgeText && m_SingingBridgeTtsInFlight))
+            return;
+
+        //不销毁已就绪的旧开场。草稿在用户说话期间每 1.4 秒刷新一次，若一进来就
+        //Release，用户大部分时间都处在"旧的已删、新的没好"的空窗里——实测三次预合成
+        //全部落在空窗上，EOU 只能播缓存语。改为：旧的留着可播，新的合成好了再替换。
         int generation = ++m_SingingBridgeGeneration;
         m_SingingBridgeTtsInFlight = true;
-        m_PreparedSingingBridgeText = draft.draft;
-        m_PreparedSingingBridgeConfidence = draft.confidence;
+        m_PendingBridgeText = bridgeText;
+        m_PendingBridgeConfidence = draft.confidence;
+        m_PendingBridgeIsSinging = singing;
+        string label = singing ? "歌唱预反应" : "说话预反应";
 
         if (m_LogSpeculativeListening)
-            Debug.Log($"[歌唱预反应] 开始静默预合成：\"{draft.draft}\"");
+            Debug.Log($"[{label}] 开始静默预合成(conf={draft.confidence:F2})：\"{bridgeText}\"");
 
-        m_ChatSettings.m_TextToSpeech.PrepareSpeech(draft.draft, (clip, text) =>
+        m_ChatSettings.m_TextToSpeech.PrepareSpeech(bridgeText, (clip, text) =>
         {
-            if (generation != m_SingingBridgeGeneration || !m_StreamingTurnIsSinging)
+            if (generation != m_SingingBridgeGeneration ||
+                (singing && !m_StreamingTurnIsSinging))
             {
+                //被更新的草稿或轮次切换取代。旧的已就绪开场仍然留着，不动。
                 if (clip != null) Destroy(clip);
+                if (m_LogSpeculativeListening)
+                    Debug.Log($"[{label}] 本次预合成已被取代，保留上一段可播开场");
                 return;
             }
             m_SingingBridgeTtsInFlight = false;
             if (clip == null)
             {
                 if (m_LogSpeculativeListening)
-                    Debug.LogWarning("[歌唱预反应] 静默预合成未完成，将在EOU使用缓存应声");
+                    Debug.LogWarning($"[{label}] 静默预合成未完成，将在EOU使用缓存应声");
                 return;
             }
 
+            //换上新的，再销毁被替换掉的那一段（正在播则延后销毁）。
+            AudioClip previous = m_PreparedSingingBridgeClip;
             m_PreparedSingingBridgeClip = clip;
             m_PreparedSingingBridgeText = text;
+            m_PreparedSingingBridgeConfidence = m_PendingBridgeConfidence;
+            m_PreparedBridgeIsSinging = m_PendingBridgeIsSinging;
+            if (previous != null)
+            {
+                if (m_AudioSource != null && m_AudioSource.isPlaying &&
+                    m_AudioSource.clip == previous)
+                {
+                    //延后销毁槽只有一个位置，先把上一段占位的清掉，否则会泄漏。
+                    if (m_DeferredPreparedClipToDestroy != null &&
+                        m_DeferredPreparedClipToDestroy != previous)
+                        Destroy(m_DeferredPreparedClipToDestroy);
+                    m_DeferredPreparedClipToDestroy = previous;
+                }
+                else
+                {
+                    Destroy(previous);
+                }
+            }
             if (m_LogSpeculativeListening)
-                Debug.Log($"[歌唱预反应] 安全开场已就绪，音频{clip.length:F2}s：\"{text}\"");
+                Debug.Log($"[{label}] 开场已就绪，音频{clip.length:F2}s：\"{text}\"");
         });
     }
 
     private bool TryPlayPreparedSingingBridge(
+        bool wantSinging,
         AudioSource output,
         out string spokenText,
         out float duration)
     {
         spokenText = "";
         duration = 0f;
+        //类别必须匹配：歌唱开场接在普通提问后面会很怪，反之亦然。
+        float required = m_PreparedBridgeIsSinging
+            ? m_SingingBridgeMinConfidence : m_SpeechBridgeMinConfidence;
         if (output == null || m_PreparedSingingBridgeClip == null ||
-            m_PreparedSingingBridgeConfidence < m_SingingBridgeMinConfidence ||
+            m_PreparedBridgeIsSinging != wantSinging ||
+            m_PreparedSingingBridgeConfidence < required ||
             string.IsNullOrWhiteSpace(m_PreparedSingingBridgeText))
             return false;
 
@@ -1187,6 +1268,10 @@ public class ChatSample : MonoBehaviour
         m_PreparedSingingBridgeClip = null;
         m_PreparedSingingBridgeText = "";
         m_PreparedSingingBridgeConfidence = 0f;
+        m_PreparedBridgeIsSinging = false;
+        m_PendingBridgeText = "";
+        m_PendingBridgeConfidence = 0f;
+        m_PendingBridgeIsSinging = false;
     }
 
     /// <summary>
@@ -1205,6 +1290,31 @@ public class ChatSample : MonoBehaviour
         if (draft != null && !string.IsNullOrWhiteSpace(draft.draft) &&
             similarity >= m_SpeculativeReuseSimilarity)
         {
+            //说话预反应会把这句抢先播出去，用户已经听到了。若仍按"候选回答"措辞交给
+            //LLM，它会把同样的意思再说一遍——实测出现过「素晴らしい」「良いアイデア」
+            //被逐字重复。EOU 播放与本函数的先后是竞态的(实测 19 轮里 5 轮请求在前)，
+            //所以不能只看"已播放"标志，还要预判"即将播放"，并用一句对两种结果都成立
+            //的措辞兜住。歌唱那条一直是这么写的，这里对齐。
+            bool speechBridgeReady =
+                (!m_PreparedBridgeIsSinging && m_PreparedSingingBridgeClip != null &&
+                 m_PreparedSingingBridgeConfidence >= m_SpeechBridgeMinConfidence) ||
+                (!m_PendingBridgeIsSinging && m_SingingBridgeTtsInFlight &&
+                 m_PendingBridgeConfidence >= m_SpeechBridgeMinConfidence);
+            bool bridgeSpoken = m_PreparedSingingBridgePlayedThisTurn && !m_PreparedBridgeIsSinging;
+            bool bridgePending = !bridgeSpoken && speechBridgeReady && m_EouFillerScheduled;
+            string spokenLine = string.IsNullOrWhiteSpace(m_PreparedSingingBridgeText)
+                ? draft.draft : m_PreparedSingingBridgeText;
+
+            string tail;
+            if (bridgeSpoken)
+                tail = "这句先行开场已经说出口，用户已经听到。正式回答请从它之后自然接续：" +
+                       "不要重复它的意思，也不要重新打招呼或重新表态。]";
+            else if (bridgePending)
+                tail = "若稍后由快速回应播放这句先行开场，正式回答请从它之后自然接续，" +
+                       "不要重复它的意思；否则可自行改写。]";
+            else
+                tail = "若最终文本改变了含义，必须修改或放弃候选回答。]";
+
             hint =
                 "[本轮可撤销倾听状态；最终用户转写具有最高优先级。不要提及这段内部状态。\n" +
                 "此前理解：" + (draft.understanding ?? "") + "\n" +
@@ -1212,10 +1322,11 @@ public class ChatSample : MonoBehaviour
                 "角色瞬时感受：" + (draft.inner_reaction ?? "") + "\n" +
                 "临时模态判断：" + NormalizeObservedMode(draft.observed_mode) +
                 "（置信度 " + Mathf.Clamp01(draft.mode_confidence).ToString("F2") + "）\n" +
-                "已准备的候选回答：" + draft.draft + "\n" +
-                "若最终文本改变了含义，必须修改或放弃候选回答。]";
+                (bridgeSpoken || bridgePending ? "先行开场：" : "已准备的候选回答：") +
+                spokenLine + "\n" + tail;
             if (m_LogSpeculativeListening)
-                Debug.Log($"[流式倾听] 最终一致度 {similarity:F2}，复用临时准备作为本轮提示");
+                Debug.Log($"[流式倾听] 最终一致度 {similarity:F2}，复用临时准备作为本轮提示" +
+                          $"(先行开场 已播={bridgeSpoken} 待播={bridgePending})");
         }
         else if (draft != null && m_LogSpeculativeListening)
         {
@@ -1252,8 +1363,10 @@ public class ChatSample : MonoBehaviour
                 "（置信度 " + Mathf.Clamp01(draft.mode_confidence).ToString("F2") + "）\n" +
                 "安全短开场：" + draft.draft + "\n" +
                 (alreadySpoken
-                    ? "这句短开场已经播放；正式回答请自然接续，不要逐字重复。]"
-                    : "若稍后由快速回应播放这句，正式回答请自然接续；否则可自行改写。]");
+                    ? "这句短开场已经说出口，用户已经听到。正式回答请从它之后自然接续：" +
+                      "不要重复它的意思，也不要重新打招呼或重新表态。]"
+                    : "若稍后由快速回应播放这句，正式回答请从它之后自然接续，" +
+                      "不要重复它的意思；否则可自行改写。]");
             if (m_LogSpeculativeListening)
                 Debug.Log($"[歌唱流式倾听] 最终确认为歌唱，复用内部感受；" +
                           $"开场已播放={alreadySpoken}");
@@ -2148,8 +2261,10 @@ public class ChatSample : MonoBehaviour
 
         string fillerText = "";
         float fillerDuration = 0f;
-        bool preparedSingingBridge = m_EouTurnWasSinging && !m_EouSingingRejectedByFinal &&
-            TryPlayPreparedSingingBridge(m_AudioSource, out fillerText, out fillerDuration);
+        //唱歌与说话都先试预合成的草稿开场；它是针对本轮内容的，比通用缓存语切题得多。
+        bool singingTurn = m_EouTurnWasSinging && !m_EouSingingRejectedByFinal;
+        bool preparedSingingBridge =
+            TryPlayPreparedSingingBridge(singingTurn, m_AudioSource, out fillerText, out fillerDuration);
         if (!preparedSingingBridge &&
             !m_ChatSettings.m_TextToSpeech.TryPlayLatencyFiller(
                 languageHint,
@@ -2178,7 +2293,7 @@ public class ChatSample : MonoBehaviour
             float eouToFiller = Time.realtimeSinceStartup - eouTime;
             Debug.Log($"[Timing] ★ EOU→快速首音: {eouToFiller:F2}s (目标≤1.5s)");
             Debug.Log(preparedSingingBridge
-                ? $"[歌唱预反应] 播放预合成安全开场: \"{fillerText}\""
+                ? $"[{(singingTurn ? "歌唱预反应" : "说话预反应")}] 播放预合成开场: \"{fillerText}\""
                 : $"[LatencyFiller] 播放EOU/{m_EouFillerContext}缓存短回应: \"{fillerText}\"");
         }
     }
