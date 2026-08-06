@@ -264,6 +264,24 @@ def singing_response_fields(analysis: Optional[dict], include_contour: bool = Tr
     return fields
 
 
+#: 人声基频的合理区间(Hz)。低于下限的"周期性信号"是机器，不是人——风扇、机箱、
+#: 桌面震动的嗡鸣周期性比人哼唱**还高**，所以只看周期性必然放行它们。实测被误放行的
+#: 噪音音域是 A1~B1(55~62Hz)，而男低音哼唱的下限约 E2(82Hz)，中间有充足余量。
+#: 上限挡的是尖啸/啸叫，C6≈1047Hz 已高于任何哼唱。
+VOCAL_MIN_HZ = float(os.environ.get("NEEEVA_ASR_VOCAL_MIN_HZ", "75"))
+VOCAL_MAX_HZ = float(os.environ.get("NEEEVA_ASR_VOCAL_MAX_HZ", "1200"))
+
+
+def has_plausible_vocal_pitch(analysis: Optional[dict]):
+    """基频是否落在人声区间。周期性区分不了机器和人，音高可以。"""
+    if not analysis:
+        return False
+    median_hz = float(analysis.get("pitch_median_hz", 0.0) or 0.0)
+    if median_hz <= 0.0:
+        return False
+    return VOCAL_MIN_HZ <= median_hz <= VOCAL_MAX_HZ
+
+
 def is_tonal_vocal(analysis: Optional[dict], short_probe: bool = False):
     """Allow humming through speech VAD without opening the gate for noise."""
     if not analysis or not analysis.get("analysis_available"):
@@ -275,6 +293,20 @@ def is_tonal_vocal(analysis: Optional[dict], short_probe: bool = False):
         float(analysis.get("singing_probability", 0.0)) >= probability_floor
         and float(analysis.get("periodicity_mean", 0.0)) >= periodicity_floor
         and float(analysis.get("voiced_ratio", 0.0)) >= voiced_floor
+        and has_plausible_vocal_pitch(analysis)
+    )
+
+
+def describe_vocal_probe(analysis: Optional[dict]) -> str:
+    """把一次音高分析压成一行，用于日志。闸门的输入必须可观测——上一版就是因为
+    日志打的是 thorough 分析、闸门用的却是 quick 探针，两个数对不上，导致
+    'rejected hallucination 一次都没出现' 这件事查了很久才定位。"""
+    a = analysis or {}
+    return (
+        f"sing={float(a.get('singing_probability', 0.0)):.2f} "
+        f"period={float(a.get('periodicity_mean', 0.0)):.2f} "
+        f"voiced={float(a.get('voiced_ratio', 0.0)):.2f} "
+        f"med={float(a.get('pitch_median_hz', 0.0) or 0.0):.0f}Hz"
     )
 
 
@@ -505,17 +537,36 @@ def _is_hallucinated_transcript(text: str, emotion: str, speaker_meta: dict) -> 
 
 
 def identify_speaker(wav: np.ndarray, speech_ms: int, learn: bool = True):
+    """返回 (identity, elapsed, pending_embedding)。
+
+    **这里不再直接写库。** 声纹识别必须在 ASR 之前(要拿 speaker_kind 判 AI 自回声、
+    也要给幻听闸判 owner)，但学习必须等幻听闸放行之后——顺序错了实测有后果：被判为
+    噪音丢弃的音频照样教过声纹库，而机器嗡鸣的"声纹"比真人还稳定，反而更容易累积
+    注册进度(实测一个纯噪音 ID 已经到 33%，再几次就会晋升成持久档案)。
+
+    learn=True 时把 embedding 交回调用方，由它在放行后调用 commit_speaker_learning。
+    """
     if _speaker_store is None:
-        return unknown_speaker_meta(), 0.0
+        return unknown_speaker_meta(), 0.0, None
     embedding, elapsed = extract_speaker_embedding(wav)
     if embedding is None:
-        return unknown_speaker_meta(), elapsed
-    identity = (
-        _speaker_store.identify_and_learn(embedding, speech_ms)
-        if learn
-        else _speaker_store.identify_only(embedding, speech_ms)
-    )
-    return identity, elapsed
+        return unknown_speaker_meta(), elapsed, None
+    identity = _speaker_store.identify_only(embedding, speech_ms)
+    return identity, elapsed, (embedding if learn else None)
+
+
+def commit_speaker_learning(embedding, speech_ms: int, identified: dict) -> dict:
+    """幻听闸放行之后，才真正把这段音频记进声纹库。"""
+    if _speaker_store is None or embedding is None:
+        return identified
+    learned = _speaker_store.identify_and_learn(embedding, speech_ms)
+    # identify_and_learn 不产出 speaker_self_confidence，而 barge-in 的 AI 自回声
+    # 否决要用它，从 identify_only 的结果里补回来。
+    if "speaker_self_confidence" in (identified or {}):
+        learned.setdefault(
+            "speaker_self_confidence", identified["speaker_self_confidence"]
+        )
+    return learned
 
 
 # ------------------------------ FastAPI ------------------------------
@@ -776,7 +827,7 @@ async def vad(
             speaker_dt = 0.0
             if is_speech:
                 speaker_wav = trim_to_speech(wav, segments)
-                speaker_meta, speaker_dt = identify_speaker(speaker_wav, speech_ms, learn=False)
+                speaker_meta, speaker_dt, _ = identify_speaker(speaker_wav, speech_ms, learn=False)
             result.update(speaker_meta)
             result["speaker_elapsed"] = round(speaker_dt, 3)
             result["elapsed"] = round(elapsed + speaker_dt, 3)
@@ -841,7 +892,9 @@ async def asr(
 
         wav, audio_content_start_seconds = trim_to_speech_with_offset(wav, segments)
 
-        speaker_meta, speaker_dt = identify_speaker(wav, speech_ms, learn=learn_speaker)
+        speaker_meta, speaker_dt, pending_embedding = identify_speaker(
+            wav, speech_ms, learn=learn_speaker
+        )
         if speaker_meta.get("speaker_kind") == "ai":
             print(
                 f"[ASR] rejected AI_SELF echo score={speaker_meta.get('speaker_confidence')} "
@@ -878,17 +931,45 @@ async def asr(
         # 哼唱必须豁免：它本来就没有词，识别结果天然极短、情绪 EMO_UNKNOWN，声纹也
         # 与说话时不同而被判成陌生人——三个条件全部命中，会被当成噪音丢掉(实测把
         # 'Da.' 'The.' 这类哼唱残片全拦了，角色对哼曲子不再有反应)。
-        # is_tonal_vocal 就是为"放行哼唱、挡住噪音"设计的：要求歌唱概率≥0.45 且
-        # 周期性≥0.60 且有声比≥0.34，噪音那批实测只有 0.35-0.44 且周期性不足。
-        tonal = is_tonal_vocal(quick_singing)
-        if (not expect_singing and not tonal and not singing_vad_override
+        # is_tonal_vocal 就是为"放行哼唱、挡住噪音"设计的。闸门本身在下面——必须等
+        # thorough 分析出来才判，见那里的注释。
+        singing = (
+            _singing_analyzer.analyze(
+                wav,
+                lyrics=text,
+                audio_event=audio_event,
+                thorough=True,
+                language=lang,
+                force_score=expect_singing,
+            )
+            if _singing_analyzer is not None
+            else quick_singing
+        )
+        # 幻听闸。放在 thorough 分析之后，因为要求两遍分析都认为这是人声才豁免。
+        # 上一版放在 quick 之后、只看 quick，结果是: quick 探针把次低频嗡鸣判成
+        # tonal(周期性极高)，闸门被短路，'I.' / '.' 一路进到角色那里；而 [ASR] 日志
+        # 打的是 thorough 的 sing 值(0.42/0.31/0.00)，和闸门实际看到的数对不上，
+        # 于是 'rejected hallucination' 一次都没出现，看上去像闸门不存在。
+        #
+        # **只信 thorough 分析。** quick 探针的音高估计不可用——实测同一段音频
+        # quick med=889Hz / full med=58Hz，而 889Hz 在多条记录里反复出现，是个 FFT
+        # 谱峰伪影；真人语音也被 quick 报成 821/889/375Hz(真值 132/154/149Hz)。
+        # 拿它做音高合理性判断就是垃圾进垃圾出。
+        #
+        # singing_vad_override 也不再豁免本闸: 它由 quick 算出，让哼唱绕过语音 VAD
+        # 是它的正当职责，但"绕过 VAD"不等于"确认是人声"。上一版漏掉这一项，于是
+        # tonal 判对了(False)、闸门却仍被 vad_override 短路，噪音照样进到角色那里。
+        #
+        # thorough 的分离度很干净: 真人 med 125~154Hz / voiced 0.54~0.69；
+        # 噪音 med 58~59Hz / voiced 0.05~0.24——voiced 一项就已低于 0.34 的门槛。
+        tonal = is_tonal_vocal(singing)
+        if (not expect_singing and not tonal
                 and _is_hallucinated_transcript(text, emotion, speaker_meta)):
             print(
                 f"[ASR] rejected hallucination emo={emotion} lang={lang} "
                 f"spk={speaker_meta.get('speaker_id')} "
-                f"sing={float((quick_singing or {}).get('singing_probability', 0.0)):.2f} "
-                f"period={float((quick_singing or {}).get('periodicity_mean', 0.0)):.2f} "
-                f"voiced={float((quick_singing or {}).get('voiced_ratio', 0.0)):.2f} "
+                f"quick({describe_vocal_probe(quick_singing)}) "
+                f"full({describe_vocal_probe(singing)}) "
                 f"text={text!r}"
             )
             result = {
@@ -902,22 +983,15 @@ async def asr(
                 "speaker_elapsed": round(speaker_dt, 3),
                 "elapsed": round(vad_dt + speaker_dt + dt, 3),
             }
-            result.update(singing_response_fields(quick_singing))
+            # 注意这里**不**调用 commit_speaker_learning——被判为噪音的音频不该进
+            # 声纹库。机器嗡鸣的"声纹"比真人还稳定，学进去反而比真人更快累积注册进度。
+            result.update(singing_response_fields(singing))
             result.update(unknown_speaker_meta())
             return result
 
-        singing = (
-            _singing_analyzer.analyze(
-                wav,
-                lyrics=text,
-                audio_event=audio_event,
-                thorough=True,
-                language=lang,
-                force_score=expect_singing,
-            )
-            if _singing_analyzer is not None
-            else quick_singing
-        )
+        # 闸门放行了，这段音频才算真话，现在才写进声纹库。
+        speaker_meta = commit_speaker_learning(pending_embedding, speech_ms, speaker_meta)
+
         # Keep the full-turn score even if armed sing-along recovery later
         # chooses a tail-only acoustic classifier. Unity crops scores in the
         # full post-VAD time base; a tail-relative score would otherwise lose
@@ -980,7 +1054,9 @@ async def asr(
             f"[ASR] dt={dt:.2f}s lang={lang} emo={emotion} evt={audio_event} "
             f"spk={speaker_meta.get('speaker_id')}({speaker_meta.get('speaker_confidence')}) "
             f"learn={learn_speaker} expect_sing={expect_singing} "
-            f"sing={float((singing or {}).get('singing_probability', 0.0)):.2f} "
+            f"tonal={tonal} vad_override={singing_vad_override} "
+            f"quick({describe_vocal_probe(quick_singing)}) "
+            f"full({describe_vocal_probe(singing)}) "
             f"expected_override={expected_singing_override} "
             f"text={text!r}"
         )

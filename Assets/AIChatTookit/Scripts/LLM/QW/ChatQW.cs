@@ -67,16 +67,42 @@ public class ChatQW : LLM
         //顶层 enable_thinking 给 DashScope 用；Local 后端会再注入 chat_template_kwargs(下方)
         sb.Append(",\"enable_thinking\":").Append(m_EnableThinking ? "true" : "false");
         sb.Append(",\"messages\":[");
+        // 易变上下文(记忆块)排在**最后一条用户消息之前**，而不是整个列表末尾。
+        //
+        // 曾经拼在末尾，结果是她读到的最后一段不是用户的话而是记忆块——而记忆块末尾的
+        // 气泡段落正是用第三人称复述用户刚说过的话。实测一整场里冒出 6 句
+        // "彼、日本語なら気楽に話せるようだね" 这类第三人称反思，全部落在回复末尾的
+        // 标签位、并且被当成正文念了出来(同场 <silent/> 使用次数从 3 跌到 0)。
+        // 把用户的话放回最后，这个诱因就没了。
+        //
+        // 顺带修正了一处不一致：PostEphemeralMsg 构造草稿时本来就是
+        // [system][历史][记忆块][user]，与这里的顺序相反，注释却写着"必须一致"。
+        // 现在两者真正一致，草稿 prompt 重新成为主 prompt 的严格前缀。
+        //
+        // 缓存行为不变：记忆块每轮都变，重算量仍然是"记忆块 + 用户这一句"。
+        int trailingAt = -1;
+        if (!string.IsNullOrEmpty(TrailingContext))
+        {
+            trailingAt = m_DataList.Count;   //没有 user 消息时退回原来的"拼在末尾"
+            for (int i = m_DataList.Count - 1; i >= 0; i--)
+            {
+                var m = m_DataList[i];
+                if (m != null && m.role == "user") { trailingAt = i; break; }
+            }
+        }
         for (int i = 0; i < m_DataList.Count; i++)
         {
+            if (i == trailingAt)
+            {
+                if (sb[sb.Length - 1] != '[') sb.Append(',');
+                AppendMessage(sb, new SendData("system", TrailingContext));
+            }
             var msg = m_DataList[i];
             if (msg == null) continue;
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, msg);
         }
-        // 易变上下文放最末尾：前面的 system + 历史是稳定前缀，可被完整复用，
-        // 本段每轮变化也只需重算它自己。放在中间会让其后的所有 token 一起失效。
-        if (!string.IsNullOrEmpty(TrailingContext))
+        if (trailingAt >= m_DataList.Count)
         {
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, new SendData("system", TrailingContext));
@@ -205,8 +231,15 @@ public class ChatQW : LLM
     [Tooltip("视觉 token 很贵，全保留会爆上下文。默认 2 让最近一两帧能精读，更早的留文字记忆")]
     public int m_KeepRecentImages = 2;
 
-    [Header("低延迟模式：请求中最多保留的非system历史消息数")]
-    [Tooltip("包含即将加入的本轮user和assistant。8约等于最近3轮完整对话+当前轮，能明显限制prefill耗时")]
+    [Header("历史消息高水位 (ChatQW 实际使用的就是这一项)")]
+    [Tooltip("非system消息超过此条数才裁剪，且一次裁到 25%(低水位)，中间若干轮都是纯追加。\n\n" +
+             "不要按「保留多少轮对话」来理解它：原先每轮裁到固定条数，等于每轮删最老两条，" +
+             "前缀逐轮平移，llama.cpp 的缓存每轮只能命中 system prompt、其余数千 token 全部" +
+             "重算(实测每轮多 5 秒)。高低水位让缓存只在腾挪那一轮失效。\n\n" +
+             "平均每轮重算量 = 2×target/(limit-target)，按固定比例取 target 时与 limit 无关，" +
+             "所以单纯抬高上限没有收益——要压的是比值。当前 32/8 => 0.67。\n\n" +
+             "上限受 llama-server 每槽 ctx 约束：主对话上下文峰值实测 18389 token。\n" +
+             "注意：基类那个「历史消息保留条数」对 ChatQW 无效。")]
     [Range(4, 64)] public int m_LowLatencyHistoryLimit = 32;
 
     [Header("Debug：打印LLM请求大小/消息数（不打印正文和密钥）")]

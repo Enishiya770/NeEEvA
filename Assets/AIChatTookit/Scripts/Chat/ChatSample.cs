@@ -7,6 +7,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 using WebGLSupport;
+using AIChat.Agent;
 using AIChat.Memory;
 
 public class ChatSample : MonoBehaviour
@@ -150,6 +151,8 @@ public class ChatSample : MonoBehaviour
 
     private void LateUpdate()
     {
+        StepUrge();
+
         bool playing = IsVoiceOutputPlaying;
         if (m_WasVoiceOutputPlaying && !playing)
             m_LastVoiceOutputEndedRealtime = Time.realtimeSinceStartup;
@@ -3348,9 +3351,15 @@ public class ChatSample : MonoBehaviour
     [SerializeField] private float m_DefaultTickSec = 30f;
     [Tooltip("会话刚启用后多久投递第一帧(秒)。给 m_Greeting 留出播放时间，避免叠音")]
     [SerializeField] private float m_FirstTickDelaySec = 1.5f;
-    [Tooltip("连续 AI 轮次硬上限(无用户回应)。超过强行等用户开口才再 tick——防独白循环。" +
-        "讲故事/详述场景下 LLM 会用 <continue/> 链多轮，所以这个值要给得宽一点")]
+    [Tooltip("连续 AI 轮次上限(无用户回应)。讲故事/详述场景下 LLM 会用 <continue/> 链多轮，" +
+        "所以这个值要给得宽一点。\n" +
+        "启用冲动模型后，这个值只再管 <continue/> 链的长度——'没人理'改由疲劳表达" +
+        "(间隔逐次拉长)，主动 tick 的兜底走 m_MonologueBackstopTurns")]
     [SerializeField] private int m_MaxConsecutiveAITurns = 8;
+    [Tooltip("冲动模型下的独白兜底。疲劳会把间隔越拉越长(60s 起、第 n 次为 1+0.45n 倍，" +
+        "最终被 m_MaxTickSec 夹住)，所以正常绝到不了这个数——它只在冲动模型出 bug 时兜底。" +
+        "撞上后同样是彻底闭嘴等用户开口")]
+    [SerializeField] private int m_MonologueBackstopTurns = 40;
     [Tooltip("感知帧里'你最近发言'最多展示多少条——给 LLM 看清自己最近说了什么，避免重复")]
     [SerializeField] private int m_RecentAIUtterancesShown = 3;
     [Tooltip("感知帧里 AI 自身发言摘要的字符截断上限")]
@@ -3359,6 +3368,11 @@ public class ChatSample : MonoBehaviour
     [SerializeField] private bool m_BringForwardOnSpike = true;
     [Tooltip("打印 agent loop 调度日志")]
     [SerializeField] private bool m_LogAgentLoop = true;
+
+    [Header("冲动模型 — 用能量累积取代固定倒计时")]
+    [Tooltip("<next in/> 从'定时'变成'定速'：无事发生时仍恰好 N 秒后开口，但孤独、" +
+             "记忆浮现、环境动静都能把她拽早。关掉则退回原来的倒计时协程")]
+    [SerializeField] private UrgeModel m_Urge = new UrgeModel();
 
     [Header("角色自主歌曲检索 — <song_search/>")]
     [Tooltip("允许角色在确实想确认歌曲时调用本机检索服务。")]
@@ -3463,6 +3477,15 @@ public class ChatSample : MonoBehaviour
     [SerializeField] private MemoryHub m_MemoryHub;
     [Tooltip("总开关。关掉后即使挂了 MemoryHub 也不召回")]
     [SerializeField] private bool m_EnableMemoryRecall = true;
+    [Tooltip("待机期间让她自己整理记忆网络。新写下的记忆默认是孤立的——扩散激活到不了，"
+             + "只能靠语义嵌入那条通道被召回，图结构那半边用不上。这里在没人说话时把孤立"
+             + "节点摆到她面前，由她自己决定连什么。整理帧只在 tick 触发的轮次出现。")]
+    [SerializeField] private bool m_EnableIdleMemoryConsolidation = true;
+    [Tooltip("用户静默超过这么久才考虑整理——太短会打断正常的对话间歇")]
+    [Range(60f, 900f)] [SerializeField] private float m_IdleConsolidationAfterSec = 180f;
+    [Tooltip("两次整理之间的最小间隔。整理块会随感知帧沉淀进历史，不宜频繁出现")]
+    [Range(120f, 3600f)] [SerializeField] private float m_IdleConsolidationCooldownSec = 900f;
+    private float m_LastConsolidationTime = -99999f;
 
     // 一次性警告标志,避免每帧刷屏
     private bool m_MemoryHubMissingWarned = false;
@@ -3647,6 +3670,7 @@ public class ChatSample : MonoBehaviour
             : null;
         if (senseVoice != null) senseVoice.BeginSingingPracticeSession();
         m_AgentEyesOpen = false;        //每次启动默认闭眼，让 LLM 自己决定何时 <look/>
+        if (m_Urge != null) m_Urge.Reset(Time.realtimeSinceStartup);
         ClearRoundParsed();
         if (m_LogAgentLoop) Debug.Log($"[Agent] Loop 启动 — 首帧 {m_FirstTickDelaySec:F1}s 后投递");
         ScheduleNextTick(m_FirstTickDelaySec, "session-start");
@@ -3724,6 +3748,19 @@ public class ChatSample : MonoBehaviour
         if (!m_BringForwardOnSpike) return;
         if (m_AgentRoundInFlight) return;        //已经在等 LLM 了，spike 自然会出现在下帧的环境字段里
         if (IsAISpeaking) return;                //角色正在说话，spike 不算打扰
+
+        //冲动模型：按响度注入，可累加，但整段沉默有总额度(见 m_SpikeMaxPerSilence)。
+        //额度就是原来那道一次性闸的连续版——环境能把她拽早，但不能单独驱动她。
+        if (m_Urge != null && m_Urge.Enabled)
+        {
+            float got = m_Urge.AddSpike(peakRms);
+            if (m_LogAgentLoop)
+                Debug.Log(got > 0f
+                    ? $"[Agent] 环境 spike(rms={peakRms:F4}) → 冲动 +{got:F2} (U={m_Urge.Value:F2})"
+                    : $"[Agent] 环境 spike(rms={peakRms:F4}) 本段沉默的环境额度已用尽，忽略");
+            return;
+        }
+
         if (m_PendingTickCo == null) return;     //没有待办 tick，不存在"拉前"
 
         //一段沉默里只允许被拽回一次注意力。否则 LLM 排的节奏会被反复架空：
@@ -3767,12 +3804,17 @@ public class ChatSample : MonoBehaviour
         }
         m_ConsecutiveAITurns = 0;
         m_SpikePulledForwardThisSilence = false;   //新一段沉默重新允许被拽回一次
+        if (m_Urge != null) m_Urge.AbsorbUserUtterance(Time.realtimeSinceStartup);
         if (m_LogAgentLoop) Debug.Log("[Agent] 用户开口 → 待 tick 撤销, 连续 AI 轮次清零");
     }
 
     /// <summary>
     /// 调度下一次 tick。requestedSec 来源：LLM 的 &lt;next in="Ns"/&gt; 或兜底 m_DefaultTickSec。
     /// 自动 clamp 到 [m_MinTickSec, m_MaxTickSec]。
+    ///
+    /// 冲动模型启用时这里不再起倒计时协程，而是把 requestedSec 翻译成一个累积速率:
+    /// 无事发生时仍恰好 requestedSec 秒后触顶，但孤独/记忆/环境可以把它拽早。
+    /// 8 个调用点的语义因此完全不变，只是"到点"变成了"攒够"。
     /// </summary>
     private void ScheduleNextTick(float requestedSec, string reason)
     {
@@ -3782,6 +3824,16 @@ public class ChatSample : MonoBehaviour
             StopCoroutine(m_PendingTickCo);
             m_PendingTickCo = null;
         }
+
+        if (m_Urge != null && m_Urge.Enabled)
+        {
+            m_Urge.SetNextIn(requestedSec, m_ConsecutiveAITurns, m_MinTickSec, m_MaxTickSec);
+            if (m_LogAgentLoop)
+                Debug.Log($"[Agent] 下次 tick 目标 {m_Urge.EffectiveSec:F1}s(reason={reason}, " +
+                          $"requested={requestedSec:F1}s, 疲劳 {m_ConsecutiveAITurns} 轮) — 冲动可提前");
+            return;
+        }
+
         float clamped = Mathf.Clamp(requestedSec, m_MinTickSec, m_MaxTickSec);
         if (m_LogAgentLoop)
             Debug.Log($"[Agent] 下次 tick {clamped:F1}s 后(reason={reason}, requested={requestedSec:F1}s)");
@@ -3793,6 +3845,35 @@ public class ChatSample : MonoBehaviour
         yield return new WaitForSeconds(sec);
         m_PendingTickCo = null;
         FireTick("scheduled");
+    }
+
+    /// <summary>
+    /// 冲动模型的推进——每帧一步，纯 C# 算术，不碰任何推理服务。
+    /// 她正在说话/轮次在飞时不推进：那时冲动本来就在被消耗。
+    /// </summary>
+    private void StepUrge()
+    {
+        if (m_Urge == null || !m_Urge.Enabled) return;
+        if (!m_AgentRunning || m_AgentGracefulShutdownPending) return;
+        if (m_AgentRoundInFlight || IsAISpeaking || IsVoiceOutputPlaying) return;
+
+        //待机漂移点火 = 她忽然想起了什么，按事件注入
+        if (m_MemoryHub != null && m_EnableMemoryRecall)
+        {
+            float drift = m_MemoryHub.ConsumeDriftEnergy();
+            if (drift > 0f) m_Urge.AddMemorySurfacing(drift);
+        }
+
+        if (!m_Urge.Step(Time.deltaTime, Time.realtimeSinceStartup)) return;
+
+        //把主因如实带进感知帧。一律说成"你自己的钟到点了"会让她误判自己的节奏：
+        //上一版就是这样，环境拽前的帧也被标成时钟触发，她随后把 <next in/> 越排越短。
+        switch (m_Urge.LastCause)
+        {
+            case "spike":  FireTick("spike-pull-forward"); break;
+            case "memory": FireTick("memory-surfaced"); break;
+            default:       FireTick("scheduled"); break;
+        }
     }
 
     /// <summary>
@@ -3810,12 +3891,17 @@ public class ChatSample : MonoBehaviour
             ScheduleNextTick(m_MinTickSec, "still-busy");
             return;
         }
-        //连续 AI 轮次硬上限——工具结果仍允许回到角色手里一次，否则可能“查到了但不说”
+        //连续 AI 轮次上限——工具结果仍允许回到角色手里一次，否则可能“查到了但不说”
         bool isSongToolResult = string.Equals(triggerReason, "song-search-result", StringComparison.Ordinal) ||
             string.Equals(triggerReason, "song-memory-result", StringComparison.Ordinal);
-        if (m_ConsecutiveAITurns >= m_MaxConsecutiveAITurns && !isSongToolResult)
+        //冲动模型接手后，"没人理"由疲劳表达(间隔逐次拉长，最终被 m_MaxTickSec 夹住)，
+        //而不是撞线就彻底闭嘴。原来那个断崖的问题是：撞线后 FireTick 直接 return 且不再排
+        //下一次，于是必须等用户开口才解封——用户走开 30 分钟，她后 22 分钟一声不吭。
+        //这里只保留一个远得多的兜底，防冲动模型出 bug 时无限独白。
+        int cap = (m_Urge != null && m_Urge.Enabled) ? m_MonologueBackstopTurns : m_MaxConsecutiveAITurns;
+        if (m_ConsecutiveAITurns >= cap && !isSongToolResult)
         {
-            if (m_LogAgentLoop) Debug.Log($"[Agent] 连续 AI 轮次={m_ConsecutiveAITurns}≥{m_MaxConsecutiveAITurns}，停止主动tick，等用户开口");
+            if (m_LogAgentLoop) Debug.Log($"[Agent] 连续 AI 轮次={m_ConsecutiveAITurns}≥{cap}，停止主动tick，等用户开口");
             return;
         }
 
@@ -4066,6 +4152,24 @@ public class ChatSample : MonoBehaviour
             else sb.Append($"\n会话阶段: 深 ({age / 60f:F0}分钟)");
         }
 
+        //待机整理：没人说话时，把孤立的记忆摆到她面前，让她自己决定连什么。
+        //只在 tick 触发的轮次做——用户刚说完话时插这段会打断当前话题。
+        if (m_EnableIdleMemoryConsolidation && m_MemoryHub != null && m_EnableMemoryRecall &&
+            m_AgentCurrentRoundIsTick &&
+            m_LastUserTurnTime > 0f &&
+            rt - m_LastUserTurnTime >= m_IdleConsolidationAfterSec &&
+            rt - m_LastConsolidationTime >= m_IdleConsolidationCooldownSec)
+        {
+            string view = m_MemoryHub.BuildConsolidationView();
+            if (!string.IsNullOrEmpty(view))
+            {
+                sb.Append(view);
+                m_LastConsolidationTime = rt;
+                if (m_LogAgentLoop)
+                    Debug.Log($"[Memory] 待机整理帧(静默 {(rt - m_LastUserTurnTime) / 60f:F1} 分钟)");
+            }
+        }
+
         //本帧是怎么来的
         switch (triggerReason)
         {
@@ -4078,6 +4182,10 @@ public class ChatSample : MonoBehaviour
                 break;
             case "spike-pull-forward":
                 sb.Append("\n(本帧因环境出现动静被拉前——你可能从走神里被拽回来一下)");
+                break;
+            case "memory-surfaced":
+                sb.Append("\n(本帧不是钟点到了——是你忽然想起了什么。看看「刚才不由自主想到的」" +
+                          "那几条；想说就说，觉得没必要提也可以 <silent/>)");
                 break;
             case "user-spoke":
                 sb.Append("\n(用户刚开口讲了下面这段话，请回应)");
@@ -7641,16 +7749,22 @@ public class ChatSample : MonoBehaviour
     //一条正则覆盖全部可执行标签(+noop):属性用 [^>]* 而不是精确引号匹配——
     //本地模型偶尔输出全角引号(＂/“)甚至漏掉自闭合斜杠,这里都要兜住,
     //否则漏网的标签会被 TTS 念出来、显示在字幕上。
+    //★ 新增标签时**必须同时加到下面的 s_AgentTagStarts**，否则流式切句器兜不住它。
+    //  漏掉会被直接念出来：LLM 把标签单写一行时，"\n" 是强边界，标签会被当成一句切出来
+    //  推进 TTS 队列(这也正是下面 <continue/> 那条兜底注释的由来)。
+    //  实测 <note/> 就这样被朗读了 3.86 秒——而它其实已经被 MemoryTagParser 正确解析
+    //  并落库了，漏的只是这份"朗读过滤"清单。memory_link 当时也漏在外面，只是碰巧没撞上。
     private static readonly System.Text.RegularExpressions.Regex s_AllAgentTagsRegex =
         new System.Text.RegularExpressions.Regex(
-            @"<(?:next|continue|silent|noop|look|unlook|memory_add|memory_update|song_search|song_remember|song_rename|song_forget|song_sing|hum_back)\b[^>]*>",
+            @"<(?:next|continue|silent|noop|look|unlook|memory_add|memory_update|memory_link|note|song_search|song_remember|song_rename|song_forget|song_sing|hum_back)\b[^>]*>",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     //用于流式阶段识别“尚未闭合”的标签。必须与 s_AllAgentTagsRegex 的名称集合保持一致。
     private static readonly string[] s_AgentTagStarts =
     {
         "<next", "<continue", "<silent", "<noop", "<look", "<unlook",
-        "<memory_add", "<memory_update", "<song_search", "<song_remember",
+        "<memory_add", "<memory_update", "<memory_link", "<note",
+        "<song_search", "<song_remember",
         "<song_rename", "<song_forget", "<song_sing", "<hum_back"
     };
 

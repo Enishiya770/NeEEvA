@@ -233,11 +233,28 @@ MonoBehaviour:
   m_SeedJson: {fileID: 4900000, guid: c5a9fe402aed53949a569756e57c00e5, type: 3}
   m_RuntimeFileName: memory.json
   m_ForceReseedOnStart: 0
-  m_MemoryMapTopN: 12
+  m_ShortTerm:
+    m_Enabled: 1
+    m_Capacity: 20
+    m_HalfLifeSec: 1500
+    m_ForgetBelow: 0.12
+    m_UserHeat: 0.55
+    m_NoteHeat: 0.95
+    m_RetouchBoost: 0.3
+    m_MaxShown: 8
+    m_TextChars: 46
+    m_LogBubbles: 0
+  m_ViewIdentityTopN: 8
+  m_ViewMaxRoots: 12
+  m_ViewMaxChildren: 6
+  m_ViewDescChars: 48
+  m_ViewMaxIsolated: 10
+  m_ViewShowEdgeStrength: 1
   m_LogMemoryMap: 1
   m_EnableLLMWrite: 1
   m_MaxNodes: 400
   m_DefaultAddWeight: 0.6
+  m_DefaultLinkStrength: 0.6
   m_LogMemoryWrites: 1
   m_EnableDecay: 1
   m_DecayHalfLifeDays: 180
@@ -254,6 +271,12 @@ MonoBehaviour:
   m_ActivationHalfLifeSec: 180
   m_ActivationWeight: 0.35
   m_ActivationOnlyThreshold: 0.5
+  m_EnableIdleDrift: 1
+  m_DriftIdleAfterSec: 45
+  m_DriftMinIntervalSec: 90
+  m_DriftMaxIntervalSec: 210
+  m_DriftEnergy: 0.6
+  m_DriftNoRepeatCount: 3
 --- !u!4 &63693727
 Transform:
   m_ObjectHideFlags: 0
@@ -2961,7 +2984,7 @@ MonoBehaviour:
   m_LocalUrl: http://127.0.0.1:8080/v1/chat/completions
   m_LocalModelName: antoneva
   m_SystemSetting: 
-  m_ChatModelName: qwen3.7-max-2026-06-08
+  m_ChatModelName: qwen3.7-flash-2026-07-15
   api_key: 
   m_EnableThinking: 0
   m_KeepRecentImages: 2
@@ -4886,8 +4909,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 620.75, y: 0}
-  m_SizeDelta: {x: 1221.5, y: 0}
+  m_AnchoredPosition: {x: 561.75, y: 0}
+  m_SizeDelta: {x: 1103.5, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1423120622
 MonoBehaviour:
@@ -5101,10 +5124,21 @@ MonoBehaviour:
   m_DefaultTickSec: 30
   m_FirstTickDelaySec: 1.5
   m_MaxConsecutiveAITurns: 8
+  m_MonologueBackstopTurns: 40
   m_RecentAIUtterancesShown: 3
   m_AIUtteranceTruncateChars: 60
   m_BringForwardOnSpike: 1
   m_LogAgentLoop: 1
+  m_Urge:
+    m_Enabled: 1
+    m_LonelyRate: 0.003
+    m_LonelyFullSec: 240
+    m_MemorySurfacingGain: 0.4
+    m_SpikeGain: 0.25
+    m_SpikeFloorRms: 0.012
+    m_SpikeMaxPerSilence: 0.6
+    m_FatiguePerTurn: 0.45
+    m_LogUrge: 1
   m_EnableAutonomousSongSearch: 1
   m_SongSearchCooldownSeconds: 12
   m_BringForwardOnSongSearchResult: 1
@@ -5150,6 +5184,9 @@ MonoBehaviour:
   m_CaptureJpegQuality: 80
   m_MemoryHub: {fileID: 63693726}
   m_EnableMemoryRecall: 1
+  m_EnableIdleMemoryConsolidation: 1
+  m_IdleConsolidationAfterSec: 180
+  m_IdleConsolidationCooldownSec: 900
   m_WordWaitTime: 0.2
   m_WriteState: 0
   m_ChatHistory: []

@@ -26,9 +26,16 @@ public class LLM:MonoBehaviour
     [Header("[回落] 回复语言 (留空；设置了Prompt Files则忽略)")]
     [SerializeField] protected string lan="日语";
     /// <summary>
-    /// 历史消息保留条数
+    /// 历史消息保留条数(高水位)。仅对使用基类 CheckHistory 的 provider 生效。
+    ///
+    /// ChatQW 重写了 CheckHistory，改用自己的 m_LowLatencyHistoryLimit，
+    /// 完全不读本字段——在 ChatQW 上调它没有任何效果。
     /// </summary>
-    [Header("历史消息保留条数")]
+    [Header("历史消息保留条数 (ChatQW 不使用，见下方 Tooltip)")]
+    [Tooltip("超过此条数才裁剪，且一次裁到 70% 留出空位——每轮只删一条会让 system 之后的" +
+             "token 序列逐轮平移，llama.cpp 的前缀缓存因此每轮只能命中 system prompt。\n\n" +
+             "⚠ ChatQW 重写了 CheckHistory，用的是「低延迟模式：请求中最多保留的非system" +
+             "历史消息数」那一项，本字段对它无效。改这里不会有任何变化。")]
     [SerializeField] protected int m_HistoryKeepCount = 15;
     /// <summary>
     /// 对话消息列表(运行时滚动刷新)
