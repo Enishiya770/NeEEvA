@@ -1684,12 +1684,18 @@ public class ChatSample : MonoBehaviour
     /// </summary>
     private float m_EouTime = 0f;
     /// <summary>
+    /// 本轮录音是不是"语音VAD本来拒绝了、靠哼唱豁免捞回来的"。
+    /// 用来抑制快速应声——见 ScheduleEouLatencyFiller。
+    /// </summary>
+    private bool m_EouRescuedByTonalOverride = false;
+    /// <summary>
     /// RTSpeechHandler通知"用户讲完了，clip正发往ASR"。
     /// 用 realtimeSinceStartup 而不是 Time.time，避免 Time.timeScale 干扰。
     /// </summary>
-    public void MarkEOU()
+    public void MarkEOU(bool rescuedByTonalOverride = false)
     {
         m_EouTime = Time.realtimeSinceStartup;
+        m_EouRescuedByTonalOverride = rescuedByTonalOverride;
         //上一轮的 formal-first 标志不能阻止本轮 EOU 快速回应。
         m_RealFirstAudioStarted = false;
         m_EouCognitiveSpeechVeto = HasStrongSpeculativeSpeechVeto();
@@ -1922,6 +1928,13 @@ public class ChatSample : MonoBehaviour
     private float m_StreamStartTime = 0f;
     //诊断用：是否打印耗时日志
     [SerializeField] private bool m_LogStreamTimings = true;
+    [Tooltip("打印每轮 LLM 的**原始输出全文**(未剥标签)。默认关——原文带全部控制标签，很吵。" +
+             "排查'标签没生成 vs 标签被吞'时才开：其余流式日志打的都是剥离之后的文本，" +
+             "这两种情况在那些日志里无法区分")]
+    [SerializeField] private bool m_LogRawLLMOutput = false;
+    //本轮正文中间出现 <silent/> 时，其后被切出来的内心独白文本(不发声，只入历史)。
+    //每轮用完即清；见 OnStreamComplete 的尾部处理。
+    private string m_PendingMidRoundInner = null;
 
     [Header("首音延迟快速回应")]
     [Tooltip("预计或实际等待较长时，先播放启动阶段缓存的短回应，不额外占用TTS推理队列")]
@@ -1980,6 +1993,7 @@ public class ChatSample : MonoBehaviour
         m_FirstChunkFlushed = false;
         m_FirstDeltaLogged = false;
         m_RoundIsInner = false;          //每个 fresh round 默认非内心；OnStreamDelta 看 <silent/> 前缀决定
+        m_PendingMidRoundInner = null;
         m_RoundInnerCheckDone = false;   //inner 检测专用门——每轮新决定，不被 m_FirstChunkFlushed 牵连
         m_HoldSpeechForSongMemoryResult = holdSpeechForSongMemoryResult;
         m_HoldSpeechForHumBackResult = holdSpeechForHumBackResult;
@@ -2195,6 +2209,19 @@ public class ChatSample : MonoBehaviour
             m_ChatSettings == null ||
             m_ChatSettings.m_TextToSpeech == null || m_AudioSource == null)
             return;
+
+        //本轮若是靠哼唱豁免捞回来的(语音VAD其实拒绝了)，不播快速应声。
+        //快速应声在 EOU+0.36s 就出声，远早于正式 ASR 的判定——实测一场里 5 次环境噪音
+        //全部被"回应"了一句缓存短句("ふふっ……" / "うん、ちゃんと聴いていたわ……")，
+        //随后才 CancelPendingEouLatencyFiller("asr-empty")。取消发生在声音已经出去之后，
+        //用户听到的就是"角色在对着杂音搭话"。
+        //真哼唱的代价是少了这句应声，等正式管线的回复——比对着风扇说话好。
+        if (m_EouRescuedByTonalOverride)
+        {
+            if (m_LogStreamTimings)
+                Debug.Log("[LatencyFiller] 本轮由哼唱豁免触发(语音VAD未认可)，不播快速应声");
+            return;
+        }
 
         m_EouFillerScheduled = true;
         int generation = m_EouFillerGeneration;
@@ -2452,6 +2479,15 @@ public class ChatSample : MonoBehaviour
     /// </summary>
     private void OnStreamComplete(string full)
     {
+        //★ 排障用：打印**未经任何剥离**的 LLM 原文。
+        //  现有流式日志(首块切出 / TTS流请求发出)打的都是切句并剥标签之后的结果，
+        //  所以"标签压根没生成"和"生成了但被吞掉"在日志里长得一模一样，无法区分。
+        //  典型待查问题：她把内心话当正文念出来(用第三人称指代用户)，而
+        //  <silent/> 连续三场 0 次——要判断是没打标签还是标签被吞，只能看原文。
+        //  平时关掉：原文会带上全部控制标签，很吵。
+        if (m_LogRawLLMOutput)
+            Debug.Log($"[LLM原文] {(full ?? "").Replace("\n", "\\n")}");
+
         //记忆写入标签的提取与应用不看 agent 开关——直接对话模式她也在记忆。
         //只在全文完成时做一次(chunk 级会重复计),剥净后再做后续解析。
         string afterMemTags;
@@ -2588,6 +2624,28 @@ public class ChatSample : MonoBehaviour
             //从 m_SentenceBuffer 尾巴里把标签剥掉(标签按 prompt 规则在末尾，所以这就是它们的位置)。
             //剥完再 flush，保证不会把标签字符送进 TTS。
             string tail = m_SentenceBuffer.ToString();
+
+            //★ 正文中间的 <silent/>：它的语义是"从这里开始不发声"，而不是只在句首才算。
+            //  实测她会把它当分隔符用——前半段说给用户听，后半段是心里话：
+            //    「…これ以上、気まずくさせちゃダメね。<silent/>小优という名前は…」
+            //  而内心独白的检测是锚定开头的(OnStreamDelta 里 @"^\s*<silent\s*/>")，中间的
+            //  匹配不上；流式阶段 FindPotentialAgentTagStart 会在 <silent 处停住不念，
+            //  所以后半段一路留在 buffer 里，最后在这里被 StripAgentTagsForTTS 剥掉标签、
+            //  两侧文本无缝拼接，整段心里话被当正文念了出来(实测原样念出三句)。
+            //  这里把标签之后的部分切出去：不进 TTS，改走内心独白(入历史、用户听不到)。
+            string tailInner = null;
+            if (!string.IsNullOrEmpty(tail))
+            {
+                var midSilent = System.Text.RegularExpressions.Regex.Match(
+                    tail, @"<silent\s*/>",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (midSilent.Success)
+                {
+                    tailInner = tail.Substring(midSilent.Index + midSilent.Length);
+                    tail = tail.Substring(0, midSilent.Index);
+                }
+            }
+
             if (!string.IsNullOrEmpty(tail))
             {
                 string cleanTail;
@@ -2601,6 +2659,28 @@ public class ChatSample : MonoBehaviour
                 cleanTail = StripAgentTagsForTTS(cleanTail);
                 m_SentenceBuffer.Length = 0;
                 if (!string.IsNullOrEmpty(cleanTail)) m_SentenceBuffer.Append(cleanTail);
+            }
+            else
+            {
+                //整段尾巴都在 <silent/> 之后(她把标签放在了正文最前面之外的位置)。
+                //必须显式清空——否则原始 tail 会留在 buffer 里被后续 flush 念出来。
+                m_SentenceBuffer.Length = 0;
+            }
+
+            //<silent/> 之后的部分：剥净控制标签后作为内心独白记录，不进 TTS。
+            if (!string.IsNullOrEmpty(tailInner))
+            {
+                string innerTail;
+                float? _ni2; string _f2; bool _c2; bool _s2; bool? _l2;
+                ParseAgentTags(tailInner, out innerTail, out _ni2, out _f2, out _c2, out _s2, out _l2);
+                innerTail = MemoryTagParser.Strip(innerTail);
+                innerTail = StripAgentTagsForTTS(innerTail);
+                if (!string.IsNullOrEmpty(innerTail))
+                {
+                    m_PendingMidRoundInner = innerTail;
+                    if (m_LogAgentLoop)
+                        Debug.Log($"[Agent] 正文中间的 <silent/> → 其后转为内心独白(不发声): \"{innerTail}\"");
+                }
             }
 
             //★ per-round 状态更新——把"本轮我说了什么"立刻入 ring buffer / 计数器 +1，
@@ -2619,6 +2699,17 @@ public class ChatSample : MonoBehaviour
                     //内心独白时给 ring buffer 条目加 [内心] 前缀——下一帧 LLM 能区分
                     //"我刚才在心里想"vs"我刚才说出口的话"，避免内心思考被当成已说出的句子
                     string display = isInnerThis ? ("[内心] " + trimmed) : trimmed;
+                    //正文中间的 <silent/>：cleanFull 里两半是连在一起的，若整段都记成"说过的"，
+                    //她下一帧会以为心里话也说出口了——而 你最近发言 正是防重复用的信号。
+                    if (!isInnerThis && !string.IsNullOrEmpty(m_PendingMidRoundInner) &&
+                        trimmed.EndsWith(m_PendingMidRoundInner, StringComparison.Ordinal))
+                    {
+                        string spokenPart = trimmed
+                            .Substring(0, trimmed.Length - m_PendingMidRoundInner.Length).Trim();
+                        display = string.IsNullOrEmpty(spokenPart)
+                            ? ("[内心] " + m_PendingMidRoundInner)
+                            : (spokenPart + "  [内心] " + m_PendingMidRoundInner);
+                    }
                     m_LastAIMsgPlain = display;
                     m_RecentAIUtterances.Enqueue(new KeyValuePair<float, string>(nowT, display));
                     int cap = Mathf.Max(1, m_RecentAIUtterancesShown);

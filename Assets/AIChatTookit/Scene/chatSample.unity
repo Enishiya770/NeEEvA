@@ -243,7 +243,7 @@ MonoBehaviour:
     m_RetouchBoost: 0.3
     m_MaxShown: 8
     m_TextChars: 46
-    m_LogBubbles: 0
+    m_LogBubbles: 1
   m_ViewIdentityTopN: 8
   m_ViewMaxRoots: 12
   m_ViewMaxChildren: 6
@@ -264,7 +264,7 @@ MonoBehaviour:
   m_RecallTopK: 6
   m_RecallThreshold: 0.45
   m_QueryMaxAgeSec: 300
-  m_LogRecall: 0
+  m_LogRecall: 1
   m_EnableActivation: 1
   m_HopDecay: 0.6
   m_ReverseFactor: 0.5
@@ -960,7 +960,7 @@ MonoBehaviour:
   m_SmoothedRms: 0
   m_RmsSmoothAlpha: 0.15
   m_BargeInDecayRate: 2
-  m_LogTimings: 0
+  m_LogTimings: 1
   m_RmsLogEveryNFrames: 30
   m_EnableNeuralVad: 1
   m_NeuralVadClient: {fileID: 501756907}
@@ -4909,8 +4909,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 561.75, y: 0}
-  m_SizeDelta: {x: 1103.5, y: 0}
+  m_AnchoredPosition: {x: 551.5, y: 0}
+  m_SizeDelta: {x: 1083, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1423120622
 MonoBehaviour:
@@ -5112,6 +5112,7 @@ MonoBehaviour:
   m_InterClipPauseSec: 0.3
   m_PunctuationAwarePause: 1
   m_LogStreamTimings: 1
+  m_LogRawLLMOutput: 1
   m_EnableLatencyFiller: 1
   m_UserFirstAudioTargetSec: 0.35
   m_LatencyFillerThresholdSec: 1.5

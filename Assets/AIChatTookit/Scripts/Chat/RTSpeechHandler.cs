@@ -193,6 +193,10 @@ public class RTSpeechHandler : MonoBehaviour
     private float m_BargeInWindowStartTime = 0f;
     private bool m_CurrentRecordingAllowsSpeakerLearning = true;
     private bool m_LikelySinging = false;
+    //本次录音是不是"语音VAD本来拒绝了、靠哼唱豁免捞回来的"。
+    //与 m_LikelySinging 的区别：那个被 m_EnableSingingMode 门控，关掉歌唱模式就丢了信号。
+    //服务端 /vad 的 is_singing 恰好等价于 singing_override，正是这个含义。
+    private bool m_RecordingRescuedByTonalOverride = false;
     private float m_CurrentSingingProbability = 0f;
 
     [Header("Agent感知 — 环境扰动通知 (Agent Loop 用)")]
@@ -404,6 +408,24 @@ public class RTSpeechHandler : MonoBehaviour
             //仍走下面的 AEC + 神经VAD Barge-In，不受此分支影响。
             if (aiSpeaking && m_IsRecording)
             {
+                //本次录音若是靠哼唱豁免捞回来的，就**不允许它掐掉她的回复**。
+                //实测环境噪音会走这条路把她打断：语音VAD正确地拒绝了(not is_speech)，
+                //但 /vad 的哼唱豁免用快速探针把它捞了回来，于是录音成立 → 她刚要出声就被
+                //Interrupt，日志里是 8 次 "[Interrupt] 角色被打断，已说: \"\""，几秒后正式
+                //ASR 才判定"未检测到有效人声"——掐断发生在正确判定之前。
+                //快速探针在这条路上没有可靠的判别维度：13 条噪音的基频**全部**报成 889Hz
+                //(FFT 谱峰伪影，落在人声窗口正中)，而周期性 0.78~0.87 比真人哼唱还高，
+                //`period >= 0.67` 这个门槛实际上是在挑选噪音。
+                //所以改为拆开两件事：豁免仍可**启动录音**(真哼唱不会漏)，但**不打断**。
+                //代价是你哼歌打断她时她会把当前这句说完——比被环境音掐掉自然得多。
+                if (m_RecordingRescuedByTonalOverride)
+                {
+                    if (m_LogTimings)
+                        Debug.Log("[Turn] 本次录音来自哼唱豁免(语音VAD未认可)，不打断当前回复");
+                    m_StreamLastSentPos = position;
+                    yield return null;
+                    continue;
+                }
                 if (m_LogTimings)
                     Debug.LogWarning("[Turn] 用户录音期间检测到旧AI开始发声，立即取消旧回复");
                 if (m_TentativeFired || m_TentativePreviewInFlight)
@@ -897,6 +919,19 @@ public class RTSpeechHandler : MonoBehaviour
                     return;
                 }
 
+                //打断必须由语音VAD本身认可。IsSinging=true 意味着语音VAD其实拒绝了、
+                //是哼唱豁免把它捞回来的——那种证据强度可以开录音，但不足以掐断她的话。
+                //(依据同上：快速探针对噪音的基频/周期性都不可用)
+                if (vadResult.IsSinging)
+                {
+                    if (m_LogTimings)
+                        Debug.Log("[Barge-in] 仅靠哼唱豁免通过，不作为打断依据");
+                    m_BargeInTimer = 0f;
+                    m_BargeInWindowStartTime = 0f;
+                    ResetNeuralVadGate("tonal-override-only");
+                    return;
+                }
+
                 // AEC residuals may retain some AI similarity. Only the best
                 // identity being AI_SELF is a hard veto; an independent self
                 // score must not override a stronger confirmed-human match.
@@ -1090,6 +1125,7 @@ public class RTSpeechHandler : MonoBehaviour
         m_StreamHumBackPrefixOffered = false;
         m_CurrentRecordingAllowsSpeakerLearning = allowSpeakerLearning;
         m_LikelySinging = m_EnableSingingMode && likelySinging;
+        m_RecordingRescuedByTonalOverride = likelySinging;
         m_CurrentSingingProbability = singingProbability;
         m_SilenceTimer = 0.0f; // 重置静默计时器
         m_IsRecording = true;
@@ -1155,7 +1191,7 @@ public class RTSpeechHandler : MonoBehaviour
         {
             //EOU锚点：必须在AcceptClip之前调用，ChatSample的DealingTextCallback/StartStreaming
             //会用这个时间戳算ASR延迟和"EOU→首音"总延迟。
-            m_ChatSample.MarkEOU();
+            m_ChatSample.MarkEOU(m_RecordingRescuedByTonalOverride);
             if (m_LogTimings)
             {
                 float clipLen = toSend != null ? toSend.length : 0f;
@@ -1164,6 +1200,7 @@ public class RTSpeechHandler : MonoBehaviour
             m_ChatSample.AcceptClip(toSend, allowSpeakerLearning);
         }
         m_LikelySinging = false;
+        m_RecordingRescuedByTonalOverride = false;
         m_CurrentSingingProbability = 0f;
     }
 
@@ -1517,6 +1554,10 @@ public class RTSpeechHandler : MonoBehaviour
         m_CurrentRecordingAllowsSpeakerLearning = true;
 
         m_IsRecording = false;
+        //先取出再清零：下面的 MarkEOU 要用它决定是否抑制快速应声，
+        //而清零发生在它之前，直接传字段永远是 false。
+        bool rescuedByTonalOverride = m_RecordingRescuedByTonalOverride;
+        m_RecordingRescuedByTonalOverride = false;
         EndStreamingRecognition();
         m_RecordingStartPos = -1;
 
@@ -1531,7 +1572,7 @@ public class RTSpeechHandler : MonoBehaviour
         if (m_ChatSample != null)
         {
             //EOU锚点：保持和StopRecording一致的语义，方便ASR/LLM/TTS阶段延迟统计
-            m_ChatSample.MarkEOU();
+            m_ChatSample.MarkEOU(rescuedByTonalOverride);
             if (m_LogTimings)
             {
                 float saved = m_RecordingTimeLimit - m_TentativeEouSilence;
