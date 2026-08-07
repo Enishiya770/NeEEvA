@@ -881,8 +881,10 @@ public class RTSpeechHandler : MonoBehaviour
 
         m_NeuralVadProbeInFlight = true;
         int sequence = ++m_NeuralVadSequence;
+        //回调里要用，但 probe 在下面就被 Destroy 了，先捕获长度
+        float probeSecondsForLog = probe.length;
         if (m_LogTimings)
-            Debug.Log($"[VAD] 候选音量通过，探测最近 {probe.length:F2}s 音频 (seq={sequence})");
+            Debug.Log($"[VAD] 候选音量通过，探测最近 {probeSecondsForLog:F2}s 音频 (seq={sequence})");
 
         byte[] rawProbeBytes = WavUtility.FromAudioClip(probe);
         byte[] vadProbeBytes = vadProbe == probe
@@ -903,6 +905,13 @@ public class RTSpeechHandler : MonoBehaviour
             float retrySeconds = forBargeIn ? m_BargeInVadRetrySeconds : m_NeuralVadRetrySeconds;
             m_NextNeuralVadProbeTime = Time.realtimeSinceStartup + Mathf.Max(0.05f, retrySeconds);
             bool isSpeech = vadResult != null && vadResult.IsSpeech;
+            //探测长度是关键变量：只给 FSMN m_NeuralVadProbeSeconds(默认 0.5s)，还要求其中
+            //至少 min_speech_ms 是语音，而探测发生在起音瞬间。服务端 [VAD] 那行有对应细节。
+            if (m_LogTimings)
+                Debug.Log($"[VAD] 探测 {probeSecondsForLog:F2}s → speech={isSpeech} " +
+                          $"is_singing={(vadResult != null && vadResult.IsSinging)} " +
+                          $"speech_ms={(vadResult != null ? vadResult.SpeechMs : 0)} " +
+                          $"forBargeIn={forBargeIn} (seq={sequence})");
             if (!isSpeech)
             {
                 if (m_LogTimings) Debug.Log($"[VAD] 拒绝非人声候选 (seq={sequence})");

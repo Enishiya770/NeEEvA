@@ -53,7 +53,14 @@ public class SenseVoiceSpeechToText : STT
     [SerializeField] private bool m_InjectSpeakerPrefix = true;
 
     [Header("听到明确自我介绍时，自动绑定访客姓名")]
-    [SerializeField] private bool m_AutoBindIntroducedName = true;
+    //正则从"我叫X/叫我X"里抓名字自动改声纹档案。**默认关**——它抓的不是自我介绍，
+    //是任何含"叫我"的句子。实测同一场对话里造出三个垃圾名字，触发它们的原话全是普通聊天：
+    //  「你怎么直接都是这么叫我名字的」        → 抓到「名字」
+    //  「一般你是这么叫我的，不太会叫我全名」  → 抓到「的」
+    //  「就叫我小优吧」                        → 抓到「小优吧」(语气词已由 StripTrailingParticles 处理)
+    //前两个不是语气词问题，剥不掉。角色有 <speaker_name/> 之后这条正则弊大于利：
+    //同一场里她只用了 1 次标签，正则却造了 3 个错名字。
+    [SerializeField] private bool m_AutoBindIntroducedName = false;
 
     [Header("歌唱感知 / 角色自主歌曲检索与记忆")]
     [SerializeField] private bool m_EnableSingingAnalysis = true;
@@ -72,6 +79,9 @@ public class SenseVoiceSpeechToText : STT
     public bool LastNoSpeech { get; private set; } = false;
     public string LastSpeakerName { get; private set; } = "";
     public string LastSpeakerKind { get; private set; } = "";
+    /// <summary>最近一次**真的认出**的非 AI 说话人；噪音/无人声轮次不会擦掉它。</summary>
+    public string LastKnownSpeakerId { get; private set; } = "";
+    public string LastKnownSpeakerName { get; private set; } = "";
     public string LastSpeakerStatus { get; private set; } = "";
     public float LastSpeakerConfidence { get; private set; } = 0f;
     public float LastSpeakerEnrollmentProgress { get; private set; } = 0f;
@@ -109,6 +119,9 @@ public class SenseVoiceSpeechToText : STT
     private string m_SongSingURL;
     private byte[] m_LastSingingAudioBytes;
     private string m_LastSingingLyrics = "";
+    //服务端对裁出来那段单独识别得到的歌词。整轮转写含唱前唱后的说话，
+    //拿它当歌词会被 SVS 硬塞进几秒的旋律里，唱出来听不清。
+    private string m_LastResponseSingingText = "";
     private float m_LastSingingAudioTime = -999f;
     private float m_LastSingingPerformanceTime = -999f;
     private float[] m_LastSingingPerformanceMidi = new float[0];
@@ -161,6 +174,9 @@ public class SenseVoiceSpeechToText : STT
     private float m_LastPlayableCandidateAudioCropSeconds = 0f;
     private float m_LastPlayableCandidateTimelineCropSeconds = 0f;
     private float m_LastPlayableCandidateScoreCropSeconds = 0f;
+    private float m_LastPlayableCandidateAudioEndSeconds = 0f;
+    private float m_LastPlayableCandidateTimelineEndSeconds = 0f;
+    private float m_LastPlayableCandidateScoreEndSeconds = 0f;
 
     // WebSocket 的收发在后台线程；Unity UI/MonoBehaviour 回调统一排回主线程。
     private readonly ConcurrentQueue<Action> m_StreamMainThreadActions =
@@ -700,6 +716,17 @@ public class SenseVoiceSpeechToText : STT
                     LastSpeakerName = _response.speaker_name ?? "";
                     LastSpeakerKind = _response.speaker_kind ?? "";
                     LastSpeakerStatus = _response.speaker_status ?? "";
+                    //粘性身份：只在真的认出人时更新，噪音/无人声轮次不擦掉它。
+                    //LastSpeakerId 会被**每一次** ASR 结果覆盖，包括被幻听闸拒绝的轮次
+                    //(那时服务端返回 unknown_speaker_meta)。实测后果：她隔一轮才反应过来
+                    //要改名字("抱歉，是小悠さん呢")，而那时 LastSpeakerId 已经是 unknown，
+                    //<speaker_name/> 被忽略——恰好在这个标签最该起作用的纠错场景上失效。
+                    if (!string.IsNullOrEmpty(LastSpeakerId) && LastSpeakerId != "unknown" &&
+                        LastSpeakerId != "ai_self" && LastSpeakerKind != "ai")
+                    {
+                        LastKnownSpeakerId = LastSpeakerId;
+                        LastKnownSpeakerName = LastSpeakerName;
+                    }
                     LastSpeakerConfidence = _response.speaker_confidence;
                     LastSpeakerEnrollmentProgress = _response.speaker_enrollment_progress;
                     LastSpeakerIsNew = _response.speaker_is_new;
@@ -712,6 +739,7 @@ public class SenseVoiceSpeechToText : STT
                     LastNoteSequence = _response.note_sequence ?? "";
                     LastSingingSummary = _response.singing_summary ?? "";
                     LastSingingScore = _response.singing_score;
+                    m_LastResponseSingingText = _response.singing_text ?? "";
                     LastPitchTimelineMidi = _response.pitch_timeline_midi != null &&
                         _response.pitch_timeline_midi.Length > 0
                         ? _response.pitch_timeline_midi
@@ -755,6 +783,25 @@ public class SenseVoiceSpeechToText : STT
                         0f, audioCropSeconds - _response.audio_content_start_seconds);
                     float timelineCropSeconds = Mathf.Max(
                         0f, croppedContentSeconds - _response.pitch_timeline_start_seconds);
+
+                    // 尾部边界：唱完之后接的那段说话必须切掉，否则会被当成歌词唱回去
+                    // （实测她把「我唱完后说的话」原样复读了出来）。服务端找不到可信
+                    // 边界时回填整段时长，贴到录音末尾即视为无需裁剪。
+                    float audioEndSeconds = 0f;
+                    if (_response.singing_end_seconds > 0f)
+                    {
+                        float absoluteEnd = _response.audio_content_start_seconds +
+                            _response.singing_end_seconds;
+                        if (absoluteEnd > audioCropSeconds + 1.2f &&
+                            (rawAudioSeconds <= 0f || absoluteEnd < rawAudioSeconds - 0.45f))
+                            audioEndSeconds = absoluteEnd;
+                    }
+                    float contentEndSeconds = audioEndSeconds > 0f
+                        ? Mathf.Max(0f, audioEndSeconds - _response.audio_content_start_seconds)
+                        : 0f;
+                    float timelineEndSeconds = contentEndSeconds > 0f
+                        ? Mathf.Max(0f, contentEndSeconds - _response.pitch_timeline_start_seconds)
+                        : 0f;
                     // The tail text is authoritative even when no explicit sing-along request
                     // was armed. Otherwise a spontaneous sung phrase followed by "不会唱了"
                     // could still overwrite the last clean performance cache.
@@ -777,6 +824,10 @@ public class SenseVoiceSpeechToText : STT
                                   $"protected={protectedStreamingCropSeconds:F2}s " +
                                   $"applied={audioCropSeconds:F2}s " +
                                   $"timeline={timelineCropSeconds:F2}s");
+                        Debug.Log($"[SenseVoice/Singing] tail rawEnd={_response.singing_end_seconds:F2}s " +
+                                  $"contentStart={_response.audio_content_start_seconds:F2}s " +
+                                  $"applied={audioEndSeconds:F2}s " +
+                                  $"timeline={timelineEndSeconds:F2}s");
                     }
 
                     bool hasPlayablePitch = HasPlayablePitchTimeline(LastPitchTimelineMidi);
@@ -787,6 +838,9 @@ public class SenseVoiceSpeechToText : STT
                         m_LastPlayableCandidateAudioCropSeconds = audioCropSeconds;
                         m_LastPlayableCandidateTimelineCropSeconds = timelineCropSeconds;
                         m_LastPlayableCandidateScoreCropSeconds = croppedContentSeconds;
+                        m_LastPlayableCandidateAudioEndSeconds = audioEndSeconds;
+                        m_LastPlayableCandidateTimelineEndSeconds = timelineEndSeconds;
+                        m_LastPlayableCandidateScoreEndSeconds = contentEndSeconds;
                     }
 
                     if (LastIsSinging && !endsWithSpokenSingingExit)
@@ -795,7 +849,10 @@ public class SenseVoiceSpeechToText : STT
                             audioBytes,
                             audioCropSeconds,
                             timelineCropSeconds,
-                            croppedContentSeconds);
+                            croppedContentSeconds,
+                            audioEndSeconds,
+                            timelineEndSeconds,
+                            contentEndSeconds);
                     }
                     else if (LastIsSinging && endsWithSpokenSingingExit)
                     {
@@ -929,7 +986,10 @@ public class SenseVoiceSpeechToText : STT
             m_LastPlayableCandidateAudioBytes,
             m_LastPlayableCandidateAudioCropSeconds,
             m_LastPlayableCandidateTimelineCropSeconds,
-            m_LastPlayableCandidateScoreCropSeconds);
+            m_LastPlayableCandidateScoreCropSeconds,
+            m_LastPlayableCandidateAudioEndSeconds,
+            m_LastPlayableCandidateTimelineEndSeconds,
+            m_LastPlayableCandidateScoreEndSeconds);
         Debug.Log($"[SenseVoice/Singing] 最终判定由流式证据恢复为歌唱 " +
                   $"prob={LastSingingProbability:F2} stability={LastPitchStability:F2} " +
                   $"timeline={m_LastSingingPerformanceMidi.Length}");
@@ -1042,7 +1102,10 @@ public class SenseVoiceSpeechToText : STT
         byte[] audioBytes,
         float audioCropSeconds = 0f,
         float timelineCropSeconds = 0f,
-        float scoreCropSeconds = 0f)
+        float scoreCropSeconds = 0f,
+        float audioEndSeconds = 0f,
+        float timelineEndSeconds = 0f,
+        float scoreEndSeconds = 0f)
     {
         m_RollbackSingingAudioBytes = m_LastSingingAudioBytes;
         m_RollbackSingingLyrics = m_LastSingingLyrics;
@@ -1058,23 +1121,42 @@ public class SenseVoiceSpeechToText : STT
         m_LastSingingCacheSerial = m_LastCompletedAsrSerial;
 
         float now = Time.realtimeSinceStartup;
-        m_LastSingingLyrics = LastText ?? "";
+        //歌词必须和裁过的旋律来自同一段音频，否则 SVS 会把整轮的字铺到几秒的旋律上。
+        bool usedSegmentLyrics = !string.IsNullOrWhiteSpace(m_LastResponseSingingText);
+        m_LastSingingLyrics = usedSegmentLyrics
+            ? m_LastResponseSingingText.Trim()
+            : (LastText ?? "");
         float actualAudioCrop = 0f;
+        float actualAudioEnd = 0f;
         if (audioBytes != null && audioBytes.Length > 44)
         {
-            m_LastSingingAudioBytes = TrimWavLeading(
+            m_LastSingingAudioBytes = TrimWavWindow(
                 audioBytes,
                 audioCropSeconds,
-                out actualAudioCrop);
+                audioEndSeconds,
+                out actualAudioCrop,
+                out actualAudioEnd);
             m_LastSingingAudioTime = now;
         }
         if (!HasPlayablePitchTimeline(LastPitchTimelineMidi)) return;
 
+        float frameSeconds = Mathf.Max(0.02f, LastPitchTimelineFrameSeconds);
         int timelineStart = Mathf.Clamp(
-            Mathf.FloorToInt(timelineCropSeconds / Mathf.Max(0.02f, LastPitchTimelineFrameSeconds)),
+            Mathf.FloorToInt(timelineCropSeconds / frameSeconds),
             0,
             Mathf.Max(0, LastPitchTimelineMidi.Length - 1));
-        int timelineLength = LastPitchTimelineMidi.Length - timelineStart;
+        //裁尾：唱完之后接的那段说话如果留在时间线里，回哼会把它当成歌词一起唱出来。
+        int timelineEnd = LastPitchTimelineMidi.Length;
+        if (timelineEndSeconds > 0.001f)
+        {
+            timelineEnd = Mathf.Clamp(
+                Mathf.CeilToInt(timelineEndSeconds / frameSeconds),
+                timelineStart,
+                LastPitchTimelineMidi.Length);
+        }
+        int timelineLength = timelineEnd - timelineStart;
+        //素材太短就退回整段——宁可多唱一点，也不要没得唱
+        if (timelineLength < 4) { timelineEnd = LastPitchTimelineMidi.Length; timelineLength = timelineEnd - timelineStart; }
         m_LastSingingPerformanceMidi = new float[timelineLength];
         Array.Copy(
             LastPitchTimelineMidi,
@@ -1090,17 +1172,37 @@ public class SenseVoiceSpeechToText : STT
                 m_LastSingingPerformanceMidi,
                 m_LastSingingPerformanceMidi.Length);
             timelineStart = 0;
+            timelineEnd = LastPitchTimelineMidi.Length;
+            scoreEndSeconds = 0f;
         }
         m_LastSingingPerformanceFrameSeconds = LastPitchTimelineFrameSeconds;
         m_LastSingingPerformanceLanguage = LastLanguage ?? "";
         m_LastSingingPerformanceScore =
-            CropSingingScore(LastSingingScore, scoreCropSeconds);
-        m_LastSingingPerformanceTime = now;
-        if (actualAudioCrop >= 0.05f || timelineStart > 0)
+            CropSingingScore(LastSingingScore, scoreCropSeconds, scoreEndSeconds);
+        //乐谱自带一份 lyrics，裁剪不会动它。9883 走 acoustic_voiced_time 对齐，
+        //整轮的字铺到裁短的音符上就成了一串听不清的音——必须换成同段的歌词。
+        if (usedSegmentLyrics && m_LastSingingPerformanceScore != null)
         {
-            Debug.Log($"[SenseVoice/Singing] cached performance after preface trim " +
-                      $"audio={actualAudioCrop:F2}s timeline={timelineStart * LastPitchTimelineFrameSeconds:F2}s " +
-                      $"frames={m_LastSingingPerformanceMidi.Length}");
+            m_LastSingingPerformanceScore.lyrics = m_LastSingingLyrics;
+            m_LastSingingPerformanceScore.lyrics_alignment = "singing-segment-asr";
+            //假名/摩拉是从整轮文本推出来的，换词后必须让 9883 重新生成
+            m_LastSingingPerformanceScore.lyrics_reading = "";
+            m_LastSingingPerformanceScore.lyrics_reading_source = "";
+            m_LastSingingPerformanceScore.lyrics_reading_complete = false;
+            m_LastSingingPerformanceScore.lyrics_mora = null;
+        }
+        m_LastSingingPerformanceTime = now;
+        bool trimmedTail = actualAudioEnd > 0.001f ||
+            timelineEnd < LastPitchTimelineMidi.Length;
+        if (actualAudioCrop >= 0.05f || timelineStart > 0 || trimmedTail)
+        {
+            Debug.Log($"[SenseVoice/Singing] cached performance trim " +
+                      $"head(audio={actualAudioCrop:F2}s timeline={timelineStart * frameSeconds:F2}s) " +
+                      $"tail(audio={actualAudioEnd:F2}s timeline={timelineEnd * frameSeconds:F2}s/" +
+                      $"{LastPitchTimelineMidi.Length * frameSeconds:F2}s) " +
+                      $"frames={m_LastSingingPerformanceMidi.Length} " +
+                      $"lyrics={(usedSegmentLyrics ? "segment" : "full-turn")}" +
+                      $"({m_LastSingingLyrics.Length}字)");
         }
     }
 
@@ -1144,20 +1246,29 @@ public class SenseVoiceSpeechToText : STT
         return byteRate > 0 && dataLength > 0 ? dataLength / (float)byteRate : 0f;
     }
 
+    /// <summary>
+    /// 把乐谱裁到 [cropSeconds, endSeconds)。endSeconds &lt;= 0 表示保留到末尾。
+    /// </summary>
     private static SingingScore CropSingingScore(
         SingingScore source,
-        float cropSeconds)
+        float cropSeconds,
+        float endSeconds = 0f)
     {
         if (source == null || source.schema_version <= 0) return null;
         SingingScore score = JsonUtility.FromJson<SingingScore>(
             JsonUtility.ToJson(source));
-        if (score == null || cropSeconds <= 0.001f) return score;
+        if (score == null || (cropSeconds <= 0.001f && endSeconds <= 0.001f))
+            return score;
 
+        bool hasTail = endSeconds > 0.001f;
+        float tail = hasTail ? endSeconds : float.MaxValue;
         float frameSeconds = Mathf.Max(0.001f, score.frame_seconds);
         int frameOffset = Mathf.Max(0, Mathf.FloorToInt(cropSeconds / frameSeconds));
-        score.f0_hz = SliceFloatArray(score.f0_hz, frameOffset);
-        score.energy = SliceFloatArray(score.energy, frameOffset);
-        score.duration_seconds = Mathf.Max(0f, score.duration_seconds - cropSeconds);
+        int frameEnd = hasTail ? Mathf.CeilToInt(endSeconds / frameSeconds) : -1;
+        score.f0_hz = SliceFloatArray(score.f0_hz, frameOffset, frameEnd);
+        score.energy = SliceFloatArray(score.energy, frameOffset, frameEnd);
+        score.duration_seconds = Mathf.Max(
+            0f, Mathf.Min(score.duration_seconds, tail) - cropSeconds);
 
         var notes = new List<SingingNote>();
         if (score.notes != null)
@@ -1167,10 +1278,11 @@ public class SenseVoiceSpeechToText : STT
                 if (note == null) continue;
                 float originalStart = note.start_seconds;
                 float originalEnd = originalStart + Mathf.Max(0f, note.duration_seconds);
-                if (originalEnd <= cropSeconds) continue;
-                note.start_seconds = Mathf.Max(0f, originalStart - cropSeconds);
-                note.duration_seconds = Mathf.Max(
-                    0f, originalEnd - Mathf.Max(cropSeconds, originalStart));
+                if (originalEnd <= cropSeconds || originalStart >= tail) continue;
+                float clippedStart = Mathf.Max(originalStart, cropSeconds);
+                float clippedEnd = Mathf.Min(originalEnd, tail);
+                note.start_seconds = clippedStart - cropSeconds;
+                note.duration_seconds = Mathf.Max(0f, clippedEnd - clippedStart);
                 if (note.duration_seconds > 0.001f) notes.Add(note);
             }
         }
@@ -1181,7 +1293,7 @@ public class SenseVoiceSpeechToText : STT
         {
             foreach (float breath in score.breath_positions_seconds)
             {
-                if (breath >= cropSeconds)
+                if (breath >= cropSeconds && breath < tail)
                     breaths.Add(breath - cropSeconds);
             }
         }
@@ -1195,10 +1307,11 @@ public class SenseVoiceSpeechToText : STT
                 if (region == null) continue;
                 float originalStart = region.start_seconds;
                 float originalEnd = originalStart + Mathf.Max(0f, region.duration_seconds);
-                if (originalEnd <= cropSeconds) continue;
-                region.start_seconds = Mathf.Max(0f, originalStart - cropSeconds);
-                region.duration_seconds = Mathf.Max(
-                    0f, originalEnd - Mathf.Max(cropSeconds, originalStart));
+                if (originalEnd <= cropSeconds || originalStart >= tail) continue;
+                float clippedStart = Mathf.Max(originalStart, cropSeconds);
+                float clippedEnd = Mathf.Min(originalEnd, tail);
+                region.start_seconds = clippedStart - cropSeconds;
+                region.duration_seconds = Mathf.Max(0f, clippedEnd - clippedStart);
                 if (region.duration_seconds > 0.001f) vibrato.Add(region);
             }
         }
@@ -1206,23 +1319,36 @@ public class SenseVoiceSpeechToText : STT
         return score;
     }
 
-    private static float[] SliceFloatArray(float[] source, int start)
+    /// <summary>endExclusive &lt; 0 表示切到末尾。</summary>
+    private static float[] SliceFloatArray(float[] source, int start, int endExclusive = -1)
     {
         if (source == null || source.Length == 0 || start >= source.Length)
             return new float[0];
         start = Mathf.Max(0, start);
-        float[] result = new float[source.Length - start];
+        int end = endExclusive < 0
+            ? source.Length
+            : Mathf.Clamp(endExclusive, start, source.Length);
+        if (end <= start) return new float[0];
+        float[] result = new float[end - start];
         Array.Copy(source, start, result, 0, result.Length);
         return result;
     }
 
-    private static byte[] TrimWavLeading(
+    /// <summary>
+    /// 把 WAV 裁到 [startSeconds, endSeconds) 这一段。
+    /// endSeconds &lt;= 0 表示"没有可信的结束位置"，保留到末尾。
+    /// </summary>
+    private static byte[] TrimWavWindow(
         byte[] wavBytes,
         float startSeconds,
-        out float actualStartSeconds)
+        float endSeconds,
+        out float actualStartSeconds,
+        out float actualEndSeconds)
     {
         actualStartSeconds = 0f;
-        if (wavBytes == null || wavBytes.Length <= 44 || startSeconds < 0.05f)
+        actualEndSeconds = 0f;
+        if (wavBytes == null || wavBytes.Length <= 44 ||
+            (startSeconds < 0.05f && endSeconds <= 0f))
             return wavBytes;
         if (wavBytes[0] != (byte)'R' || wavBytes[1] != (byte)'I' ||
             wavBytes[2] != (byte)'F' || wavBytes[3] != (byte)'F' ||
@@ -1273,8 +1399,28 @@ public class SenseVoiceSpeechToText : STT
         skipBytes -= skipBytes % blockAlign;
         skipBytes = Mathf.Clamp(skipBytes, 0, dataLength);
         int remaining = dataLength - skipBytes;
-        if (skipBytes <= 0 || remaining < Mathf.CeilToInt(byteRate * 0.35f))
+
+        //裁尾：唱完之后接的那段说话必须去掉，否则会被当成歌词唱回去。
+        //endSeconds <= 0 表示"没有可信的结束位置"，此时保留到末尾(旧行为)。
+        if (endSeconds > 0f)
+        {
+            int endByte = Mathf.FloorToInt(endSeconds * byteRate);
+            endByte -= endByte % blockAlign;
+            endByte = Mathf.Clamp(endByte, 0, dataLength);
+            int windowed = endByte - skipBytes;
+            //尾巴裁完至少要留 0.35s，否则宁可不裁——素材太短反而没法回哼
+            if (windowed >= Mathf.CeilToInt(byteRate * 0.35f) && windowed < remaining)
+            {
+                remaining = windowed;
+                actualEndSeconds = endByte / (float)byteRate;
+            }
+        }
+        if ((skipBytes <= 0 && actualEndSeconds <= 0f) ||
+            remaining < Mathf.CeilToInt(byteRate * 0.35f))
+        {
+            actualEndSeconds = 0f;
             return wavBytes;
+        }
 
         byte[] trimmed = new byte[dataOffset + remaining];
         Array.Copy(wavBytes, 0, trimmed, 0, dataOffset);
@@ -2102,10 +2248,27 @@ public class SenseVoiceSpeechToText : STT
                 patterns[i],
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (!match.Success) continue;
-            string name = match.Groups["name"].Value.Trim();
+            string name = StripTrailingParticles(match.Groups["name"].Value.Trim());
             if (name.Length > 0 && name.Length <= 32) return name;
         }
         return "";
+    }
+
+    /// <summary>
+    /// 去掉名字尾部的语气词。正则不知道「吧」不是名字的一部分：
+    /// 用户说「就叫我小优吧。」，`叫我(...)[，。！？]` 会一路吃到句号，抓出「小优吧」，
+    /// 然后被自动写进声纹档案，元数据里就一直显示 [说话人:小优吧]。
+    /// 只剥尾部、且不把名字剥空——「吧」本身可以是名字的一部分(极少见但不该误伤)。
+    /// 这条只是兜底；她自己用 &lt;speaker_name/&gt; 给的名字优先级更高、质量也更好。
+    /// </summary>
+    private static string StripTrailingParticles(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+        //中文句末语气词 + 日语的 だ/です 残留
+        string particles = "吧呀啊呐呢哦喔啦嘛咯了的";
+        int end = name.Length;
+        while (end > 1 && particles.IndexOf(name[end - 1]) >= 0) end--;
+        return end == name.Length ? name : name.Substring(0, end);
     }
 
     private bool IsInArray(string s, string[] arr)
@@ -2204,6 +2367,11 @@ public class SenseVoiceSpeechToText : STT
         public float[] pitch_timeline_midi = null;
         public float pitch_timeline_frame_seconds = 0.10f;
         public float singing_start_seconds = 0f;
+        //歌声岛的结束位置（内容坐标系，与 singing_start_seconds 同一原点）。
+        //服务端找不到可信边界时会回填整段时长，等价于"不裁尾"。
+        public float singing_end_seconds = 0f;
+        //只对裁出来那段单独再识别一次得到的歌词。没发生裁剪时为空。
+        public string singing_text = "";
         public float pitch_timeline_start_seconds = 0f;
         public float audio_content_start_seconds = 0f;
         public SingingScore singing_score = null;

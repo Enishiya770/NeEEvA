@@ -250,6 +250,7 @@ def singing_response_fields(analysis: Optional[dict], include_contour: bool = Tr
         "note_sequence": str(analysis.get("note_sequence", "")),
         "singing_summary": str(analysis.get("summary", "")),
         "singing_start_seconds": float(analysis.get("singing_start_seconds", 0.0)),
+        "singing_end_seconds": float(analysis.get("singing_end_seconds", 0.0)),
         "pitch_timeline_start_seconds": float(
             analysis.get("pitch_timeline_start_seconds", 0.0)
         ),
@@ -267,9 +268,21 @@ def singing_response_fields(analysis: Optional[dict], include_contour: bool = Tr
 #: 人声基频的合理区间(Hz)。低于下限的"周期性信号"是机器，不是人——风扇、机箱、
 #: 桌面震动的嗡鸣周期性比人哼唱**还高**，所以只看周期性必然放行它们。实测被误放行的
 #: 噪音音域是 A1~B1(55~62Hz)，而男低音哼唱的下限约 E2(82Hz)，中间有充足余量。
-#: 上限挡的是尖啸/啸叫，C6≈1047Hz 已高于任何哼唱。
+#:
+#: 上限 700 是量出来的，不是拍的。singing_analysis 的 voiced 掩码写着
+#:     voiced = (pitch >= 55.0) & (pitch <= 900.0) & (periodicity >= 0.42)
+#: 而快速 FFT 跟踪器找不到真实基频时会输出 ~889Hz 的退化值——**卡在它自己 900 上限
+#: 的下方一点点**，于是被当成有效浊音帧统计进去，quick 分析就报出一个"音高稳定的人声"。
+#: 实测一场里(用户刻意制造环境噪音):
+#:     噪音 22 条: 889Hz ×21, 797Hz ×1        —— 全部 >= 797
+#:     真人 127 条: 主体 262~407Hz, 尾巴到 810, 另有 889Hz ×23
+#: 上限取 400~700 都能挡住 22/22 的噪音；取 800 会漏掉 797 那条；取 900/1200 一条都挡不住
+#: (原来的 1200 比分析器自己的 900 还宽，等于完全没起作用)。
+#: 700 挡住全部实测噪音，同时给哼唱留最大余量——哼唱基频通常 100~400Hz，
+#: quick 会系统性高估(真人说话 85~255Hz 被报成 262~407)，但到不了 700。
+#: 极高音域的女高音可能超过 700，需要时用环境变量放宽。
 VOCAL_MIN_HZ = float(os.environ.get("NEEEVA_ASR_VOCAL_MIN_HZ", "75"))
-VOCAL_MAX_HZ = float(os.environ.get("NEEEVA_ASR_VOCAL_MAX_HZ", "1200"))
+VOCAL_MAX_HZ = float(os.environ.get("NEEEVA_ASR_VOCAL_MAX_HZ", "700"))
 
 
 def has_plausible_vocal_pitch(analysis: Optional[dict]):
@@ -280,6 +293,54 @@ def has_plausible_vocal_pitch(analysis: Optional[dict]):
     if median_hz <= 0.0:
         return False
     return VOCAL_MIN_HZ <= median_hz <= VOCAL_MAX_HZ
+
+
+def transcribe_singing_segment(
+    wav: np.ndarray,
+    analysis: Optional[dict],
+    full_text: str,
+    language: str,
+) -> str:
+    """只对裁出来的[唱歌开始, 唱歌结束]窗口再识别一次，返回这段的歌词。
+
+    回哼素材是裁过的，而 text 是整轮转写(含唱前唱后的说话)。把整轮的字铺到几秒
+    的旋律上，SVS 会按 acoustic_voiced_time 把它们硬塞进音符里——8/7 实测 67 个字
+    塞进 9.7s / 59 个音符，唱出来完全听不清。
+
+    只在真的裁掉了 0.45s 以上、且本轮确认是歌唱时才做。这两个条件成立时后面必然
+    要跑慢得多的歌声合成，多这一次识别的耗时可以忽略。
+    """
+    if not analysis or not bool(analysis.get("is_singing", False)):
+        return ""
+    total = wav.size / 16000.0
+    start = max(0.0, float(analysis.get("singing_start_seconds", 0.0) or 0.0))
+    end = float(analysis.get("singing_end_seconds", 0.0) or 0.0)
+    if end <= 0.0 or end > total:
+        end = total
+    if start + (total - end) < 0.45 or end - start < 1.2:
+        return ""
+
+    lo = max(0, int(start * 16000))
+    hi = min(int(wav.size), int(end * 16000))
+    if hi - lo < 16000:
+        return ""
+    t0 = time.time()
+    try:
+        res = generate_asr(wav[lo:hi], language)
+    except Exception as exc:  # 识别失败不能拖垮整轮，退回整轮转写即可
+        print(f"[SingingText] segment ASR failed: {exc}")
+        return ""
+    seg_text = parse_output(res[0]["text"] if res else "")[0]
+    # 字/秒是判断「歌词够不够铺满旋律」的直接指标。实测干净的一段唱在 1.6~1.8，
+    # 明显偏低时(<0.9) SVS 会把前半段唱完就没词了，后半段听起来就不像在唱词。
+    chars = len("".join(ch for ch in seg_text if not ch.isspace()))
+    density = chars / max(0.1, end - start)
+    print(
+        f"[SingingText] seg=[{start:.2f},{end:.2f}]s/{total:.2f}s "
+        f"dt={time.time() - t0:.2f}s chars={chars} density={density:.2f}/s "
+        f"full={full_text!r} seg={seg_text!r}"
+    )
+    return seg_text
 
 
 def is_tonal_vocal(analysis: Optional[dict], short_probe: bool = False):
@@ -518,6 +579,9 @@ def unknown_speaker_meta():
 #: 幻听残片的判定门槛。低于这个字数(去标点后)且情绪为 EMO_UNKNOWN 的陌生人语音
 #: 视为噪音。实测真实语音最短 6 字且一律带 NEUTRAL，噪音最长 5 字且一律 EMO_UNKNOWN。
 HALLUCINATION_MAX_CHARS = int(os.environ.get("NEEEVA_ASR_HALLUCINATION_MAX_CHARS", "5"))
+
+#: 打印每次 /vad 探测的判定细节。VAD 调用频率远高于 /asr，排查完建议置 0。
+LOG_VAD = os.environ.get("NEEEVA_LOG_VAD", "1") != "0"
 
 
 def _is_hallucinated_transcript(text: str, emotion: str, speaker_meta: dict) -> bool:
@@ -804,12 +868,38 @@ async def vad(
             if _singing_analyzer is not None
             else None
         )
+        # FSMN 的原始输出必须在被 override 改写之前留存。
+        # 上一版日志把救回后的 speech_ms 当成 FSMN 的判据打了出来，导致误读——
+        # 那个值是 duration_ms * voiced_ratio 重算的，和 FSMN 数出多少语音无关。
+        raw_is_speech = is_speech
+        raw_speech_ms = speech_ms
+        raw_segments = len(segments)
         singing_override = not is_speech and is_tonal_vocal(singing, short_probe=True)
         if singing_override:
             is_speech = True
             duration_ms = int(round(wav.size * 1000.0 / 16000.0))
             speech_ms = max(speech_ms, int(duration_ms * float(singing.get("voiced_ratio", 0.0))))
             segments = [[0, duration_ms]]
+
+        # 排查用：语音 VAD 到底认不认，以及为什么。
+        # raw_* 是 FSMN 的原始输出；override 之后的值另外打，两者不能混。
+        #
+        # 已知事实(别再重复验证)：
+        #   - is_singing 只在 `not is_speech` 时才可能为真，所以每个"正在倾听演唱"
+        #     都意味着 FSMN 拒绝了这段音频。
+        #   - 探测窗口不是原因：0.5s 改成 1.0s 之后误判反而从 6:2 变成 10:1，已撤回。
+        #   - 45 条 override 里 period 全部 >= 0.77、med 全部是 889Hz(FFT 谱峰伪影)，
+        #     而 short_probe 的门槛只要求 period >= 0.67——正常说话的周期性就在
+        #     0.77~0.90，这个维度根本分不开人声和噪音。
+        # 待查：FSMN 的 raw_speech_ms 到底是多少，以此判断是"听不到"还是别的原因。
+        # 排查完可用 NEEEVA_LOG_VAD=0 关掉。
+        if LOG_VAD:
+            print(
+                f"[VAD] dur={wav.size / 16000:.2f}s min_req={min_ms}ms "
+                f"fsmn(speech={raw_is_speech} ms={raw_speech_ms} segs={raw_segments}) "
+                f"override={singing_override} final(speech={is_speech} ms={speech_ms}) "
+                f"({describe_vocal_probe(singing)})"
+            )
         result = {
             "is_speech": is_speech,
             "speech_ms": speech_ms,
@@ -1032,6 +1122,10 @@ async def asr(
                 expected_analysis["singing_start_seconds"] = tail_offset + float(
                     expected_analysis.get("singing_start_seconds", 0.0)
                 )
+                if float(expected_analysis.get("singing_end_seconds", 0.0)) > 0.0:
+                    expected_analysis["singing_end_seconds"] = tail_offset + float(
+                        expected_analysis.get("singing_end_seconds", 0.0)
+                    )
                 expected_analysis["pitch_timeline_start_seconds"] = tail_offset + float(
                     expected_analysis.get("pitch_timeline_start_seconds", 0.0)
                 )
@@ -1072,6 +1166,7 @@ async def asr(
             "elapsed": round(dt + vad_dt + speaker_dt, 3),
         }
         result.update(singing_response_fields(singing))
+        result["singing_text"] = transcribe_singing_segment(wav, singing, text, language)
         result["audio_content_start_seconds"] = round(audio_content_start_seconds, 3)
         result["singing_expected"] = bool(expect_singing)
         result["singing_expected_override"] = bool(expected_singing_override)

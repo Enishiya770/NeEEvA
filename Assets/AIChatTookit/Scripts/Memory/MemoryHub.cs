@@ -76,6 +76,28 @@ namespace AIChat.Memory
         [Tooltip("打印每次写入操作")]
         [SerializeField] private bool m_LogMemoryWrites = true;
 
+        [Header("节点名解析 — 她是双语角色，名字是身份键")]
+        [Tooltip("节点名对不上时，先做归一化再找唯一近似匹配。\n" +
+                 "实测失败：她写了节点『用户昵称小优』，随后在日语语境里想连边，写成了" +
+                 "『ユーザー昵称小优』——反射性地把 用户 翻成了 ユーザー，于是" +
+                 "『连边失败(节点不存在)』，那个节点至今是库里唯一的孤儿。\n" +
+                 "库里的名字本来就是混的(用户喜欢的歌曲Lemon / ユーザーの歌声_短い即興)，" +
+                 "而 <memory_update/> 走的是同一条精确匹配——对不上会**静默新建一个孪生节点**，" +
+                 "比连边失败更糟。")]
+        [SerializeField] private bool m_EnableNodeNameResolve = true;
+        [Tooltip("同义名组，每行用 = 分隔，第一个是规范写法。归一化时组内互相等价。\n" +
+                 "**只放真正指同一实体的词**——合并很难撤销，宁可漏也别错。\n" +
+                 "刻意没放昵称(小优/小優)：拿真实库测过，放进去之后单独一个『小优』会解析到" +
+                 "核心节点『ユーザー』，那意味着 <memory_update name=\"小优\"/> 会静默改写她的" +
+                 "身份节点描述。而实测的失败用例(ユーザー昵称小优 → 用户昵称小优)只靠" +
+                 "用户↔ユーザー 就能解析，不需要昵称。\n" +
+                 "改动后建议复测：全库归一化不应产生任何两个节点撞到同一个键")]
+        [SerializeField] private string[] m_NodeNameAliases =
+        {
+            "用户=ユーザー=ユーザ=user",
+            "アントネーワ=安东尼亚=安托涅瓦=安東尼亞",
+        };
+
         [Header("权重衰减")]
         [Tooltip("启动时按距上次衰减的天数统一衰减一次。乘法衰减不改变相对排序,作用是让新记忆能压过久不提及的旧节点")]
         [SerializeField] private bool m_EnableDecay = true;
@@ -302,14 +324,19 @@ namespace AIChat.Memory
                 {
                     //写边。两端必须已存在——她不能凭空连到一个没写过的节点上，
                     //否则会造出只有边没有节点的悬挂引用。
-                    string a = Truncate(op.from, 48);
-                    string b = Truncate(op.to, 48);
-                    if (m_Store.GetNode(a) == null || m_Store.GetNode(b) == null)
+                    var nodeA = ResolveNode(Truncate(op.from, 48));
+                    var nodeB = ResolveNode(Truncate(op.to, 48));
+                    if (nodeA == null || nodeB == null)
                     {
                         if (m_LogMemoryWrites)
-                            Debug.LogWarning($"[Memory] 连边失败(节点不存在): {a} → {b}");
+                            Debug.LogWarning($"[Memory] 连边失败(节点不存在): " +
+                                             $"{Truncate(op.from, 48)} → {Truncate(op.to, 48)}" +
+                                             $"  [未解析: {(nodeA == null ? "from" : "")}{(nodeB == null ? " to" : "")}]");
                         continue;
                     }
+                    //用库里的规范名，不用她写的那版
+                    string a = nodeA.name;
+                    string b = nodeB.name;
                     float st = op.hasStrength ? Mathf.Clamp(op.strength, 0f, 1f) : m_DefaultLinkStrength;
                     bool added = m_Store.SetEdge(a, b, st);
                     dirty = true;
@@ -327,9 +354,12 @@ namespace AIChat.Memory
                 if (string.IsNullOrEmpty(name)) continue;
                 string desc = Truncate(op.desc, 160);
 
-                var existing = m_Store.GetNode(name);
+                //走解析器：<memory_update/> 的名字对不上时，原来会静默新建一个孪生节点。
+                //<memory_add/> 同理——她本来就把"同名再写=更新"写进了提示词。
+                var existing = ResolveNode(name);
                 if (existing != null)
                 {
+                    name = existing.name;   //后续激活/扩散都用规范名
                     if (!string.IsNullOrEmpty(desc)) existing.description = desc;
                     if (op.hasWeight) existing.weight = Mathf.Clamp01(op.weight);
                     existing.TouchActivated();
@@ -358,6 +388,77 @@ namespace AIChat.Memory
             }
 
             if (dirty) m_Store.Save();
+        }
+
+        /// <summary>
+        /// 把 LLM 写的节点名解析成库里**已存在**的节点。找不到返回 null。
+        ///
+        /// 三级：精确 → 归一化后精确 → 归一化后唯一匹配。有歧义(多个候选)时宁可返回 null
+        /// 也不猜——猜错会把两条不同的记忆合并，那比连边失败更难发现。
+        /// </summary>
+        private MemoryNode ResolveNode(string raw)
+        {
+            if (string.IsNullOrEmpty(raw) || m_Store == null) return null;
+            var exact = m_Store.GetNode(raw);
+            if (exact != null || !m_EnableNodeNameResolve) return exact;
+
+            string key = NormalizeNodeName(raw);
+            if (string.IsNullOrEmpty(key)) return null;
+
+            MemoryNode hit = null;
+            int count = 0;
+            foreach (var n in m_Store.Nodes)
+            {
+                if (n == null || string.IsNullOrEmpty(n.name)) continue;
+                if (NormalizeNodeName(n.name) != key) continue;
+                hit = n;
+                if (++count > 1) break;
+            }
+            if (count != 1)
+            {
+                if (count > 1 && m_LogMemoryWrites)
+                    Debug.LogWarning($"[Memory] 节点名『{raw}』归一化后匹配到多个，不猜");
+                return null;
+            }
+            if (m_LogMemoryWrites)
+                Debug.Log($"[Memory] 节点名解析: 『{raw}』→『{hit.name}』");
+            return hit;
+        }
+
+        /// <summary>
+        /// 归一化：去掉空白与连接符、ASCII 转小写、再把同义名组统一成组内第一个写法。
+        /// 别名替换按长度降序，避免 ユーザ 先命中导致 ユーザー 被切成两半。
+        /// </summary>
+        private string NormalizeNodeName(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return string.Empty;
+            var sb = new StringBuilder(s.Length);
+            foreach (char c in s)
+            {
+                if (char.IsWhiteSpace(c) || c == '_' || c == '-' || c == '－' ||
+                    c == '・' || c == '･' || c == '、') continue;
+                sb.Append(char.ToLowerInvariant(c));
+            }
+            string t = sb.ToString();
+            if (m_NodeNameAliases == null) return t;
+
+            foreach (var group in m_NodeNameAliases)
+            {
+                if (string.IsNullOrEmpty(group)) continue;
+                var parts = group.Split('=');
+                if (parts.Length < 2) continue;
+                string canonical = parts[0].Trim().ToLowerInvariant();
+                //长的先替换：ユーザー 必须在 ユーザ 之前处理
+                var alts = new List<string>();
+                for (int i = 1; i < parts.Length; i++)
+                {
+                    string p = parts[i].Trim().ToLowerInvariant();
+                    if (!string.IsNullOrEmpty(p)) alts.Add(p);
+                }
+                alts.Sort((x, y) => y.Length.CompareTo(x.Length));
+                foreach (var a in alts) t = t.Replace(a, canonical);
+            }
+            return t;
         }
 
         private static string Truncate(string s, int max)

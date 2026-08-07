@@ -9,6 +9,7 @@ starting; the deterministic NumPy fallback remains available.
 from __future__ import annotations
 
 import math
+import os
 import threading
 from typing import Dict, Iterable, List, Tuple
 
@@ -17,6 +18,10 @@ from singing_score import build_singing_score
 
 
 NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+# 排查「回哼从哪句开始/到哪句结束」时用。一次 thorough 分析只打一行，
+# 排查完可用 NEEEVA_LOG_ISLAND=0 关掉。
+_LOG_ISLAND = os.environ.get("NEEEVA_LOG_ISLAND", "1") != "0"
 
 
 def hz_to_midi(hz: np.ndarray) -> np.ndarray:
@@ -303,7 +308,7 @@ class SingingAnalyzer:
             hop_seconds,
             timeline_frame_seconds,
         )
-        singing_start_seconds = self._estimate_singing_start(
+        singing_start_seconds, singing_end_seconds = self._estimate_singing_start(
             smoothed,
             voiced,
             periodicity,
@@ -378,6 +383,7 @@ class SingingAnalyzer:
             # voice-converting a sing-along, while retaining a small breath/
             # attack pre-roll at the first sung phrase.
             "singing_start_seconds": round(singing_start_seconds, 3),
+            "singing_end_seconds": round(singing_end_seconds, 3),
             "pitch_timeline_start_seconds": round(timeline_start_seconds, 3),
             "note_sequence": note_sequence,
             "note_change_rate": round(note_change_rate, 3),
@@ -410,8 +416,12 @@ class SingingAnalyzer:
         periodicity: np.ndarray,
         hop_seconds: float,
         duration: float,
-    ) -> float:
-        """Locate the first sustained melodic region in a mixed utterance.
+    ) -> Tuple[float, float]:
+        """Locate the sustained melodic region in a mixed utterance.
+
+        Returns ``(start, end)`` in seconds.  ``(0.0, duration)`` is the
+        conservative fallback: failure to find a boundary must never cut away
+        real singing.
 
         A single clean spoken vowel can look tonal, so the detector scores
         overlapping 1.1 s windows and then chooses a long run of windows rather
@@ -420,13 +430,13 @@ class SingingAnalyzer:
         """
         count = min(smoothed_midi.size, voiced.size, periodicity.size)
         if count <= 0 or duration < 2.0:
-            return 0.0
+            return 0.0, float(duration)
 
         hop = max(float(hop_seconds), 1e-3)
         window = max(8, int(round(1.10 / hop)))
         stride = max(1, int(round(0.10 / hop)))
         if count < window:
-            return 0.0
+            return 0.0, float(duration)
 
         candidates: List[Tuple[int, float]] = []
         for start in range(0, count - window + 1, stride):
@@ -457,7 +467,7 @@ class SingingAnalyzer:
                 candidates.append((start, score))
 
         if not candidates:
-            return 0.0
+            return 0.0, float(duration)
 
         # Merge neighbouring melodic windows, tolerating consonants and short
         # breaths.  A spoken preface may create a tiny candidate island; the
@@ -488,7 +498,7 @@ class SingingAnalyzer:
             if (run[1] - run[0]) * hop >= 1.65 and run[3] >= 4
         ]
         if not viable:
-            return 0.0
+            return 0.0, float(duration)
 
         best = max(
             viable,
@@ -497,17 +507,95 @@ class SingingAnalyzer:
                 -run[0],
             ),
         )
+
+        # 一首歌里的换气会把同一段演唱切成好几座岛，只取一座就会丢掉半句。但「合格」
+        # (>=1.65s 且 >=4 个窗口) 挡不住说话——一句连贯的口语照样能凑出一座长岛。
+        # 8/7 的实测把这两件事分得很干净，靠的是分数而不是长度:
+        #     runs=[2.00-8.10/0.91* 8.10-11.20/0.87* 10.80-14.50/0.88* 14.60-17.40/0.71*]
+        # 前三座是同一段演唱，第四座是唱完接的说话。长度上第四座并不短(2.8s)，
+        # 分数上却差了 0.16。同一条日志里另一轮 best 甚至直接选中了说话那座
+        # (14.40-21.20/0.66，因为它最长)，把整段演唱丢在外面。
+        #
+        # 所以: 先按分数筛掉不像唱的岛，再以「分数最高」而不是「最长」的那座为锚
+        # 向两侧合并。下限取 0.78 与 top-0.10 的较大者(实测唱 0.86~0.91 / 说 0.66~0.72，
+        # 门槛落在两簇中间)；再与 top 取小，保证只有一座低分岛时不会把它也筛掉。
+        scores = [run[2] / max(1, run[3]) for run in viable]
+        top_score = max(scores)
+        keep_floor = min(top_score, max(0.78, top_score - 0.10))
+        kept = [
+            run for run, score in zip(viable, scores)
+            if score >= keep_floor - 1e-9
+        ]
+        # 锚只在「过了分数下限的岛」里挑，所以这里按长度挑就够了——分数负责筛掉
+        # 说话，长度负责在两段独立演唱之间选素材更多的那段。反过来(按分数挑锚)会
+        # 在两段质量相当时随机选中较短的一段。
+        anchor = max(kept, key=lambda run: (run[1] - run[0], run[2] / max(1, run[3])))
+
+        bridge_frames = max(max_gap_frames, int(round(1.20 / hop)))
+        span_start, span_end = anchor[0], anchor[1]
+        merged = True
+        while merged:
+            merged = False
+            for run in kept:
+                if run[0] < span_start and span_start - run[1] <= bridge_frames:
+                    span_start = run[0]
+                    merged = True
+                if run[1] > span_end and run[0] - span_end <= bridge_frames:
+                    span_end = run[1]
+                    merged = True
+
         # The first qualifying 1.1 s window normally straddles the transition
         # from speech into song. Its midpoint is a better onset estimate than
         # its leading edge; then retain 220 ms for breath and note attack.
-        start_frame = best[0] + window // 2
+        start_frame = span_start + window // 2
         start_seconds = max(0.0, start_frame * hop - 0.22)
+
+        # 结束位置对称处理：最后一个合格窗口同样横跨"唱→说"的过渡，取它的中点比取
+        # 尾缘更准，再留 220ms 给收音尾巴。span_end 一直都算出来了，只是以前没返回——
+        # 于是"唱完之后接的那段说话"被整段留在回哼素材里，实测被当成歌词唱了回去。
+        end_frame = max(start_frame, span_end - window // 2)
+        end_seconds = min(duration, end_frame * hop + 0.22)
 
         # Tiny trims are inaudible and risk shaving the opening note of an
         # already-pure singing clip.
         if start_seconds < 0.45 or duration - start_seconds < 1.2:
-            return 0.0
-        return float(start_seconds)
+            start_seconds = 0.0
+        # 尾部同理：裁不到 0.45s 就别裁，免得削掉最后一个音的收尾
+        if duration - end_seconds < 0.45 or end_seconds - start_seconds < 1.2:
+            end_seconds = duration
+
+        # 只在真的裁掉了东西时打印——流式模式每轮会调用本函数十几次，无条件打印会淹掉日志。
+        if _LOG_ISLAND and (start_seconds > 0.0 or end_seconds < duration):
+            print(
+                "[Island] dur={:.2f}s cand={} viable={}/{} floor={:.2f} runs=[{}] "
+                "anchor=({:.2f},{:.2f}) oldBest=({:.2f},{:.2f}) "
+                "span=({:.2f},{:.2f}) -> ({:.2f},{:.2f})".format(
+                    duration,
+                    len(candidates),
+                    len(viable),
+                    len(runs),
+                    keep_floor,
+                    " ".join(
+                        # * = 合格(长度/窗口数)，+ = 通过分数下限、参与合并
+                        "{:.2f}-{:.2f}/{:.2f}{}".format(
+                            r[0] * hop,
+                            r[1] * hop,
+                            r[2] / max(1, r[3]),
+                            ("+" if r in kept else "*") if r in viable else "",
+                        )
+                        for r in runs
+                    ),
+                    anchor[0] * hop,
+                    anchor[1] * hop,
+                    best[0] * hop,
+                    best[1] * hop,
+                    span_start * hop,
+                    span_end * hop,
+                    start_seconds,
+                    end_seconds,
+                )
+            )
+        return float(start_seconds), float(end_seconds)
 
     def _build_contour(
         self, smoothed_midi: np.ndarray, voiced: np.ndarray, hop_seconds: float
@@ -602,6 +690,7 @@ class SingingAnalyzer:
             "pitch_timeline_midi": [],
             "pitch_timeline_frame_seconds": 0.10,
             "singing_start_seconds": 0.0,
+            "singing_end_seconds": 0.0,
             "pitch_timeline_start_seconds": 0.0,
             "note_sequence": "",
             "note_change_rate": 0.0,

@@ -256,6 +256,10 @@ MonoBehaviour:
   m_DefaultAddWeight: 0.6
   m_DefaultLinkStrength: 0.6
   m_LogMemoryWrites: 1
+  m_EnableNodeNameResolve: 1
+  m_NodeNameAliases:
+  - "\u7528\u6237=\u30E6\u30FC\u30B6\u30FC=\u30E6\u30FC\u30B6=user"
+  - "\u30A2\u30F3\u30C8\u30CD\u30FC\u30EF=\u5B89\u6258\u6D85\u74E6"
   m_EnableDecay: 1
   m_DecayHalfLifeDays: 180
   m_DecayFloor: 0.15
@@ -1642,7 +1646,7 @@ MonoBehaviour:
   m_VerboseLog: 0
   m_VadMinSpeechMs: 160
   m_InjectSpeakerPrefix: 1
-  m_AutoBindIntroducedName: 1
+  m_AutoBindIntroducedName: 0
   m_EnableSingingAnalysis: 1
   m_SingingAudioRetentionSeconds: 180
 --- !u!1 &515554062
@@ -5091,7 +5095,7 @@ MonoBehaviour:
   m_EnableSpeculativeListening: 1
   m_ShowStreamingTranscript: 1
   m_SpeculativeDebounceSeconds: 0.55
-  m_SpeculativeMinRequestInterval: 1.4
+  m_SpeculativeMinRequestInterval: 4
   m_SpeculativeMinTranscriptChars: 4
   m_SpeculativeReuseSimilarity: 0.72
   m_LogSpeculativeListening: 1

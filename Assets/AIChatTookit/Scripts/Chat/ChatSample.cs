@@ -449,8 +449,20 @@ public class ChatSample : MonoBehaviour
     [SerializeField] private bool m_ShowStreamingTranscript = true;
     [Tooltip("收到新 partial 后等待多久再请求一次临时草稿，避免每个字都调用 LLM。")]
     [Range(0.2f, 1.5f)] [SerializeField] private float m_SpeculativeDebounceSeconds = 0.55f;
-    [Tooltip("两次临时草稿请求的最小间隔。正式回复会抢占并撤销临时请求。")]
-    [Range(0.8f, 4f)] [SerializeField] private float m_SpeculativeMinRequestInterval = 1.4f;
+    [Tooltip("两次临时草稿请求的最小间隔。正式回复会抢占并撤销临时请求。\n" +
+             "**这个值直接决定首 token 的慢尾巴。** 草稿是占 KV slot 的 LLM 请求，而 " +
+             "--parallel 2 只有两个 slot，三路流(主对话/说话草稿/唱歌草稿)挤在一起；" +
+             "某一路的前缀被踢掉时就掉进 LRU，实测 LRU 请求重算中位 9618 token、" +
+             "而前缀命中的只有 523——差 18 倍，一场里 21 次首 token 中 >3s 的 4 次" +
+             "全部且仅仅是 LRU。\n" +
+             "1.4 时实测一段 15 秒长句发了 8 次草稿(ASR 每修订一次就重发一次)，" +
+             "而全场 24 次草稿只有 5 次真被复用——命中率 18.5%。\n" +
+             "拿真实草稿时间点模拟不同间隔: 1.4→22次(最多7次/轮), 2.0→18, 3.0→16, " +
+             "4.0→15(最多3次/轮), 5.0→15。**4.0 之后收益就平了**，因为多数轮次本来" +
+             "只有 1-2 次草稿，只有长句在密集重发。\n" +
+             "注意不要按 confidence 设门槛：实测 0.90 的被放弃过三次、0.80 的进了" +
+             "全部复用的那轮——放弃与否取决于用户后来说的话，是草稿生成时无法预知的。")]
+    [Range(0.8f, 6f)] [SerializeField] private float m_SpeculativeMinRequestInterval = 4.0f;
     [Range(2, 20)] [SerializeField] private int m_SpeculativeMinTranscriptChars = 4;
     [Tooltip("最终转写与 partial 的编辑相似度低于此值时，丢弃临时草稿并正常重想。")]
     [Range(0.4f, 1f)] [SerializeField] private float m_SpeculativeReuseSimilarity = 0.72f;
@@ -463,6 +475,15 @@ public class ChatSample : MonoBehaviour
     [Range(0.5f, 2.5f)] [SerializeField] private float m_SingingSpeculativeDebounceSeconds = 0.9f;
     [Tooltip("两次歌唱内部反应请求的最小间隔，避免歌词回滚时频繁请求。")]
     [Range(1.2f, 6f)] [SerializeField] private float m_SingingSpeculativeMinRequestInterval = 2.4f;
+    [Tooltip("歌唱模式的声学退出：singing 概率连续低于此值这么多帧就退出。\n" +
+             "不依赖 LLM、零额外请求，是 <歌唱→说话> 唯一不花钱的退出通道。\n" +
+             "取值来自实测的一轮「说话→哼唱→说话」: 哼唱段(v31~v39) singing 最低 0.48，" +
+             "回到说话后(v40~v47) 最高 0.52——**两者有重叠**，所以单帧判不了，必须连续帧。\n" +
+             "同一序列上: 0.40/3帧 在 21.2s 退出(哼唱约 17s 结束)且哼唱段不误退；" +
+             "0.45/3帧 退出时刻相同但离哼唱段最低值只剩 0.03 余量，换首歌就可能误伤；" +
+             "0.30/3帧 则完全不退出。0.40 留了 0.08 余量。")]
+    [Range(0.1f, 0.6f)] [SerializeField] private float m_SingingExitProbability = 0.40f;
+    [Range(2, 8)] [SerializeField] private int m_SingingExitFrames = 3;
     [Tooltip("只有达到此置信度的安全短开场才会被静默预合成。")]
     [Range(0.4f, 0.95f)] [SerializeField] private float m_SingingBridgeMinConfidence = 0.62f;
     [Tooltip("预合成开场的最大字符数；过长候选会放弃，避免抢占正式回答。")]
@@ -499,6 +520,13 @@ public class ChatSample : MonoBehaviour
     private int m_StreamingLatestAudioMs = 0;
     private int m_StreamingSingingCandidateStartAudioMs = -1;
     private int m_StreamingSingingOnsetAudioMs = -1;
+    //最近一次草稿给出的 observed_mode 判定，独立于 m_SpeculativeDraft 保存。
+    //每帧重新评估、不粘——"说一半再哼唱"要靠这个：前半段判 speech 退出歌唱模式，
+    //后半段声学证据出现时仍能切回去。粘住就会把后半段的哼唱彻底忽略。
+    private string m_LastObservedMode = "";
+    private float m_LastObservedModeConfidence = 0f;
+    private string m_LastObservedModeTranscript = "";
+    private int m_StreamingSingingLowFrames = 0;
     private bool m_StreamingSingingExitDetected = false;
     private string m_StreamingSingingEvidence = "";
     private float m_LastSingingSpeculativeRequestTime = -999f;
@@ -743,6 +771,63 @@ public class ChatSample : MonoBehaviour
                           $"mode={(expectedStableSingingEvidence && !normalStableSingingEvidence ? "expected-relaxed" : "normal")}");
         }
         bool singing = m_StreamingTurnIsSinging || stableSingingEvidence;
+
+        //★ 声学退出：唱完之后回到说话，singing 概率会持续掉下来。
+        //  实测「说话→哼唱→说话」那一轮，声学侧其实**察觉到了**——概率从 0.66 掉到 0.12，
+        //  但 m_StreamingTurnIsSinging 是粘的、声学侧只有进入逻辑没有退出逻辑，
+        //  于是后半段的自然说话被当成歌词复读了出来(用户原话:"你把那段自然说话也复读出来了")。
+        //  这条通道不依赖 LLM、零额外请求，是歌唱→说话唯一不花钱的退出方式。
+        if (m_StreamingTurnIsSinging)
+        {
+            if (transcript.SingingProbability < m_SingingExitProbability) m_StreamingSingingLowFrames++;
+            else m_StreamingSingingLowFrames = 0;
+
+            if (m_StreamingSingingLowFrames >= m_SingingExitFrames)
+            {
+                if (m_LogSpeculativeListening)
+                    Debug.Log($"[歌唱流式倾听] 声学退出：singing 连续 {m_StreamingSingingLowFrames} 帧 " +
+                              $"低于 {m_SingingExitProbability:F2}(当前 {transcript.SingingProbability:F2}, " +
+                              $"pitch {transcript.PitchStability:F2})，退出歌唱模式");
+                m_StreamingTurnIsSinging = false;
+                m_StreamingSingingOnsetAudioMs = -1;
+                m_StreamingSingingConsecutiveFrames = 0;
+                m_StreamingSingingCandidateStartAudioMs = -1;
+                m_StreamingSingingLowFrames = 0;
+                singing = false;
+            }
+        }
+        else m_StreamingSingingLowFrames = 0;
+
+        //★ 她自己判定"这是说话"时退出歌唱模式。每帧重新评估，**不粘**——
+        //  "说一半再哼唱"就靠这个：前半段被判 speech 退出，后半段声学证据出现时
+        //  stableSingingEvidence 会重新为真、再切回去。粘住会把后半段的哼唱彻底忽略。
+        //  起唱锚点(m_StreamingSingingCandidateStartAudioMs)本来就是为这个场景设计的，
+        //  它记的是"哼唱从第几毫秒开始"，退出时归零、切回时重新定位。
+        if (singing && HasStrongSpeechModeJudgment())
+        {
+            //日志不能门控在 m_StreamingTurnIsSinging 上——它是在
+            //UpdateStreamingSingingReaction **内部**才置 true 的，而这段检查在调用它之前，
+            //所以拦在"切进去之前"的那些命中会一条都打不出来(实测 0 次，只能靠
+            //"起唱锚点打印了两次"反推出它其实生效了)。改成无条件打印，并区分两种情形。
+            if (m_LogSpeculativeListening)
+            {
+                float sim = (!string.IsNullOrWhiteSpace(m_LastObservedModeTranscript) &&
+                             !string.IsNullOrWhiteSpace(m_StreamingTranscript))
+                    ? TranscriptContinuity(m_LastObservedModeTranscript, m_StreamingTranscript)
+                    : -1f;
+                Debug.Log($"[歌唱流式倾听] 她判定这是说话({m_LastObservedMode}/" +
+                          $"{m_LastObservedModeConfidence:F2}, 门槛 {m_SpeculativeSpeechVetoConfidence:F2})，" +
+                          $"{(m_StreamingTurnIsSinging ? "退出已进入的歌唱模式" : "拦在切进歌唱之前")} " +
+                          $"(声学: singing={transcript.SingingProbability:F2} " +
+                          $"pitch={transcript.PitchStability:F2}; 转写相似度={sim:F2}; " +
+                          $"判定源=\"{TruncateForFrame(m_LastObservedModeTranscript, 24)}\")");
+            }
+            m_StreamingTurnIsSinging = false;
+            m_StreamingSingingOnsetAudioMs = -1;
+            m_StreamingSingingConsecutiveFrames = 0;
+            m_StreamingSingingCandidateStartAudioMs = -1;
+            singing = false;
+        }
         if (singing)
         {
             UpdateStreamingSingingReaction(transcript);
@@ -907,6 +992,12 @@ public class ChatSample : MonoBehaviour
                 parsed.sourceTranscript = transcript;
                 parsed.draft = StripAgentTagsForTTS(parsed.draft).Trim();
                 m_SpeculativeDraft = parsed;
+                //mode 判定单独留一份：切进歌唱模式时 m_SpeculativeDraft 会被清掉
+                //(UpdateStreamingSingingReaction 开头的 CancelSpeculativeRequestOnly)，
+                //而正是那之后才需要靠它把误判的歌唱模式退出来。
+                m_LastObservedMode = parsed.observed_mode;
+                m_LastObservedModeConfidence = Mathf.Clamp01(parsed.mode_confidence);
+                m_LastObservedModeTranscript = transcript;
                 if (m_LogSpeculativeListening)
                     Debug.Log($"[流式倾听] 临时草稿就绪 confidence={parsed.confidence:F2} " +
                               $"mode={parsed.observed_mode}/{parsed.mode_confidence:F2}: \"{parsed.draft}\"");
@@ -928,9 +1019,15 @@ public class ChatSample : MonoBehaviour
         if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
         m_SpeculativeDraftCoroutine = null;
 
-        if (!m_StreamingTurnIsSinging || transcriptVersion != m_StreamingTranscriptVersion ||
-            evidence != m_StreamingSingingEvidence || m_SpeculativeRequestInFlight)
-            yield break;
+        //★ 不能拿排队时捕获的 version/evidence 去比对——它们**每帧都变**
+        //  (m_StreamingTranscriptVersion++ 每帧自增，evidence 里带着实时概率)，
+        //  而帧间隔约 890ms、debounce 900ms，协程一醒来就必然"过期"→ 直接 bail。
+        //  实测后果：一段 14 秒的哼唱里歌唱草稿发出 **0 次**，唯一那次 mode 判定
+        //  来自切进歌唱之前的说话草稿。而模式判定正是靠它刷新的，退出机制因此完全没有输入。
+        //  改成醒来后用当下最新的 evidence 重新取值。
+        if (!m_StreamingTurnIsSinging || m_SpeculativeRequestInFlight) yield break;
+        evidence = m_StreamingSingingEvidence;
+        if (string.IsNullOrEmpty(evidence)) yield break;
         if (evidence == m_LastDraftTranscript) yield break;
 
         m_LastDraftTranscript = evidence;
@@ -967,6 +1064,11 @@ public class ChatSample : MonoBehaviour
             {
                 parsed.observed_mode = NormalizeObservedMode(parsed.observed_mode);
                 parsed.sourceTranscript = m_StreamingTranscript;
+                //歌唱草稿也要刷新这份判定，否则切进歌唱模式之后就没有新判定了——
+                //退出将只能依赖切换之前的旧值，那等于只有一次机会。
+                m_LastObservedMode = parsed.observed_mode;
+                m_LastObservedModeConfidence = Mathf.Clamp01(parsed.mode_confidence);
+                m_LastObservedModeTranscript = m_StreamingTranscript;
                 parsed.sourceEvidence = evidence;
                 parsed.sourceSingingProbability = m_StreamingSingingProbability;
                 parsed.sourcePitchStability = m_StreamingPitchStability;
@@ -1081,6 +1183,29 @@ public class ChatSample : MonoBehaviour
         if (!string.IsNullOrWhiteSpace(draft.sourceTranscript) &&
             !string.IsNullOrWhiteSpace(m_StreamingTranscript) &&
             TranscriptContinuity(draft.sourceTranscript, m_StreamingTranscript) < 0.55f)
+            return false;
+        return true;
+    }
+
+    /// <summary>
+    /// 她自己(而不是声学指标)认定"这是在说话"。用来把误判的流式歌唱模式退出来。
+    ///
+    /// 为什么交给她：声学侧的门槛是 SingingProbability >= 0.54 + 连续 2 帧，而实测正常说话
+    /// 稳定落在 0.58~0.64，稳稳骑在门槛上方；一旦切进去 m_StreamingTurnIsSinging 还会粘住
+    /// 整轮——实测一句"对的，你居然在看我的副屏幕啊"被锁在歌唱监听里 14 秒。
+    /// 而同一场里她的 mode 判定 7/7 全对(0.80~0.95)，且在声学切换之前 34 行就给出了
+    /// speech/0.95。判定一直存在，只是没接到这里。
+    ///
+    /// 用 m_LastObservedMode 而不是 m_SpeculativeDraft：后者在切进歌唱时就被清空了。
+    /// 转写相似度那道校验保留——判定必须还对得上当前听到的内容。
+    /// </summary>
+    private bool HasStrongSpeechModeJudgment()
+    {
+        if (NormalizeObservedMode(m_LastObservedMode) != "speech") return false;
+        if (m_LastObservedModeConfidence < m_SpeculativeSpeechVetoConfidence) return false;
+        if (!string.IsNullOrWhiteSpace(m_LastObservedModeTranscript) &&
+            !string.IsNullOrWhiteSpace(m_StreamingTranscript) &&
+            TranscriptContinuity(m_LastObservedModeTranscript, m_StreamingTranscript) < 0.55f)
             return false;
         return true;
     }
@@ -1403,6 +1528,10 @@ public class ChatSample : MonoBehaviour
         m_StreamingLatestAudioMs = 0;
         m_StreamingSingingCandidateStartAudioMs = -1;
         m_StreamingSingingOnsetAudioMs = -1;
+        m_LastObservedMode = "";
+        m_LastObservedModeConfidence = 0f;
+        m_LastObservedModeTranscript = "";
+        m_StreamingSingingLowFrames = 0;
         m_StreamingSingingExitDetected = false;
     }
 
@@ -2501,6 +2630,7 @@ public class ChatSample : MonoBehaviour
         AgentSongSearchRequest songSearch = ExtractSongSearchTag(ref cleanFull);
         AgentSongSingRequest songSing = ExtractSongSingTag(ref cleanFull);
         AgentHumBackRequest humBack = ExtractHumBackTag(ref cleanFull);
+        ApplySpeakerNameTag(ExtractSpeakerNameTag(ref cleanFull));
         if (ShouldDiscardSongSingToolForCurrentTurn(songSing))
         {
             if (m_LogHumBack)
@@ -5058,6 +5188,66 @@ public class ChatSample : MonoBehaviour
         new System.Text.RegularExpressions.Regex(
             @"<song_search\b(?<attrs>[^>]*)>",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    //<speaker_name name="小悠"/> —— 给"刚说话的这个人"改声纹档案里的显示名。
+    //
+    //为什么交给她：工程层原来用正则从"我叫X/叫我X"里抓名字，而正则不知道语气词——
+    //用户说"就叫我小优吧。"，抓到的是「小优吧」。她看得懂，同一句话她在 <note/> 里
+    //写的是"自分の名前を小優と教えてくれた"，已经正确剥掉了「吧」，只是没有渠道
+    //把这个判断写回声纹库。
+    //
+    //不带 speaker_id 是刻意的：那样她得从元数据里抄 guest_9028f80491 这种串，而实测
+    //她连节点名都会写错(ユーザー昵称小优 vs 用户昵称小优)，少一个易错参数。
+    private static readonly System.Text.RegularExpressions.Regex s_SpeakerNameTagRegex =
+        new System.Text.RegularExpressions.Regex(
+            @"<speaker_name\b(?<attrs>[^>]*)>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private string ExtractSpeakerNameTag(ref string text)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        var match = s_SpeakerNameTagRegex.Match(text);
+        if (!match.Success) return null;
+        string name = ReadToolAttribute(match.Groups["attrs"].Value, "name");
+        text = s_SpeakerNameTagRegex.Replace(text, "").Trim();
+        return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+    }
+
+    /// <summary>
+    /// 把她给出的名字写回声纹档案。目标固定是"最近一次识别出的说话人"。
+    /// </summary>
+    private void ApplySpeakerNameTag(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+        var senseVoice = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+            : null;
+        if (senseVoice == null) return;
+
+        //先用本轮的；本轮没认出人(噪音轮次会返回 unknown)就回退到最近一次认出的那个。
+        //她经常隔一轮才反应过来要改名——实测 5 次调用里有 2 次卡在这，而且两次都是纠错。
+        string id = senseVoice.LastSpeakerId;
+        string via = "本轮";
+        if (string.IsNullOrEmpty(id) || id == "unknown" || id == "ai_self")
+        {
+            id = senseVoice.LastKnownSpeakerId;
+            via = "回退到最近识别";
+        }
+        if (string.IsNullOrEmpty(id) || id == "unknown")
+        {
+            Debug.LogWarning($"[Speaker] <speaker_name name=\"{name}\"/> 被忽略：当前没有可指认的说话人");
+            return;
+        }
+        //AI 自己的档案不能被改——那是回声识别的锚点
+        if (id == "ai_self")
+        {
+            Debug.LogWarning("[Speaker] <speaker_name/> 被忽略：不能改 ai_self 的档案");
+            return;
+        }
+        Debug.Log($"[Speaker] <speaker_name/>({via}): {id} → 「{name}」" +
+                  $"(原「{senseVoice.LastKnownSpeakerName}」)");
+        senseVoice.RenameSpeaker(id, name, null);
+    }
 
     private AgentSongSearchRequest ExtractSongSearchTag(ref string text)
     {
@@ -7847,14 +8037,14 @@ public class ChatSample : MonoBehaviour
     //  并落库了，漏的只是这份"朗读过滤"清单。memory_link 当时也漏在外面，只是碰巧没撞上。
     private static readonly System.Text.RegularExpressions.Regex s_AllAgentTagsRegex =
         new System.Text.RegularExpressions.Regex(
-            @"<(?:next|continue|silent|noop|look|unlook|memory_add|memory_update|memory_link|note|song_search|song_remember|song_rename|song_forget|song_sing|hum_back)\b[^>]*>",
+            @"<(?:next|continue|silent|noop|look|unlook|memory_add|memory_update|memory_link|note|speaker_name|song_search|song_remember|song_rename|song_forget|song_sing|hum_back)\b[^>]*>",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     //用于流式阶段识别“尚未闭合”的标签。必须与 s_AllAgentTagsRegex 的名称集合保持一致。
     private static readonly string[] s_AgentTagStarts =
     {
         "<next", "<continue", "<silent", "<noop", "<look", "<unlook",
-        "<memory_add", "<memory_update", "<memory_link", "<note",
+        "<memory_add", "<memory_update", "<memory_link", "<note", "<speaker_name",
         "<song_search", "<song_remember",
         "<song_rename", "<song_forget", "<song_sing", "<hum_back"
     };
