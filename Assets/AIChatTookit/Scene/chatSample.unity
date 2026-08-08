@@ -5102,6 +5102,8 @@ MonoBehaviour:
   m_EnableSingingSpeculativeReaction: 1
   m_SingingSpeculativeDebounceSeconds: 0.9
   m_SingingSpeculativeMinRequestInterval: 2.4
+  m_SingingExitProbability: 0.4
+  m_SingingExitFrames: 3
   m_SingingBridgeMinConfidence: 0.62
   m_SingingBridgeMaxChars: 28
   m_EnableSpeechBridge: 1

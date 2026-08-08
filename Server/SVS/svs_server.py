@@ -531,7 +531,14 @@ def _run_alignment_job(job: dict) -> dict:
 def _acoustic_alignment(
     target_path: Path, language: str, request_id: str
 ) -> tuple[dict | None, str]:
-    if language not in {"Mandarin", "Cantonese"}:
+    # 日语没有自己的对齐模型，但这里要的只是「音节切在哪」，不是「唱的是什么字」。
+    # 8/8 实测中文对齐器跑日文演唱切出的是正确音节：
+    #   阿@12.11 纳@12.83 塔@13.23 嘎@13.57 依@14.31 列@15.03 巴@15.47
+    #   = あなたが / いれば，中位 0.52s/音节
+    # 字全错，时间是对的。字由 SenseVoice 的假名提供，两者在
+    # _acoustic_target_metadata 里用 _sequence_index_mapping 按编辑距离对上。
+    worker_language = "Mandarin" if language == "JapaneseAdapter" else language
+    if worker_language not in {"Mandarin", "Cantonese"}:
         return None, "unsupported-language"
     digest = hashlib.sha256()
     digest.update(b"acoustic-lyrics-v2-segmented")
@@ -554,7 +561,9 @@ def _acoustic_alignment(
         {
             "job_id": f"align-{request_id}",
             "audio": str(target_path),
-            "language": language,
+            # 缓存键用原 language，作业用 worker_language：日语与中文的结果
+            # 内容相同但不共用缓存条目，免得将来改了映射规则互相串味。
+            "language": worker_language,
         }
     )
     alignment = {
@@ -812,7 +821,10 @@ def _run_japanese_via_kana(
         max_seconds,
         inference_steps,
         backend_name="soulx-kana-adapter",
-        use_acoustic_alignment=False,
+        # 打开声学对齐：不开时假名按「总发声时长等分」分配，实测中位错位 1.00s、
+        # ±0.25s 命中率 7%，歌词完全听不懂。等分之外试过的两种替代(按起音强度挑
+        # 音符 0.57s、按音高重记谱 0.46s)都远不够，只有真实时间戳能救。
+        use_acoustic_alignment=True,
     )
     metadata["backend"] = "soulx-kana-adapter"
     metadata["target_language"] = "Japanese (kana mora → SoulX phones)"

@@ -122,6 +122,12 @@ public class SenseVoiceSpeechToText : STT
     //服务端对裁出来那段单独识别得到的歌词。整轮转写含唱前唱后的说话，
     //拿它当歌词会被 SVS 硬塞进几秒的旋律里，唱出来听不清。
     private string m_LastResponseSingingText = "";
+    //与上面那段歌词配套的语言/假名，必须整组一起用，不能和整轮的混着。
+    private string m_LastResponseSingingLanguage = "";
+    private string m_LastResponseSingingReading = "";
+    private string m_LastResponseSingingReadingSource = "";
+    private bool m_LastResponseSingingReadingComplete = false;
+    private string[] m_LastResponseSingingMora = null;
     private float m_LastSingingAudioTime = -999f;
     private float m_LastSingingPerformanceTime = -999f;
     private float[] m_LastSingingPerformanceMidi = new float[0];
@@ -740,6 +746,13 @@ public class SenseVoiceSpeechToText : STT
                     LastSingingSummary = _response.singing_summary ?? "";
                     LastSingingScore = _response.singing_score;
                     m_LastResponseSingingText = _response.singing_text ?? "";
+                    m_LastResponseSingingLanguage = _response.singing_language ?? "";
+                    m_LastResponseSingingReading = _response.singing_lyrics_reading ?? "";
+                    m_LastResponseSingingReadingSource =
+                        _response.singing_lyrics_reading_source ?? "";
+                    m_LastResponseSingingReadingComplete =
+                        _response.singing_lyrics_reading_complete;
+                    m_LastResponseSingingMora = _response.singing_lyrics_mora;
                     LastPitchTimelineMidi = _response.pitch_timeline_midi != null &&
                         _response.pitch_timeline_midi.Length > 0
                         ? _response.pitch_timeline_midi
@@ -769,7 +782,8 @@ public class SenseVoiceSpeechToText : STT
                         audioCropSeconds = Mathf.Min(
                             acousticAudioCropSeconds, protectedStreamingCropSeconds);
                     }
-                    else if (expectSinging && LastIsSinging)
+                    bool conservativeHeadKeep = false;
+                    if (!hasUsableStreamingOnset && expectSinging && LastIsSinging)
                     {
                         // An expected sing-along is allowed to be conservative.  The offline
                         // longest-island detector can jump to the second phrase when streaming
@@ -778,7 +792,19 @@ public class SenseVoiceSpeechToText : STT
                         // is safer than silently deleting a real opening; a short breath or
                         // spoken lead-in is an acceptable trade-off.
                         audioCropSeconds = 0f;
+                        conservativeHeadKeep = true;
                     }
+
+                    // 歌词与音频必须描述同一段。分段歌词取自岛窗口，而上面这两条分支
+                    // 会把头部裁剪压低甚至归零——8/8 实测岛是 [7.63,13.84]，头部却按
+                    // 流式保护裁到 0.15s，于是 13 个假名被摊到 13.69s 的音频上，其中
+                    // 前 7.5s 根本不是歌声，听起来完全不像在唱词。
+                    // 岛检测这周已修过两轮(换气合并 + 分数下限)，比流式起点可信，
+                    // 所以用分段歌词时一律以岛为准。
+                    bool alignCropToIsland =
+                        !string.IsNullOrWhiteSpace(_response.singing_text) &&
+                        acousticAudioCropSeconds > audioCropSeconds + 0.05f;
+                    if (alignCropToIsland) audioCropSeconds = acousticAudioCropSeconds;
                     float croppedContentSeconds = Mathf.Max(
                         0f, audioCropSeconds - _response.audio_content_start_seconds);
                     float timelineCropSeconds = Mathf.Max(
@@ -828,6 +854,21 @@ public class SenseVoiceSpeechToText : STT
                                   $"contentStart={_response.audio_content_start_seconds:F2}s " +
                                   $"applied={audioEndSeconds:F2}s " +
                                   $"timeline={timelineEndSeconds:F2}s");
+                        // 岛占内容的比例。保守分支(流式没确认起唱点时放弃头部裁剪)防的是
+                        // 「岛跳到第二句」——那种失效会表现为比例很小。本例 68% 却也被放弃了，
+                        // 所以先量分布再定阈值，别拍脑袋。
+                        float contentSeconds = _response.pitch_timeline_start_seconds +
+                            LastPitchTimelineMidi.Length * LastPitchTimelineFrameSeconds;
+                        float islandEnd = _response.singing_end_seconds > 0f
+                            ? _response.singing_end_seconds : contentSeconds;
+                        float islandSeconds = Mathf.Max(
+                            0f, islandEnd - _response.singing_start_seconds);
+                        Debug.Log($"[SenseVoice/Singing] island 占比 " +
+                                  $"{(contentSeconds > 0.01f ? islandSeconds / contentSeconds : 0f):P0} " +
+                                  $"({islandSeconds:F2}s / 内容 {contentSeconds:F2}s) " +
+                                  $"起点={_response.singing_start_seconds:F2}s " +
+                                  $"保守放弃头部裁剪={conservativeHeadKeep} " +
+                                  $"为对齐歌词改按岛裁={alignCropToIsland}");
                     }
 
                     bool hasPlayablePitch = HasPlayablePitchTimeline(LastPitchTimelineMidi);
@@ -1176,7 +1217,13 @@ public class SenseVoiceSpeechToText : STT
             scoreEndSeconds = 0f;
         }
         m_LastSingingPerformanceFrameSeconds = LastPitchTimelineFrameSeconds;
-        m_LastSingingPerformanceLanguage = LastLanguage ?? "";
+        //语言必须跟着歌词走：整轮可能判 zh，而唱的那一段是日文。8/8 实测标签用了
+        //整轮的 zh，9883 拿中文 G2P 撞上假名，整份乐谱被弃用退化成 backend-transcription，
+        //旋律对而歌词全是它自己瞎猜的。
+        m_LastSingingPerformanceLanguage = usedSegmentLyrics &&
+            !string.IsNullOrWhiteSpace(m_LastResponseSingingLanguage)
+            ? m_LastResponseSingingLanguage
+            : (LastLanguage ?? "");
         m_LastSingingPerformanceScore =
             CropSingingScore(LastSingingScore, scoreCropSeconds, scoreEndSeconds);
         //乐谱自带一份 lyrics，裁剪不会动它。9883 走 acoustic_voiced_time 对齐，
@@ -1185,11 +1232,15 @@ public class SenseVoiceSpeechToText : STT
         {
             m_LastSingingPerformanceScore.lyrics = m_LastSingingLyrics;
             m_LastSingingPerformanceScore.lyrics_alignment = "singing-segment-asr";
-            //假名/摩拉是从整轮文本推出来的，换词后必须让 9883 重新生成
-            m_LastSingingPerformanceScore.lyrics_reading = "";
-            m_LastSingingPerformanceScore.lyrics_reading_source = "";
-            m_LastSingingPerformanceScore.lyrics_reading_complete = false;
-            m_LastSingingPerformanceScore.lyrics_mora = null;
+            m_LastSingingPerformanceScore.language = m_LastSingingPerformanceLanguage;
+            //假名/摩拉由服务端连同分段歌词一起产出。9883 明确要求 SenseVoice 提供
+            //lyrics_reading，它自己不会生成——清空会直接吃 422。
+            m_LastSingingPerformanceScore.lyrics_reading = m_LastResponseSingingReading;
+            m_LastSingingPerformanceScore.lyrics_reading_source =
+                m_LastResponseSingingReadingSource;
+            m_LastSingingPerformanceScore.lyrics_reading_complete =
+                m_LastResponseSingingReadingComplete;
+            m_LastSingingPerformanceScore.lyrics_mora = m_LastResponseSingingMora;
         }
         m_LastSingingPerformanceTime = now;
         bool trimmedTail = actualAudioEnd > 0.001f ||
@@ -1202,7 +1253,9 @@ public class SenseVoiceSpeechToText : STT
                       $"{LastPitchTimelineMidi.Length * frameSeconds:F2}s) " +
                       $"frames={m_LastSingingPerformanceMidi.Length} " +
                       $"lyrics={(usedSegmentLyrics ? "segment" : "full-turn")}" +
-                      $"({m_LastSingingLyrics.Length}字)");
+                      $"({m_LastSingingLyrics.Length}字, lang={m_LastSingingPerformanceLanguage}" +
+                      $"{(usedSegmentLyrics && LastLanguage != m_LastSingingPerformanceLanguage ? $"←整轮{LastLanguage}" : "")}" +
+                      $", kana={m_LastResponseSingingReadingComplete})");
         }
     }
 
@@ -2372,6 +2425,13 @@ public class SenseVoiceSpeechToText : STT
         public float singing_end_seconds = 0f;
         //只对裁出来那段单独再识别一次得到的歌词。没发生裁剪时为空。
         public string singing_text = "";
+        //随分段歌词一起来的语言与假名。整轮可能是 zh 而唱的那段是 ja，
+        //沿用整轮标签会让 9883 用错 G2P、整份乐谱被弃用。
+        public string singing_language = "";
+        public string singing_lyrics_reading = "";
+        public string singing_lyrics_reading_source = "";
+        public bool singing_lyrics_reading_complete = false;
+        public string[] singing_lyrics_mora = null;
         public float pitch_timeline_start_seconds = 0f;
         public float audio_content_start_seconds = 0f;
         public SingingScore singing_score = null;

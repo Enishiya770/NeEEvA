@@ -51,6 +51,7 @@ import uvicorn
 from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from funasr import AutoModel
+from japanese_lyrics import normalise_japanese_lyrics
 from speaker_identity import SpeakerIdentityStore
 from singing_analysis import SingingAnalyzer
 from song_search import SongSearchEngine
@@ -300,37 +301,50 @@ def transcribe_singing_segment(
     analysis: Optional[dict],
     full_text: str,
     language: str,
-) -> str:
+) -> dict:
     """只对裁出来的[唱歌开始, 唱歌结束]窗口再识别一次，返回这段的歌词。
 
     回哼素材是裁过的，而 text 是整轮转写(含唱前唱后的说话)。把整轮的字铺到几秒
     的旋律上，SVS 会按 acoustic_voiced_time 把它们硬塞进音符里——8/7 实测 67 个字
     塞进 9.7s / 59 个音符，唱出来完全听不清。
 
+    **语言必须跟着这一段单独判**，不能沿用整轮的：8/8 实测用户中文说话、中间唱
+    日文歌，整轮判 zh，而分段歌词是纯假名；乐谱带着 zh 标签送到 9883，中文 G2P
+    对不上假名 (ValueError: Chinese G2P length does not match lyric units)，整份
+    乐谱被弃用、退化成 backend-transcription，于是旋律对而歌词全是瞎猜的。
+    日语还要连假名一起产出——9883 明确要求 SenseVoice 提供 lyrics_reading，
+    它自己不会生成。
+
     只在真的裁掉了 0.45s 以上、且本轮确认是歌唱时才做。这两个条件成立时后面必然
     要跑慢得多的歌声合成，多这一次识别的耗时可以忽略。
     """
+    empty = {"text": "", "language": ""}
     if not analysis or not bool(analysis.get("is_singing", False)):
-        return ""
+        return empty
     total = wav.size / 16000.0
     start = max(0.0, float(analysis.get("singing_start_seconds", 0.0) or 0.0))
     end = float(analysis.get("singing_end_seconds", 0.0) or 0.0)
     if end <= 0.0 or end > total:
         end = total
     if start + (total - end) < 0.45 or end - start < 1.2:
-        return ""
+        return empty
 
     lo = max(0, int(start * 16000))
     hi = min(int(wav.size), int(end * 16000))
     if hi - lo < 16000:
-        return ""
+        return empty
     t0 = time.time()
     try:
         res = generate_asr(wav[lo:hi], language)
     except Exception as exc:  # 识别失败不能拖垮整轮，退回整轮转写即可
         print(f"[SingingText] segment ASR failed: {exc}")
-        return ""
-    seg_text = parse_output(res[0]["text"] if res else "")[0]
+        return empty
+    seg_text, seg_lang = parse_output(res[0]["text"] if res else "")[:2]
+    if not seg_text.strip():
+        return empty
+    result = {"text": seg_text, "language": seg_lang or ""}
+    if str(seg_lang).lower().startswith("ja"):
+        result.update(normalise_japanese_lyrics(seg_text))
     # 字/秒是判断「歌词够不够铺满旋律」的直接指标。实测干净的一段唱在 1.6~1.8，
     # 明显偏低时(<0.9) SVS 会把前半段唱完就没词了，后半段听起来就不像在唱词。
     chars = len("".join(ch for ch in seg_text if not ch.isspace()))
@@ -338,9 +352,11 @@ def transcribe_singing_segment(
     print(
         f"[SingingText] seg=[{start:.2f},{end:.2f}]s/{total:.2f}s "
         f"dt={time.time() - t0:.2f}s chars={chars} density={density:.2f}/s "
+        f"lang={seg_lang}(整轮={language}) "
+        f"kana={result.get('lyrics_reading_complete', False)} "
         f"full={full_text!r} seg={seg_text!r}"
     )
-    return seg_text
+    return result
 
 
 def is_tonal_vocal(analysis: Optional[dict], short_probe: bool = False):
@@ -1166,7 +1182,19 @@ async def asr(
             "elapsed": round(dt + vad_dt + speaker_dt, 3),
         }
         result.update(singing_response_fields(singing))
-        result["singing_text"] = transcribe_singing_segment(wav, singing, text, language)
+        segment_lyrics = transcribe_singing_segment(wav, singing, text, language)
+        result["singing_text"] = segment_lyrics.get("text", "")
+        # 歌词换成了分段的，随它而来的语言与假名也必须一起换，否则 9883 会拿
+        # 整轮的语言去解析这一段(实测中文 G2P 撞上假名，整份乐谱被弃用)。
+        result["singing_language"] = segment_lyrics.get("language", "")
+        result["singing_lyrics_reading"] = segment_lyrics.get("lyrics_reading", "")
+        result["singing_lyrics_reading_source"] = segment_lyrics.get(
+            "lyrics_reading_source", ""
+        )
+        result["singing_lyrics_reading_complete"] = bool(
+            segment_lyrics.get("lyrics_reading_complete", False)
+        )
+        result["singing_lyrics_mora"] = segment_lyrics.get("lyrics_mora", []) or []
         result["audio_content_start_seconds"] = round(audio_content_start_seconds, 3)
         result["singing_expected"] = bool(expect_singing)
         result["singing_expected_override"] = bool(expected_singing_override)

@@ -883,7 +883,10 @@ public class ChatSample : MonoBehaviour
             CancelSpeculativeRequestOnly();
             m_SpeculativeDraft = null;
             m_LastDraftTranscript = "";
-            ReleasePreparedSingingBridge(false);
+            // 已经渲染成音频的开场不在此列：类别是否匹配由取用处的守卫判定
+            // (m_PreparedBridgeIsSinging != wantSinging)，在这里提前扔掉只会白费
+            // 一次 LLM+TTS。而且这个判定经常被 LLM 推翻——8/8 实测一场里
+            // 「她判定这是说话」响了 9 次，每次都对应一条被误扔的说话开场。
         }
 
         m_StreamingTurnIsSinging = true;
@@ -1356,11 +1359,25 @@ public class ChatSample : MonoBehaviour
         //类别必须匹配：歌唱开场接在普通提问后面会很怪，反之亦然。
         float required = m_PreparedBridgeIsSinging
             ? m_SingingBridgeMinConfidence : m_SpeechBridgeMinConfidence;
-        if (output == null || m_PreparedSingingBridgeClip == null ||
-            m_PreparedBridgeIsSinging != wantSinging ||
-            m_PreparedSingingBridgeConfidence < required ||
-            string.IsNullOrWhiteSpace(m_PreparedSingingBridgeText))
+        //落选原因必须能看见：8/7 实测一场里预合成 6 次「开场已就绪」，却只有 1 次
+        //被播出去，另外 5 次的 LLM+TTS 成本白付。不知道卡在哪一条就没法判断该动谁。
+        string reject =
+            output == null ? "无音频输出源"
+            : m_PreparedSingingBridgeClip == null
+                ? (m_SingingBridgeTtsInFlight ? "尚在合成中" : "无预合成素材")
+            : m_PreparedBridgeIsSinging != wantSinging
+                ? $"类别不匹配(素材={(m_PreparedBridgeIsSinging ? "歌唱" : "说话")}, " +
+                  $"本轮={(wantSinging ? "歌唱" : "说话")})"
+            : m_PreparedSingingBridgeConfidence < required
+                ? $"置信度不足({m_PreparedSingingBridgeConfidence:F2} < {required:F2})"
+            : string.IsNullOrWhiteSpace(m_PreparedSingingBridgeText) ? "文本为空"
+            : null;
+        if (reject != null)
+        {
+            if (m_LogStreamTimings)
+                Debug.Log($"[说话预反应] 预合成开场未采用：{reject}");
             return false;
+        }
 
         spokenText = m_PreparedSingingBridgeText;
         duration = m_PreparedSingingBridgeClip.length;
@@ -1373,6 +1390,17 @@ public class ChatSample : MonoBehaviour
 
     private void ReleasePreparedSingingBridge(bool cancelSynthesis)
     {
+        //已经合成好、却还没播就被丢掉的素材，是白付掉的一次 LLM+TTS。和
+        //「预合成开场未采用：无预合成素材」配起来看，就能分清是"没生成"还是"被提前扔了"。
+        if (m_LogStreamTimings && !m_PreparedSingingBridgePlayedThisTurn &&
+            (m_PreparedSingingBridgeClip != null || m_SingingBridgeTtsInFlight))
+        {
+            Debug.Log($"[说话预反应] 丢弃未播出的预合成开场 " +
+                      $"(已就绪={m_PreparedSingingBridgeClip != null}, " +
+                      $"合成中={m_SingingBridgeTtsInFlight}, " +
+                      $"conf={m_PreparedSingingBridgeConfidence:F2}): " +
+                      $"\"{m_PreparedSingingBridgeText}\"");
+        }
         if (cancelSynthesis && m_ChatSettings != null && m_ChatSettings.m_TextToSpeech != null)
             m_ChatSettings.m_TextToSpeech.CancelPreparedSpeech();
         m_SingingBridgeGeneration++;
