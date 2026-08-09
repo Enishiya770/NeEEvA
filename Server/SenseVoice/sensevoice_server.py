@@ -544,12 +544,23 @@ def trim_to_speech(wav: np.ndarray, segments, margin_ms: int = 120):
     return trim_to_speech_with_offset(wav, segments, margin_ms)[0]
 
 
-def trim_to_speech_with_offset(wav: np.ndarray, segments, margin_ms: int = 120):
-    """Trim outer silence and return the start offset in the uploaded WAV."""
+def trim_to_speech_with_offset(
+    wav: np.ndarray, segments, margin_ms: int = 120, tail_margin_ms: int = 0
+):
+    """Trim outer silence and return the start offset in the uploaded WAV.
+
+    tail_margin_ms 让尾部单独用更大的余量。歌声的收尾是渐弱长音，能量低，FSMN
+    会把它判成静音——8/9 实测一段 15.73s 的演唱被切成 14.30s，尾部去掉 1.43s，
+    最后一个音的收尾整个没了(用户直接反馈"没有尾音")。说话没有这个问题，所以
+    只在本轮像唱歌时才放宽，避免给普通说话轮平白加一截静音。
+    """
     if not segments:
         return wav, 0.0
     begin_ms = max(0, segments[0][0] - margin_ms)
-    end_ms = min(int(wav.size * 1000 / 16000), segments[-1][1] + margin_ms)
+    end_ms = min(
+        int(wav.size * 1000 / 16000),
+        segments[-1][1] + max(margin_ms, tail_margin_ms),
+    )
     begin = int(begin_ms * 16)
     end = int(end_ms * 16)
     if end <= begin:
@@ -996,7 +1007,19 @@ async def asr(
             result.update(unknown_speaker_meta())
             return result
 
-        wav, audio_content_start_seconds = trim_to_speech_with_offset(wav, segments)
+        # 像唱歌就给尾部留足余量。判据用 quick 探针的 tonal 或"本轮约好了跟唱"——
+        # 两者都在 thorough 分析之前就有，而裁剪必须发生在分析之前。
+        singing_tail_margin = (
+            600
+            if (expect_singing or is_tonal_vocal(quick_singing))
+            else 0
+        )
+        wav, audio_content_start_seconds = trim_to_speech_with_offset(
+            wav, segments, tail_margin_ms=singing_tail_margin
+        )
+        if singing_tail_margin and LOG_VAD:
+            print(f"[VAD] 歌声尾部余量 {singing_tail_margin}ms "
+                  f"(tonal={is_tonal_vocal(quick_singing)} expect={expect_singing})")
 
         speaker_meta, speaker_dt, pending_embedding = identify_speaker(
             wav, speech_ms, learn=learn_speaker

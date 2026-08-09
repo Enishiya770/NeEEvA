@@ -5155,9 +5155,9 @@ MonoBehaviour:
   m_RecentRememberedSongReferenceSeconds: 900
   m_EnableAutonomousHumBack: 1
   m_EnableAutonomousRememberedSongSinging: 1
-  m_EnableSingingVoiceSynthesis: 1
+  m_EnableSingingVoiceSynthesis: 0
   m_SVSURL: http://127.0.0.1:9883/synthesize
-  m_AutoStartSVS: 1
+  m_AutoStartSVS: 0
   m_SVSStartupTimeoutSeconds: 45
   m_SVSStartScriptRelativePath: Server/SVS/start_svs_server.ps1
   m_SVSTimeoutSeconds: 300

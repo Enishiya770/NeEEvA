@@ -516,12 +516,17 @@ class SingingAnalyzer:
         # 分数上却差了 0.16。同一条日志里另一轮 best 甚至直接选中了说话那座
         # (14.40-21.20/0.66，因为它最长)，把整段演唱丢在外面。
         #
-        # 所以: 先按分数筛掉不像唱的岛，再以「分数最高」而不是「最长」的那座为锚
-        # 向两侧合并。下限取 0.78 与 top-0.10 的较大者(实测唱 0.86~0.91 / 说 0.66~0.72，
-        # 门槛落在两簇中间)；再与 top 取小，保证只有一座低分岛时不会把它也筛掉。
+        # 所以: 先按分数筛掉不像唱的岛，再以幸存者里最长的那座为锚向两侧合并。
+        # 下限用绝对值 0.78——实测唱 0.83~0.95 / 说 0.61~0.74，两簇之间是空的，
+        # 绝对门槛已经够用。与 top 取小是为了只有一座低分岛时不会把它也筛掉。
+        #
+        # 原来还叠了一个 top-0.10 的相对项，它只会让门槛更严：8/9 实测一段
+        # runs=[…4.40-11.50/0.83 11.40-14.40/0.84 14.10-17.80/0.95]，因为 top=0.95
+        # 把下限抬到 0.85，两座真岛被筛掉，起唱点从 4.40s 跳到 14.43s。
+        # 遇到特别干净的一段反而更容易切错，所以去掉相对项。
         scores = [run[2] / max(1, run[3]) for run in viable]
         top_score = max(scores)
-        keep_floor = min(top_score, max(0.78, top_score - 0.10))
+        keep_floor = min(top_score, 0.78)
         kept = [
             run for run, score in zip(viable, scores)
             if score >= keep_floor - 1e-9
@@ -531,16 +536,42 @@ class SingingAnalyzer:
         # 在两段质量相当时随机选中较短的一段。
         anchor = max(kept, key=lambda run: (run[1] - run[0], run[2] / max(1, run[3])))
 
+        # 桥接要看的是「这段时间里到底有没有旋律」，而不是「两座合格岛之间隔多远」。
+        # 8/9 实测同一段音频两次请求给出完全不同的边界：
+        #   ① runs=[… 4.00-11.00/0.81 10.80-17.00/0.85]        → 起唱 4.33s  正确
+        #   ② runs=[… 4.00-9.80/0.82  9.30-10.90/0.79  11.10-17.00/0.85] → 起唱 11.43s 切掉前半
+        # ② 里同一段演唱被切成三块，中间那块 1.60s 差 0.05s 没过 1.65s 的合格线，
+        # 于是两座合格岛之间凭空出现 1.30s 空档，又差 0.10s 桥不过去。可那 1.60s
+        # 明明证明了那段时间有旋律——真实空档只有 0.20s。
+        # 所以：合格岛决定谁能当锚，**全部**候选岛决定谁能当桥。
+        coverage: List[List[int]] = []
+        for lo, hi in sorted((run[0], run[1]) for run in runs):
+            if coverage and lo <= coverage[-1][1]:
+                coverage[-1][1] = max(coverage[-1][1], hi)
+            else:
+                coverage.append([lo, hi])
+
+        def uncovered(begin: int, end: int) -> int:
+            """[begin, end) 里没有被任何候选岛覆盖的帧数。"""
+            if end <= begin:
+                return 0
+            gap = end - begin
+            for lo, hi in coverage:
+                left, right = max(begin, lo), min(end, hi)
+                if right > left:
+                    gap -= right - left
+            return max(0, gap)
+
         bridge_frames = max(max_gap_frames, int(round(1.20 / hop)))
         span_start, span_end = anchor[0], anchor[1]
         merged = True
         while merged:
             merged = False
             for run in kept:
-                if run[0] < span_start and span_start - run[1] <= bridge_frames:
+                if run[0] < span_start and uncovered(run[1], span_start) <= bridge_frames:
                     span_start = run[0]
                     merged = True
-                if run[1] > span_end and run[0] - span_end <= bridge_frames:
+                if run[1] > span_end and uncovered(span_end, run[0]) <= bridge_frames:
                     span_end = run[1]
                     merged = True
 
@@ -564,10 +595,29 @@ class SingingAnalyzer:
         if duration - end_seconds < 0.45 or end_seconds - start_seconds < 1.2:
             end_seconds = duration
 
+        # 被分数下限挡掉的岛：记下它在跨度的哪一侧、分数、以及**与跨度的间隔**
+        # （负数表示重叠）。
+        #
+        # 位置本身已被证明没有区分度：8/9 实测一个渐弱的收尾长音(0.74)出现在最后，
+        # 位置上和"唱完转说话"一模一样。剩下的线索是间隔——
+        #   渐弱收尾 23.40-25.20/0.74  与保留区间重叠 0.60s   ← 该并进来
+        #   唱完说话 17.30-19.20/0.74  与跨度间隔 0.10s       ← 该挡住
+        # 物理上说得通：长音衰减与前一个音连续，滑动窗口会重叠；而唱完转说话
+        # 中间要换气，会留一道缝。但目前 1 比 1，先只记录不改判定。
+        blocked_before, blocked_after = [], []
+        for run, score in zip(viable, scores):
+            if run in kept:
+                continue
+            if run[0] < span_start:
+                blocked_before.append((score, (span_start - run[1]) * hop))
+            else:
+                blocked_after.append((score, (run[0] - span_end) * hop))
+
         # 只在真的裁掉了东西时打印——流式模式每轮会调用本函数十几次，无条件打印会淹掉日志。
         if _LOG_ISLAND and (start_seconds > 0.0 or end_seconds < duration):
             print(
                 "[Island] dur={:.2f}s cand={} viable={}/{} floor={:.2f} runs=[{}] "
+                "挡掉[前:{} 后:{}] "
                 "anchor=({:.2f},{:.2f}) oldBest=({:.2f},{:.2f}) "
                 "span=({:.2f},{:.2f}) -> ({:.2f},{:.2f})".format(
                     duration,
@@ -585,6 +635,11 @@ class SingingAnalyzer:
                         )
                         for r in runs
                     ),
+                    # 分数@间隔，间隔为负表示与保留跨度重叠
+                    " ".join("{:.2f}@{:+.2f}s".format(s, g)
+                             for s, g in blocked_before) or "-",
+                    " ".join("{:.2f}@{:+.2f}s".format(s, g)
+                             for s, g in blocked_after) or "-",
                     anchor[0] * hop,
                     anchor[1] * hop,
                     best[0] * hop,

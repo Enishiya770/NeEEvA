@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -277,7 +277,6 @@ public class ChatSample : MonoBehaviour
             m_LastUserMsg = _postWord ?? "";
             m_ExplicitSongRememberHandled = false;
             m_ExplicitHumBackHandled = false;
-            m_ExplicitSongSingHandled = false;
             m_AgentCurrentRoundIsTick = false;
             if (m_MemoryHub != null && m_EnableMemoryRecall)
                 m_MemoryHub.NotifyUserUtterance(m_LastUserMsg);
@@ -352,7 +351,6 @@ public class ChatSample : MonoBehaviour
             songSing = null;
         }
         if (humBack != null) m_ExplicitHumBackHandled = true;
-        if (songSing != null) m_ExplicitSongSingHandled = true;
         if (songMemory != null)
         {
             if (songMemory.Action == "remember" && string.IsNullOrWhiteSpace(songMemory.Title))
@@ -373,14 +371,13 @@ public class ChatSample : MonoBehaviour
         else if (m_HoldSpeechForSongMemoryResult)
             CompleteSongMemoryImmediately("没有找到可用于保存的最近歌声音频，本次未写入本机曲库。");
         if (songSearch != null) BeginSongSearch(songSearch);
-        AgentSongSingRequest fallbackSongSing;
-        if (songSing == null && TryCreateExplicitSongSingFallback(out fallbackSongSing))
-        {
-            songSing = fallbackSongSing;
-            m_ExplicitSongSingHandled = true;
-            if (m_LogHumBack)
-                Debug.LogWarning("[SongSing] 检测到明确曲库演唱请求，模型未调用 <song_sing/>，执行安全兜底");
-        }
+        //曾经在这里做「模型漏调 <song_sing/> 就按正则兜底」。已删除：8/9 实测触发 5 次、
+        //成功 0 次，而正则从普通说话里编出来的"歌名"是「了呀」(出自"我刚才已经唱了呀")、
+        //「点歌」、「完再唱」、以及整句歌词。判据 IsPlausibleUnquotedSongTitle 是一份
+        //黑名单，不在名单里的一律放行，注定漏。
+        //更要命的是它会连带扣住她那一轮的正常回复(已扣留 7 次)，查不到歌之后整轮无声。
+        //而那几轮模型自己**没有**调用 <song_sing/>——它判断"这不是点歌请求"，判断是对的，
+        //是正则在第二次猜并且猜错。要不要从曲库唱，交给她自己决定。
         if (songSing != null)
         {
             // 持久曲库与“刚才一句”是不同音源；同一轮只执行一种真实歌唱动作。
@@ -2666,7 +2663,6 @@ public class ChatSample : MonoBehaviour
             songSing = null;
         }
         if (humBack != null) m_ExplicitHumBackHandled = true;
-        if (songSing != null) m_ExplicitSongSingHandled = true;
         if (m_SongMemoryAcknowledgementInFlight &&
             (songMemory != null || songSearch != null || songSing != null))
         {
@@ -2721,14 +2717,13 @@ public class ChatSample : MonoBehaviour
         else if (heldForSongMemory)
             CompleteSongMemoryImmediately("没有找到可用于保存的最近歌声音频，本次未写入本机曲库。");
         if (songSearch != null) BeginSongSearch(songSearch);
-        AgentSongSingRequest fallbackSongSing;
-        if (songSing == null && TryCreateExplicitSongSingFallback(out fallbackSongSing))
-        {
-            songSing = fallbackSongSing;
-            m_ExplicitSongSingHandled = true;
-            if (m_LogHumBack)
-                Debug.LogWarning("[SongSing] 检测到明确曲库演唱请求，模型未调用 <song_sing/>，执行安全兜底");
-        }
+        //曾经在这里做「模型漏调 <song_sing/> 就按正则兜底」。已删除：8/9 实测触发 5 次、
+        //成功 0 次，而正则从普通说话里编出来的"歌名"是「了呀」(出自"我刚才已经唱了呀")、
+        //「点歌」、「完再唱」、以及整句歌词。判据 IsPlausibleUnquotedSongTitle 是一份
+        //黑名单，不在名单里的一律放行，注定漏。
+        //更要命的是它会连带扣住她那一轮的正常回复(已扣留 7 次)，查不到歌之后整轮无声。
+        //而那几轮模型自己**没有**调用 <song_sing/>——它判断"这不是点歌请求"，判断是对的，
+        //是正则在第二次猜并且猜错。要不要从曲库唱，交给她自己决定。
         if (songSing != null)
         {
             humBack = null;
@@ -3638,16 +3633,17 @@ public class ChatSample : MonoBehaviour
     [SerializeField] private bool m_EnforceExplicitSongRemember = true;
     [Tooltip("同一个歌曲记忆操作的防重复间隔。改名不会被刚才的保存操作阻塞。")]
     [Range(2f, 60f)] [SerializeField] private float m_SongMemoryDuplicateCooldownSeconds = 10f;
-    [Tooltip("“刚才那首/这段”没有明确歌名且近期原始歌声已过期时，可绑定到最近一次成功落盘歌曲 ID 的时限。")]
-    [Range(30f, 1800f)] [SerializeField] private float m_RecentRememberedSongReferenceSeconds = 900f;
 
     [Header("角色旋律回哼 — <hum_back/>")]
     [Tooltip("允许角色在听完歌唱/哼唱后，自主选择把最近一句旋律哼回来。")]
     [SerializeField] private bool m_EnableAutonomousHumBack = true;
     [Tooltip("允许角色从持久本地曲库选择已记住的歌曲片段，或根据刚听到的歌词/旋律可靠续唱后续已学段落。")]
     [SerializeField] private bool m_EnableAutonomousRememberedSongSinging = true;
-    [Tooltip("优先把识别到的歌词、音符、时值和连续音高交给独立歌声合成器，生成新的角色歌声；这不是变声。")]
-    [SerializeField] private bool m_EnableSingingVoiceSynthesis = true;
+    [Tooltip("可选：把识别到的歌词、音符、时值和音高交给独立歌声合成器，生成新的角色歌声（不是变声）。" +
+             "默认关闭——歌词能否听懂取决于「哪个字唱在哪个音上」，而跟唱乐谱的对齐来自声学切分，" +
+             "中文靠词级时间戳勉强可用、日语实测切分率 0.22~1.00 不稳定。关闭后一律走 SVC：" +
+             "复用用户真实演唱、只换音色，咬字天生正确。代价是她唱不出用户没唱过的内容。")]
+    [SerializeField] private bool m_EnableSingingVoiceSynthesis = false;
     [Tooltip("独立 SVS 服务。中文/英语/粤语使用 SoulX 官方前端；日语使用项目内实验性假名音素适配。")]
     [SerializeField] private string m_SVSURL = "http://127.0.0.1:9883/synthesize";
     [Tooltip("首次需要时自动启动轻量 9883 桥；模型仍由请求进程按需加载并在完成后释放显存。")]
@@ -3778,7 +3774,6 @@ public class ChatSample : MonoBehaviour
     private bool m_SongMemoryAcknowledgementInFlight = false;
     private bool m_SongSingInFlight = false;
     private int m_SongSingGeneration = 0;
-    private bool m_ExplicitSongSingHandled = false;
     private bool m_HumBackPending = false;
     private bool m_HumBackPreparingCarrier = false;
     private bool m_HumBackPlaying = false;
@@ -3909,7 +3904,6 @@ public class ChatSample : MonoBehaviour
         m_LastSongMemorySignature = "";
         m_ExplicitSongRememberHandled = false;
         m_ExplicitHumBackHandled = false;
-        m_ExplicitSongSingHandled = false;
         m_WaitingForRequestedSingAlong = false;
         m_SingAlongRequestArmedAt = -999f;
         m_HumBackResultPending = false;
@@ -4177,7 +4171,6 @@ public class ChatSample : MonoBehaviour
         m_LastUserMsg = userText ?? "";
         m_ExplicitSongRememberHandled = false;
         m_ExplicitHumBackHandled = false;
-        m_ExplicitSongSingHandled = false;
         //情境召回:提及扫描同步生效(本帧可见),语境嵌入异步、作用于后续帧
         if (m_MemoryHub != null && m_EnableMemoryRecall)
             m_MemoryHub.NotifyUserUtterance(m_LastUserMsg);
@@ -4749,72 +4742,9 @@ public class ChatSample : MonoBehaviour
         return true;
     }
 
-    private static string ExtractRequestedSongTitle(string utterance)
-    {
-        if (string.IsNullOrWhiteSpace(utterance)) return "";
-        string semanticText = StripSingingPerceptionMetadata(utterance);
-        if (IsSingingFailureReport(semanticText) ||
-            IsSingingCapabilityQuestion(semanticText))
-            return "";
-
-        // 明确书名号/引号优先；标题本身可能长得像普通句子，不应用未加引号的启发式过滤。
-        var quoted = System.Text.RegularExpressions.Regex.Match(
-            semanticText,
-            @"[《“""'「『](?<title>[^》”""'」』\r\n]{1,80})[》”""'」』]",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        if (quoted.Success)
-        {
-            string quotedTitle = quoted.Groups["title"].Value.Trim();
-            if (!string.IsNullOrWhiteSpace(quotedTitle)) return quotedTitle;
-        }
-
-        string[] patterns =
-        {
-            @"(?:唱|演唱|哼)(?:一下|一遍|一段|一首|出来|给我听|给我唱)?\s*[《“""'「『]?(?<title>[A-Za-z0-9\p{L}][^，,。！？!?；;\r\n《》“”""'「」『』]{0,59})",
-            @"(?:sing|perform|hum)\s+(?<title>[A-Za-z0-9][A-Za-z0-9 _'\-]{0,59})",
-            @"(?<title>[A-Za-z0-9\p{L}][^，,。！？!?；;\r\n《》“”""'「」『』]{0,59})\s*(?:を)?(?:歌って|歌える|歌う)"
-        };
-        foreach (string pattern in patterns)
-        {
-            var match = System.Text.RegularExpressions.Regex.Match(
-                utterance, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!match.Success) continue;
-            string title = match.Groups["title"].Value.Trim();
-            title = System.Text.RegularExpressions.Regex.Replace(
-                title,
-                @"(?:吧|吗|呢|好不好|可以吗|能不能|please|for me|给我听|一下|一遍)$",
-                "",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
-            string generic = title.ToLowerInvariant();
-            if (!IsPlausibleUnquotedSongTitle(generic)) continue;
-            return title;
-        }
-        return "";
-    }
-
-    private static bool IsExplicitRememberedSongSingRequest(string utterance)
-    {
-        string semanticText = StripSingingPerceptionMetadata(utterance);
-        string lower = semanticText.ToLowerInvariant();
-        if (string.IsNullOrWhiteSpace(lower) || IsHumBackCancellation(lower)) return false;
-        if (IsSingingFailureReport(lower) || IsSingingCapabilityQuestion(lower) ||
-            IsSingAlongInvitation(lower))
-            return false;
-        bool hasSingIntent = lower.Contains("唱") || lower.Contains("哼") ||
-            lower.Contains("sing") || lower.Contains("hum") || lower.Contains("歌って") ||
-            lower.Contains("続きを歌");
-        if (!hasSingIntent) return false;
-        if (IsRememberedSongContinuationRequest(lower)) return true;
-        if (HasRememberedSongCue(lower)) return true;
-        return !string.IsNullOrWhiteSpace(ExtractRequestedSongTitle(semanticText));
-    }
-
-    private bool HasRecentRememberedSongReference()
-    {
-        return !string.IsNullOrWhiteSpace(m_LastRememberedSongId) &&
-            Time.realtimeSinceStartup - m_LastRememberedSongResultTime <=
-                m_RecentRememberedSongReferenceSeconds;
-    }
+    //ExtractRequestedSongTitle / IsExplicitRememberedSongSingRequest 随兜底一并删除：
+    //它们唯一的用途就是从普通说话里猜曲库歌名，而那个猜测已被证明不可靠。
+    //模型自己写在 <song_sing title=""/> 里的标题仍会被 IsPlausibleUnquotedSongTitle 校验。
 
     private bool ShouldDiscardSongSingToolForCurrentTurn(AgentSongSingRequest request)
     {
@@ -4832,56 +4762,6 @@ public class ChatSample : MonoBehaviour
         bool hasSelector = !string.IsNullOrWhiteSpace(request.SongId) ||
             IsPlausibleUnquotedSongTitle(request.Title);
         return !hasSelector && IsRecentSingingReference(semanticText);
-    }
-
-    private bool TryCreateExplicitSongSingFallback(out AgentSongSingRequest request)
-    {
-        request = null;
-        if (!m_EnableAutonomousRememberedSongSinging || m_ExplicitSongSingHandled ||
-            m_AgentCurrentRoundIsTick)
-            return false;
-
-        string semanticText = StripSingingPerceptionMetadata(m_LastUserMsg);
-        if (IsSingingFailureReport(semanticText) ||
-            IsSingingCapabilityQuestion(semanticText) ||
-            IsSingAlongInvitation(semanticText))
-            return false;
-
-        bool recentReference = IsRecentSingingReference(semanticText);
-        bool hasRecentPerformance = HasRecentPlayableSingingPerformance();
-        if (recentReference && hasRecentPerformance && IsExplicitHumBackRequest(semanticText))
-        {
-            // “把刚才这段唱出来”应使用仍在保留期内的真实歌声/旋律；让 hum_back
-            // 处理，不要把“刚才这段”猜成曲库歌名。
-            return false;
-        }
-
-        bool explicitRememberedRequest = IsExplicitRememberedSongSingRequest(semanticText);
-        bool canBindRecentId = recentReference && HasRecentRememberedSongReference();
-        if (!explicitRememberedRequest && !canBindRecentId) return false;
-
-        string title = ExtractRequestedSongTitle(semanticText);
-        string songId = "";
-        if (string.IsNullOrWhiteSpace(title) &&
-            HasRecentRememberedSongReference() &&
-            (recentReference || HasRememberedSongCue(semanticText) ||
-             IsRememberedSongContinuationRequest(semanticText)))
-        {
-            songId = m_LastRememberedSongId;
-        }
-        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(songId))
-            return false;
-
-        request = new AgentSongSingRequest
-        {
-            SongId = songId,
-            Title = title,
-            Mode = IsRememberedSongContinuationRequest(semanticText) ? "continue" : "memory",
-            Reason = string.IsNullOrWhiteSpace(songId)
-                ? "用户明确要求按歌名演唱已记住的歌曲，但模型漏掉了 song_sing 标签"
-                : "用户用模糊指代要求演唱刚落盘歌曲，已绑定最近一次成功保存的歌曲ID",
-        };
-        return true;
     }
 
     private bool IsCurrentTurnSpokenSingingExit()
@@ -5027,10 +4907,10 @@ public class ChatSample : MonoBehaviour
             IsHumBackCancellation(m_LastUserMsg) || IsCurrentTurnSpokenSingingExit())
             return false;
 
-        if (m_EnableAutonomousRememberedSongSinging &&
-            IsExplicitRememberedSongSingRequest(m_LastUserMsg))
-            return true;
-
+        //原来这里只要用户的话"看起来像点歌"就扣住 TTS，等曲库演唱出声。配合上面那个
+        //已删除的正则兜底，8/9 实测扣了 7 次、成功 0 次，那几轮直接没有声音。
+        //扣留只应该发生在她**真的**调用了 <song_sing/> 之后——那条路径由 BeginSongSing
+        //自己负责，不需要在这里预判。
         bool confirmedSinging = IsCurrentTurnConfirmedSinging();
         if (!confirmedSinging && IsPracticeCompositionRequest(m_LastUserMsg))
             return HasPracticeCompositionMaterial();
@@ -5157,6 +5037,11 @@ public class ChatSample : MonoBehaviour
         public string Mode = "echo";
         public string Lyrics = "";
         public string Reason = "";
+        //演唱参数：她可以自己决定这一遍怎么唱。NaN/未指定时沿用按 seed 生成的默认档，
+        //所以不写这些属性时行为和以前完全一样。
+        public float Key = float.NaN;         //移调，半音
+        public float Pace = float.NaN;        //速度倍率
+        public float Expression = float.NaN;  //演绎强度：0=逐帧复刻用户，1=尽量按她自己的表现
     }
 
     private class AgentSongSingRequest
@@ -5206,6 +5091,9 @@ public class ChatSample : MonoBehaviour
             Mode = ReadToolAttribute(attrs, "mode"),
             Lyrics = ReadToolAttribute(attrs, "lyrics"),
             Reason = ReadToolAttribute(attrs, "reason"),
+            Key = ReadToolFloatAttribute(attrs, "key", -4f, 4f),
+            Pace = ReadToolFloatAttribute(attrs, "pace", 0.8f, 1.25f),
+            Expression = ReadToolFloatAttribute(attrs, "expression", 0f, 1f),
         };
         if (string.IsNullOrWhiteSpace(request.Mode)) request.Mode = "echo";
         text = s_HumBackTagRegex.Replace(text, "").Trim();
@@ -5292,6 +5180,28 @@ public class ChatSample : MonoBehaviour
         if (string.IsNullOrWhiteSpace(request.Mode)) request.Mode = "auto";
         text = s_SongSearchTagRegex.Replace(text, "").Trim();
         return request;
+    }
+
+    /// <summary>
+    /// 读一个数值属性并夹到合法区间。缺省或写得不合法时返回 NaN，交给调用方回落到
+    /// 按 seed 生成的默认档——她漏写或写错都不该让这次演唱失败。
+    /// </summary>
+    private static float ReadToolFloatAttribute(
+        string attrs, string name, float min, float max)
+    {
+        string raw = ReadToolAttribute(attrs, name);
+        if (string.IsNullOrWhiteSpace(raw)) return float.NaN;
+        //允许「+2」「-1半音」「1.05倍」这类写法，只取第一个数
+        var number = System.Text.RegularExpressions.Regex.Match(
+            raw, @"[-+]?\d*\.?\d+");
+        if (!number.Success) return float.NaN;
+        if (!float.TryParse(
+                number.Value,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out float value))
+            return float.NaN;
+        return Mathf.Clamp(value, min, max);
     }
 
     private static string ReadToolAttribute(string attrs, string name)
@@ -6500,6 +6410,10 @@ public class ChatSample : MonoBehaviour
         CreateHumPerformanceProfile(
             performanceSeed, out semitoneOffset, out rmsMixRate, out protect,
             out interpretation);
+        //她写了就听她的；没写就用上面按 seed 生成的那一档（request 在方法入口已判非空）
+        if (!float.IsNaN(request.Key)) semitoneOffset = Mathf.RoundToInt(request.Key);
+        if (!float.IsNaN(request.Expression)) interpretation = request.Expression;
+        float paceOverride = request.Pace;
 
         float[] timeline;
         float frameSeconds;
@@ -6546,8 +6460,10 @@ public class ChatSample : MonoBehaviour
                 return;
             }
             senseVoice.TryGetVariedRecentSingingAudio(
-                performanceSeed, out sourceWav, out variationDiagnostic);
+                performanceSeed, out sourceWav, out variationDiagnostic, paceOverride);
             sourceDuration = timeline.Length * Mathf.Clamp(frameSeconds, 0.02f, 0.25f);
+            if (!float.IsNaN(paceOverride))
+                sourceDuration /= Mathf.Clamp(paceOverride, 0.8f, 1.25f);
         }
 
         m_HumBackResultPending = false;
@@ -6579,6 +6495,9 @@ public class ChatSample : MonoBehaviour
             Debug.Log($"[HumBack] 已排队 mode={m_PendingHumMode} phrases={phraseCount} " +
                       $"frames={timeline.Length} melody={duration:F1}s source={sourceDuration:F1}s " +
                       $"seed={performanceSeed} shiftOffset={semitoneOffset} " +
+                      $"她指定=[key={(float.IsNaN(request.Key) ? "-" : request.Key.ToString("0.#"))} " +
+                      $"pace={(float.IsNaN(request.Pace) ? "-" : request.Pace.ToString("0.##"))} " +
+                      $"expr={(float.IsNaN(request.Expression) ? "-" : request.Expression.ToString("0.##"))}] " +
                       $"rms={rmsMixRate:F2} protect={protect:F2} interp={interpretation:F2} " +
                       $"language={m_PendingHumLanguage} " +
                       $"variation=\"{m_PendingHumVariationDiagnostic}\" " +

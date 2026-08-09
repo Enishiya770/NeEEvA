@@ -118,6 +118,21 @@ public class SenseVoiceSpeechToText : STT
     private string m_SongForgetURL;
     private string m_SongSingURL;
     private byte[] m_LastSingingAudioBytes;
+    //置信度分带的暂定边界。**目前只用于打日志，不参与任何判定。**
+    //来自 8/8~8/9 两场共 26 次离线判定的分布：
+    //   0.13/0.23/0.35 判说话，0.62~0.77 共 14 次全判唱歌，两端各自干净；
+    //   [0.40,0.58] 是唯一重叠区(0.40唱 0.45唱 0.57说 0.58说)，占 15%。
+    //攒够 60~80 个样本后再决定要不要把「模糊带交给 LLM 定」变成真实行为。
+    private const float k_SingingBandLow = 0.40f;
+    private const float k_SingingBandHigh = 0.58f;
+
+    private static string DescribeSingingBand(float probability)
+    {
+        if (probability < k_SingingBandLow) return "低区";
+        if (probability > k_SingingBandHigh) return "高区";
+        return "模糊带";
+    }
+
     private string m_LastSingingLyrics = "";
     //服务端对裁出来那段单独识别得到的歌词。整轮转写含唱前唱后的说话，
     //拿它当歌词会被 SVS 硬塞进几秒的旋律里，唱出来听不清。
@@ -745,6 +760,17 @@ public class SenseVoiceSpeechToText : STT
                     LastNoteSequence = _response.note_sequence ?? "";
                     LastSingingSummary = _response.singing_summary ?? "";
                     LastSingingScore = _response.singing_score;
+                    //分带观测：只记录，不改判定。看两端是否真的干净、模糊带多大比例，
+                    //以及模糊带里若要问 LLM，手里的文本长什么样。
+                    if (m_EnableSingingAnalysis && !_response.no_speech &&
+                        _response.singing_analysis_available)
+                    {
+                        string band = DescribeSingingBand(_response.singing_probability);
+                        Debug.Log($"[Singing/Band] 离线 prob={_response.singing_probability:F2} " +
+                                  $"stab={_response.pitch_stability:F2} → {band} " +
+                                  $"(阈值 0.58 判为{(_response.is_singing ? "唱" : "说")}) " +
+                                  $"文本=\"{(LastText ?? "").Trim()}\"");
+                    }
                     m_LastResponseSingingText = _response.singing_text ?? "";
                     m_LastResponseSingingLanguage = _response.singing_language ?? "";
                     m_LastResponseSingingReading = _response.singing_lyrics_reading ?? "";
@@ -768,6 +794,7 @@ public class SenseVoiceSpeechToText : STT
                     float audioCropSeconds = acousticAudioCropSeconds;
                     float rawAudioSeconds = GetWavDurationSeconds(audioBytes);
                     float protectedStreamingCropSeconds = -1f;
+                    bool onsetsAgree = false;
                     bool hasUsableStreamingOnset = streamingSingingOnsetSeconds >= 0f &&
                         streamingObservedSeconds > 0f &&
                         streamingSingingOnsetSeconds <= streamingObservedSeconds + 0.5f &&
@@ -779,8 +806,17 @@ public class SenseVoiceSpeechToText : STT
                         // the offline longest-island heuristic cut later than that anchor.
                         protectedStreamingCropSeconds = Mathf.Max(
                             0f, streamingSingingOnsetSeconds - 0.75f);
-                        audioCropSeconds = Mathf.Min(
-                            acousticAudioCropSeconds, protectedStreamingCropSeconds);
+                        // 0.75s 的提前量是为了防止岛跳得太晚。两者本来就一致时它没有
+                        // 存在理由，只会往回吃进约一秒的说话：8/9 实测 岛=3.93s /
+                        // 流式=3.65s(差 0.28s)，减完变成 2.90s，「那我再唱最后一段哦」
+                        // 就这么漏进了回哼素材。
+                        // 一致时取岛的精确值；分歧大时(岛可能跳到后半句)维持保护。
+                        onsetsAgree = Mathf.Abs(
+                            acousticAudioCropSeconds - streamingSingingOnsetSeconds) <= 1.0f;
+                        audioCropSeconds = onsetsAgree
+                            ? acousticAudioCropSeconds
+                            : Mathf.Min(
+                                acousticAudioCropSeconds, protectedStreamingCropSeconds);
                     }
                     bool conservativeHeadKeep = false;
                     if (!hasUsableStreamingOnset && expectSinging && LastIsSinging)
@@ -795,16 +831,14 @@ public class SenseVoiceSpeechToText : STT
                         conservativeHeadKeep = true;
                     }
 
-                    // 歌词与音频必须描述同一段。分段歌词取自岛窗口，而上面这两条分支
-                    // 会把头部裁剪压低甚至归零——8/8 实测岛是 [7.63,13.84]，头部却按
-                    // 流式保护裁到 0.15s，于是 13 个假名被摊到 13.69s 的音频上，其中
-                    // 前 7.5s 根本不是歌声，听起来完全不像在唱词。
-                    // 岛检测这周已修过两轮(换气合并 + 分数下限)，比流式起点可信，
-                    // 所以用分段歌词时一律以岛为准。
-                    bool alignCropToIsland =
-                        !string.IsNullOrWhiteSpace(_response.singing_text) &&
-                        acousticAudioCropSeconds > audioCropSeconds + 0.05f;
-                    if (alignCropToIsland) audioCropSeconds = acousticAudioCropSeconds;
+                    // 曾经在这里让「有分段歌词时一律按岛裁」，已撤回。
+                    // 它确实修好了「13 个假名摊到含 7.5s 说话的音频上」，但代价是废掉了
+                    // 流式保护那条 min(acoustic, streamOnset-0.75)——而那条正是防止岛切
+                    // 得太晚的。8/9 实测 acoustic=11.43s / streamOnset=8.93s / 占比 33%，
+                    // 岛跳到了后半句，保护本已拦住，被这行推翻后切掉了 3.25s 真歌声。
+                    // 两次失效方向相反(岛太早 vs 岛太晚)，占比 45% 与 33% 分不开，
+                    // 暂无可靠判据，先退回已知状态：窗口由流式保护决定。
+                    bool alignCropToIsland = false;
                     float croppedContentSeconds = Mathf.Max(
                         0f, audioCropSeconds - _response.audio_content_start_seconds);
                     float timelineCropSeconds = Mathf.Max(
@@ -834,6 +868,13 @@ public class SenseVoiceSpeechToText : STT
                     bool endsWithSpokenSingingExit = streamingSpokenExitDetected ||
                         EndsWithSpokenSingingExit(LastText);
 
+                    //裁剪三行必须一直打：8/9 那次「说话+歌唱」被整段复读，服务端明明
+                    //把起唱点定在 4.53s，Unity 侧却记的是 head=0.00s——而 crop 那行被
+                    //挂在 expectSinging 下，自发歌唱(本场绝大多数)时不打，等于丢掉了唯一
+                    //能看出是谁把裁剪抹掉的证据。条件放宽到「本轮有歌声分析且确实算出了
+                    //歌唱或非零起点」，普通说话轮仍然不打。
+                    bool logCropDiagnostics = _response.singing_analysis_available &&
+                        (LastIsSinging || acousticAudioCropSeconds > 0.05f);
                     if (expectSinging || m_VerboseLog)
                     {
                         Debug.Log($"[SenseVoice/Singing] final expected={expectSinging} " +
@@ -843,12 +884,16 @@ public class SenseVoiceSpeechToText : STT
                                   $"timeline={LastPitchTimelineMidi.Length} " +
                                   $"spokenExit={endsWithSpokenSingingExit} " +
                                   $"streamExitHint={streamingSpokenExitDetected}");
+                    }
+                    if (logCropDiagnostics)
+                    {
                         Debug.Log($"[SenseVoice/Singing] crop raw={rawAudioSeconds:F2}s " +
                                   $"acoustic={acousticAudioCropSeconds:F2}s " +
                                   $"streamOnset={streamingSingingOnsetSeconds:F2}s " +
                                   $"streamObserved={streamingObservedSeconds:F2}s " +
                                   $"protected={protectedStreamingCropSeconds:F2}s " +
                                   $"applied={audioCropSeconds:F2}s " +
+                                  $"起点一致={onsetsAgree} " +
                                   $"timeline={timelineCropSeconds:F2}s");
                         Debug.Log($"[SenseVoice/Singing] tail rawEnd={_response.singing_end_seconds:F2}s " +
                                   $"contentStart={_response.audio_content_start_seconds:F2}s " +
@@ -1013,9 +1058,33 @@ public class SenseVoiceSpeechToText : STT
         if (!m_EnableSingingAnalysis || LastNoSpeech || LastIsSinging) return LastIsSinging;
         bool strongStreamingEvidence = streamingProbability >= 0.55f ||
             streamingPitchStability >= 0.52f;
+        //离线概率落在低区时，不允许流式把它推翻。
+        //流式是 quick 探针 + 半截音频，系统性高估：8/9 实测「那我们换一首歌吧。」
+        //流式 0.68 而离线 0.13，差 0.55；这一步三次触发三次都把正确的离线结论推翻了，
+        //其中一次还经由 armed-sing-along 快速路径直接唱了出来(那条路不问 LLM)。
+        //离线看的是完整音频，低区意味着它有把握——只有它自己也不确定(模糊带)时，
+        //流式证据才有资格参与。上界不必判：离线 >= 阈值时 LastIsSinging 已为真，
+        //函数在前面就返回了，所以这里生效的区间恰好就是模糊带。
+        bool offlineAllowsPromotion = LastSingingProbability >= k_SingingBandLow;
+        //分带观测：这一步会用流式概率推翻离线结论，是 8/9 那次「你跟着我唱呀」被
+        //当成唱歌的实际放行口。两个或条件分开记，因为 stability 在样本里几乎没有
+        //区分度(说话 0.47~0.62 / 唱歌 0.62~0.77 大面积重叠)，怀疑它长期为真。
+        Debug.Log($"[Singing/Band] 提升点 streamProb={streamingProbability:F2} " +
+                  $"→ {DescribeSingingBand(streamingProbability)}  " +
+                  $"streamStab={streamingPitchStability:F2} " +
+                  $"(prob条件={streamingProbability >= 0.55f} " +
+                  $"stab条件={streamingPitchStability >= 0.52f}) " +
+                  $"离线prob={LastSingingProbability:F2}(判说话) " +
+                  $"文本=\"{(LastText ?? "").Trim()}\"");
         bool freshCandidate = Time.realtimeSinceStartup - m_LastPlayableCandidateTime <= 5f &&
             m_LastPlayableCandidateAudioBytes != null &&
             m_LastPlayableCandidateAudioBytes.Length > 44;
+        if (!offlineAllowsPromotion)
+        {
+            Debug.Log($"[Singing/Band] 提升被拒：离线 prob={LastSingingProbability:F2} " +
+                      $"落在低区(<{k_SingingBandLow:F2})，不接受流式 {streamingProbability:F2} 的推翻");
+            return false;
+        }
         if (!strongStreamingEvidence || !freshCandidate ||
             !HasPlayablePitchTimeline(LastPitchTimelineMidi))
             return false;
@@ -1687,10 +1756,14 @@ public class SenseVoiceSpeechToText : STT
     /// Creates a private performance variant of the latest phrase. The melody is not
     /// rewritten: only sub-percent pacing and a slow dynamics contour change between takes.
     /// </summary>
+    /// <summary>
+    /// paceOverride 为 NaN 时按 seed 取一个近乎不可察的速度扰动；她显式指定时听她的。
+    /// </summary>
     public bool TryGetVariedRecentSingingAudio(
         int performanceSeed,
         out byte[] wavBytes,
-        out string diagnostic)
+        out string diagnostic,
+        float paceOverride = float.NaN)
     {
         wavBytes = null;
         diagnostic = "";
@@ -1699,7 +1772,9 @@ public class SenseVoiceSpeechToText : STT
             return false;
 
         System.Random random = new System.Random(performanceSeed);
-        float pace = 0.994f + (float)random.NextDouble() * 0.012f;
+        float pace = float.IsNaN(paceOverride)
+            ? 0.994f + (float)random.NextDouble() * 0.012f
+            : Mathf.Clamp(paceOverride, 0.8f, 1.25f);
         float gainStart = 0.96f + (float)random.NextDouble() * 0.07f;
         float gainEnd = 0.96f + (float)random.NextDouble() * 0.07f;
         samples = ResampleForPace(samples, pace);
