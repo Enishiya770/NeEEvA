@@ -275,7 +275,9 @@ SoulX-Singer 官方前端不支持日语；项目内置的 `soulx-ja-phone-adapt
 
 转换等待和播放都可被 barge-in 打断，角色自己的歌声也不会被重新识别成用户输入。当前不支持严格同步的双人合唱：倾听和认知准备可以并行，真正可听见的说话与歌唱仍由同一声音仲裁器单路播放。
 
-`ChatSample > 角色旋律回哼` 默认 `Enable Singing Voice Synthesis=true`、`Enable SVSRVC Post Polish=false`、`Allow SVC Fallback From SVS=true`、`Enable Neural Hum SVC=true`、`Allow Legacy Hum Fallback=false`。`independent SVS complete` 表示独立重新合成；可选的 `svc-post-polish` 表示先独立生成、再用角色 RVC 润色，属于音色转换后处理；`明确降级：改用 9882 SVC` 则表示直接转换原始演唱。`backend=rvc-character-v2` 表示角色专属转换模型，`backend=seed-vc` 表示零样本转换回退。SVS 说明见 [`Server/SVS/README.md`](Server/SVS/README.md)；专属转换模型训练见 [`Server/RVC/README.md`](Server/RVC/README.md)；转换桥见 [`Server/SeedVC/README.md`](Server/SeedVC/README.md)。
+`ChatSample > 角色旋律回哼` 默认 `Enable Singing Voice Synthesis=false`（SVC 音色转换为默认后端，SVS 独立歌声合成退为可选）、`Enable SVSRVC Post Polish=false`、`Allow SVC Fallback From SVS=true`、`Enable Neural Hum SVC=true`、`Allow Legacy Hum Fallback=false`。`independent SVS complete` 表示独立重新合成；可选的 `svc-post-polish` 表示先独立生成、再用角色 RVC 润色，属于音色转换后处理；`明确降级：改用 9882 SVC` 则表示直接转换原始演唱。`backend=rvc-character-v2` 表示角色专属转换模型，`backend=seed-vc` 表示零样本转换回退。SVS 说明见 [`Server/SVS/README.md`](Server/SVS/README.md)；专属转换模型训练见 [`Server/RVC/README.md`](Server/RVC/README.md)；转换桥见 [`Server/SeedVC/README.md`](Server/SeedVC/README.md)。
+
+**改动歌唱边界或模态判定之前，请先读 [`docs/singing-boundary-status.md`](docs/singing-boundary-status.md)**：那里记着每个阈值是怎么量出来的、哪些数是小样本拟合的、哪些判据已经试过并失败、以及哪些代码路径还没被真正触发过。这块反复出现"看似合理的改动上线后要撤回"，原因基本都是没有先看已有的反例。
 
 手工添加仍可使用兼容接口，歌名同样可省略：
 
