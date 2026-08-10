@@ -528,6 +528,19 @@ public class ChatSample : MonoBehaviour
     private string m_StreamingSingingEvidence = "";
     private float m_LastSingingSpeculativeRequestTime = -999f;
     private bool m_EouCognitiveSpeechVeto = false;
+    [Tooltip("拿最终转写问一次 LLM「这是唱还是说」，判完再决定要不要回哼。" +
+             "实测不带上下文的轻量请求 0.41s，十个历史误判样本全对；关掉则完全依赖声学" +
+             "与流式判定，而流式只有约 25% 的轮次来得及回包。")]
+    [SerializeField] private bool m_EnableFinalModeCheck = true;
+    //本轮的最终模态结论："singing" / "speech" / "-"(判不出) / ""(还没问)。
+    //非空即表示已经问过，用来防止回调重入时再问一次。
+    private string m_FinalModeVerdict = "";
+    //声学很确定在唱、而文字说不是时的软降级：仍按歌唱轮呈现给 LLM，但不自动回哼、
+    //不写进练唱会话。文字判错时最坏只是"她没主动唱回来"，而不是整段演唱被丢弃。
+    private bool m_FinalModeSoftDowngrade = false;
+    //软降级这一轮要不要让她出声追问「刚才那段是在唱吗」。只在本轮内有效，
+    //构造完 _msg 就清掉，不跨轮。
+    private bool m_PendingSingingConfirmation = false;
     private bool m_EouCognitiveSingingSupport = false;
     private int m_SingingBridgeGeneration = 0;
     private bool m_SingingBridgeTtsInFlight = false;
@@ -1176,6 +1189,31 @@ public class ChatSample : MonoBehaviour
             Mathf.Clamp01(draft.mode_confidence) >= m_SpeculativeSpeechVetoConfidence;
     }
 
+    /// <summary>
+    /// 最终证据是否足以推翻心里话的"这是说话"。
+    ///
+    /// 心里话是在**流式途中**、拿着残缺转写下的判断；最终模态判定拿的是完整转写
+    /// (必要时还附了片段歌词)，信息严格更多。两者冲突时不该让先下的那个赢——
+    /// 8/10 实测两轮被这么杀掉：岛正确(77% / 67%)、最终判定都说 singing、声学
+    /// 0.63 / 0.71，仍被回滚，用户当场说「我刚才已经唱了呀」。
+    ///
+    /// 但心里话那道闸本身有用(见 HasStrongSpeechModeJudgment：正常说话声学稳在
+    /// 0.58~0.64，单看声学挡不住)，所以不是取消它，而是要求**声学与最终文字同时
+    /// 判唱**才能推翻——两票对一票，且那两票信息更全。
+    ///
+    /// 两处心里话闸必须用同一条规则：DealingTextCallback 里的 cognitiveSpeechVeto，
+    /// 以及 TryHandleDirectSingAlongTurn 开头那道。8/10 只改了前者，结果 28214 行
+    /// 日志里"不否决"已经打出来，28256 行仍被后者拦下，回哼照样没发生。
+    /// </summary>
+    private bool FinalEvidenceOverridesSpeculation()
+    {
+        if (m_FinalModeVerdict != "singing") return false;
+        SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+            : null;
+        return senseVoice != null && senseVoice.LastSingingProbability >= 0.58f;
+    }
+
     private bool HasStrongSpeculativeSpeechVeto()
     {
         SpeculativeDraft draft = m_SpeculativeDraft;
@@ -1716,8 +1754,77 @@ public class ChatSample : MonoBehaviour
         // SenseVoice 给 LLM 的消息包含 [说话人:...] 元数据；界面仍只显示纯转写。
         string displayMsg = _msg;
         SenseVoiceSpeechToText senseVoice = m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText;
-        bool cognitiveSpeechVeto = m_EouCognitiveSpeechVeto ||
-            HasStrongSpeculativeSpeechVeto();
+
+        // 最终模态判定：拿完整转写问一次 LLM，判完再往下走。
+        //
+        // 为什么放在这里、为什么阻塞：流式期间的判定只有 25% 的轮次回得来
+        // (debounce 0.55~0.9s + 节流 2.4~4.0s + 往返 2.6s，而一轮常常只有 2~4 秒)，
+        // 于是「说话被当成唱歌」反复发生——0.54/0.56/0.61/0.62/0.65 都出现过，
+        // 其中几次还经 armed-sing-along 快速路径直接唱了回去(那条路不问 LLM)。
+        // 不带上下文的轻量请求实测 **0.41s**、十个历史误判样本全对，代价是快速首音
+        // 从 0.36s 变约 0.77s，仍远在 1.5s 目标之内。而且这里用的是**最终**转写，
+        // 比流式 partial 可靠得多。
+        if (m_EnableFinalModeCheck && string.IsNullOrEmpty(m_FinalModeVerdict) &&
+            senseVoice != null && senseVoice.LastIsSinging &&
+            !string.IsNullOrWhiteSpace(senseVoice.LastText))
+        {
+            ChatQW qw = m_ChatSettings.m_ChatModel as ChatQW;
+            if (qw != null)
+            {
+                string pendingMsg = _msg;
+                bool pendingExit = streamingExitAtSubmission;
+                qw.ClassifyUtteranceMode(senseVoice.LastText, verdict =>
+                {
+                    //空结论时用 "-" 占位，避免判不出来时无限重入
+                    m_FinalModeVerdict = string.IsNullOrEmpty(verdict) ? "-" : verdict;
+                    DealingTextCallback(pendingMsg, pendingExit);
+                }, senseVoice.LastSegmentLyrics);
+                return;
+            }
+        }
+
+        // 文字与声学取交集，而不是让文字一票否决。
+        //
+        // 转写里"引用歌词"和"唱歌词"长得一模一样——「我刚才唱了…就是那个雪下的那么的深
+        // 那个」和真的在唱，文字上分不开(实测这一句被判成 singing)。而声学恰好知道
+        // 差别：真唱时音高稳、有持续音。所以：
+        //   声学模糊带(<0.58，多半是待唱宽松闸强行判成的唱) → 文字有完全否决权，
+        //     那正是 0.54/0.56 那两次「不对呀你漏了一些话」被唱回去的场合；
+        //   声学高区(>=0.58) → 文字说不是也只做软降级，不自动回哼但保留演唱，
+        //     因为混合轮(说话开头+后面唱)文字仍有 2/5 会答错，误杀代价太大。
+        bool textSaysSpeech = m_FinalModeVerdict == "speech";
+        bool acousticIsConfident = senseVoice != null &&
+            senseVoice.LastSingingProbability >= 0.58f;
+        m_FinalModeSoftDowngrade = textSaysSpeech && acousticIsConfident;
+
+        bool finalEvidenceOverridesSpeculation = FinalEvidenceOverridesSpeculation();
+        bool speculationSaysSpeech =
+            m_EouCognitiveSpeechVeto || HasStrongSpeculativeSpeechVeto();
+        bool speculativeVeto =
+            speculationSaysSpeech && !finalEvidenceOverridesSpeculation;
+        if (speculationSaysSpeech && finalEvidenceOverridesSpeculation &&
+            m_LogStreamTimings)
+        {
+            Debug.Log("[模态判定] 心里话判说话，但声学 " +
+                      $"prob={senseVoice.LastSingingProbability:F2} 与最终文字都判唱" +
+                      "——以信息更全的最终判定为准，不否决");
+        }
+        bool cognitiveSpeechVeto = speculativeVeto ||
+            (textSaysSpeech && !acousticIsConfident);
+        if (m_FinalModeSoftDowngrade)
+        {
+            if (m_LogStreamTimings)
+                Debug.Log($"[模态判定] 软降级：声学 prob={senseVoice.LastSingingProbability:F2} " +
+                          "仍判唱，但文字判为说话——保留演唱，改为出声追问");
+            // 软降级以前是**静默**跳过自动回哼：素材留着，但用户不知道，于是重唱、
+            // 解释、再重唱——8/10 实测一次误判换来五轮返工。
+            //
+            // 提示词那一侧已经到顶：拿 28 段真值 + 29 条真说话量过五种写法，漏判
+            // 死死卡在 6/28，而且漏的清一色是「评价+宣布+唱」这种形态(其中三条唱的
+            // 是《演员》，歌词字面就是「说话的方式」，文字侧对它没有信息量)。
+            // 判据推不动，就改代价：把静默丢弃换成一句追问，五轮返工变一轮确认。
+            m_PendingSingingConfirmation = true;
+        }
         if (cognitiveSpeechVeto)
         {
             // 心里话只在高置信度“这是普通说话”时拥有否决权；它不能单独把一段
@@ -1790,6 +1897,25 @@ public class ChatSample : MonoBehaviour
                 Debug.LogWarning("[歌唱流式倾听] 流式曾判定歌唱，但最终响应没有有效音高时间轴，无法安全回哼");
             }
         }
+        // 声学说在唱、文字说在说话——两边都不足以定案，那就别替用户决定，问一句。
+        // 素材保留 180s，他答"是"下一轮立刻能唱回来。
+        // 必须放在流式恢复之后：那一段会整个重建 _msg，写在前面会被它盖掉，
+        // 结果既不回哼也不追问。
+        if (m_PendingSingingConfirmation && !spokenSingingExit && !cognitiveSpeechVeto &&
+            senseVoice != null)
+        {
+            _msg = "[本轮存在不确定性：声学判定用户在唱歌，但转写读起来像普通说话，" +
+                "无法确定他刚才是在演唱还是在讲话。**刚才那段录音已经完整保留在手边**，" +
+                "他只要说一句「是」，下一轮你立刻就能把它唱回来。" +
+                "请在回应里自然地问一句「刚才那段是在唱吗／要我跟着唱一下吗」，由他确认。" +
+                "不要擅自当成演唱去复述或跟唱；也不要去查曲库找歌名——" +
+                "要唱的就是刚才那段录音本身，跟它叫什么歌无关；" +
+                "更不要在他回答之前自己说「还是算了吧」把话收回去] " +
+                senseVoice.BuildLastPerceivedText();
+            if (m_LogHumBack)
+                Debug.Log("[HumBack] 软降级：改为让她出声追问是否在唱");
+        }
+        m_PendingSingingConfirmation = false;
         if (senseVoice != null && senseVoice.LastIsSinging)
         {
             displayMsg = string.IsNullOrWhiteSpace(senseVoice.LastText)
@@ -1858,6 +1984,9 @@ public class ChatSample : MonoBehaviour
         m_EouTurnWasSinging = m_StreamingTurnIsSinging &&
             !m_StreamingSingingExitDetected && !m_EouCognitiveSpeechVeto;
         m_EouSingingRejectedByFinal = false;
+        //每轮必清：EOU 是一轮的确定起点，比依赖各种收尾路径可靠
+        m_FinalModeVerdict = "";
+        m_FinalModeSoftDowngrade = false;
         if (m_StreamingSingingExitDetected)
         {
             ReleasePreparedSingingBridge(true);
@@ -2507,6 +2636,8 @@ public class ChatSample : MonoBehaviour
         m_EouSingingRejectedByFinal = false;
         m_EouCognitiveSpeechVeto = false;
         m_EouCognitiveSingingSupport = false;
+        m_FinalModeVerdict = "";
+        m_FinalModeSoftDowngrade = false;
         m_EouFillerContext = "neutral";
         if (m_LogStreamTimings) Debug.Log($"[LatencyFiller] 取消EOU快速回应 ({reason})");
         if (OnAISpeakDone != null) OnAISpeakDone();
@@ -2524,6 +2655,8 @@ public class ChatSample : MonoBehaviour
         m_EouSingingRejectedByFinal = false;
         m_EouCognitiveSpeechVeto = false;
         m_EouCognitiveSingingSupport = false;
+        m_FinalModeVerdict = "";
+        m_FinalModeSoftDowngrade = false;
         m_EouFillerContext = "neutral";
 
         float actual = Elapsed();
@@ -3817,6 +3950,10 @@ public class ChatSample : MonoBehaviour
     private float m_StreamingHumRmsMixRate = 0.85f;
     private float m_StreamingHumInterpretation = 0.5f;
     private float m_StreamingHumProtect = 0.33f;
+    // 允许快速回唱保留的最大头部说话量。0.35s 是呼吸/起音的余量，超过这个数
+    // 就是真的有一句话在前面。实测漏出去的两次分别是 2.53s 和 1.81s，
+    // 而干净的那几轮裁剪点与岛起点差在 0.1s 以内。
+    private const float k_FastHumBackMaxHeadCropSeconds = 0.35f;
     private bool m_FastHumBackEouStaged = false;
     private bool m_FastHumBackActive = false;
     private bool m_FastHumBackFinalDecisionReceived = false;
@@ -4039,6 +4176,8 @@ public class ChatSample : MonoBehaviour
         m_EouSingingRejectedByFinal = false;
         m_EouCognitiveSpeechVeto = false;
         m_EouCognitiveSingingSupport = false;
+        m_FinalModeVerdict = "";
+        m_FinalModeSoftDowngrade = false;
         m_EouFillerContext = "neutral";
         if (m_PendingTickCo != null)
         {
@@ -6024,12 +6163,23 @@ public class ChatSample : MonoBehaviour
     /// </summary>
     private bool TryHandleDirectSingAlongTurn()
     {
-        if (m_EouCognitiveSpeechVeto)
+        if (m_EouCognitiveSpeechVeto && !FinalEvidenceOverridesSpeculation())
         {
             RejectFastHumBackAfterFinal("speculative-cognition-classified-speech");
             m_ExplicitHumBackHandled = true;
             if (m_LogHumBack)
                 Debug.Log("[HumBack] 心里话高置信度判断为普通说话；跳过自动复唱，交给LLM正常回应");
+            return false;
+        }
+        //软降级：声学确定在唱但文字判为说话。演唱素材照常保留(用户确认后仍可回哼)，
+        //只是不再自动唱回来，也不写进练唱会话——那正是被误判时最扰人的两件事。
+        //不再静默：DealingTextCallback 已经往 _msg 里注入了追问指示，她会开口确认。
+        if (m_FinalModeSoftDowngrade)
+        {
+            RejectFastHumBackAfterFinal("final-mode-text-says-speech");
+            m_ExplicitHumBackHandled = true;
+            if (m_LogHumBack)
+                Debug.Log("[HumBack] 文字判为说话；跳过自动复唱，保留素材并由她追问确认");
             return false;
         }
         if (IsCurrentTurnSpokenSingingExit())
@@ -6060,6 +6210,7 @@ public class ChatSample : MonoBehaviour
                 senseVoice.CommitRecentSingingToPracticeSession(out phraseCount) &&
                 m_LogHumBack)
                 Debug.Log($"[HumBack/Practice] 已记录最终确认片段 sequence={phraseCount}");
+            TryAbortHumBackOnRetraction(senseVoice);
         }
 
         // A preview request can fail before final ASR arrives.  Drop only the staged
@@ -6077,6 +6228,25 @@ public class ChatSample : MonoBehaviour
             if (!confirmedSinging || !armed)
             {
                 RejectFastHumBackAfterFinal("final-asr-rejected-streaming-singing");
+                return false;
+            }
+
+            // 快速回唱是从录音第 0 秒开始预转换的（预转换开头 20s + EOU 时整段并行
+            // 转换），压延迟的代价是它完全不经过岛裁剪。这在【纯唱歌】轮没问题，
+            // 在【说话+唱歌】轮就会把说话原样播出去：8/10 实测一轮
+            // raw=23.15s、裁剪窗口只有 2.53-4.17s，却播了 19.98+3.22=23.2 秒，
+            // 「好，那我再来一次哦」连同整首歌一起复读了出来。
+            // 最终裁剪一说要丢头，预转换的那份就是废的——撤掉，走正常裁剪路径。
+            SenseVoiceSpeechToText cropSource = m_ChatSettings != null
+                ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+                : null;
+            float finalHeadCrop = cropSource != null
+                ? cropSource.LastResponseAudioCropSeconds : 0f;
+            if (finalHeadCrop > k_FastHumBackMaxHeadCropSeconds)
+            {
+                RejectFastHumBackAfterFinal(
+                    $"final-crop-discards-head({finalHeadCrop:F2}s)；" +
+                    "预转换从第0秒起，含最终判定要丢掉的说话");
                 return false;
             }
 
@@ -6120,6 +6290,39 @@ public class ChatSample : MonoBehaviour
         if (started && m_LogHumBack)
             Debug.Log("[HumBack] 最终ASR确认歌唱；跳过LLM决策，直接启动完整GPU回唱");
         return started;
+    }
+
+    /// <summary>
+    /// 唱完之后那句话若是在作废刚才那段演唱，就中止还在跑的歌声合成。
+    ///
+    /// 与合成**并行**：转换十几秒、判定不到一秒，藏得住，不占首音延迟。
+    /// 8/10 实测那一轮的尾巴是「呃，后面好像有点唱错了，停一下停一下，这一段不算
+    /// 这一段不算，我们重新唱。」——整轮 ASR 只转出了开头 6.5 秒，这句话此前没有
+    /// 任何子系统看得见；当时是靠用户抢话(barge-in)才没播出去。
+    ///
+    /// 只在还没开始播时中止。已经在放了就让它放完——中途掐断更难听，而且用户一
+    /// 开口 barge-in 本来就会停。
+    /// </summary>
+    private void TryAbortHumBackOnRetraction(SenseVoiceSpeechToText senseVoice)
+    {
+        string tail = senseVoice != null ? senseVoice.LastSingingTailText : "";
+        if (string.IsNullOrWhiteSpace(tail)) return;
+        ChatQW qw = m_ChatSettings != null
+            ? m_ChatSettings.m_ChatModel as ChatQW : null;
+        if (qw == null) return;
+        qw.ClassifySingingRetraction(tail, discard =>
+        {
+            if (!discard) return;
+            if (m_HumBackPlaying || m_FastHumBackPrefixPlaybackStarted) return;
+            bool stillWorking = m_HumBackPending || m_HumBackPreparingCarrier ||
+                m_SongSingInFlight || m_ActiveHumSVCRequest != null ||
+                m_ActiveSVSRequest != null || m_FastHumBackActive ||
+                m_FastHumBackEouStaged;
+            if (!stillWorking) return;
+            CancelPendingHumBack("user-retracted-take", false);
+            if (m_LogHumBack)
+                Debug.Log($"[HumBack] 唱完那句判为作废刚才的演唱，已中止合成：\"{tail}\"");
+        });
     }
 
     private void RejectFastHumBackAfterFinal(string reason)

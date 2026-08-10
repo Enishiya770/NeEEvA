@@ -131,3 +131,5 @@ Server/RVC/*_headers.txt
 # The checked Mandarin SVS prompt has its own accurate metadata instead.
 /Assets/Model/41041.json
 /Assets/Model/41041.json.meta
+# 边界附近的整轮音频落盘，只用于离线定阈值，不入库
+/Server/SenseVoice/band_dumps/

@@ -37,6 +37,8 @@ SenseVoiceSmall 本地 ASR 服务 (给 Unity 客户端用)
 import argparse
 import asyncio
 import base64
+import collections
+import hashlib
 import io
 import json
 import os
@@ -294,6 +296,130 @@ def has_plausible_vocal_pitch(analysis: Optional[dict]):
     if median_hz <= 0.0:
         return False
     return VOCAL_MIN_HZ <= median_hz <= VOCAL_MAX_HZ
+
+
+# 落盘用来量「按岛算 prob」值不值得做。8/10 实测同一首《演员》被判成说话五次，
+# 整段 prob 0.34~0.57，而岛占比 ≥69% 的两轮 prob ≥0.63——怀疑整段统计被前面十几秒
+# 说话稀释了。但被判成说话的轮次不会写进 song_library，手上没有原始音频可算，
+# 所以先把边界附近的整轮音频连同当时的分析一起存下来。
+# 存的是 trim_to_speech 之后的 content(分析器真正看到的那份)，不是原始录音。
+_BAND_DUMP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "band_dumps")
+_BAND_DUMP_ENABLED = os.environ.get("NEEEVA_BAND_DUMP", "1") != "0"
+# 区间取得比 Unity 的模糊带(0.40~0.58)两头都宽：定阈值需要边界两侧的样本，
+# 只存带内的话拟合不出该往哪边挪。
+_BAND_DUMP_LOW = float(os.environ.get("NEEEVA_BAND_DUMP_LOW", "0.25"))
+_BAND_DUMP_HIGH = float(os.environ.get("NEEEVA_BAND_DUMP_HIGH", "0.70"))
+_BAND_DUMP_KEEP = 80
+# 一轮说话在流式期间会被反复分析，trim 之后的 content 每次完全一样：8/10 实测
+# 20 个文件只对应 9 个不同轮次(一轮最多重复 5 次)。按音频内容去重，否则人工
+# 标注有一半是白做工。只记指纹，不留音频。
+_band_dump_seen: "collections.OrderedDict[str, float]" = collections.OrderedDict()
+_band_dump_lock = threading.Lock()
+
+
+def dump_band_sample(
+    wav: np.ndarray,
+    analysis: Optional[dict],
+    result: dict,
+    text: str,
+    expect_singing: bool,
+) -> None:
+    """整段 prob 落在边界附近时，把音频与分析一起存一份，供离线定阈值。"""
+    if not _BAND_DUMP_ENABLED or not analysis or wav is None or not len(wav):
+        return
+    prob = float(analysis.get("singing_probability", 0.0) or 0.0)
+    if not (_BAND_DUMP_LOW <= prob <= _BAND_DUMP_HIGH):
+        return
+    try:
+        fingerprint = hashlib.sha1(
+            np.ascontiguousarray(wav, dtype=np.float32).tobytes()
+        ).hexdigest()
+        with _band_dump_lock:
+            if fingerprint in _band_dump_seen:
+                return
+            _band_dump_seen[fingerprint] = time.time()
+            while len(_band_dump_seen) > 4 * _BAND_DUMP_KEEP:
+                _band_dump_seen.popitem(last=False)
+        os.makedirs(_BAND_DUMP_DIR, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
+        base = os.path.join(_BAND_DUMP_DIR, f"{stamp}_p{prob:.2f}")
+        sf.write(base + ".wav", wav, 16000, format="WAV", subtype="PCM_16")
+        meta = {
+            "singing_probability": prob,
+            "is_singing": bool(result.get("is_singing", False)),
+            "duration": float(analysis.get("duration", 0.0) or 0.0),
+            "singing_start_seconds": float(analysis.get("singing_start_seconds", 0.0) or 0.0),
+            "singing_end_seconds": float(analysis.get("singing_end_seconds", 0.0) or 0.0),
+            "pitch_timeline_start_seconds": float(
+                analysis.get("pitch_timeline_start_seconds", 0.0) or 0.0),
+            "voiced_ratio": float(analysis.get("voiced_ratio", 0.0) or 0.0),
+            "periodicity_mean": float(analysis.get("periodicity_mean", 0.0) or 0.0),
+            "pitch_stability": float(analysis.get("pitch_stability", 0.0) or 0.0),
+            "sustained_ratio": float(analysis.get("sustained_ratio", 0.0) or 0.0),
+            "pitch_backend": str(analysis.get("pitch_backend", "")),
+            "expect_singing": bool(expect_singing),
+            "singing_expected_override": bool(
+                result.get("singing_expected_override", False)),
+            "language": str(result.get("language", "")),
+            "text": text,
+            "singing_text": str(result.get("singing_text", "")),
+            # 人工标注用：这一轮到底唱了没有。落盘时留空，离线看波形/听音频后填。
+            "label": "",
+        }
+        with io.open(base + ".json", "w", encoding="utf-8") as handle:
+            json.dump(meta, handle, ensure_ascii=False, indent=2)
+        # 只留最近若干组，别把磁盘吃满
+        stems = sorted(
+            name[:-4] for name in os.listdir(_BAND_DUMP_DIR) if name.endswith(".wav")
+        )
+        for stem in stems[:-_BAND_DUMP_KEEP]:
+            for suffix in (".wav", ".json"):
+                try:
+                    os.remove(os.path.join(_BAND_DUMP_DIR, stem + suffix))
+                except OSError:
+                    pass
+        print(f"[BandDump] prob={prob:.2f} dur={meta['duration']:.2f}s "
+              f"岛=({meta['singing_start_seconds']:.2f},{meta['singing_end_seconds']:.2f}) "
+              f"→ {os.path.basename(base)}.wav", flush=True)
+    except Exception as exc:                       # 落盘失败绝不能影响 ASR
+        print(f"[BandDump] 跳过: {exc}", flush=True)
+
+
+def transcribe_singing_tail(
+    wav: np.ndarray,
+    analysis: Optional[dict],
+    language: str,
+) -> str:
+    """唱完之后那截说话的单独转写。
+
+    整轮 ASR 在长的混合录音上只转得出开头：8/10 实测一段 26.7s 的
+    【说话6.5s + 日文演唱14.4s + 说话5.8s】，整轮转写只有开头那 6.5 秒，
+    演唱和尾巴全丢了。单独切片一跑，尾巴是
+        「呃，后面好像有点唱错了，停一下停一下，这一段不算这一段不算，我们重新唱。」
+    ——用户明确作废了刚才那段演唱，而这句话此前没有任何子系统看得见。
+
+    跟 transcribe_singing_segment 一样只在确认歌唱时做，多这一次识别相对于
+    随后十几秒的歌声合成可以忽略。
+    """
+    if not analysis or not bool(analysis.get("is_singing", False)):
+        return ""
+    total = wav.size / 16000.0
+    end = float(analysis.get("singing_end_seconds", 0.0) or 0.0)
+    if end <= 0.0 or total - end < 1.2:      # 没有尾巴，或短到不可能是一句话
+        return ""
+    lo = min(int(wav.size), max(0, int(end * 16000)))
+    if wav.size - lo < 16000:
+        return ""
+    try:
+        res = generate_asr(wav[lo:], language)
+    except Exception as exc:                 # 失败不能拖垮整轮
+        print(f"[SingingTail] tail ASR failed: {exc}")
+        return ""
+    tail_text = parse_output(res[0]["text"] if res else "")[0]
+    tail_text = (tail_text or "").strip()
+    if tail_text:
+        print(f"[SingingTail] {end:.2f}s~{total:.2f}s: {tail_text!r}", flush=True)
+    return tail_text
 
 
 def transcribe_singing_segment(
@@ -1218,12 +1344,14 @@ async def asr(
             segment_lyrics.get("lyrics_reading_complete", False)
         )
         result["singing_lyrics_mora"] = segment_lyrics.get("lyrics_mora", []) or []
+        result["singing_tail_text"] = transcribe_singing_tail(wav, singing, language)
         result["audio_content_start_seconds"] = round(audio_content_start_seconds, 3)
         result["singing_expected"] = bool(expect_singing)
         result["singing_expected_override"] = bool(expected_singing_override)
         if singing_vad_override:
             result["is_singing"] = True
         result.update(speaker_meta)
+        dump_band_sample(wav, singing, result, text, expect_singing)
         return result
     except Exception as e:
         import traceback

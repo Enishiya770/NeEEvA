@@ -360,6 +360,197 @@ public class ChatQW : LLM
     }
 
     /// <summary>
+    /// 判断一段最终转写是唱歌还是说话，回调返回 "singing" / "speech" / ""(判不出)。
+    ///
+    /// 刻意不带会话上下文：实测同样的判断，挂在 12k token 的完整上下文后面要 2.64s
+    /// (其中生成整个 JSON 占 2.2s、上下文预填充另占约 1.6s)，而只带这一句转写、
+    /// 只要一个词时是 **0.41s**，十个历史误判样本全部判对。
+    ///
+    /// 必须关思考：模型是 thinking 型的，不关的话 content 一直为空，答案卡在
+    /// reasoning_content 里出不来。
+    /// </summary>
+    /// <param name="segmentLyrics">
+    /// 声学上被判为演唱的那一段的**单独转写**。整轮 ASR 按整轮语言跑，唱的那段语言
+    /// 不同时会被整段丢掉：8/9 实测三轮连续的「中文说话 + 日文演唱」，整轮转写里
+    /// 一个假名都没有(全日志搜 夢/でしょう 只在唯一转对的那轮出现过)，而片段转写
+    /// 拿到了 31~32 字 lang=ja。分类器只看整轮转写时只能答 speech，三段真演唱因此
+    /// 被软降级丢弃，用户当场反馈「你还是没唱出来啊」。
+    /// </param>
+    public void ClassifyUtteranceMode(
+        string transcript, Action<string> callback, string segmentLyrics = null)
+    {
+        if (callback == null) return;
+        if (string.IsNullOrWhiteSpace(transcript)) { callback(""); return; }
+        StartCoroutine(ClassifyUtteranceModeRoutine(
+            transcript.Trim(),
+            string.IsNullOrWhiteSpace(segmentLyrics) ? "" : segmentLyrics.Trim(),
+            callback));
+    }
+
+    /// <summary>
+    /// 用户唱完之后那句话，是不是在把刚才那段演唱作废。
+    /// 回调 true 只在模型明确说作废时给出；判不出、请求失败、文本为空一律 false。
+    ///
+    /// 调用方应当让它与歌声转换**并行**跑：转换要十几秒，这个判定不到一秒，
+    /// 完全藏得住，所以不占首音延迟。判 true 时中止转换即可。
+    ///
+    /// 宁可漏判也不能误判：漏了最多多唱一次(用户开口就会触发 barge-in 中止)，
+    /// 误判则是静默吞掉一段本该回哼的演唱，用户看不到任何反馈。
+    /// </summary>
+    public void ClassifySingingRetraction(string tailText, Action<bool> callback)
+    {
+        if (callback == null) return;
+        if (string.IsNullOrWhiteSpace(tailText)) { callback(false); return; }
+        StartCoroutine(ClassifySingingRetractionRoutine(tailText.Trim(), callback));
+    }
+
+    private IEnumerator ClassifySingingRetractionRoutine(
+        string tailText, Action<bool> callback)
+    {
+        //措辞是量出来的。第一版只说"是不是在作废"，12 个样本里 10/12，**两个错都是
+        //假阳**——「这首歌叫演员，是薛之谦的。」和「那我们下一首换一个吧。」都被判成
+        //作废。假阳正是不能出的方向：它会静默吞掉一段本该回哼的演唱。
+        //补上反例清单、并把"拿不准答 keep"写死之后 12/12，假阳 0。
+        string prompt =
+            "用户刚唱完一段，紧接着说了下面这句话。判断他是不是在说**刚才唱的这一遍作废、" +
+            "不要用**。\n" +
+            "只有当他明确否定刚才那一遍（唱错了／不算／重来／重新唱一次）时 → discard\n" +
+            "其余一律 → keep。包括：评价刚才唱得怎么样、介绍这首歌、让你跟着唱、" +
+            "提议下一首换别的歌——这些都不是作废。\n" +
+            "拿不准就答 keep。只回答一个词。\n\n" + tailText;
+
+        var sb = new StringBuilder(prompt.Length + 256);
+        sb.Append('{');
+        sb.Append("\"model\":"); AppendJsonString(sb, CurrentModelName);
+        sb.Append(",\"stream\":false,\"enable_thinking\":false");
+        sb.Append(",\"max_tokens\":8,\"temperature\":0");
+        sb.Append(",\"messages\":[");
+        AppendMessage(sb, new SendData("user", prompt));
+        sb.Append(']');
+        if (m_Backend == BackendType.Local)
+            sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        sb.Append('}');
+
+        float t0 = Time.realtimeSinceStartup;
+        bool discard = false;
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(sb.ToString()));
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader(
+                "Authorization",
+                string.Format("Bearer {0}", string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
+            request.timeout = 8;
+            yield return request.SendWebRequest();
+            if (request.responseCode == 200)
+            {
+                string body = request.downloadHandler.text ?? "";
+                //只认明确的 discard；含糊一律当作没作废
+                discard = body.IndexOf("discard", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            if (m_LogRequestStats)
+                Debug.Log($"[唱完撤回判定] {(discard ? "作废" : "保留")} " +
+                          $"用时 {Time.realtimeSinceStartup - t0:F2}s " +
+                          $"code={request.responseCode}: \"{tailText}\"");
+        }
+        callback(discard);
+    }
+
+    /// <summary>
+    /// 片段转写是否已经被整轮转写涵盖。按去重字符的重合率算：日文演唱那种整轮完全
+    /// 漏掉的场合重合率接近 0，中文里片段本就是整轮子串的场合接近 1。
+    /// </summary>
+    private static bool TranscriptCoversSegment(string transcript, string segment)
+    {
+        if (string.IsNullOrEmpty(segment)) return true;
+        var distinct = new HashSet<char>();
+        foreach (char c in segment)
+            if (!char.IsWhiteSpace(c) && !char.IsPunctuation(c)) distinct.Add(c);
+        if (distinct.Count == 0) return true;
+        int covered = 0;
+        foreach (char c in distinct)
+            if (transcript.IndexOf(c) >= 0) covered++;
+        return covered >= distinct.Count * 0.6f;
+    }
+
+    private IEnumerator ClassifyUtteranceModeRoutine(
+        string transcript, string segmentLyrics, Action<string> callback)
+    {
+        //问法很关键：早先问"这句是 singing 还是 speech"，混合轮(说话开头+后面唱)
+        //全部答 speech——句子以对话开头、又含对话内容，模型答得没错，是问题问错了。
+        //流水线要的是"这一轮里有没有值得回哼的演唱"，混合轮答案应该是 singing。
+        //改成下面这个问法后，同一批 20 个真实样本从 11/20 提到 17/20。
+        //片段转写只在整轮转写没收录它时才附上。整轮已经包含同样的字时重复贴一遍，
+        //等于把歌词在提示里说两遍，会把模型往 singing 推——而文字否决权是有用的
+        //(实测「我刚才已经唱出来了呀，就是唱。」正是靠它降级的)，不能削弱。
+        bool segmentAddsEvidence = segmentLyrics.Length > 0 &&
+            !TranscriptCoversSegment(transcript, segmentLyrics);
+        string prompt =
+            "用户刚说完一段话，下面是它的转写。判断这段里**有没有真正唱出来的部分**" +
+            "（哪怕前面几句是普通说话、哪怕只唱了一句）。\n" +
+            "含有歌词或旋律 → singing\n" +
+            "全程都是在对你讲话、提问、评论、或者只是在商量要唱什么 → speech\n" +
+            "只回答一个词。\n\n" + transcript;
+        if (segmentAddsEvidence)
+        {
+            //措辞是量出来的，不是随手写的。12 个样本(7 个来自 8/9 实测 + 5 个反面构造)
+            //上扫了四种写法：只中立地说"整轮漏了这段"是 9/12——救回了三轮日文演唱，
+            //但把「噪音碎片」「点播 Lemon」「引用歌词讨论」三个说话轮全推成了 singing，
+            //等于废掉文字否决权。补上下面这句"引用不算唱"后是 11/12。
+            //唯一剩下的误判是"边说边引用歌词"，那是文字上本来就分不开的老问题
+            //(见 ChatSample 交集那段注释)，由声学模糊带的全票否决兜底，不归这里管。
+            prompt += "\n\n（补充：上面的整轮转写可能漏掉了一段声音，那段单独转写是：）\n" +
+                      segmentLyrics +
+                      "\n\n注意：只是在谈论、引用、点播一首歌，不算唱；要真的把它唱出来才算。";
+        }
+
+        var sb = new StringBuilder(prompt.Length + 256);
+        sb.Append('{');
+        sb.Append("\"model\":"); AppendJsonString(sb, CurrentModelName);
+        sb.Append(",\"stream\":false,\"enable_thinking\":false");
+        sb.Append(",\"max_tokens\":8,\"temperature\":0");
+        sb.Append(",\"messages\":[");
+        AppendMessage(sb, new SendData("user", prompt));
+        sb.Append(']');
+        if (m_Backend == BackendType.Local)
+            sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        sb.Append('}');
+
+        float t0 = Time.realtimeSinceStartup;
+        string verdict = "";
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(sb.ToString()));
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader(
+                "Authorization",
+                string.Format("Bearer {0}", string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
+            request.timeout = 8;
+            yield return request.SendWebRequest();
+            if (request.responseCode == 200)
+            {
+                string body = request.downloadHandler.text ?? "";
+                //判不出时宁可返回空，让调用方沿用原有的声学结论，不要瞎猜
+                if (body.IndexOf("singing", StringComparison.OrdinalIgnoreCase) >= 0)
+                    verdict = "singing";
+                else if (body.IndexOf("speech", StringComparison.OrdinalIgnoreCase) >= 0)
+                    verdict = "speech";
+            }
+            if (m_LogRequestStats)
+            {
+                Debug.Log($"[模态判定] {(string.IsNullOrEmpty(verdict) ? "无结论" : verdict)} " +
+                          $"用时 {Time.realtimeSinceStartup - t0:F2}s code={request.responseCode} " +
+                          $"附片段歌词={(segmentAddsEvidence ? "是" : segmentLyrics.Length > 0 ? "否(整轮已含)" : "否(无)")}: " +
+                          $"\"{(transcript.Length > 40 ? transcript.Substring(0, 40) : transcript)}\"" +
+                          (segmentAddsEvidence ? $" + \"{segmentLyrics}\"" : ""));
+            }
+        }
+        callback(verdict);
+    }
+
+    /// <summary>
     /// 发送消息
     /// </summary>
     /// <returns></returns>

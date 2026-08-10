@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 import os
 import threading
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 from singing_score import build_singing_score
@@ -22,6 +22,32 @@ NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 # 排查「回哼从哪句开始/到哪句结束」时用。一次 thorough 分析只打一行，
 # 排查完可用 NEEEVA_LOG_ISLAND=0 关掉。
 _LOG_ISLAND = os.environ.get("NEEEVA_LOG_ISLAND", "1") != "0"
+
+# 候选岛的取舍判据：把这座岛单独当成一段音频跑一次 analyze()，用它的
+# singing_probability，而不是岛内候选窗的平均分。
+#
+# 8/10 用 29 段人工标注(用户逐段听音频打的起唱/唱完)量出来的：
+#     岛分类准确率   候选窗均分 90%  →  岛内 prob 93%
+#     起点误差中位   0.22s → 0.13s   最大 5.22s → 2.22s   超 1s 3/27 → 1/27
+#     终点误差最大   13.81s → 1.85s                      超 1s 2/27 → 1/27
+# 在此之前我用 LLM 给切片打标签量过一次，得到"两个判据都只有 75%/79%、完全
+# 分不开"——那是错的：LLM 面对两三秒的歌词切片(「简单点。」)会压倒性地判成说话
+# (31 次假阴、1 次假阳)，标签本身有偏。真值一到，结论就反过来了。
+#
+# 下限 0.60 的稳定窗口是 [0.59, 0.61]（三点结果完全一致），但 0.58 和 0.62
+# 都会退化到 4/27。27 段里 21 段对阈值完全不敏感，波动全来自 6 段边缘素材。
+# 窗口只有约 ±0.015，样本也只有 27 段——日志里打了每座岛的 prob，
+# 将来素材落到窗外时能一眼看出是不是这个数的问题。
+_ISLAND_PROB_FLOOR = 0.60
+# 低于这个整段概率就不做细化：那多半是普通对话轮，而这条路径直接决定她开口的
+# 延迟(实测细化每座岛 0.24s、一轮约 3.6 座，整段 analyze 从 0.89s 涨到 1.53s)。
+# 0.40 与 Unity 侧模糊带下沿一致。
+_ISLAND_REFINE_MIN_PROBABILITY = 0.40
+# 再加一道时长闸。细化要解决的是「说话+唱歌」混合轮的起唱点，而混合轮都不短：
+# 29 段标注里需要纠正边界的全部 ≥11.8s。短句要么整段说话要么整段唱，岛占比接近
+# 100%，旧判据本来就对。不细化短句 = 维持已知没问题的行为，同时让模糊带里那些
+# 两三秒的轮次一秒都不多花。
+_ISLAND_REFINE_MIN_SECONDS = 8.0
 
 
 def hz_to_midi(hz: np.ndarray) -> np.ndarray:
@@ -69,6 +95,11 @@ class SingingAnalyzer:
         self._crepe = None
         self._crepe_checked = False
         self._crepe_lock = threading.Lock()
+        # 细化候选岛时会对切片再调一次 analyze()，用这个标志挡住无限递归。
+        self._nested_island_probe = False
+        # 音频指纹 → (已累计次数, 平均后的周期性)。同一段音频被重复分析时用来降方差，
+        # 见 _track_crepe 里的说明。只保留最近几段。
+        self._periodicity_history: Dict[tuple, Tuple[int, np.ndarray]] = {}
 
     @property
     def torchcrepe_available(self) -> bool:
@@ -143,7 +174,11 @@ class SingingAnalyzer:
         )
         if should_upgrade:
             try:
-                crepe_result = self._track_crepe(signal)
+                # 必须和 FFT 那一遍喂同一个信号。原来这里传的是未归一化的 signal，
+                # 而 FFT 拿的是 tracker_signal(除以 rms*8 后裁剪)，两者算出的周期性
+                # 量纲不同——同一段尾部说话，FFT 那遍打 0.61、crepe 那遍打 0.81，
+                # 而岛的分数下限 0.78 对两者一视同仁。
+                crepe_result = self._track_crepe(tracker_signal)
                 if crepe_result is not None:
                     pitch, periodicity, hop_seconds = crepe_result
                     result = self._summarize(
@@ -158,6 +193,9 @@ class SingingAnalyzer:
                         language=language,
                         include_score=thorough,
                         force_score=force_score,
+                        # 只有 crepe 这一遍做候选岛细化：FFT 那一遍的结果马上就被
+                        # 覆盖，白花时间；嵌套调用里也必须关掉，否则无限递归。
+                        island_signal=None if self._nested_island_probe else signal,
                     )
             except Exception as exc:
                 # A CUDA/driver mismatch must not break ASR.  Keep the already
@@ -210,6 +248,16 @@ class SingingAnalyzer:
         pitch[silent] = 0.0
         return pitch, periodicity, hop / float(self.sample_rate)
 
+    @staticmethod
+    def _signal_key(signal: np.ndarray) -> tuple:
+        """给同一段音频一个廉价指纹。长度 + 首尾/中段抽样的字节哈希即可——
+        我们要区分的是"同一轮被重复分析"和"不同的音频"，不需要抗碰撞。"""
+        raw = signal.tobytes()
+        head = raw[:4096]
+        tail = raw[-4096:]
+        middle = raw[len(raw) // 2: len(raw) // 2 + 4096]
+        return (signal.size, hash(head), hash(middle), hash(tail))
+
     def _track_crepe(self, signal: np.ndarray):
         torchcrepe = self._load_torchcrepe()
         if torchcrepe is None:
@@ -229,11 +277,56 @@ class SingingAnalyzer:
                 device=self.device,
                 return_periodicity=True,
             )
-        return (
-            pitch.squeeze(0).detach().cpu().numpy().astype(np.float32),
-            periodicity.squeeze(0).detach().cpu().numpy().astype(np.float32),
-            0.01,
-        )
+        pitch = pitch.squeeze(0).detach().cpu().numpy().astype(np.float32)
+        periodicity = periodicity.squeeze(0).detach().cpu().numpy().astype(np.float32)
+
+        # torchcrepe 对同一段音频不是确定性的：实测同一个 wav 连跑三次，
+        # 整段 prob = 0.7380 / 0.7360 / 0.7550(voiced_ratio 三次相同，抖动全在周期性)。
+        # 岛的分数只在十几个窗口上平均，抖动被放大——8/9 实测同一段尾部说话三次分别
+        # 打了 0.69 / 0.66 / 0.78，而下限就在 0.78，最后那次擦线通过，多留了 1.7s 说话。
+        #
+        # 而同一段音频本来就会被分析多次(推测 ASR 与最终 ASR 各一次，日志里可见两条
+        # 完全相同的 dur)。把历次周期性做平均，方差按 √n 下降，成本为零。
+        key = self._signal_key(signal)
+        with self._crepe_lock:
+            previous = self._periodicity_history.get(key)
+            if previous is not None and previous[1].shape == periodicity.shape:
+                count = previous[0] + 1
+                periodicity = (previous[1] * previous[0] + periodicity) / count
+                self._periodicity_history[key] = (count, periodicity)
+            else:
+                self._periodicity_history[key] = (1, periodicity)
+                count = 1
+            # 只保留最近若干段，防止长会话把内存吃光
+            while len(self._periodicity_history) > 8:
+                self._periodicity_history.pop(next(iter(self._periodicity_history)))
+        if count > 1 and _LOG_ISLAND:
+            print(f"[Island] 周期性取 {count} 次分析的平均(同一段音频重复分析)",
+                  flush=True)
+        return pitch, periodicity, 0.01
+
+    def _make_island_prober(self, signal: np.ndarray):
+        """→ f(起, 止) 返回把这一小段单独当成一段音频分析得到的 singing_probability。
+
+        `_nested_island_probe` 挡住递归：这里再调 analyze 会又走到 _summarize，
+        若不关掉细化就会无限套下去。
+        """
+        def probe(start_seconds: float, end_seconds: float) -> float:
+            lo = max(0, int(start_seconds * self.sample_rate))
+            hi = min(signal.size, int(end_seconds * self.sample_rate))
+            if hi - lo < int(1.2 * self.sample_rate):
+                return float("nan")          # 太短，分析不可靠，交回给旧判据
+            self._nested_island_probe = True
+            try:
+                got = self.analyze(
+                    signal[lo:hi], lyrics="", thorough=True, force_score=True)
+            except Exception:
+                return float("nan")
+            finally:
+                self._nested_island_probe = False
+            return float(got.get("singing_probability", float("nan")))
+
+        return probe
 
     def _summarize(
         self,
@@ -248,6 +341,7 @@ class SingingAnalyzer:
         language: str,
         include_score: bool,
         force_score: bool,
+        island_signal: Optional[np.ndarray] = None,
     ) -> Dict:
         pitch = np.asarray(pitch, dtype=np.float32).reshape(-1)
         periodicity = np.asarray(periodicity, dtype=np.float32).reshape(-1)
@@ -308,13 +402,6 @@ class SingingAnalyzer:
             hop_seconds,
             timeline_frame_seconds,
         )
-        singing_start_seconds, singing_end_seconds = self._estimate_singing_start(
-            smoothed,
-            voiced,
-            periodicity,
-            hop_seconds,
-            duration,
-        )
         timeline_bucket = max(
             1, int(round(timeline_frame_seconds / max(hop_seconds, 1e-3)))
         )
@@ -352,6 +439,23 @@ class SingingAnalyzer:
             - speech_density_penalty
             - pitch_churn_penalty
         )
+        # 边界要在 probability 之后算：细化那一层(每座候选岛单独跑一次 analyze)
+        # 只在这一轮确实像唱歌时才做，普通对话轮一秒都不多花——那条路径直接决定
+        # 她开口的延迟。8/10 实测每座岛 0.24s、一轮约 3.6 座，合计约 +0.9s。
+        refine_islands = (
+            island_signal is not None
+            and duration >= _ISLAND_REFINE_MIN_SECONDS
+            and (probability >= _ISLAND_REFINE_MIN_PROBABILITY or force_score)
+        )
+        singing_start_seconds, singing_end_seconds = self._estimate_singing_start(
+            smoothed,
+            voiced,
+            periodicity,
+            hop_seconds,
+            duration,
+            self._make_island_prober(island_signal) if refine_islands else None,
+        )
+
         low_hz = float(440.0 * (2.0 ** ((low - 69.0) / 12.0)))
         high_hz = float(440.0 * (2.0 ** ((high - 69.0) / 12.0)))
         median_hz = float(440.0 * (2.0 ** ((median - 69.0) / 12.0)))
@@ -416,8 +520,13 @@ class SingingAnalyzer:
         periodicity: np.ndarray,
         hop_seconds: float,
         duration: float,
+        island_prob=None,
     ) -> Tuple[float, float]:
         """Locate the sustained melodic region in a mixed utterance.
+
+        ``island_prob(start, end) -> float`` 可选：给出把某座候选岛单独分析得到的
+        singing_probability。给了就用它取舍候选岛（更准，代价是每座岛一次分析），
+        没给就退回候选窗均分那套。返回 NaN 表示这座岛测不了，该岛退回旧判据。
 
         Returns ``(start, end)`` in seconds.  ``(0.0, duration)`` is the
         conservative fallback: failure to find a boundary must never cut away
@@ -517,16 +626,35 @@ class SingingAnalyzer:
         # (14.40-21.20/0.66，因为它最长)，把整段演唱丢在外面。
         #
         # 所以: 先按分数筛掉不像唱的岛，再以幸存者里最长的那座为锚向两侧合并。
-        # 下限用绝对值 0.78——实测唱 0.83~0.95 / 说 0.61~0.74，两簇之间是空的，
-        # 绝对门槛已经够用。与 top 取小是为了只有一座低分岛时不会把它也筛掉。
+        # 与 top 取小是为了只有一座低分岛时不会把它也筛掉。
         #
         # 原来还叠了一个 top-0.10 的相对项，它只会让门槛更严：8/9 实测一段
         # runs=[…4.40-11.50/0.83 11.40-14.40/0.84 14.10-17.80/0.95]，因为 top=0.95
         # 把下限抬到 0.85，两座真岛被筛掉，起唱点从 4.40s 跳到 14.43s。
         # 遇到特别干净的一段反而更容易切错，所以去掉相对项。
-        scores = [run[2] / max(1, run[3]) for run in viable]
+        #
+        # 下限原为 0.78，依据是「唱 0.83~0.95 / 说 0.61~0.74，两簇之间是空的」。
+        # 8/9 实测打破了这个前提：「啊，我先唱这一首吧，嗯」——开头长「啊」、结尾
+        # 长「嗯」，全是持续元音——组成一座 0.00-2.30s 的岛，均分 0.786，比她真正
+        # 起唱那几秒(0.555/0.631/0.677)还高。它以 0.006 之差过闸，进而获得桥接资格
+        # (与歌声之间未覆盖间隔只有 0.20s，远小于 1.20s 容忍度)，把 span 拉到 0，
+        # 最后被 <0.45 那道保护抹成 0.00 —— 整段说话被当成歌回哼了出去。
+        # 抬到 0.80 后：手上 21 段素材只有这一段的边界变了(0.00s → 2.83s，与流式
+        # 锚点 2.82s 一致)，全语料里均分落在 [0.78,0.80) 的合格岛也只有它那一座。
+        # 余量很薄(同段真歌声最低 0.825)——8/10 果然又撞上反例(说话 0.809 / 唱 0.733)，
+        # 于是换判据：有 island_prob 时改用「把这座岛单独分析一次」的概率，
+        # 均分只作为拿不到概率时的退路。依据见文件顶部 _ISLAND_PROB_FLOOR。
+        mean_scores = [run[2] / max(1, run[3]) for run in viable]
+        scores, floor_used, probed = mean_scores, 0.80, False
+        if island_prob is not None:
+            measured = [island_prob(run[0] * hop, run[1] * hop) for run in viable]
+            # 全部测到才换判据。只测到一部分时两种分数量纲不同(均分 0.6~0.9 /
+            # 概率 0.3~0.8)，混在一起比大小是错的，宁可整段退回旧判据。
+            if all(value == value for value in measured):
+                scores, floor_used, probed = measured, _ISLAND_PROB_FLOOR, True
+        score_of = {id(run): score for run, score in zip(viable, scores)}
         top_score = max(scores)
-        keep_floor = min(top_score, 0.78)
+        keep_floor = min(top_score, floor_used)
         kept = [
             run for run, score in zip(viable, scores)
             if score >= keep_floor - 1e-9
@@ -562,6 +690,14 @@ class SingingAnalyzer:
                     gap -= right - left
             return max(0, gap)
 
+        # 试过"桥不许跨过一座合格但被分数否掉的岛"，已撤回。8/10 实测 46 段：
+        # 修好了 2 段(1.23s→6.83s、0.00s→10.13s，切片核对过起点确实在那里)，
+        # 但也切坏了 1 段本来正确的——那一段 3.93-7.00s 唱的是「简单点，说话的方式」
+        # (切片 ASR prob=0.61)，它的岛分数低于下限被当成"说话"挡住了桥，起点从
+        # 3.93s 推到 10.03s，砍掉 6.1 秒真歌声。尾侧更糟：一段 5.13-18.11s 的
+        # 日文演唱被截成 5.13-9.67s。
+        # 根因是分数本身分不开——实测 说话 0.786/0.805/0.809 与 唱 0.733/0.778
+        # 完全交错，任何建立在这个分数上的规则都会同时误伤两边。
         bridge_frames = max(max_gap_frames, int(round(1.20 / hop)))
         span_start, span_end = anchor[0], anchor[1]
         merged = True
@@ -626,11 +762,15 @@ class SingingAnalyzer:
                     len(runs),
                     keep_floor,
                     " ".join(
-                        # * = 合格(长度/窗口数)，+ = 通过分数下限、参与合并
-                        "{:.2f}-{:.2f}/{:.2f}{}".format(
+                        # * = 合格(长度/窗口数)，+ = 通过分数下限、参与合并。
+                        # 细化生效时括号里是这座岛单独分析出来的概率——它才是取舍
+                        # 依据，斜杠前那个均分只留着做对照。
+                        "{:.2f}-{:.2f}/{:.2f}{}{}".format(
                             r[0] * hop,
                             r[1] * hop,
                             r[2] / max(1, r[3]),
+                            "(p{:.2f})".format(score_of[id(r)])
+                            if probed and id(r) in score_of else "",
                             ("+" if r in kept else "*") if r in viable else "",
                         )
                         for r in runs

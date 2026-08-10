@@ -123,6 +123,8 @@ public class SenseVoiceSpeechToText : STT
     //   0.13/0.23/0.35 判说话，0.62~0.77 共 14 次全判唱歌，两端各自干净；
     //   [0.40,0.58] 是唯一重叠区(0.40唱 0.45唱 0.57说 0.58说)，占 15%。
     //攒够 60~80 个样本后再决定要不要把「模糊带交给 LLM 定」变成真实行为。
+    // 岛比流式起唱点晚多少之内仍然信岛。见下方 onsetsAgree 处的推导。
+    private const float k_IslandLaterToleranceSeconds = 1.75f;
     private const float k_SingingBandLow = 0.40f;
     private const float k_SingingBandHigh = 0.58f;
 
@@ -137,6 +139,40 @@ public class SenseVoiceSpeechToText : STT
     //服务端对裁出来那段单独识别得到的歌词。整轮转写含唱前唱后的说话，
     //拿它当歌词会被 SVS 硬塞进几秒的旋律里，唱出来听不清。
     private string m_LastResponseSingingText = "";
+    //本轮响应给出的头部裁剪量。每份响应都会重写，所以不会串轮。
+    private float m_LastResponseAudioCropSeconds = 0f;
+    private string m_LastResponseSingingTailText = "";
+
+    /// <summary>
+    /// 唱完之后那截说话的单独转写（可能为空）。整轮 ASR 在长的混合录音上只转得出
+    /// 开头——8/10 实测 26.7s 的【说话+日文演唱+说话】只转出了前 6.5 秒，
+    /// 尾巴那句「这一段不算，我们重新唱」谁都看不见。回哼要靠它判断你是不是
+    /// 当场把刚才那段作废了。
+    /// </summary>
+    public string LastSingingTailText
+    {
+        get { return m_LastResponseSingingTailText ?? ""; }
+    }
+
+    /// <summary>
+    /// 本轮响应的头部裁剪量（秒，0 表示从录音开头就是歌）。流式快速回唱是从
+    /// 录音第 0 秒开始预转换的，它必须看这个值：不为 0 就说明它转的那一段
+    /// 前面含有最终判定要丢掉的说话。
+    /// </summary>
+    public float LastResponseAudioCropSeconds
+    {
+        get { return m_LastResponseAudioCropSeconds; }
+    }
+
+    /// <summary>
+    /// 上一轮里被判为演唱的那一段的单独转写(可能为空)。整轮 ASR 按整轮语言跑，
+    /// 演唱段语言不同时会整段丢失，这份是唯一还留着唱词的地方——模态判定要靠它，
+    /// 否则「中文说话 + 日文演唱」的轮次在文字上看起来全是说话。
+    /// </summary>
+    public string LastSegmentLyrics
+    {
+        get { return m_LastResponseSingingText ?? ""; }
+    }
     //与上面那段歌词配套的语言/假名，必须整组一起用，不能和整轮的混着。
     private string m_LastResponseSingingLanguage = "";
     private string m_LastResponseSingingReading = "";
@@ -771,6 +807,10 @@ public class SenseVoiceSpeechToText : STT
                                   $"(阈值 0.58 判为{(_response.is_singing ? "唱" : "说")}) " +
                                   $"文本=\"{(LastText ?? "").Trim()}\"");
                     }
+                    //每一份响应都要重置：调用方问的是「刚刚这一轮裁了多少头」，
+                    //沿用上一轮的值会让没有演唱的轮次继承一个大裁剪量。
+                    m_LastResponseAudioCropSeconds = 0f;
+                    m_LastResponseSingingTailText = _response.singing_tail_text ?? "";
                     m_LastResponseSingingText = _response.singing_text ?? "";
                     m_LastResponseSingingLanguage = _response.singing_language ?? "";
                     m_LastResponseSingingReading = _response.singing_lyrics_reading ?? "";
@@ -811,8 +851,24 @@ public class SenseVoiceSpeechToText : STT
                         // 流式=3.65s(差 0.28s)，减完变成 2.90s，「那我再唱最后一段哦」
                         // 就这么漏进了回哼素材。
                         // 一致时取岛的精确值；分歧大时(岛可能跳到后半句)维持保护。
-                        onsetsAgree = Mathf.Abs(
-                            acousticAudioCropSeconds - streamingSingingOnsetSeconds) <= 1.0f;
+                        //
+                        // 判据只该看**岛比流式晚多少**，不该看绝对差：
+                        //  · 岛比流式早 → min() 本来就会选岛，保护不起作用，早多少无所谓
+                        //    (8/10 实测 岛=13.83s / 流式=20.41s，早 6.6s，选岛且正确)；
+                        //  · 岛比流式晚 → 才是"岛可能跳到后半句"，保护才有意义。
+                        // 原来写成 Abs(...) <= 1.0f，把两种情形混为一谈，而且 1.0 这个
+                        // 硬阈值有悬崖：8/10 实测 岛=8.33s / 流式=7.27s，差 1.06s，
+                        // 只超了 0.06 就判为分歧，退回 6.52s，把 1.81 秒的「唱着首」
+                        // 当成歌唱了回去(切片送 ASR 复核：6.52-8.33s 是说话 prob=0.36，
+                        // 8.33s 起才是歌 prob=0.71，岛是对的)。
+                        //
+                        // 容忍度 1.75s 的依据很薄，只有两个方向相反的实测点：
+                        //   晚 1.06s → 岛正确(上面这次)
+                        //   晚 2.50s → 岛错误(8/9，岛=11.43s / 流式=8.93s，占比 33%)
+                        // 取在两者之间。再遇到反例应该换判据，而不是继续挪这个数。
+                        float islandLaterBySeconds =
+                            acousticAudioCropSeconds - streamingSingingOnsetSeconds;
+                        onsetsAgree = islandLaterBySeconds <= k_IslandLaterToleranceSeconds;
                         audioCropSeconds = onsetsAgree
                             ? acousticAudioCropSeconds
                             : Mathf.Min(
@@ -839,6 +895,17 @@ public class SenseVoiceSpeechToText : STT
                     // 两次失效方向相反(岛太早 vs 岛太晚)，占比 45% 与 33% 分不开，
                     // 暂无可靠判据，先退回已知状态：窗口由流式保护决定。
                     bool alignCropToIsland = false;
+
+                    // 音频与音高时间线必须描述同一段。时间线只从 pitch_timeline_start_seconds
+                    // 开始（服务端只为歌声那部分建时间线），如果音频裁得比它还靠前，多出来的
+                    // 那截就没有旋律与之对应——8/9 实测保守分支把 audioCrop 归零，音频留了
+                    // 19.16s、时间线只有 9.90s，排队时按 melody=9.9s 记账，实际播出去 19.10s，
+                    // 前面 9.3 秒的说话被原样复读。
+                    float timelineStartAbsolute = _response.audio_content_start_seconds +
+                        _response.pitch_timeline_start_seconds;
+                    bool clampedToTimeline = audioCropSeconds < timelineStartAbsolute - 0.05f;
+                    if (clampedToTimeline) audioCropSeconds = timelineStartAbsolute;
+
                     float croppedContentSeconds = Mathf.Max(
                         0f, audioCropSeconds - _response.audio_content_start_seconds);
                     float timelineCropSeconds = Mathf.Max(
@@ -894,14 +961,16 @@ public class SenseVoiceSpeechToText : STT
                                   $"protected={protectedStreamingCropSeconds:F2}s " +
                                   $"applied={audioCropSeconds:F2}s " +
                                   $"起点一致={onsetsAgree} " +
-                                  $"timeline={timelineCropSeconds:F2}s");
+                                  $"timeline={timelineCropSeconds:F2}s " +
+                                  $"对齐时间线={clampedToTimeline}" +
+                                  (clampedToTimeline ? $"(→{timelineStartAbsolute:F2}s)" : ""));
                         Debug.Log($"[SenseVoice/Singing] tail rawEnd={_response.singing_end_seconds:F2}s " +
                                   $"contentStart={_response.audio_content_start_seconds:F2}s " +
                                   $"applied={audioEndSeconds:F2}s " +
                                   $"timeline={timelineEndSeconds:F2}s");
                         // 岛占内容的比例。保守分支(流式没确认起唱点时放弃头部裁剪)防的是
-                        // 「岛跳到第二句」——那种失效会表现为比例很小。本例 68% 却也被放弃了，
-                        // 所以先量分布再定阈值，别拍脑袋。
+                        // 「岛跳到第二句」——那种失效会表现为比例很小。但 8/9 实测里占比 44%、
+                        // 岛起点完全正确的一轮也被它放弃了，所以先量分布再定阈值，别拍脑袋。
                         float contentSeconds = _response.pitch_timeline_start_seconds +
                             LastPitchTimelineMidi.Length * LastPitchTimelineFrameSeconds;
                         float islandEnd = _response.singing_end_seconds > 0f
@@ -915,6 +984,8 @@ public class SenseVoiceSpeechToText : STT
                                   $"保守放弃头部裁剪={conservativeHeadKeep} " +
                                   $"为对齐歌词改按岛裁={alignCropToIsland}");
                     }
+
+                    m_LastResponseAudioCropSeconds = audioCropSeconds;
 
                     bool hasPlayablePitch = HasPlayablePitchTimeline(LastPitchTimelineMidi);
                     if (hasPlayablePitch && !endsWithSpokenSingingExit)
@@ -2500,6 +2571,9 @@ public class SenseVoiceSpeechToText : STT
         public float singing_end_seconds = 0f;
         //只对裁出来那段单独再识别一次得到的歌词。没发生裁剪时为空。
         public string singing_text = "";
+        //唱完之后那截说话的单独转写。整轮 ASR 在长混合录音上只转得出开头，
+        //「这一段不算，我们重新唱」这种话此前没有任何子系统看得见。
+        public string singing_tail_text = "";
         //随分段歌词一起来的语言与假名。整轮可能是 zh 而唱的那段是 ja，
         //沿用整轮标签会让 9883 用错 G2P、整份乐谱被弃用。
         public string singing_language = "";
