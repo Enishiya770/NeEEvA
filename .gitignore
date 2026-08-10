@@ -133,3 +133,5 @@ Server/RVC/*_headers.txt
 /Assets/Model/41041.json.meta
 # 边界附近的整轮音频落盘，只用于离线定阈值，不入库
 /Server/SenseVoice/band_dumps/
+# 离线类型检查漏写 -out 时会在根目录生成 Assembly-CSharp 的副本（取了第一个源文件名）
+/OpenFileName.dll
