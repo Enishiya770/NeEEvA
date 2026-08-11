@@ -54,7 +54,19 @@ _active_request_id = ""
 # leave only ~1.6 GiB free at EOU; a 1.9 GiB pre-gate therefore forced an 80-second
 # CPU conversion without ever trying the much faster GPU path.  Try CUDA from
 # 1.5 GiB and let the real allocation result (rather than a coarse snapshot) decide.
-RVC_GPU_MIN_FREE_MIB = 1500
+#
+# 8/10：全套服务起来之后实测空闲只有 1109~1122 MiB，1500 这道闸把每一次回哼都
+# 推到了 CPU，CUDA 那条路一次都没试过。降到 900 实测同一段 20.4s 素材：
+#     CUDA  8.70 / 8.71 / 8.82s   (n=3，含服务重启后的第一次)
+#     CPU  12.53 / 12.73s         (n=2)
+# 省约 3.9s（31%），4/4 成功，转换期间空闲显存降到 157~198 MiB。
+# 注意两件事：
+#  · 首次启用时第一次转换要 33s（CUDA 内核自动调优）。那份缓存落在磁盘上，
+#    之后重启服务也不会再付——上面第三个 8.70s 就是重启后的第一次。
+#  · 实际空闲显存随负载在 1100~2200 MiB 之间浮动，1000 这个闸是按低点定的。
+#    真正的安全网仍是 attempts=[True, False]：CUDA OOM 会自动退回 CPU。
+# 环境变量可覆盖，便于在不同显存占用下重新量而不用改代码。
+RVC_GPU_MIN_FREE_MIB = int(os.environ.get("RVC_GPU_MIN_FREE_MIB", "1000"))
 
 
 def _is_recoverable_cuda_failure(details: str) -> bool:
