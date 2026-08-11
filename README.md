@@ -277,7 +277,7 @@ SoulX-Singer 官方前端不支持日语；项目内置的 `soulx-ja-phone-adapt
 
 `ChatSample > 角色旋律回哼` 默认 `Enable Singing Voice Synthesis=false`（SVC 音色转换为默认后端，SVS 独立歌声合成退为可选）、`Enable SVSRVC Post Polish=false`、`Allow SVC Fallback From SVS=true`、`Enable Neural Hum SVC=true`、`Allow Legacy Hum Fallback=false`。`independent SVS complete` 表示独立重新合成；可选的 `svc-post-polish` 表示先独立生成、再用角色 RVC 润色，属于音色转换后处理；`明确降级：改用 9882 SVC` 则表示直接转换原始演唱。`backend=rvc-character-v2` 表示角色专属转换模型，`backend=seed-vc` 表示零样本转换回退。SVS 说明见 [`Server/SVS/README.md`](Server/SVS/README.md)；专属转换模型训练见 [`Server/RVC/README.md`](Server/RVC/README.md)；转换桥见 [`Server/SeedVC/README.md`](Server/SeedVC/README.md)。
 
-**改动歌唱边界或模态判定之前，请先读 [`docs/singing-boundary-status.md`](docs/singing-boundary-status.md)**：那里记着每个阈值是怎么量出来的、哪些数是小样本拟合的、哪些判据已经试过并失败、以及哪些代码路径还没被真正触发过。这块反复出现"看似合理的改动上线后要撤回"，原因基本都是没有先看已有的反例。
+**改动歌唱边界、模态判定或语音延迟相关的东西之前，请先读 [`docs/singing-boundary-status.md`](docs/singing-boundary-status.md)**：那里记着每个阈值是怎么量出来的、哪些数是小样本拟合的、哪些判据和延迟假设已经试过并被证伪、以及哪些代码路径还没被真正触发过。这块反复出现"看似合理的改动上线后要撤回"，原因基本都是没有先看已有的反例。
 
 手工添加仍可使用兼容接口，歌名同样可省略：
 
