@@ -34,11 +34,23 @@ _LOG_ISLAND = os.environ.get("NEEEVA_LOG_ISLAND", "1") != "0"
 # 分不开"——那是错的：LLM 面对两三秒的歌词切片(「简单点。」)会压倒性地判成说话
 # (31 次假阴、1 次假阳)，标签本身有偏。真值一到，结论就反过来了。
 #
-# 下限 0.60 的稳定窗口是 [0.59, 0.61]（三点结果完全一致），但 0.58 和 0.62
-# 都会退化到 4/27。27 段里 21 段对阈值完全不敏感，波动全来自 6 段边缘素材。
-# 窗口只有约 ±0.015，样本也只有 27 段——日志里打了每座岛的 prob，
-# 将来素材落到窗外时能一眼看出是不是这个数的问题。
-_ISLAND_PROB_FLOOR = 0.60
+# 8/11 又撞上反例：三轮【说话+唱歌】被整段复读，切片核实真实起唱在 9.60s / 7.80s，
+# 而系统只裁到 6.03s / 2.43s。原因是**说话岛打了 0.60 和 0.63**，擦着下限过闸。
+# 这已经是这块的第五个阈值反例，按注释里定的规矩该换判据而不是继续挪数——
+# 换的办法是给逐岛分析**带上该岛自己的转写**（island_transcriber），
+# 让一直存在却从没喂到数据的 speech_density_penalty 生效：
+# 说话字密度高扣分多，唱歌字少音长几乎不扣。同样那两座说话岛 0.60→0.16、0.63→0.24。
+#
+# 117 座岛（真值来自用户逐段标注）：岛分类 90% → 94%。
+# 更要紧的是边界（9 段有 wav 的标注素材）：
+#     均分(旧)        起点中位 0.33s 最大 5.22s  >1s 2/9
+#     岛内prob 0.60   起点中位 0.38s 最大 6.53s  >1s 3/9
+#     带转写          起点中位 0.22s 最大 0.43s  >1s 0/9
+# 而且 0.45 / 0.50 / 0.55 三个下限**结果完全一致**——这是这块第一次出现
+# "阈值随便取都一样"，说明判据本身有余量，不再是在拟合阈值。
+# （对比：不带转写时窗口只有 ±0.015 宽。）
+# 样本仍只有 9 段有 wav 的标注素材，其余被落盘上限挤掉了。
+_ISLAND_PROB_FLOOR = 0.50
 # 低于这个整段概率就不做细化：那多半是普通对话轮，而这条路径直接决定她开口的
 # 延迟(实测细化每座岛 0.24s、一轮约 3.6 座，整段 analyze 从 0.89s 涨到 1.53s)。
 # 0.40 与 Unity 侧模糊带下沿一致。
@@ -97,6 +109,10 @@ class SingingAnalyzer:
         self._crepe_lock = threading.Lock()
         # 细化候选岛时会对切片再调一次 analyze()，用这个标志挡住无限递归。
         self._nested_island_probe = False
+        # 可选：f(wav) -> str，把一小段音频转写成文字。由服务端注入(它才有 ASR)。
+        # 给了之后逐岛打分会带上该岛自己的转写，speech_density_penalty 随之生效——
+        # 那是把"说得快"和"唱得慢"分开的关键，见 _ISLAND_PROB_FLOOR 的说明。
+        self.island_transcriber = None
         # 音频指纹 → (已累计次数, 平均后的周期性)。同一段音频被重复分析时用来降方差，
         # 见 _track_crepe 里的说明。只保留最近几段。
         self._periodicity_history: Dict[tuple, Tuple[int, np.ndarray]] = {}
@@ -316,10 +332,19 @@ class SingingAnalyzer:
             hi = min(signal.size, int(end_seconds * self.sample_rate))
             if hi - lo < int(1.2 * self.sample_rate):
                 return float("nan")          # 太短，分析不可靠，交回给旧判据
+            piece = signal[lo:hi]
+            # 带上这一小段自己的转写。没有它就没有 speech_density_penalty，
+            # 说话和唱的分数会挤在一起（实测说话 0.60/0.63 擦着下限过闸）。
+            lyrics = ""
+            if self.island_transcriber is not None:
+                try:
+                    lyrics = self.island_transcriber(piece) or ""
+                except Exception:
+                    lyrics = ""
             self._nested_island_probe = True
             try:
                 got = self.analyze(
-                    signal[lo:hi], lyrics="", thorough=True, force_score=True)
+                    piece, lyrics=lyrics, thorough=True, force_score=True)
             except Exception:
                 return float("nan")
             finally:

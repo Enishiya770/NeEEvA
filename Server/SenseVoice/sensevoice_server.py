@@ -140,6 +140,19 @@ def load_model(
         device=pitch_device,
         enable_torchcrepe=enable_torchcrepe,
     )
+    # 让逐岛打分能拿到该岛自己的转写。分析器本身没有 ASR，必须由这里注入。
+    # 不注入时它退回 lyrics=""，speech_density_penalty 失效——那正是 8/11 三次
+    # 【说话+唱歌】被整段复读的原因（说话岛 0.60/0.63 擦着下限过闸）。
+    # generate_asr 自带 _asr_lock，而 analyze 一律在锁外调用，不会重入死锁。
+    def _transcribe_island(piece: np.ndarray) -> str:
+        try:
+            res = generate_asr(piece, "auto")
+        except Exception as exc:
+            print(f"[Island] 岛内转写失败: {exc}", flush=True)
+            return ""
+        return (parse_output(res[0]["text"] if res else "")[0] or "").strip()
+
+    _singing_analyzer.island_transcriber = _transcribe_island
     _song_search_engine = SongSearchEngine(song_catalog_path, _singing_analyzer)
     print(
         f"[Singing] 感知已启用（快速FFT + "
