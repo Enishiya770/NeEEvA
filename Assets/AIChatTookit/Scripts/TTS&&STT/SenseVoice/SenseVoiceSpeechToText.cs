@@ -180,6 +180,13 @@ public class SenseVoiceSpeechToText : STT
     private bool m_LastResponseSingingReadingComplete = false;
     private string[] m_LastResponseSingingMora = null;
     private float m_LastSingingAudioTime = -999f;
+    //回哼素材的长度下限。不看概率、不看任何阈值，只做一次合理性检查：8/11 那一轮
+    //「那你试着唱出来啊」整段判为说(prob=0.42)，仍被缓存成 14 帧 / 1.4s / 9 字的
+    //“演唱”，随后她把这句问话本身回哼了出去。两份日志里 9 次缓存，正当素材最短
+    //4.7s，唯一的误缓存是 1.4s，中间没有任何一例——3.0s 两边各留一倍余量。
+    //命中就整轮不缓存(音频、歌词、旋律、乐谱一起放弃)，保留上一段：只挡旋律会让
+    //旧时间线配上新音频，比现在更糟。
+    private const float k_MinSingablePerformanceSeconds = 3.0f;
     private float m_LastSingingPerformanceTime = -999f;
     private float[] m_LastSingingPerformanceMidi = new float[0];
     private float m_LastSingingPerformanceFrameSeconds = 0.10f;
@@ -1159,6 +1166,19 @@ public class SenseVoiceSpeechToText : STT
         if (!strongStreamingEvidence || !freshCandidate ||
             !HasPlayablePitchTimeline(LastPitchTimelineMidi))
             return false;
+        //提升是拿流式证据推翻离线的“判说”，素材再短就什么都撑不住了。8/11
+        //「那你试着唱出来啊」正是从这里进去的：离线 0.42 判说，流式把它提成歌唱，
+        //缓存下 1.4s / 9 字，随后她把这句问话本身回哼了出去。长度不达标就连
+        //LastIsSinging 也不置真，否则这一轮会被当成“她唱过”而缓存里却是上一段。
+        float promotableSeconds = MeasurePerformanceSeconds(
+            m_LastPlayableCandidateTimelineCropSeconds,
+            m_LastPlayableCandidateTimelineEndSeconds);
+        if (promotableSeconds < k_MinSingablePerformanceSeconds)
+        {
+            Debug.Log($"[Singing/Band] 提升被拒：可唱素材只有 {promotableSeconds:F2}s，" +
+                      $"短于 {k_MinSingablePerformanceSeconds:F1}s");
+            return false;
+        }
 
         LastIsSinging = true;
         LastSingingProbability = Mathf.Max(LastSingingProbability, streamingProbability);
@@ -1279,6 +1299,77 @@ public class SenseVoiceSpeechToText : STT
         DowngradeLastSingingToSpeech("mixed singing-to-speech: " + (reason ?? "tail speech"));
     }
 
+    /// <summary>
+    /// 算出本轮裁剪后真正会被缓存的那段旋律，不改任何状态。返回 null 表示这一轮
+    /// 没有可演奏的时间线。<paramref name="croppedWindowUnplayable"/> 为真时裁出来的
+    /// 窗口全是休止，已退回整段，乐谱的裁尾也必须跟着作废。
+    /// </summary>
+    private float[] ResolvePerformanceTimeline(
+        float timelineCropSeconds,
+        float timelineEndSeconds,
+        out int timelineStart,
+        out int timelineEnd,
+        out bool croppedWindowUnplayable)
+    {
+        timelineStart = 0;
+        timelineEnd = 0;
+        croppedWindowUnplayable = false;
+        if (!HasPlayablePitchTimeline(LastPitchTimelineMidi)) return null;
+
+        float frameSeconds = Mathf.Max(0.02f, LastPitchTimelineFrameSeconds);
+        timelineStart = Mathf.Clamp(
+            Mathf.FloorToInt(timelineCropSeconds / frameSeconds),
+            0,
+            Mathf.Max(0, LastPitchTimelineMidi.Length - 1));
+        //裁尾：唱完之后接的那段说话如果留在时间线里，回哼会把它当成歌词一起唱出来。
+        timelineEnd = LastPitchTimelineMidi.Length;
+        if (timelineEndSeconds > 0.001f)
+        {
+            timelineEnd = Mathf.Clamp(
+                Mathf.CeilToInt(timelineEndSeconds / frameSeconds),
+                timelineStart,
+                LastPitchTimelineMidi.Length);
+        }
+        int timelineLength = timelineEnd - timelineStart;
+        //素材太短就退回整段——宁可多唱一点，也不要没得唱
+        if (timelineLength < 4) { timelineEnd = LastPitchTimelineMidi.Length; timelineLength = timelineEnd - timelineStart; }
+        var performance = new float[timelineLength];
+        Array.Copy(
+            LastPitchTimelineMidi,
+            timelineStart,
+            performance,
+            0,
+            timelineLength);
+        if (!HasPlayablePitchTimeline(performance))
+        {
+            performance = new float[LastPitchTimelineMidi.Length];
+            Array.Copy(
+                LastPitchTimelineMidi,
+                performance,
+                performance.Length);
+            timelineStart = 0;
+            timelineEnd = LastPitchTimelineMidi.Length;
+            croppedWindowUnplayable = true;
+        }
+        return performance;
+    }
+
+    /// <summary>
+    /// 这一轮按给定裁剪之后还剩多少可唱素材(秒)。没有可演奏时间线时返回 0。
+    /// </summary>
+    private float MeasurePerformanceSeconds(
+        float timelineCropSeconds,
+        float timelineEndSeconds)
+    {
+        int start;
+        int end;
+        bool fellBack;
+        float[] performance = ResolvePerformanceTimeline(
+            timelineCropSeconds, timelineEndSeconds, out start, out end, out fellBack);
+        if (performance == null) return 0f;
+        return performance.Length * Mathf.Max(0.02f, LastPitchTimelineFrameSeconds);
+    }
+
     private void CacheLastSingingPerformance(
         byte[] audioBytes,
         float audioCropSeconds = 0f,
@@ -1288,6 +1379,28 @@ public class SenseVoiceSpeechToText : STT
         float timelineEndSeconds = 0f,
         float scoreEndSeconds = 0f)
     {
+        //长度检查必须赶在任何赋值之前：音频和旋律要么一起换，要么一起不换，
+        //否则旧时间线会配上新音频。
+        int timelineStart;
+        int timelineEnd;
+        bool croppedWindowUnplayable;
+        float[] performance = ResolvePerformanceTimeline(
+            timelineCropSeconds,
+            timelineEndSeconds,
+            out timelineStart,
+            out timelineEnd,
+            out croppedWindowUnplayable);
+        float frameSeconds = Mathf.Max(0.02f, LastPitchTimelineFrameSeconds);
+        if (performance != null &&
+            performance.Length * frameSeconds < k_MinSingablePerformanceSeconds)
+        {
+            Debug.Log("[SenseVoice/Singing] 本轮可唱素材只有 " +
+                      $"{performance.Length * frameSeconds:F2}s（{performance.Length} 帧），" +
+                      $"短于 {k_MinSingablePerformanceSeconds:F1}s，不作为可回唱歌声，" +
+                      "沿用上一段。");
+            return;
+        }
+
         m_RollbackSingingAudioBytes = m_LastSingingAudioBytes;
         m_RollbackSingingLyrics = m_LastSingingLyrics;
         m_RollbackSingingAudioTime = m_LastSingingAudioTime;
@@ -1319,43 +1432,10 @@ public class SenseVoiceSpeechToText : STT
                 out actualAudioEnd);
             m_LastSingingAudioTime = now;
         }
-        if (!HasPlayablePitchTimeline(LastPitchTimelineMidi)) return;
+        if (performance == null) return;
 
-        float frameSeconds = Mathf.Max(0.02f, LastPitchTimelineFrameSeconds);
-        int timelineStart = Mathf.Clamp(
-            Mathf.FloorToInt(timelineCropSeconds / frameSeconds),
-            0,
-            Mathf.Max(0, LastPitchTimelineMidi.Length - 1));
-        //裁尾：唱完之后接的那段说话如果留在时间线里，回哼会把它当成歌词一起唱出来。
-        int timelineEnd = LastPitchTimelineMidi.Length;
-        if (timelineEndSeconds > 0.001f)
-        {
-            timelineEnd = Mathf.Clamp(
-                Mathf.CeilToInt(timelineEndSeconds / frameSeconds),
-                timelineStart,
-                LastPitchTimelineMidi.Length);
-        }
-        int timelineLength = timelineEnd - timelineStart;
-        //素材太短就退回整段——宁可多唱一点，也不要没得唱
-        if (timelineLength < 4) { timelineEnd = LastPitchTimelineMidi.Length; timelineLength = timelineEnd - timelineStart; }
-        m_LastSingingPerformanceMidi = new float[timelineLength];
-        Array.Copy(
-            LastPitchTimelineMidi,
-            timelineStart,
-            m_LastSingingPerformanceMidi,
-            0,
-            timelineLength);
-        if (!HasPlayablePitchTimeline(m_LastSingingPerformanceMidi))
-        {
-            m_LastSingingPerformanceMidi = new float[LastPitchTimelineMidi.Length];
-            Array.Copy(
-                LastPitchTimelineMidi,
-                m_LastSingingPerformanceMidi,
-                m_LastSingingPerformanceMidi.Length);
-            timelineStart = 0;
-            timelineEnd = LastPitchTimelineMidi.Length;
-            scoreEndSeconds = 0f;
-        }
+        m_LastSingingPerformanceMidi = performance;
+        if (croppedWindowUnplayable) scoreEndSeconds = 0f;
         m_LastSingingPerformanceFrameSeconds = LastPitchTimelineFrameSeconds;
         //语言必须跟着歌词走：整轮可能判 zh，而唱的那一段是日文。8/8 实测标签用了
         //整轮的 zh，9883 拿中文 G2P 撞上假名，整份乐谱被弃用退化成 backend-transcription，
