@@ -500,6 +500,15 @@ public class ChatSample : MonoBehaviour
     [Range(0.55f, 0.95f)] [SerializeField] private float m_SpeculativeSingingSupportConfidence = 0.70f;
 
     private string m_StreamingTranscript = "";
+    //最近一次收到流式 partial 的时刻。自主发言的闸用它判断"用户还在说话"。
+    private float m_LastStreamingPartialRealtime = -999f;
+    //partial 每 0.85~0.95s 来一帧(见日志 audio= 的步长)，所以 1.5s 足够跨过一帧间隔，
+    //又不会在用户真的说完之后压制太久。
+    private const float k_UserSpeakingHoldSeconds = 1.5f;
+    //上一次回哼有没有垫过场。硬底线：不允许连着两次都说话。
+    private bool m_HumBackPreludeSpokenLastTime = false;
+    //最近垫过的几句。垫场是裸请求、不带会话历史，不把这些回传她会重复同一句。
+    private readonly List<string> m_RecentHumBackPreludes = new List<string>();
     private string m_LastDraftTranscript = "";
     private int m_StreamingTranscriptVersion = 0;
     private int m_SpeculativeRequestVersion = 0;
@@ -726,6 +735,8 @@ public class ChatSample : MonoBehaviour
     {
         if (transcript == null) return;
 
+        //自主发言的闸要用它：只要还在收 partial，用户就还在说，这时不能开口。
+        m_LastStreamingPartialRealtime = Time.realtimeSinceStartup;
         m_StreamingLatestAudioMs = Mathf.Max(m_StreamingLatestAudioMs, transcript.AudioMs);
 
         // 单个早期 partial 很容易把有抑扬的普通问句误判成歌唱。至少要求两个连续
@@ -4238,6 +4249,23 @@ public class ChatSample : MonoBehaviour
         if (m_Urge == null || !m_Urge.Enabled) return;
         if (!m_AgentRunning || m_AgentGracefulShutdownPending) return;
         if (m_AgentRoundInFlight || IsAISpeaking || IsVoiceOutputPlaying) return;
+        // 用户还在说话时不许自主开口。
+        //
+        // 这道闸原来只挡"她自己在说"，不挡"用户正在说"。而感知帧里的"距用户上句"
+        // 是从**上一轮提交**算起的——一轮【说话+唱歌】要二三十秒才提交，于是 8/11
+        // 实测出现：用户唱到一半，感知帧写着「距用户上句: 51秒」，时钟冲动到点，
+        // 她拿上一轮的上下文开口说了「あら、またそのフレーズ？」，随后才被
+        // 「用户录音期间检测到旧AI开始发声」事后打断——声音已经放出去了，
+        // 紧接着回哼开始，听感非常突兀。
+        //
+        // 流式 partial 每来一帧就刷新一次时间戳，所以"最近还在收 partial"就等于
+        // "用户还在说"。比接一条录音状态过来简单，也不依赖 RTSpeechHandler 的内部状态。
+        // 和上面几条一样直接 return、不推进冲动——沿用这个函数注释里定下的规则
+        // 「她正在说话/轮次在飞时不推进」。若在这里调 Step 又丢弃返回值，点火会被
+        // 白白消耗掉。
+        if (Time.realtimeSinceStartup - m_LastStreamingPartialRealtime
+            < k_UserSpeakingHoldSeconds)
+            return;
 
         //待机漂移点火 = 她忽然想起了什么，按事件注入
         if (m_MemoryHub != null && m_EnableMemoryRecall)
@@ -6289,7 +6317,55 @@ public class ChatSample : MonoBehaviour
         bool started = TryBeginPendingHumBack();
         if (started && m_LogHumBack)
             Debug.Log("[HumBack] 最终ASR确认歌唱；跳过LLM决策，直接启动完整GPU回唱");
+        if (started) TryComposeHumBackPrelude();
         return started;
+    }
+
+    /// <summary>
+    /// 这条快车道为了省延迟跳过了 LLM，代价是转换那十几~五十秒里她一个字都不说，
+    /// 用户不知道到底有没有在生成（8/11 实测 ASR 8.85s + SVC 42.8s ≈ 52 秒静默）。
+    /// 这里让她自己决定要不要垫一句、垫什么，与转换并行，不占首音延迟。
+    ///
+    /// 两条约束都是用户定的：
+    ///  · 不要每次都出声——交给她判断（提示词里给了"没什么可说就回 -"的出口），
+    ///    再加一条硬底线：不允许连着两次，防止"每次她都觉得值得说"退化成每次都说。
+    ///  · 允许说别的——不限于"我在准备"，可以顺带评价刚才那段。
+    /// 说出来的话进对话历史，否则她下一轮可能重复同样的观察。
+    /// </summary>
+    private void TryComposeHumBackPrelude()
+    {
+        if (m_HumBackPreludeSpokenLastTime) { m_HumBackPreludeSpokenLastTime = false; return; }
+        ChatQW qw = m_ChatSettings != null ? m_ChatSettings.m_ChatModel as ChatQW : null;
+        SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText : null;
+        if (qw == null || m_ChatSettings == null ||
+            m_ChatSettings.m_TextToSpeech == null || m_AudioSource == null) return;
+
+        int generation = m_HumBackGeneration;
+        string lyrics = senseVoice != null ? senseVoice.LastSegmentLyrics : "";
+        string context = senseVoice != null ? senseVoice.LastText : "";
+        string recent = string.Join(" / ", m_RecentHumBackPreludes);
+        qw.ComposeHumBackPrelude(lyrics, context, recent, line =>
+        {
+            if (string.IsNullOrWhiteSpace(line)) return;
+            m_RecentHumBackPreludes.Add(line);
+            while (m_RecentHumBackPreludes.Count > 4) m_RecentHumBackPreludes.RemoveAt(0);
+            //回哼已经开始播或已经结束就别再插话了——那只会盖在歌声上
+            if (generation != m_HumBackGeneration || m_HumBackPlaying ||
+                (m_AudioSource != null && m_AudioSource.isPlaying)) return;
+            m_HumBackPreludeSpokenLastTime = true;
+            if (m_ChatHistory != null) m_ChatHistory.Add(line);
+            m_TextBack.text = line;
+            m_ChatSettings.m_TextToSpeech.Speak(line, (clip, spoken) =>
+            {
+                if (clip == null || generation != m_HumBackGeneration ||
+                    m_HumBackPlaying || m_AudioSource == null) return;
+                if (m_AudioSource.isPlaying) return;
+                m_AudioSource.clip = clip;
+                m_AudioSource.Play();
+            });
+            if (m_LogHumBack) Debug.Log($"[HumBack] 转换期间垫场：\"{line}\"");
+        });
     }
 
     /// <summary>
@@ -7815,6 +7891,10 @@ public class ChatSample : MonoBehaviour
             string serverElapsed = request.GetResponseHeader("X-SVC-Elapsed-Seconds") ?? "?";
             string autoF0 = request.GetResponseHeader("X-SVC-Auto-F0-Adjust") ?? "?";
             string seed = request.GetResponseHeader("X-SVC-Seed") ?? "?";
+            //服务端一直在返回决策时的空闲显存，只是从没打进日志。8/11 实测同一场里
+            //三次转换全落 CPU，而事后查 /health 又显示空闲 1096MiB、will_use=cuda——
+            //少了这个数就无法判断当时到底差多少，只能靠猜。
+            string freeVram = request.GetResponseHeader("X-SVC-Free-VRAM-MiB") ?? "?";
             float unityElapsed = Time.realtimeSinceStartup - startedAt;
             PlayHumBackClip(
                 generation,
@@ -7823,7 +7903,8 @@ public class ChatSample : MonoBehaviour
                     ? independentDiagnostic + "; RVC post-polish complete "
                     : "neural SVC complete ") +
                 $"source={sourceSeconds}s output={outputSeconds}s, " +
-                $"backend={backend}, device={device}, autoF0={autoF0}, seed={seed}, " +
+                $"backend={backend}, device={device}, freeVRAM={freeVram}MiB, " +
+                $"autoF0={autoF0}, seed={seed}, " +
                 $"server={serverElapsed}s, total={unityElapsed:F2}s");
         }
     }

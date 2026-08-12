@@ -43,6 +43,32 @@ public class ChatQW : LLM
         get { return m_Backend == BackendType.Local ? m_LocalModelName : m_ChatModelName; }
     }
 
+    // llama-server 的两个槽位各自持有一份 KV 缓存。--slot-prompt-similarity 0.8 本该
+    // 把请求匹配到"前缀最像"的槽，但投机草稿的 prompt 就是主对话的前缀、相似度极高，
+    // 它一更新那个槽，主对话的前缀就没了；下一轮主对话被分到另一个槽，整段重算。
+    //
+    // 8/11 实测（llama 自己的 slot 日志 + Unity 首 token）：
+    //   112 个主对话请求里 4 个复用率 0%，其中 3 个不是会话首个
+    //   命中时 prefill 0.47s（约 1050 tok/s）→ 首音 0.6~1.5s
+    //   没命中时整段重算 9451~10114 token → prefill 9.0~9.5s → 首音 9.64s
+    //   那 3 次就是"首音超 2 秒"的全部来源
+    //
+    // 所以两条流各钉一个槽，谁也别碰对方的缓存：
+    //   槽 0 = 主对话 + 预热（预热的 prompt 与主对话同前缀，本来就该暖同一个槽。
+    //          旧注释记着"预热暖的是 slot 1、首个正式请求被 LRU 分到 slot 0、
+    //          重算 9792 token(14.40s)"——钉槽把这个浪费一起修掉）
+    //   槽 1 = 投机草稿 + 模态判定 + 撤回判定（都不在首音路径上，被挤掉也不心疼）
+    //
+    // 只对本地后端有效；DashScope 不认这个字段。
+    private const int k_SlotMainConversation = 0;
+    private const int k_SlotAuxiliary = 1;
+
+    private void AppendSlot(StringBuilder sb, int slot)
+    {
+        if (m_Backend != BackendType.Local) return;
+        sb.Append(",\"id_slot\":").Append(slot);
+    }
+
     /// <summary>
     /// 手动拼请求 JSON——之前用 JsonUtility 序列化 PostData，但 JsonUtility 处理不了
     /// OpenAI 多模态消息的混合 content 字段(string vs array of parts)，所以走手写。
@@ -114,6 +140,7 @@ public class ChatQW : LLM
               .Append(m_EnableThinking ? "true" : "false")
               .Append('}');
         }
+        AppendSlot(sb, k_SlotMainConversation);
         sb.Append('}');
         return sb.ToString();
     }
@@ -332,6 +359,7 @@ public class ChatQW : LLM
         sb.Append(']');
         if (m_Backend == BackendType.Local)
             sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        AppendSlot(sb, k_SlotMainConversation);   // PrewarmPrefix 预热(与主对话同槽)
         sb.Append('}');
 
         float t0 = Time.realtimeSinceStartup;
@@ -388,6 +416,102 @@ public class ChatQW : LLM
     }
 
     /// <summary>
+    /// 回哼转换要跑十几秒，这期间她一个字都不说。让她自己决定要不要垫一句、垫什么。
+    /// 回调给出要说的话；判断"这会儿没什么值得说的"时给空串。
+    ///
+    /// 与转换**并行**跑，藏在那十几秒里，不占首音延迟。
+    /// 刻意不写死模板：项目里已有的 TryPlayLatencyFiller 用的是预缓存固定音频，
+    /// 那套在这里会很快听腻——每次都该结合当下(唱的什么语言、第几遍、刚才聊到哪)。
+    /// </summary>
+    public void ComposeHumBackPrelude(
+        string recentLyrics, string turnContext, string recentPreludes,
+        Action<string> callback)
+    {
+        if (callback == null) return;
+        StartCoroutine(ComposeHumBackPreludeRoutine(
+            (recentLyrics ?? "").Trim(), (turnContext ?? "").Trim(),
+            (recentPreludes ?? "").Trim(), callback));
+    }
+
+    private IEnumerator ComposeHumBackPreludeRoutine(
+        string recentLyrics, string turnContext, string recentPreludes,
+        Action<string> callback)
+    {
+        // 措辞是量出来的，这个旋钮极其敏感——同一批 5 段素材上跑：
+        //   只说"有想说的就说" .............. 沉默 40%，但 3/9 句把角色搞反或冒系统腔
+        //   重写成带三条禁令的结构 .......... 沉默 7%，句子干净（几乎每次都说，等于机械）
+        //   再强调"大多数时候安静就好" ...... 沉默 67%，但开口的那些变懒、开始复述歌词
+        //   再加一句"沉默不需要理由" ........ 沉默 100%，一句都不说了
+        //   回到第一版原样、只补三条具体禁令 . 沉默 55%，问题句 0  ← 就是下面这版
+        // 教训：坏的只是几个具体毛病时，别重写框架，补最小的禁令就够。
+        var prompt = new StringBuilder(640);
+        prompt.Append(
+            "他刚唱完一段，接下来轮到你用自己的声音把它唱回来，这期间有十几秒是安静的。\n" +
+            "如果此刻有什么自然想说的——对刚才那段的感觉、一句随口的评价——就说出来，" +
+            "一到两句，口语，别太正式。\n" +
+            "**如果这会儿没什么值得说的，就只回一个短横线 -**。宁可不说，也不要硬凑。\n" +
+            "要唱的人是你不是他，别说「期待你的版本」这类把两人搞反的话；" +
+            "不要提转换、合成、加载、稍等这类幕后过程；不要把歌词原样复述一遍；" +
+            "也不要预告你待会儿会唱成什么样。\n");
+        if (!string.IsNullOrEmpty(recentLyrics))
+            prompt.Append("\n他刚才唱的是：").Append(recentLyrics);
+        if (!string.IsNullOrEmpty(turnContext))
+            prompt.Append("\n这一轮他还说了：").Append(turnContext);
+        // 这是个裸请求、不带会话历史，她不知道自己上次垫了什么——实测同一段素材
+        // 连着三次都说「这调子挺抓耳的」。把最近几句带进来才不会重复。
+        if (!string.IsNullOrEmpty(recentPreludes))
+            prompt.Append("\n\n你最近在这种时候说过：").Append(recentPreludes)
+                  .Append("\n换个说法，别重复上面这些。");
+
+        var sb = new StringBuilder(prompt.Length + 256);
+        sb.Append('{');
+        sb.Append("\"model\":"); AppendJsonString(sb, CurrentModelName);
+        sb.Append(",\"stream\":false,\"enable_thinking\":false");
+        sb.Append(",\"max_tokens\":80,\"temperature\":0.9");
+        sb.Append(",\"messages\":[");
+        AppendMessage(sb, new SendData("user", prompt.ToString()));
+        sb.Append(']');
+        if (m_Backend == BackendType.Local)
+            sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        AppendSlot(sb, k_SlotAuxiliary);
+        sb.Append('}');
+
+        float t0 = Time.realtimeSinceStartup;
+        string line = "";
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(sb.ToString()));
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader(
+                "Authorization",
+                string.Format("Bearer {0}", string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
+            request.timeout = 10;
+            yield return request.SendWebRequest();
+            if (request.responseCode == 200)
+            {
+                try
+                {
+                    MessageBack back = JsonUtility.FromJson<MessageBack>(
+                        request.downloadHandler.text);
+                    if (back != null && back.choices != null && back.choices.Count > 0 &&
+                        back.choices[0] != null && back.choices[0].message != null)
+                        line = back.choices[0].message.content ?? "";
+                }
+                catch (Exception) { line = ""; }
+            }
+            line = (line ?? "").Trim();
+            //她选择不说时会回一个短横线；标签/系统腔也一律当作不说
+            if (line == "-" || line == "—" || line.StartsWith("-") || line.Contains("<"))
+                line = "";
+            if (m_LogRequestStats)
+                Debug.Log($"[回哼垫场] {(line.Length == 0 ? "她选择不说" : "\"" + line + "\"")} " +
+                          $"用时 {Time.realtimeSinceStartup - t0:F2}s code={request.responseCode}");
+        }
+        callback(line);
+    }
+
+    /// <summary>
     /// 用户唱完之后那句话，是不是在把刚才那段演唱作废。
     /// 回调 true 只在模型明确说作废时给出；判不出、请求失败、文本为空一律 false。
     ///
@@ -429,6 +553,7 @@ public class ChatQW : LLM
         sb.Append(']');
         if (m_Backend == BackendType.Local)
             sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        AppendSlot(sb, k_SlotAuxiliary);   // ClassifySingingRetractionRoutine 撤回判定
         sb.Append('}');
 
         float t0 = Time.realtimeSinceStartup;
@@ -515,6 +640,7 @@ public class ChatQW : LLM
         sb.Append(']');
         if (m_Backend == BackendType.Local)
             sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        AppendSlot(sb, k_SlotAuxiliary);   // ClassifyUtteranceModeRoutine 模态判定
         sb.Append('}');
 
         float t0 = Time.realtimeSinceStartup;
@@ -780,6 +906,7 @@ public class ChatQW : LLM
         sb.Append(']');
         if (m_Backend == BackendType.Local)
             sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        AppendSlot(sb, k_SlotAuxiliary);   // BuildEphemeralRequestJson 投机草稿
         sb.Append('}');
         return sb.ToString();
     }
