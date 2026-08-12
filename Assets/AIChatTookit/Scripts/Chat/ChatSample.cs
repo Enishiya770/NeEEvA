@@ -324,6 +324,7 @@ public class ChatSample : MonoBehaviour
         {
             m_HoldSpeechForSongMemoryResult = ShouldHoldSpeechForExplicitSongRemember();
             m_HoldSpeechForHumBackResult = ShouldHoldSpeechForExplicitHumBack();
+            PublishSpokenPrefixToLlm();
             m_ChatSettings.m_ChatModel.PostMsg(llmInput, CallBack);
         }
     }
@@ -556,6 +557,8 @@ public class ChatSample : MonoBehaviour
     private AudioClip m_PreparedSingingBridgeClip;
     private AudioClip m_DeferredPreparedClipToDestroy;
     private string m_PreparedSingingBridgeText = "";
+    //本轮真正出过声的那句开场，在播放时留存，只在轮次重置时清。
+    private string m_SpokenBridgeTextThisTurn = "";
     private float m_PreparedSingingBridgeConfidence = 0f;
     private bool m_PreparedSingingBridgePlayedThisTurn = false;
     //预合成的这段开场是给唱歌轮次还是说话轮次准备的。两者不能互用：
@@ -1431,6 +1434,10 @@ public class ChatSample : MonoBehaviour
         output.loop = false;
         output.Play();
         m_PreparedSingingBridgePlayedThisTurn = true;
+        //在出声的这一刻留一份：从这里到主请求派发之间，ReleasePreparedSingingBridge
+        //有好几处会把 m_PreparedSingingBridgeText 清空(歌唱未确认、轮次重置、打断)，
+        //而这句话已经进了用户的耳朵，必须原样交给本轮回复当前缀。
+        m_SpokenBridgeTextThisTurn = spokenText;
         return true;
     }
 
@@ -1492,30 +1499,19 @@ public class ChatSample : MonoBehaviour
         if (draft != null && !string.IsNullOrWhiteSpace(draft.draft) &&
             similarity >= m_SpeculativeReuseSimilarity)
         {
-            //说话预反应会把这句抢先播出去，用户已经听到了。若仍按"候选回答"措辞交给
-            //LLM，它会把同样的意思再说一遍——实测出现过「素晴らしい」「良いアイデア」
-            //被逐字重复。EOU 播放与本函数的先后是竞态的(实测 19 轮里 5 轮请求在前)，
-            //所以不能只看"已播放"标志，还要预判"即将播放"，并用一句对两种结果都成立
-            //的措辞兜住。歌唱那条一直是这么写的，这里对齐。
+            //已经出声(或即将出声)的那句开场不再写进这里。它由 PublishSpokenPrefixToLlm
+            //作为一条 assistant 消息挂在用户消息之后，正式回复相当于接着它往下写——
+            //散文形态的"不要重复它"实测挡不住(8/11 那轮明写了，她照样又说了一遍；
+            //离线复现同样是 1/5 重说、2/5 重新打招呼，换成 assistant 消息后归零)。
+            //这里只保留没出声时的候选回答。
             bool speechBridgeReady =
                 (!m_PreparedBridgeIsSinging && m_PreparedSingingBridgeClip != null &&
                  m_PreparedSingingBridgeConfidence >= m_SpeechBridgeMinConfidence) ||
                 (!m_PendingBridgeIsSinging && m_SingingBridgeTtsInFlight &&
                  m_PendingBridgeConfidence >= m_SpeechBridgeMinConfidence);
             bool bridgeSpoken = m_PreparedSingingBridgePlayedThisTurn && !m_PreparedBridgeIsSinging;
-            bool bridgePending = !bridgeSpoken && speechBridgeReady && m_EouFillerScheduled;
-            string spokenLine = string.IsNullOrWhiteSpace(m_PreparedSingingBridgeText)
-                ? draft.draft : m_PreparedSingingBridgeText;
-
-            string tail;
-            if (bridgeSpoken)
-                tail = "这句先行开场已经说出口，用户已经听到。正式回答请从它之后自然接续：" +
-                       "不要重复它的意思，也不要重新打招呼或重新表态。]";
-            else if (bridgePending)
-                tail = "若稍后由快速回应播放这句先行开场，正式回答请从它之后自然接续，" +
-                       "不要重复它的意思；否则可自行改写。]";
-            else
-                tail = "若最终文本改变了含义，必须修改或放弃候选回答。]";
+            bool bridgeHandledAsPrefix =
+                bridgeSpoken || (speechBridgeReady && m_EouFillerScheduled);
 
             hint =
                 "[本轮可撤销倾听状态；最终用户转写具有最高优先级。不要提及这段内部状态。\n" +
@@ -1524,11 +1520,13 @@ public class ChatSample : MonoBehaviour
                 "角色瞬时感受：" + (draft.inner_reaction ?? "") + "\n" +
                 "临时模态判断：" + NormalizeObservedMode(draft.observed_mode) +
                 "（置信度 " + Mathf.Clamp01(draft.mode_confidence).ToString("F2") + "）\n" +
-                (bridgeSpoken || bridgePending ? "先行开场：" : "已准备的候选回答：") +
-                spokenLine + "\n" + tail;
+                (bridgeHandledAsPrefix
+                    ? "]"
+                    : "已准备的候选回答：" + draft.draft + "\n" +
+                      "若最终文本改变了含义，必须修改或放弃候选回答。]");
             if (m_LogSpeculativeListening)
                 Debug.Log($"[流式倾听] 最终一致度 {similarity:F2}，复用临时准备作为本轮提示" +
-                          $"(先行开场 已播={bridgeSpoken} 待播={bridgePending})");
+                          $"(开场走前缀={bridgeHandledAsPrefix})");
         }
         else if (draft != null && m_LogSpeculativeListening)
         {
@@ -1555,6 +1553,7 @@ public class ChatSample : MonoBehaviour
         string hint = null;
         if (reusable)
         {
+            //与说话那条一致：已经出声的短开场交给 assistant 前缀，这里不再复述。
             bool alreadySpoken = m_PreparedSingingBridgePlayedThisTurn;
             hint =
                 "[本轮可撤销听歌状态；最终歌唱分析具有最高优先级，不要提及内部状态。\n" +
@@ -1563,11 +1562,10 @@ public class ChatSample : MonoBehaviour
                 "角色瞬时感受：" + (draft.inner_reaction ?? "") + "\n" +
                 "临时模态判断：" + NormalizeObservedMode(draft.observed_mode) +
                 "（置信度 " + Mathf.Clamp01(draft.mode_confidence).ToString("F2") + "）\n" +
-                "安全短开场：" + draft.draft + "\n" +
                 (alreadySpoken
-                    ? "这句短开场已经说出口，用户已经听到。正式回答请从它之后自然接续：" +
-                      "不要重复它的意思，也不要重新打招呼或重新表态。]"
-                    : "若稍后由快速回应播放这句，正式回答请从它之后自然接续，" +
+                    ? "]"
+                    : "安全短开场：" + draft.draft + "\n" +
+                      "若稍后由快速回应播放这句，正式回答请从它之后自然接续，" +
                       "不要重复它的意思；否则可自行改写。]");
             if (m_LogSpeculativeListening)
                 Debug.Log($"[歌唱流式倾听] 最终确认为歌唱，复用内部感受；" +
@@ -1633,6 +1631,7 @@ public class ChatSample : MonoBehaviour
         ResetStreamingSingingEvidence();
         m_SpeculativeDraft = null;
         m_PreparedSingingBridgePlayedThisTurn = false;
+        m_SpokenBridgeTextThisTurn = "";
         m_StreamingTranscriptVersion++;
     }
 
@@ -2244,6 +2243,13 @@ public class ChatSample : MonoBehaviour
     [Tooltip("首音延迟指数移动平均的更新权重")]
     [SerializeField, Range(0.05f, 1f)] private float m_FirstAudioPredictionWeight = 0.3f;
 
+    [Tooltip("正式首句可以在先行开场结束前多久就发 TTS 请求。\n" +
+             "GPT-SoVITS 流式实测请求→出声 0.60~1.02s；取小于下沿的值，\n" +
+             "宁可留一点空隙也不要把开场切掉。")]
+    [SerializeField, Range(0f, 1.5f)] private float m_FillerHandoffLeadSec = 0.55f;
+    //开场时长异常时的兜底，别让首句无限期等下去
+    private const float k_MaxFillerHandoffWaitSeconds = 3.5f;
+
     private float m_FirstAudioLatencyEstimateSec = -1f;
     private int m_LatencyFillerGeneration = 0;
     private bool m_RealFirstAudioStarted = false;
@@ -2355,8 +2361,30 @@ public class ChatSample : MonoBehaviour
 
     private float Elapsed() { return Time.realtimeSinceStartup - m_StreamStartTime; }
 
+    /// <summary>
+    /// 把本轮已经出声、却还没进历史的那句开场交给主请求。必须每次都调用(没有就写空串)，
+    /// 否则上一轮的开场会漏进下一轮。
+    ///
+    /// 在派发这一刻取值，而不是在 FinalizeSpeculative/SingingTurn 里取：那两个函数与
+    /// EOU 播放是竞态的(注释记着 19 轮里 5 轮请求在前)，而派发要等 ASR 回来(实测中位
+    /// 6.6s)，那时开场早就播完了。代价是万一开场播得更晚，这一轮拿不到前缀——退回改动
+    /// 前的行为，不会说错。
+    /// </summary>
+    private void PublishSpokenPrefixToLlm()
+    {
+        if (m_ChatSettings == null || m_ChatSettings.m_ChatModel == null) return;
+        bool spoken = m_PreparedSingingBridgePlayedThisTurn &&
+            !string.IsNullOrWhiteSpace(m_SpokenBridgeTextThisTurn);
+        m_ChatSettings.m_ChatModel.SpokenPrefix =
+            spoken ? m_SpokenBridgeTextThisTurn.Trim() : "";
+        if (spoken && m_LogSpeculativeListening)
+            Debug.Log("[说话预反应] 已出声开场作为 assistant 前缀交给本轮回复: " +
+                      $"\"{m_ChatSettings.m_ChatModel.SpokenPrefix}\"");
+    }
+
     private void DispatchFormalStream(string prompt, string imageUrl, int responseGeneration)
     {
+        PublishSpokenPrefixToLlm();
         m_FormalResponseInFlight = true;
         m_ChatSettings.m_ChatModel.PostMsgStream(
             prompt,
@@ -2652,6 +2680,40 @@ public class ChatSample : MonoBehaviour
         m_EouFillerContext = "neutral";
         if (m_LogStreamTimings) Debug.Log($"[LatencyFiller] 取消EOU快速回应 ({reason})");
         if (OnAISpeakDone != null) OnAISpeakDone();
+    }
+
+    /// <summary>
+    /// 已经出声的快速回应(缓存短句或预合成开场)先把话说完，再让正式回复的首句出声。
+    ///
+    /// 以前是直接抢过音源，CommitPlayedLatencyFiller 按播放比例记"听到了几个字"——
+    /// 设计上默认会截断。真实首音一直在 6 秒上下时看不出问题；8/12 那场 <c>&lt;think&gt;</c>
+    /// 把首音拉到 1.89s，开场刚播不到一半就被腰斩。
+    ///
+    /// 前缀改动之后这里还多了一层：交给 LLM 的 SpokenPrefix 是整句，被截断就意味着
+    /// 她以为自己说完了、用户只听到一半。等它播完，两边才对得上。
+    ///
+    /// <paramref name="leadSeconds"/> 是提前量：流式 TTS 要先跑一趟请求才出声
+    /// (实测 0.60~1.02s)，可以在开场结束前这么多秒就发请求，不浪费这段重叠。
+    /// clip 已经在手的那条路传 0。
+    /// </summary>
+    private IEnumerator WaitForSpokenFillerToFinish(int responseGeneration, float leadSeconds)
+    {
+        if (!m_LatencyFillerPlayed || m_LatencyFillerStartedAt < 0f) yield break;
+        float endsAt = m_LatencyFillerStartedAt + m_LatencyFillerDuration;
+        float deadline = Time.realtimeSinceStartup + k_MaxFillerHandoffWaitSeconds;
+        float startedWaiting = Time.realtimeSinceStartup;
+        while (Time.realtimeSinceStartup + Mathf.Max(0f, leadSeconds) < endsAt)
+        {
+            if (responseGeneration != m_FormalResponseGeneration) yield break;
+            //用户插话/轮次作废时 m_LatencyFillerPlayed 会被清掉，别继续空等
+            if (!m_LatencyFillerPlayed) yield break;
+            if (Time.realtimeSinceStartup >= deadline) break;
+            yield return null;
+        }
+        float waited = Time.realtimeSinceStartup - startedWaiting;
+        if (waited > 0.02f && m_LogStreamTimings)
+            Debug.Log($"[LatencyFiller] 等先行开场说完，正式首句推迟 {waited:F2}s " +
+                      $"(开场时长 {m_LatencyFillerDuration:F2}s, 提前量 {leadSeconds:F2}s)");
     }
 
     private void MarkRealFirstAudioStarted()
@@ -3376,6 +3438,13 @@ public class ChatSample : MonoBehaviour
             bool succeeded = false;
             float audioDuration = 0f;
 
+            //先行开场既然已经出声，就让它把话说完。GPTSoVITSFASTAPI 只在首批 PCM 到达时
+            //才接管音源，所以请求可以提前发出去，提前量由 m_FillerHandoffLeadSec 控制。
+            if (firstChunk)
+                yield return StartCoroutine(WaitForSpokenFillerToFinish(
+                    responseGeneration, m_FillerHandoffLeadSec));
+            if (responseGeneration != m_FormalResponseGeneration) yield break;
+
             if (m_LogStreamTimings) Debug.Log($"[Stream] T+{Elapsed():F2}s TTS流请求发出: \"{text}\"");
 
             m_ChatSettings.m_TextToSpeech.SpeakStreaming(
@@ -3507,6 +3576,13 @@ public class ChatSample : MonoBehaviour
             string text = kv.Key;
             if (clip == null) continue;
 
+            //这条路 clip 已经在手，不需要提前量：等满即播。
+            if (firstChunk)
+            {
+                yield return StartCoroutine(
+                    WaitForSpokenFillerToFinish(responseGeneration, 0f));
+                if (responseGeneration != m_FormalResponseGeneration) yield break;
+            }
             if (firstChunk) MarkRealFirstAudioStarted();
             m_AudioSource.clip = clip;
             m_AudioSource.Play();

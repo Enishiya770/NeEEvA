@@ -51,6 +51,19 @@ public class LLM:MonoBehaviour
     /// </summary>
     [System.NonSerialized] public string TrailingContext = "";
     /// <summary>
+    /// 本轮已经通过快速回应出声、但还没进历史的那句开场。非空时它会作为一条
+    /// **assistant 消息挂在用户消息之后**，正式回复相当于从它往下续写。
+    ///
+    /// 之前是把"你已经说过 X，别重复"写成散文塞进 user 消息里，模型看到的是用户
+    /// 在转述它说过的话，结构上很弱：8/11 实测那一轮 hint 明写了不要重复，她照样
+    /// 又说了一遍。离线对照(真系统提示词，两个真实例子各 5 次)：散文形态仍有
+    /// 1/5 重说、2/5 重新打招呼，换成 assistant 消息后两项都是 0/5。
+    ///
+    /// 由调用方每次请求前无条件赋值(没有就赋空串)，所以不会跨轮泄漏。
+    /// 收到回复时与回复合并成一条 assistant 历史——那才是用户实际听到的一整段。
+    /// </summary>
+    [System.NonSerialized] public string SpokenPrefix = "";
+    /// <summary>
     /// 计算方法调用耗时
     /// </summary>
     [SerializeField] protected Stopwatch stopwatch=new Stopwatch();

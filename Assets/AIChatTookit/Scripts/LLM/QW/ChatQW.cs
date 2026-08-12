@@ -133,6 +133,15 @@ public class ChatQW : LLM
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, new SendData("system", TrailingContext));
         }
+        //已经出声的开场排在最后：用户的话仍是最后一条 user，它跟在后面，
+        //本轮回复于是变成"接着这句往下说"而不是"另写一段"。不要在这里再补一条
+        //解释它的 system——离线实测加了之后 #8 那例 5/5 全塌成 <silent/>，
+        //位置本身就够了。
+        if (!string.IsNullOrWhiteSpace(SpokenPrefix))
+        {
+            if (sb[sb.Length - 1] != '[') sb.Append(',');
+            AppendMessage(sb, new SendData("assistant", SpokenPrefix));
+        }
         sb.Append(']');
         if (m_Backend == BackendType.Local)
         {
@@ -687,6 +696,99 @@ public class ChatQW : LLM
         base.PostMsg(_msg, _callback);
     }
 
+    // 开头那段空 think 块的过滤状态：
+    //   0=还在判断开头  1=正在吞 think 块  3=吞完了正在跳过其后的空白  2=直通。
+    // 状态 3 不能省：线上 delta 就是 "<think>" / "\n\n" / "</think>" / "\n\n\n" / "確かに"
+    // 这样切的，闭合标签自成一段时余量为空，若直接转直通，后面那段换行会原样漏出去。
+    private int m_ThinkStripState = 0;
+    private readonly StringBuilder m_ThinkStripBuffer = new StringBuilder();
+    private const string k_ThinkOpen = "<think>";
+    private const string k_ThinkClose = "</think>";
+
+    private void ResetThinkStrip()
+    {
+        m_ThinkStripState = 0;
+        m_ThinkStripBuffer.Length = 0;
+    }
+
+    /// <summary>
+    /// 吞掉回复开头的 <c>&lt;think&gt;…&lt;/think&gt;</c>。
+    ///
+    /// Qwen3 的模板是靠**把空 think 块预先写进生成提示**来实现 enable_thinking=false 的；
+    /// 消息列表最后一条是 assistant 时(SpokenPrefix 走的就是这条路)模板换了分支不再注入，
+    /// 模型于是自己把这两个标签当正文写出来。8/12 实测 4 轮注入前缀、4 轮全中，
+    /// 而且被当台词念了出去(各 0.6s 音频)，还进了历史的「你最近发言」。
+    ///
+    /// 顺带治好了抢话：标签被切成极短的块，TTS 秒回，首音从中位 5.9s 提前到 1.9s，
+    /// 正好落在预合成开场还没播完的时候，把它拦腰截断。
+    ///
+    /// 只吞开头这一处，且必须逐段判断——delta 可能把 "&lt;think&gt;" 拆开送。
+    /// 开头不是它就立刻转直通，把攒下的原样吐出去(<c>&lt;silent/&gt;</c> 这类前缀不能丢)。
+    /// </summary>
+    private string StripLeadingThinkBlock(string delta)
+    {
+        if (m_ThinkStripState == 2) return delta ?? "";
+        if (m_ThinkStripState == 3)
+        {
+            string skipped = (delta ?? "").TrimStart('\r', '\n', ' ', '　');
+            if (skipped.Length == 0) return "";
+            m_ThinkStripState = 2;
+            return skipped;
+        }
+        m_ThinkStripBuffer.Append(delta ?? "");
+        string acc = m_ThinkStripBuffer.ToString();
+        if (m_ThinkStripState == 0)
+        {
+            string head = acc.TrimStart();
+            if (head.Length == 0) return "";                 //目前只有空白，继续等
+            if (!head.StartsWith(k_ThinkOpen, StringComparison.Ordinal))
+            {
+                //还可能是被拆开的 "<thi"，那就继续等；否则确定不是，转直通
+                if (k_ThinkOpen.StartsWith(head, StringComparison.Ordinal)) return "";
+                m_ThinkStripState = 2;
+                m_ThinkStripBuffer.Length = 0;
+                return acc;
+            }
+            m_ThinkStripState = 1;
+        }
+        int close = acc.IndexOf(k_ThinkClose, StringComparison.Ordinal);
+        if (close < 0) return "";
+        m_ThinkStripBuffer.Length = 0;
+        string rest = acc.Substring(close + k_ThinkClose.Length)
+                         .TrimStart('\r', '\n', ' ', '　');
+        if (rest.Length == 0) { m_ThinkStripState = 3; return ""; }
+        m_ThinkStripState = 2;
+        return rest;
+    }
+
+    /// <summary>
+    /// 整段文本版本，用于历史与非流式回复。与流式过滤器同一条规则。
+    /// </summary>
+    private static string StripLeadingThinkBlock(string text, bool wholeText)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? "";
+        string head = text.TrimStart();
+        if (!head.StartsWith(k_ThinkOpen, StringComparison.Ordinal)) return text;
+        int close = head.IndexOf(k_ThinkClose, StringComparison.Ordinal);
+        if (close < 0) return text;
+        return head.Substring(close + k_ThinkClose.Length)
+                   .TrimStart('\r', '\n', ' ', '　');
+    }
+
+    /// <summary>
+    /// 把已经出声的开场和正式回复并成一条 assistant 历史，并清掉 SpokenPrefix。
+    /// 历史里留的必须是用户实际听到的那一整段：拆成两条 assistant 会让后面的轮次
+    /// 读到一段本不存在的对话结构，只留回复又会漏掉她真的说过的那句。
+    /// </summary>
+    private string MergeSpokenPrefix(string reply)
+    {
+        string prefix = SpokenPrefix;
+        SpokenPrefix = "";
+        if (string.IsNullOrWhiteSpace(prefix)) return reply ?? "";
+        if (string.IsNullOrWhiteSpace(reply)) return prefix;
+        return prefix.TrimEnd() + "\n" + reply.TrimStart();
+    }
+
 
     /// <summary>
     /// 发送数据
@@ -717,9 +819,10 @@ public class ChatQW : LLM
                 if (_textback != null && _textback.choices.Count > 0)
                 {
 
-                    string _backMsg = _textback.choices[0].message.content;
+                    string _backMsg = StripLeadingThinkBlock(
+                        _textback.choices[0].message.content, true);
                     //添加记录
-                    m_DataList.Add(new SendData("assistant", _backMsg));
+                    m_DataList.Add(new SendData("assistant", MergeSpokenPrefix(_backMsg)));
                     _callback(_backMsg);
                 }
             }
@@ -918,6 +1021,7 @@ public class ChatQW : LLM
         Action<string> _onComplete)
     {
         stopwatch.Restart();
+        ResetThinkStrip();
 
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
@@ -930,7 +1034,9 @@ public class ChatQW : LLM
             SSEDownloadHandler handler = new SSEDownloadHandler(delta =>
             {
                 if (generation != m_StreamRequestGeneration) return;
-                if (_onDelta != null) _onDelta(delta);
+                string clean = StripLeadingThinkBlock(delta);
+                if (clean.Length == 0) return;
+                if (_onDelta != null) _onDelta(clean);
             });
             request.downloadHandler = handler;
 
@@ -953,8 +1059,8 @@ public class ChatQW : LLM
 
             if (request.responseCode == 200)
             {
-                string full = handler.GetFullContent();
-                m_DataList.Add(new SendData("assistant", full));
+                string full = StripLeadingThinkBlock(handler.GetFullContent(), true);
+                m_DataList.Add(new SendData("assistant", MergeSpokenPrefix(full)));
                 if (_onComplete != null) _onComplete(full);
             }
             else
