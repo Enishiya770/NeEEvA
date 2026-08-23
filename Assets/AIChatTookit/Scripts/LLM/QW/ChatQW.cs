@@ -278,6 +278,14 @@ public class ChatQW : LLM
              "注意：基类那个「历史消息保留条数」对 ChatQW 无效。")]
     [Range(4, 64)] public int m_LowLatencyHistoryLimit = 32;
 
+    [Header("prompt token 上限。超过就继续裁历史，不管条数够不够")]
+    //只按条数裁是不够的：8/22 实测连着 6 次 400
+    //「request (26263 tokens) exceeds the available context size (24576 tokens)」。
+    //系统提示已经 14000 token、演唱轮每条带 265~296 token 的方括号前缀，
+    //32 条历史轻易就把 24576 撑破，而条数规则对此一无所知。
+    //留出的余量要够放感知帧(约 1500~2500)和这一轮要生成的内容。
+    [Range(4096, 131072)] public int m_MaxPromptTokens = 20000;
+
     [Header("Debug：打印LLM请求大小/消息数（不打印正文和密钥）")]
     public bool m_LogRequestStats = true;
 
@@ -1067,8 +1075,13 @@ public class ChatQW : LLM
             {
                 //出错时把请求体结构打出来(base64 替换成长度占位)，方便对比 server 报错
                 string bodyDigest = SummarizeRequestBody(_jsonText);
+                //流式 handler 不保留错误正文，所以 400 时永远是"(空)"——8/22 为此
+                //绕了一整轮才从 llama-server 日志里找到"exceeds the available context"。
+                //把估算的 prompt 大小直接打出来：400 基本只有超长这一种原因。
                 Debug.LogError("Qwen流式失败: code=" + request.responseCode
                     + " err=" + request.error
+                    + " / prompt约" + EstimatePromptTokens() + "token(预算"
+                    + m_MaxPromptTokens + ")"
                     + " / 响应体: " + (string.IsNullOrEmpty(request.downloadHandler.text) ? "(空)" : request.downloadHandler.text)
                     + " / 请求体摘要: " + bodyDigest);
                 if (_onComplete != null) _onComplete("");
@@ -1091,8 +1104,135 @@ public class ChatQW : LLM
     ///
     /// 改法：只有超过高水位才裁，且一次裁到低水位，中间若干轮都是纯追加、可完整命中。
     /// </summary>
+    //历史里的感知帧要压缩掉。感知帧按定义是"此刻的状态"：五分钟前那份写着
+    //「距用户上句: 43秒」「练唱会话: …5 段…」，现在既不成立、也误导。
+    //8/22 实测那次 400：user 21 条共 11991 token，每条都是一整份感知帧(586~852)，
+    //同一份 313 token 的练唱清单被复制了 21 遍；而真正的对话内容只占其中一小截。
+    //
+    //只留两样：工具结果(那是发生过的事实)，和用户真正说的那句话。
+    private const string k_FrameUserMarker = "(用户刚开口讲了下面这段话，请回应)";
+
+    private static readonly string[] s_FrameKeepPrefixes =
+    {
+        "旋律回哼工具结果:", "歌曲记忆工具结果:", "歌曲检索工具结果:",
+        "长期歌曲演唱工具:", "歌曲记忆工具:", "上一轮你写了",
+    };
+
+    /// <summary>
+    /// 把历史里的感知帧压成"工具结果 + 用户原话"。最后一条 user 是本轮的，不动。
+    /// </summary>
+    private void CompactStaleFrames()
+    {
+        if (m_DataList == null) return;
+        int lastUser = -1;
+        for (int i = m_DataList.Count - 1; i >= 0; i--)
+        {
+            if (m_DataList[i] != null && m_DataList[i].role == "user") { lastUser = i; break; }
+        }
+        for (int i = 0; i < m_DataList.Count; i++)
+        {
+            var entry = m_DataList[i];
+            if (entry == null || entry.role != "user" || i == lastUser) continue;
+            string content = entry.content;
+            if (string.IsNullOrEmpty(content)) continue;
+            if (!content.StartsWith("[感知帧", StringComparison.Ordinal)) continue;
+
+            var kept = new StringBuilder();
+            foreach (string line in content.Split('\n'))
+            {
+                string trimmed = line.TrimStart();
+                foreach (string prefix in s_FrameKeepPrefixes)
+                {
+                    if (!trimmed.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                    kept.Append(trimmed).Append('\n');
+                    break;
+                }
+            }
+            int marker = content.IndexOf(k_FrameUserMarker, StringComparison.Ordinal);
+            if (marker >= 0)
+                kept.Append(content.Substring(marker + k_FrameUserMarker.Length).TrimStart());
+            else if (kept.Length == 0)
+                //自主时钟帧、又没有工具结果：这一轮她是自己开口的，历史里留个标记即可。
+                kept.Append("[自主时钟帧]");
+            entry.content = kept.ToString().TrimEnd();
+        }
+    }
+
+    /// <summary>
+    /// 粗估 token：CJK 约 1 字 1 个，其余按 4 字符 1 个。只用来决定"要不要再裁一条"，
+    /// 不需要精确——宁可略微高估，代价只是多裁一条历史，而低估的代价是整轮 400 失败。
+    /// </summary>
+    private static int EstimateTokens(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return 0;
+        int cjk = 0;
+        foreach (char ch in text)
+        {
+            if ((ch >= 0x3040 && ch <= 0x30FF) || (ch >= 0x4E00 && ch <= 0x9FFF)) cjk++;
+        }
+        return cjk + (text.Length - cjk) / 4 + 4;   //+4 是每条消息的角色标记开销
+    }
+
+    private int EstimatePromptTokens()
+    {
+        int total = 0;
+        if (m_DataList != null)
+        {
+            for (int i = 0; i < m_DataList.Count; i++)
+            {
+                if (m_DataList[i] == null) continue;
+                total += EstimateTokens(m_DataList[i].content);
+                //带图的轮次视觉 token 另算，按一张图的常见量级粗估。
+                if (!string.IsNullOrEmpty(m_DataList[i].imageDataUrl)) total += 1024;
+            }
+        }
+        return total;
+    }
+
+    /// <summary>
+    /// 从最老的非 system 消息开始裁，直到估算 token 进入预算。system 永远保留。
+    /// </summary>
+    private void TrimHistoryToTokenBudget()
+    {
+        int budget = Mathf.Max(4096, m_MaxPromptTokens);
+        int before = EstimatePromptTokens();
+        if (before <= budget) return;
+
+        int removed = 0;
+        while (EstimatePromptTokens() > budget)
+        {
+            int removeIndex = -1;
+            for (int i = 0; i < m_DataList.Count; i++)
+            {
+                if (m_DataList[i] != null && m_DataList[i].role != "system")
+                {
+                    removeIndex = i;
+                    break;
+                }
+            }
+            //只剩 system 了还超预算：那是提示词本身太长，裁历史救不了，
+            //继续裁下去会把 m_DataList 清空。这里停手并明确报出来。
+            if (removeIndex < 0)
+            {
+                Debug.LogError(
+                    $"[ChatQW] 系统提示本身已约 {EstimatePromptTokens()} token，" +
+                    $"超过 prompt 预算 {budget}——裁历史无法解决，请精简 behavior.txt " +
+                    "或调大服务端上下文。");
+                return;
+            }
+            m_DataList.RemoveAt(removeIndex);
+            removed++;
+        }
+        Debug.LogWarning(
+            $"[ChatQW] prompt 约 {before} token 超出预算 {budget}，" +
+            $"按 token 追加裁掉 {removed} 条历史 → 约 {EstimatePromptTokens()} token");
+    }
+
     public override void CheckHistory()
     {
+        //历史里的感知帧先压掉。本轮消息是在 CheckHistory 之后才追加的，当轮不受影响。
+        CompactStaleFrames();
+
         int limit = Mathf.Max(4, m_LowLatencyHistoryLimit);
         int nonSystemCount = 0;
         for (int i = 0; i < m_DataList.Count; i++)
@@ -1100,7 +1240,12 @@ public class ChatQW : LLM
             if (m_DataList[i] != null && m_DataList[i].role != "system") nonSystemCount++;
         }
         //高水位：没超过就一条都不动，让这一轮成为纯追加
-        if (nonSystemCount <= limit) return;
+        if (nonSystemCount <= limit)
+        {
+            //条数没超也可能 token 超——系统提示长、演唱轮前缀重的时候就会这样。
+            TrimHistoryToTokenBudget();
+            return;
+        }
         //低水位。设每条消息 t 个 token，裁剪一次要重算 target*t，而涨回高水位需要
         //(limit-target)/2 轮，故平均每轮重算 2*t*target/(limit-target)。按固定比例取
         //target 时这个值与 limit 无关(0.6 倍 => 恒为 3t)，所以单纯抬高上限没有收益——
@@ -1126,6 +1271,9 @@ public class ChatQW : LLM
             nonSystemCount--;
             removed++;
         }
+
+        //条数裁完再确认 token 也进了预算；不够就继续裁。
+        TrimHistoryToTokenBudget();
 
         if (removed > 0 && m_LogRequestStats)
         {

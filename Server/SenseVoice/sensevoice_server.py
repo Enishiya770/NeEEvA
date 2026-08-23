@@ -246,6 +246,28 @@ def recognize_stream_partial(wav: np.ndarray, language: str):
     return result
 
 
+def build_song_recall(analysis: Optional[dict], query_text: str, limit: int = 3):
+    """唱歌轮自动回忆：曲库里有没有像这一段的。
+
+    做成"自动"而不是"她想查才查"，是因为认出一段听过的调子不是一个决定——
+    人不会先决定再认出来。<song_search/> 留给它本来的用途(查外部歌名)。
+
+    只在整段判为唱歌时跑，普通说话轮一分钱不花。
+    """
+    if _song_search_engine is None or not analysis:
+        return []
+    if not bool(analysis.get("is_singing", False)):
+        return []
+    contour = analysis.get("pitch_contour_midi") or []
+    if len(contour) < 8:
+        return []
+    try:
+        return _song_search_engine.recall(query_text or "", contour, limit)
+    except Exception as exc:
+        print(f"[Recall] 曲库回忆失败: {exc}", flush=True)
+        return []
+
+
 def singing_response_fields(analysis: Optional[dict], include_contour: bool = True):
     """Flatten singing output for Unity JsonUtility while retaining one schema."""
     analysis = analysis or {}
@@ -1358,6 +1380,10 @@ async def asr(
         )
         result["singing_lyrics_mora"] = segment_lyrics.get("lyrics_mora", []) or []
         result["singing_tail_text"] = transcribe_singing_tail(wav, singing, language)
+        #分段歌词比整轮文本更贴近真正唱的内容，优先拿它去回忆
+        result["song_recall"] = build_song_recall(
+            singing, result.get("singing_text") or text
+        )
         result["audio_content_start_seconds"] = round(audio_content_start_seconds, 3)
         result["singing_expected"] = bool(expect_singing)
         result["singing_expected_override"] = bool(expected_singing_override)

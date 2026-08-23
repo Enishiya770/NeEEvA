@@ -68,6 +68,107 @@ def _resample_sequence(values: Iterable[float], max_points: int = 220) -> np.nda
     return np.interp(x_new, x_old, arr).astype(np.float32)
 
 
+#音名序列：给 LLM 看的旋律文本形式。18 音是实测的够用长度——同一批四选一题上
+#18/36/72/不截断分别 66%/70%/66%/66%，差异全在噪声内，而字符数从 62 涨到 187。
+NOTE_SEQUENCE_MAX_NOTES = 18
+
+
+def notes_from_contour(contour: Iterable[float], limit: int = NOTE_SEQUENCE_MAX_NOTES) -> str:
+    """与 SingingAnalyzer._note_sequence 同一算法，独立实现一份供曲库补算用。"""
+    names: List[str] = []
+    for value in contour or []:
+        try:
+            f = float(value)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(f):
+            continue
+        n = _midi_to_note_name(f)
+        if n and (not names or names[-1] != n):
+            names.append(n)
+    if limit and len(names) > limit:
+        names = names[:limit] + ["…"]
+    return "-".join(names)
+
+
+_NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+
+def _midi_to_note_name(midi: float) -> str:
+    if not math.isfinite(midi) or midi <= 0:
+        return ""
+    index = int(round(midi))
+    if index < 12 or index > 127:
+        return ""
+    return f"{_NOTE_NAMES[index % 12]}{index // 12 - 1}"
+
+
+def semitone_tokens(contour: Iterable[float]) -> List[int]:
+    """把轮廓量化成半音、合并相邻重复——音名序列的数值等价物。
+
+    与 SingingAnalyzer._note_sequence 同一口径(那边输出音名字符串给 LLM 看)，
+    只是留成整数便于移调归一。
+    """
+    out: List[int] = []
+    for value in contour or []:
+        if not math.isfinite(float(value)):
+            continue
+        s = int(round(float(value)))
+        if not out or out[-1] != s:
+            out.append(s)
+    return out
+
+
+def token_alignment_similarity(query: Iterable[float], reference: Iterable[float]) -> float:
+    """音名 token 对齐 + 移调归一，用于**候选排序**。
+
+    8/17 拿曲库已有的重复组量过(63 条参考、515 同歌对 vs 1438 异歌对)，
+    按 AUC(随机取一对同歌、一对异歌，同歌得分更高的概率)比较：
+
+        现役 melody_similarity      全部 0.531   长度悬殊 0.613   长度接近 0.511
+        本函数(对称 token + 移调)    全部 0.648   长度悬殊 0.666   长度接近 0.753
+        含有率(移调归一)             全部 0.633   长度悬殊 0.661   长度接近 0.661
+
+    melody_similarity 把轮廓重采样到 220 点再取差分，**时长和调高都被抹掉**，
+    只剩起伏形状——而人声旋律的起伏形状天生相似，所以它在长度接近时 AUC 0.511，
+    等于抛硬币。改成按量化音名逐 token 对齐、并在 ±6 半音内取最好的移调，
+    三档都不输，是唯一没有明显短板的。
+
+    注意：这里只用于**排序取前几名**，不设阈值。0.65 的 AUC 撑不起判定——
+    实测任何阈值要么只认出两成，要么带进一堆错。谁是谁最终由 LLM 看歌词判断。
+    """
+    q = semitone_tokens(query)
+    r = semitone_tokens(reference)
+    if len(q) < 4 or len(r) < 4:
+        return 0.0
+    best = 0.0
+    for shift in range(-6, 7):
+        shifted = [v + shift for v in q]
+        best = max(best, SequenceMatcher(None, shifted, r).ratio())
+    return float(max(0.0, min(1.0, best)))
+
+
+def melody_containment(query: Iterable[float], reference: Iterable[float]) -> float:
+    """较短那条里有多少音在另一条里找到了（移调归一）。
+
+    与上面的对称相似度是**不同的问题**：对称回答"这两次录音是不是同一段"，
+    含有率回答"我唱的这一小段是不是那首歌的一部分"。用户唱 6 个音、曲库存着
+    50 个音时，完美前缀的对称分只有 2×6/56=0.21，而含有率是 1.00。
+    排序用对称(AUC 更高)，含有率作为一条**有直观含义**的线索展示给她。
+    """
+    q = semitone_tokens(query)
+    r = semitone_tokens(reference)
+    if not q or not r:
+        return 0.0
+    shorter = min(len(q), len(r))
+    best = 0
+    for shift in range(-6, 7):
+        shifted = [v + shift for v in q]
+        hit = sum(b.size for b in SequenceMatcher(None, shifted, r).get_matching_blocks())
+        best = max(best, hit)
+    return float(max(0.0, min(1.0, best / float(shorter))))
+
+
 def melody_similarity(query: Iterable[float], reference: Iterable[float]) -> float:
     """Subsequence DTW over melodic intervals, invariant to vocal key."""
     q = _resample_sequence(query)
@@ -288,6 +389,10 @@ class SongSearchEngine:
                 "id": clip_id,
                 "wav_file": self._relative_audio_path(absolute_path),
                 "pitch_contour_midi": contour,
+                #旋律的文本形式。分析结果里本来就有(note_sequence)，以前算完就丢，
+                #于是回忆候选拿不到旋律、她只能靠歌词认歌。存一份即可，不额外算。
+                "note_sequence": (str(analysis.get("note_sequence", "")).strip()
+                                  or notes_from_contour(contour)),
                 "pitch_timeline_midi": analysis.get("pitch_timeline_midi", []) or [],
                 "pitch_timeline_frame_seconds": float(
                     analysis.get("pitch_timeline_frame_seconds", 0.10)
@@ -809,6 +914,59 @@ class SongSearchEngine:
             "privacy": "raw_audio_kept_local",
         }
 
+    def recall(self, query: str, contour: List[float], limit: int = 3) -> List[Dict]:
+        """听到一段歌声时"想起了什么"——只查本机，不打外部目录。
+
+        **刻意不设置信度门槛。** 8/12 拿曲库现有的重复组量过：同一首歌的不同录音
+        与不同歌之间，melody_similarity 的分布几乎完全重合(组内中位 0.701 /
+        跨组中位 0.675，213 对 vs 490 对)，0.80 以上才干净但只认得出 9/213。
+        原因在实现本身：轮廓重采样到 220 点再取差分，时长和调性都被抹掉，
+        只剩起伏形状——而人声旋律的起伏形状天生相似。
+
+        所以这里只按分数取前几名，把歌词和上次听到的时间一并带出去，判断留给上层：
+        能分辨这几条的是歌词语义，不是旋律数字。
+        """
+        ranked = self._search_local(query or "", list(contour or []), max(1, int(limit)))
+        with self._lock:
+            index = {str(item.get("id", "")): item for item in self._catalog}
+        out: List[Dict] = []
+        for match in ranked:
+            entry = index.get(str(match.get("source_id", "")))
+            if entry is None:
+                continue
+            references = [
+                item for item in (entry.get("references") or [])
+                if isinstance(item, dict)
+            ]
+            stamps = [int(_safe_float(item.get("created_at"), 0.0)) for item in references]
+            stamps.append(int(_safe_float(entry.get("updated_at"), 0.0)))
+            #旋律的文本形式一并带出去。8/17 实测：候选里只有歌词时她四选一 50%，
+            #只有旋律文本 58%，两个都给 66%——它们是互补的而不是冗余。
+            #歌词来自唱歌 ASR、错字很多(「几十长旋天边」)，音高提取相对稳，
+            #所以旋律文本单独反而比歌词强。
+            note_seq = ""
+            for item in references:
+                cand = str(item.get("note_sequence", "")).strip()
+                if cand:
+                    note_seq = cand
+                    break
+            if not note_seq:
+                note_seq = notes_from_contour(entry.get("pitch_contour_midi") or [])
+            out.append({
+                "song_id": str(entry.get("id", "")),
+                "display_name": str(match.get("title", "")),
+                "named": bool(match.get("named")),
+                "lyrics": " ".join(str(entry.get("lyrics", "")).split()),
+                "note_sequence": note_seq,
+                "confidence": _safe_float(match.get("confidence"), 0.0),
+                "melody_score": _safe_float(match.get("melody_score"), 0.0),
+                "containment": _safe_float(match.get("containment"), 0.0),
+                "match_reason": str(match.get("match_reason", "")),
+                "last_heard": max(stamps) if stamps else 0,
+                "take_count": len(references),
+            })
+        return out
+
     def _search_local(self, query: str, contour: List[float], limit: int) -> List[Dict]:
         normalized_query = _normalize_text(query)
         with self._lock:
@@ -839,8 +997,18 @@ class SongSearchEngine:
             for reference in item.get("references", []):
                 if isinstance(reference, dict) and reference.get("pitch_contour_midi"):
                     reference_contours.append(reference.get("pitch_contour_midi", []))
+            #排序判据换成 token 对齐(见 token_alignment_similarity 的注释：
+            #AUC 0.531 → 0.648，长度接近时 0.511 → 0.753)。
+            #去重与 mode=continue 仍用旧的 performance_similarity /
+            #melody_subsequence_alignment——那两处的语义不同，不在这次改动范围内。
             melody_score = max(
-                (melody_similarity(contour, reference) for reference in reference_contours),
+                (token_alignment_similarity(contour, reference)
+                 for reference in reference_contours),
+                default=0.0,
+            )
+            containment = max(
+                (melody_containment(contour, reference)
+                 for reference in reference_contours),
                 default=0.0,
             )
             if text_score > 0 and melody_score > 0:
@@ -864,6 +1032,8 @@ class SongSearchEngine:
                         else (f"旋律{melody_score:.2f}" if melody_score > 0 else f"文字{text_score:.2f}")
                     ),
                     "url": str(item.get("url", "")),
+                    "melody_score": round(float(melody_score), 3),
+                    "containment": round(float(containment), 3),
                 }
             )
         output.sort(key=lambda item: item["confidence"], reverse=True)

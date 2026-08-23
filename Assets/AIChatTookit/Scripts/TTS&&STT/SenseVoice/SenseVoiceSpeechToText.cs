@@ -31,6 +31,11 @@ public class SenseVoiceSpeechToText : STT
     [SerializeField, Range(400, 3000)] private int m_StreamMinAudioMs = 800;
     [SerializeField] private bool m_LogStreamingPreview = false;
 
+    [Header("把练唱各段与合成源写到 Server/SenseVoice/practice_dumps，供离线分析")]
+    //练唱片段只活在内存里：prob 高于 0.70 的轮次不进 band_dumps，事后想复现
+    //用户听到的东西就没有素材。开着它，下一次练唱就能在离线侧拿到同一批音频。
+    [SerializeField] private bool m_DumpPracticeAudio = true;
+
     [Header("识别语言: auto / zh / en / ja / ko / yue")]
     [SerializeField] private string m_Language = "auto";
 
@@ -142,6 +147,33 @@ public class SenseVoiceSpeechToText : STT
     //本轮响应给出的头部裁剪量。每份响应都会重写，所以不会串轮。
     private float m_LastResponseAudioCropSeconds = 0f;
     private string m_LastResponseSingingTailText = "";
+    private SongRecall[] m_LastSongRecall = null;
+    //最近一次被判为"说话"的转写。用户在唱之前往往会交代这一段是什么
+    //（「换一首歌吧」「刚才唱错了，重来一遍」），而那句话正是清单里唯一缺的东西：
+    //「第2/2遍」只说明是重复，说不出为什么重复；「疑似」来自旋律匹配，实测 AUC 0.53。
+    //8/22 实测：用户两种情况都当面交代过、她也回应说理解了，等到调 practice 时
+    //却把两首不同的歌 + 同一句的两遍全合了起来，也没有问。信息丢在了这一步。
+    private string m_LastSpokenTranscript = "";
+
+    /// <summary>
+    /// 这一轮的曲库候选里有没有写着这个歌名。歌名溯源用——候选是曲库里真实存在的条目。
+    /// </summary>
+    public bool RecallMentionsSongName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || m_LastSongRecall == null) return false;
+        foreach (var item in m_LastSongRecall)
+        {
+            if (item == null || !item.named) continue;
+            if (string.IsNullOrWhiteSpace(item.display_name)) continue;
+            if (item.display_name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                name.IndexOf(item.display_name, StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+        }
+        return false;
+    }
+    //本轮裁剪起点比岛起点早多少秒。>0 表示歌声之前还留了一段，可能是说话。
+    private float m_LastCropLeadInSeconds = 0f;
+    public float LastCropLeadInSeconds { get { return m_LastCropLeadInSeconds; } }
 
     /// <summary>
     /// 唱完之后那截说话的单独转写（可能为空）。整轮 ASR 在长的混合录音上只转得出
@@ -213,6 +245,45 @@ public class SenseVoiceSpeechToText : STT
         public float FrameSeconds;
         public string Language;
         public int Signature;
+        //身份：用户是按内容指段的(「先唱沉默着走了那段」)，不是按序号。
+        //没有这些字段时感知帧只能报歌词片段，她分不清哪几段属于同一首、哪段是最近唱的
+        //——8/16 实测练唱会话累到 7 段、跨两首歌，她连着三次选错段(order=1,2 / 3,5,6,1 / 7)。
+        public string Lyrics;
+        public float Seconds;
+        public string SongId;      //本轮曲库回忆的首选，作为"这段属于哪首歌"的线索
+        public string SongName;
+        public float AtRealtime;   //唱下这一段的时刻，供"最近唱的是哪段"判断
+        //唱这一段之前用户说的最后一句话。换歌/重唱的意图就在这句里。
+        public string PrecedingSpeech;
+    }
+
+    /// <summary>练唱会话里每一段的身份，供感知帧展示与顺序指定。</summary>
+    public sealed class PracticePhraseInfo
+    {
+        public int Index;          //1 起，就是 order 里要写的数字
+        public string Lyrics;
+        public float Seconds;
+        public string Language;
+        public string SongId;
+        public string SongName;
+        public float AgoSeconds;   //距现在多久唱的
+        //同一句被教了好几遍时的分组：TakeGroup 相同 = 同一句，TakeIndex 是第几遍。
+        //没有这两个字段时清单里两段歌词一模一样，用户说"第二次教你的那段"她对不上段号
+        //——8/17 实测她因此把「紧闭双眼」连着唱了两遍。
+        public int TakeGroup;
+        public int TakeIndex;
+        public int TakeTotal;
+        //唱这一段之前用户说的最后一句话——「换一首歌」「刚才唱错了」都在这里。
+        public string PrecedingSpeech;
+        //这一段的音高中位(MIDI)，以及它比"各段的共同基准"高/低多少个半音。
+        //用户说的「让第三段和前两段调一致」需要这个数才能落地——8/20 实测
+        //段1/段2 中位 60，段3 中位 57，实际只差 3 个半音；而她当时猜的是升八度(+12)，
+        //既超出 key 的取值范围被截回默认档，也远大于真实差值，于是三轮都听不出变化。
+        public float PitchMedianMidi;
+        //绝对起调的音名(C#4 这样)。不写「比别段低几个半音」：那需要先认定
+        //某几段是共同基调，而用户唱两首歌、或者每段起调都不同时，这个认定
+        //就是凭空造出来的。摆绝对值，让用户自己指定以哪段为准。
+        public string PitchBaseNote;
     }
 
     public sealed class PracticeComposition
@@ -224,6 +295,17 @@ public class SenseVoiceSpeechToText : STT
         public int PhraseCount;
         public float DurationSeconds;
         public string VariationDiagnostic;
+        //以下三项只为"逐段各自移调"服务：转换那一侧一次只收一条音频 + 一个移调值，
+        //所以要逐段送就得在拼接**之前**把各段单独拿出来，拼接改到转换之后做。
+        //Gaps[i] 是第 i 段之前的静音长度(第 0 段为 0)，照着填才能和整条转的听感一致。
+        public List<byte[]> SegmentWavs;
+        public List<float> Gaps;
+        //各段自己的起调(MIDI)。移调后的结果 = 这个数 + 实际发出的半音数，
+        //回报给她之后她才能看出还差多少，而不是一次加一个半音地试。
+        public List<float> SegmentMedians;
+        //整条的有声音高中位数。auto_f0_adjust 关掉之后要自己补上它本来会给的抬升，
+        //公式见 Server/SeedVC/vendor/seed-vc/app_svc.py:315：目标中位 − 源中位。
+        public float MedianMidi;
     }
 
     private readonly List<PracticePhrase> m_PracticePhrases = new List<PracticePhrase>();
@@ -809,15 +891,40 @@ public class SenseVoiceSpeechToText : STT
                         _response.singing_analysis_available)
                     {
                         string band = DescribeSingingBand(_response.singing_probability);
+                        //岛秒数**只观测不参与判定**。8/12 那一轮「好吧…那个我们换一首歌吧…
+                        //简单点，说话的方式简单点…」整段 24 秒里唱了 9.14 秒，岛检测找到了，
+                        //但整段概率被前面 13 秒说话稀释到 0.40 判成说话——用户连唱三遍才被听见。
+                        //现有 17 个样本里，真唱的岛秒数最低 4.97、纯说话最高 2.44，中间是分开的，
+                        //但"该放行却被判说"的正样本只有 1 例，撑不起一个具体阈值。
+                        //所以先把它打出来攒样本，别重蹈 _ISLAND_PROB_FLOOR 那次一路改阈值的覆辙。
+                        //整段概率之外单独看它，是因为混合轮的均值天然会被说话拉低。
+                        int timelineFrames = _response.pitch_timeline_midi != null
+                            ? _response.pitch_timeline_midi.Length : 0;
+                        float contentSecondsProbe = _response.pitch_timeline_start_seconds +
+                            timelineFrames * Mathf.Max(0.02f, _response.pitch_timeline_frame_seconds);
+                        float islandEndProbe = _response.singing_end_seconds > 0f
+                            ? _response.singing_end_seconds : contentSecondsProbe;
+                        float islandSecondsProbe = Mathf.Max(
+                            0f, islandEndProbe - _response.singing_start_seconds);
                         Debug.Log($"[Singing/Band] 离线 prob={_response.singing_probability:F2} " +
                                   $"stab={_response.pitch_stability:F2} → {band} " +
                                   $"(阈值 0.58 判为{(_response.is_singing ? "唱" : "说")}) " +
+                                  $"岛={islandSecondsProbe:F2}s/内容{contentSecondsProbe:F2}s " +
                                   $"文本=\"{(LastText ?? "").Trim()}\"");
+                    }
+                    //说话轮的原话留一份，下一段歌声提交时作为"唱这段之前用户说了什么"。
+                    if (!_response.is_singing)
+                    {
+                        string spoken = (LastText ?? "").Trim();
+                        //太短的应答（「嗯」「好」）说明不了任何事，留着反而占地方。
+                        if (spoken.Length >= 4) m_LastSpokenTranscript = spoken;
                     }
                     //每一份响应都要重置：调用方问的是「刚刚这一轮裁了多少头」，
                     //沿用上一轮的值会让没有演唱的轮次继承一个大裁剪量。
                     m_LastResponseAudioCropSeconds = 0f;
                     m_LastResponseSingingTailText = _response.singing_tail_text ?? "";
+                    //每轮必赋值：沿用上一轮会让这一次的歌声配上别的歌的回忆
+                    m_LastSongRecall = _response.song_recall;
                     m_LastResponseSingingText = _response.singing_text ?? "";
                     m_LastResponseSingingLanguage = _response.singing_language ?? "";
                     m_LastResponseSingingReading = _response.singing_lyrics_reading ?? "";
@@ -984,6 +1091,21 @@ public class SenseVoiceSpeechToText : STT
                             ? _response.singing_end_seconds : contentSeconds;
                         float islandSeconds = Mathf.Max(
                             0f, islandEnd - _response.singing_start_seconds);
+                        //起点分歧观测：真正拿去变声的是 audioCropSeconds，而岛检测认为
+                        //歌声从 singing_start_seconds 才开始。两者差得越多，前面混进去的
+                        //说话就越长。8/20 实测一轮 applied=3.75s 而岛起点=7.23s，中间那
+                        //3.48 秒是用户的中文说话，被原样用歌声唱了回去；用户连着三轮抱怨
+                        //「你把我说话的部分也复读出来了」，而工具结果只写"成功播放"，
+                        //她完全无从察觉，最后归结成「それは仕方がないの」。
+                        //先只观测不改判据——保守取早本身是对的(防止乐句开头被切)，
+                        //要区分"多留半秒余量"和"多留三秒说话"需要样本。
+                        m_LastCropLeadInSeconds = Mathf.Max(
+                            0f, _response.singing_start_seconds - audioCropSeconds);
+                        Debug.Log($"[Singing/LeadIn] 裁剪起点={audioCropSeconds:F2}s " +
+                                  $"岛起点={_response.singing_start_seconds:F2}s " +
+                                  $"多留={m_LastCropLeadInSeconds:F2}s 起点一致={onsetsAgree} " +
+                                  $"整轮{(LastText ?? "").Trim().Length}字 " +
+                                  $"分段{(_response.singing_text ?? "").Trim().Length}字");
                         Debug.Log($"[SenseVoice/Singing] island 占比 " +
                                   $"{(contentSeconds > 0.01f ? islandSeconds / contentSeconds : 0f):P0} " +
                                   $"({islandSeconds:F2}s / 内容 {contentSeconds:F2}s) " +
@@ -1105,7 +1227,47 @@ public class SenseVoiceSpeechToText : STT
             : LastNoteSequence;
         return $"[演唱片段; 歌唱概率:{LastSingingProbability:F2}; 语言:{LastLanguage}; " +
                $"音域:{range}; 音高稳定度:{LastPitchStability:F2}; 旋律:{melody}; " +
-               "歌词是ASR推测，长音与一字多音处可能不准确] ";
+               "歌词是ASR推测，长音与一字多音处可能不准确" +
+               BuildSongRecallClause() + "] ";
+    }
+
+    /// <summary>
+    /// 把曲库回忆拼成感知帧里的一小段。措辞刻意留在"像/也许"这一档：
+    /// 旋律相似度分不开不同的歌，这几条只是线索，断言留给她看完歌词再下。
+    /// </summary>
+    private string BuildSongRecallClause()
+    {
+        if (m_LastSongRecall == null || m_LastSongRecall.Length == 0)
+            return "; 曲库里没有旋律接近的段落";
+        var sb = new StringBuilder("; 曲库里旋律接近的(仅线索，不是识别结果):");
+        int shown = 0;
+        foreach (var item in m_LastSongRecall)
+        {
+            if (item == null || string.IsNullOrEmpty(item.song_id)) continue;
+            if (shown >= 3) break;
+            shown++;
+            string name = item.named && !string.IsNullOrWhiteSpace(item.display_name)
+                ? "《" + item.display_name.Trim() + "》"
+                : "未命名";
+            string lyric = (item.lyrics ?? "").Trim();
+            if (lyric.Length > 24) lyric = lyric.Substring(0, 24) + "…";
+            sb.Append($" {shown}) {name} id={item.song_id}");
+            if (lyric.Length > 0) sb.Append($" 歌词\"{lyric}\"");
+            if (!string.IsNullOrWhiteSpace(item.note_sequence))
+                sb.Append($" 旋律{item.note_sequence.Trim()}");
+            sb.Append($" 相似{item.confidence:F2}");
+            //含有率单独给：它回答的是"我唱的这几个音在这首里找到了多少"，
+            //和"这两段像不像"是不同的问题，用户唱一小段时前者才是有意义的那个。
+            if (item.containment > 0.001f)
+                sb.Append($" 音符命中{item.containment:P0}");
+            if (item.last_heard > 0)
+            {
+                var when = DateTimeOffset.FromUnixTimeSeconds(item.last_heard).ToLocalTime();
+                sb.Append($" 上次听到{when:M月d日 HH:mm}");
+            }
+            if (item.take_count > 1) sb.Append($" 共{item.take_count}遍");
+        }
+        return shown == 0 ? "; 曲库里没有旋律接近的段落" : sb.ToString();
     }
 
     /// <summary>
@@ -1134,6 +1296,13 @@ public class SenseVoiceSpeechToText : STT
     {
         if (EndsWithSpokenSingingExit(LastText)) return false;
         if (!m_EnableSingingAnalysis || LastNoSpeech || LastIsSinging) return LastIsSinging;
+        //stab 曾在 8/12 被我从判据里拿掉(理由是它没有区分度、等于长期为真)，
+        //当天下一场就证明那是个错误改动：新的误判走的是服务端 expect_singing
+        //放宽那条路，与提升点无关——改动对故障零贡献，却关掉了"离线保守、
+        //流式 0.40~0.55 的真唱"这条救援通道，纯亏。而且当时日志里提升点总共
+        //只触发过 1 次，等于拿 1 个样本改判据。已回退。
+        //真正的修复在转换期否决(见 ChatSample 的 SVC 期间语义复核)：
+        //声学侧继续宽松地抢时间，语义侧在音频落地前行使否决权。
         bool strongStreamingEvidence = streamingProbability >= 0.55f ||
             streamingPitchStability >= 0.52f;
         //离线概率落在低区时，不允许流式把它推翻。
@@ -1144,14 +1313,14 @@ public class SenseVoiceSpeechToText : STT
         //流式证据才有资格参与。上界不必判：离线 >= 阈值时 LastIsSinging 已为真，
         //函数在前面就返回了，所以这里生效的区间恰好就是模糊带。
         bool offlineAllowsPromotion = LastSingingProbability >= k_SingingBandLow;
-        //分带观测：这一步会用流式概率推翻离线结论，是 8/9 那次「你跟着我唱呀」被
-        //当成唱歌的实际放行口。两个或条件分开记，因为 stability 在样本里几乎没有
-        //区分度(说话 0.47~0.62 / 唱歌 0.62~0.77 大面积重叠)，怀疑它长期为真。
+        //分带观测：这一步会用流式概率推翻离线结论，是 8/9 那次「你跟着我唱呀」和
+        //8/12 那次「那我那我开始喽」被当成唱歌的实际放行口。stab 已经不参与判定，
+        //但继续打出来——它当初被怀疑"长期为真"，留着看这个怀疑还成不成立。
         Debug.Log($"[Singing/Band] 提升点 streamProb={streamingProbability:F2} " +
                   $"→ {DescribeSingingBand(streamingProbability)}  " +
-                  $"streamStab={streamingPitchStability:F2} " +
-                  $"(prob条件={streamingProbability >= 0.55f} " +
-                  $"stab条件={streamingPitchStability >= 0.52f}) " +
+                  $"(判据 prob>=0.55: {streamingProbability >= 0.55f}) " +
+                  $"streamStab={streamingPitchStability:F2}(仅观测, " +
+                  $"旧判据下会={streamingPitchStability >= 0.52f}) " +
                   $"离线prob={LastSingingProbability:F2}(判说话) " +
                   $"文本=\"{(LastText ?? "").Trim()}\"");
         bool freshCandidate = Time.realtimeSinceStartup - m_LastPlayableCandidateTime <= 5f &&
@@ -1857,6 +2026,174 @@ public class SenseVoiceSpeechToText : STT
         get { return m_PracticePhrases.Count; }
     }
 
+    /// <summary>练唱会话里每一段的身份快照，供感知帧列给她看。</summary>
+    public List<PracticePhraseInfo> DescribePracticePhrases()
+    {
+        var list = new List<PracticePhraseInfo>(m_PracticePhrases.Count);
+        for (int i = 0; i < m_PracticePhrases.Count; i++)
+        {
+            list.Add(new PracticePhraseInfo
+            {
+                Index = i + 1,
+                Lyrics = m_PracticePhrases[i].Lyrics ?? "",
+                Seconds = m_PracticePhrases[i].Seconds,
+                Language = m_PracticePhrases[i].Language ?? "",
+                SongId = m_PracticePhrases[i].SongId ?? "",
+                SongName = m_PracticePhrases[i].SongName ?? "",
+                AgoSeconds = Mathf.Max(
+                    0f, Time.realtimeSinceStartup - m_PracticePhrases[i].AtRealtime),
+                PitchMedianMidi = MedianVoicedPitch(m_PracticePhrases[i].MidiTimeline),
+                PrecedingSpeech = m_PracticePhrases[i].PrecedingSpeech ?? "",
+            });
+        }
+        AnnotateTakeGroups(list);
+        AnnotatePitchBases(list);
+        return list;
+    }
+
+    /// <summary>
+    /// 标出各段的音高中位，以及相对"共同基准"的偏移。
+    ///
+    /// 基准取各段中位数的中位数——多数段落定的调就是基准，个别偏低/偏高的那段
+    /// 会被显出来。8/20 实测段1/段2 都是 60、段3 是 57，基准 60，段3 报 −3。
+    /// 只做展示：要不要对齐、对齐到哪，仍然由用户和她决定。
+    /// </summary>
+    private static void AnnotatePitchBases(List<PracticePhraseInfo> list)
+    {
+        for (int i = 0; i < list.Count; i++)
+        {
+            //音名后面带上 MIDI 数值。8/21 实测她照音名做减法连错三次：
+            //D#3→D3 她算成 4(实际 1)、G#3→D#3 算成 -4(实际 -5)，三段调完更不齐了。
+            //给出整数之后"差几个半音"就是两个数相减，不必在音名上数格子。
+            list[i].PitchBaseNote = list[i].PitchMedianMidi > 0f
+                ? $"{MidiToNoteName(list[i].PitchMedianMidi)}" +
+                  $"({Mathf.RoundToInt(list[i].PitchMedianMidi)})"
+                : "";
+        }
+    }
+
+    private static readonly string[] s_NoteNames =
+    {
+        "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+    };
+
+    /// <summary>
+    /// 与服务端 singing_analysis.midi_to_note 保持同一套写法，两边显示的音名才对得上。
+    /// </summary>
+    public static string MidiToNoteName(float value)
+    {
+        if (float.IsNaN(value) || float.IsInfinity(value)) return "";
+        int note = Mathf.RoundToInt(value);
+        int octave = Mathf.FloorToInt(note / 12f) - 1;
+        int index = ((note % 12) + 12) % 12;
+        return s_NoteNames[index] + octave;
+    }
+
+    /// <summary>有声帧音高的中位数；全是休止时返回 0。</summary>
+    private static float MedianVoicedPitch(float[] timeline)
+    {
+        if (timeline == null || timeline.Length == 0) return 0f;
+        var voiced = new List<float>(timeline.Length);
+        foreach (float v in timeline) if (v > 1f) voiced.Add(v);
+        if (voiced.Count == 0) return 0f;
+        voiced.Sort();
+        return voiced[voiced.Count / 2];
+    }
+
+    /// <summary>
+    /// 标出"同一句的第几遍"。判据用歌词——用户重唱同一句时歌词高度一致，
+    /// 而不同段落的歌词差别很大。刻意不用旋律相似度：实测它连不同的歌都分不开
+    /// (组内中位 0.701 / 跨组 0.675)，拿来分"同一句的两遍"更不可能。
+    /// 这里只做展示分组，不影响任何合成行为——选哪一遍仍然由用户/她用 order 决定。
+    /// </summary>
+    private static void AnnotateTakeGroups(List<PracticePhraseInfo> list)
+    {
+        int nextGroup = 0;
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list[i].TakeGroup > 0) continue;
+            nextGroup++;
+            list[i].TakeGroup = nextGroup;
+            string a = NormalizeLyricForTake(list[i].Lyrics);
+            for (int j = i + 1; j < list.Count; j++)
+            {
+                if (list[j].TakeGroup > 0) continue;
+                string b = NormalizeLyricForTake(list[j].Lyrics);
+                if (a.Length == 0 || b.Length == 0) continue;
+                if (LyricsLooksSamePhrase(a, b)) list[j].TakeGroup = nextGroup;
+            }
+        }
+        for (int g = 1; g <= nextGroup; g++)
+        {
+            int total = 0;
+            for (int i = 0; i < list.Count; i++) if (list[i].TakeGroup == g) total++;
+            int seq = 0;
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i].TakeGroup != g) continue;
+                list[i].TakeIndex = ++seq;
+                list[i].TakeTotal = total;
+            }
+        }
+    }
+
+    private static string NormalizeLyricForTake(string lyric)
+    {
+        if (string.IsNullOrEmpty(lyric)) return "";
+        var sb = new StringBuilder(lyric.Length);
+        foreach (char c in lyric)
+        {
+            if (char.IsLetterOrDigit(c)) sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    //唱歌 ASR 每一遍的错字都不同，所以不能要求完全相等。0.62 是从 8/17 那一场
+    //定的：同一句的两遍(「紧闭双眼才能看得见…」)算出来 0.78，而相邻的不同段落
+    //(「说好了它永远断了线…」vs「紧闭双眼…」)只有 0.15，中间隔得很开。
+    private static bool LyricsLooksSamePhrase(string a, string b)
+    {
+        if (a == b) return true;
+        int min = Mathf.Min(a.Length, b.Length);
+        if (min < 4) return false;
+        if (a.Contains(b) || b.Contains(a)) return true;
+        return LyricOverlapRatio(a, b) >= 0.62f;
+    }
+
+    private static float LyricOverlapRatio(string a, string b)
+    {
+        //按 2-gram 交并比，比逐字编辑距离更耐 ASR 错字
+        var ga = new HashSet<string>();
+        for (int i = 0; i + 1 < a.Length; i++) ga.Add(a.Substring(i, 2));
+        var gb = new HashSet<string>();
+        for (int i = 0; i + 1 < b.Length; i++) gb.Add(b.Substring(i, 2));
+        if (ga.Count == 0 || gb.Count == 0) return 0f;
+        int inter = 0;
+        foreach (string g in ga) if (gb.Contains(g)) inter++;
+        return inter / (float)(ga.Count + gb.Count - inter);
+    }
+
+    /// <summary>
+    /// 把 <c>order="2,1"</c> 解析成 0 起的下标序列。
+    /// 空串／解析不出任何合法序号时返回 null，调用方按原顺序走。
+    /// 允许只取其中几段，也允许重复(用户可能要求"再唱一遍第一段")。
+    /// </summary>
+    private List<int> ParsePracticeOrder(string order)
+    {
+        if (string.IsNullOrWhiteSpace(order)) return null;
+        var picked = new List<int>();
+        foreach (string piece in order.Split(',', '，', ' ', '、', '-', '>'))
+        {
+            string t = piece.Trim();
+            if (t.Length == 0) continue;
+            int n;
+            if (!int.TryParse(t, out n)) continue;
+            if (n < 1 || n > m_PracticePhrases.Count) continue;
+            picked.Add(n - 1);
+        }
+        return picked.Count > 0 ? picked : null;
+    }
+
     /// <summary>
     /// Starts a new in-memory practice sequence. Persistent song memories are untouched.
     /// </summary>
@@ -1885,6 +2222,22 @@ public class SenseVoiceSpeechToText : STT
             Time.realtimeSinceStartup - m_LastPracticeCommitTime < 8f)
             return false;
 
+        //本轮回忆的首选候选：只在够像时才当身份线索用。相似度分不开不同的歌
+        //(实测组内中位 0.701 / 跨组 0.675)，所以这里要的不是"判定"，而是"提示"——
+        //她最终仍然靠歌词自己判断，写错也只是少一条线索。
+        string topRecallId = "";
+        string topRecallName = "";
+        if (m_LastSongRecall != null)
+        {
+            foreach (var item in m_LastSongRecall)
+            {
+                if (item == null || string.IsNullOrEmpty(item.song_id)) continue;
+                topRecallId = item.song_id;
+                topRecallName = item.named ? (item.display_name ?? "").Trim() : "";
+                break;
+            }
+        }
+
         if (m_PracticePhrases.Count >= MaxPracticePhraseCount)
             m_PracticePhrases.RemoveAt(0);
         m_PracticePhrases.Add(new PracticePhrase
@@ -1894,6 +2247,16 @@ public class SenseVoiceSpeechToText : STT
             FrameSeconds = Mathf.Clamp(frameSeconds, 0.02f, 0.25f),
             Language = language ?? "",
             Signature = signature,
+            //分段歌词比整轮文本更贴近真正唱的那一段
+            Lyrics = !string.IsNullOrWhiteSpace(m_LastSingingLyrics)
+                ? m_LastSingingLyrics.Trim()
+                : (LastText ?? "").Trim(),
+            Seconds = GetWavDurationSeconds(wavBytes),
+            //本轮曲库回忆的首选就是现成的身份线索，不额外算
+            SongId = topRecallId,
+            SongName = topRecallName,
+            AtRealtime = Time.realtimeSinceStartup,
+            PrecedingSpeech = m_LastSpokenTranscript ?? "",
         });
         m_LastCommittedPracticeSignature = signature;
         m_LastPracticeCommitTime = Time.realtimeSinceStartup;
@@ -1941,11 +2304,18 @@ public class SenseVoiceSpeechToText : STT
     /// Small take-level timing and dynamics differences make repetitions feel performed,
     /// while the same seed keeps one rendition internally coherent.
     /// </summary>
+    /// <param name="order">
+    /// 演唱顺序，形如 <c>"2,1"</c>；空串按练唱先后。8/16 实测用户连着七轮要求"反过来唱"，
+    /// 而这个工具当时只能原序合成、还每次都回报"成功"，她于是反复承诺、反复道歉、
+    /// 四次回哼全是同一个结果。顺序必须是可指定的——用户是按内容指段的
+    /// (「先唱沉默着走了那段」)，由她照着感知帧里的段号翻译成这个参数。
+    /// </param>
     public bool TryBuildSingingPracticeComposition(
         int performanceSeed,
         float maxSeconds,
         out PracticeComposition composition,
-        out string failure)
+        out string failure,
+        string order = "")
     {
         composition = null;
         failure = "";
@@ -1955,10 +2325,18 @@ public class SenseVoiceSpeechToText : STT
             return false;
         }
 
-        var decoded = new List<float[]>(m_PracticePhrases.Count);
-        int outputRate = 0;
-        for (int i = 0; i < m_PracticePhrases.Count; i++)
+        List<int> sequence = ParsePracticeOrder(order);
+        if (sequence == null)
         {
+            sequence = new List<int>(m_PracticePhrases.Count);
+            for (int i = 0; i < m_PracticePhrases.Count; i++) sequence.Add(i);
+        }
+
+        var decoded = new List<float[]>(sequence.Count);
+        int outputRate = 0;
+        for (int k = 0; k < sequence.Count; k++)
+        {
+            int i = sequence[k];
             if (!TryDecodePcmWav(
                     m_PracticePhrases[i].WavBytes,
                     out float[] phraseSamples,
@@ -1979,6 +2357,11 @@ public class SenseVoiceSpeechToText : STT
         var midi = new List<float>();
         var variation = new StringBuilder();
         string language = "";
+        //逐段送转换时用的那一份：内容与拼接进 output 的完全相同(同一个 phrase 数组)，
+        //只是没有被拼起来。两条路走同一批采样，听感才不会分叉。
+        var segmentWavs = new List<byte[]>(decoded.Count);
+        var gaps = new List<float>(decoded.Count);
+        var segmentMedians = new List<float>(decoded.Count);
 
         for (int i = 0; i < decoded.Count; i++)
         {
@@ -2001,19 +2384,24 @@ public class SenseVoiceSpeechToText : STT
                 int gapFrames = Mathf.Max(1, Mathf.RoundToInt(gapSeconds / outputFrameSeconds));
                 for (int f = 0; f < gapFrames; f++) midi.Add(0f);
                 variation.Append($" gap{i}={gapSeconds:F2}s");
+                gaps.Add(gapSeconds);
             }
+            else gaps.Add(0f);
+            segmentWavs.Add(EncodeMonoPcm16Wav(phrase, outputRate));
+            segmentMedians.Add(MedianVoicedPitch(m_PracticePhrases[sequence[i]].MidiTimeline));
 
+            int src = sequence[i];
             output.AddRange(phrase);
             AppendResampledTimeline(
                 midi,
-                m_PracticePhrases[i].MidiTimeline,
-                m_PracticePhrases[i].FrameSeconds,
+                m_PracticePhrases[src].MidiTimeline,
+                m_PracticePhrases[src].FrameSeconds,
                 outputFrameSeconds,
                 pace);
             if (string.IsNullOrEmpty(language) &&
-                !string.IsNullOrEmpty(m_PracticePhrases[i].Language))
-                language = m_PracticePhrases[i].Language;
-            variation.Append($" p{i + 1}={pace:F3}/{gainStart:F2}->{gainEnd:F2}");
+                !string.IsNullOrEmpty(m_PracticePhrases[src].Language))
+                language = m_PracticePhrases[src].Language;
+            variation.Append($" p{src + 1}={pace:F3}/{gainStart:F2}->{gainEnd:F2}");
         }
 
         float duration = output.Count / (float)Mathf.Max(1, outputRate);
@@ -2024,6 +2412,7 @@ public class SenseVoiceSpeechToText : STT
         }
         float[] outputSamples = output.ToArray();
         ApplyShortEdgeFade(outputSamples, outputRate, 0.018f);
+        DumpPracticeAudio(sequence, outputSamples, outputRate);
         composition = new PracticeComposition
         {
             WavBytes = EncodeMonoPcm16Wav(outputSamples, outputRate),
@@ -2033,9 +2422,49 @@ public class SenseVoiceSpeechToText : STT
             PhraseCount = m_PracticePhrases.Count,
             DurationSeconds = duration,
             VariationDiagnostic = $"seed={performanceSeed};{variation.ToString().Trim()}",
+            SegmentWavs = segmentWavs,
+            Gaps = gaps,
+            SegmentMedians = segmentMedians,
+            MedianMidi = MedianVoicedPitch(midi.ToArray()),
         };
         return composition.WavBytes != null && composition.WavBytes.Length > 44 &&
             HasPlayablePitchTimeline(composition.MidiTimeline);
+    }
+
+    /// <summary>
+    /// 把这一次参与合成的各段原始音频与拼好的合成源写到磁盘。纯诊断，失败不影响演唱。
+    /// </summary>
+    private void DumpPracticeAudio(List<int> sequence, float[] composed, int rate)
+    {
+        if (!m_DumpPracticeAudio) return;
+        try
+        {
+            string dir = Path.GetFullPath(Path.Combine(
+                Application.dataPath, "..", "Server", "SenseVoice", "practice_dumps"));
+            Directory.CreateDirectory(dir);
+            string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            for (int k = 0; k < sequence.Count; k++)
+            {
+                int i = sequence[k];
+                if (m_PracticePhrases[i].WavBytes == null) continue;
+                //文件名带上段序与歌词开头，离线侧不必再去翻日志对号入座。
+                string lyric = (m_PracticePhrases[i].Lyrics ?? "").Trim();
+                if (lyric.Length > 8) lyric = lyric.Substring(0, 8);
+                foreach (char bad in Path.GetInvalidFileNameChars())
+                    lyric = lyric.Replace(bad, '_');
+                File.WriteAllBytes(
+                    Path.Combine(dir, $"{stamp}_seg{k + 1}_p{i + 1}_{lyric}.wav"),
+                    m_PracticePhrases[i].WavBytes);
+            }
+            File.WriteAllBytes(
+                Path.Combine(dir, $"{stamp}_composed.wav"),
+                EncodeMonoPcm16Wav(composed, rate));
+            Debug.Log($"[Singing/Dump] 练唱素材已写入 {dir}（{sequence.Count} 段 + 合成源）");
+        }
+        catch (Exception exc)
+        {
+            Debug.LogWarning("[Singing/Dump] 写入练唱素材失败: " + exc.Message);
+        }
     }
 
     private static int ComputePracticeSignature(byte[] wavBytes, float[] timeline)
@@ -2664,6 +3093,30 @@ public class SenseVoiceSpeechToText : STT
         public float pitch_timeline_start_seconds = 0f;
         public float audio_content_start_seconds = 0f;
         public SingingScore singing_score = null;
+        //曲库里旋律接近的几条，服务端每个唱歌轮自动算好。不是识别结果——
+        //旋律相似度本身分不开不同的歌(实测组内中位 0.701 / 跨组 0.675)，
+        //所以这里只给候选和证据，谁是谁由她看歌词自己判断。
+        public SongRecall[] song_recall = null;
+    }
+
+    [Serializable]
+    public class SongRecall
+    {
+        public string song_id = "";
+        public string display_name = "";
+        public bool named = false;
+        public string lyrics = "";
+        //旋律的文本形式。8/17 实测四选一：只给歌词 50%、只给旋律 58%、两个都给 66%
+        //——互补而非冗余。曲库歌词来自唱歌 ASR、错字多，音高提取相对稳。
+        public string note_sequence = "";
+        public float confidence = 0f;
+        public float melody_score = 0f;
+        //较短那条里有多少音在另一条里找到了。用户唱一小段问"记不记得"时，
+        //这个数比对称相似度直观：唱 6 个音全命中就是 1.00，而对称分只有 0.21。
+        public float containment = 0f;
+        public string match_reason = "";
+        public long last_heard = 0;
+        public int take_count = 0;
     }
 
     [Serializable]
