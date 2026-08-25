@@ -54,7 +54,19 @@ _active_request_id = ""
 # leave only ~1.6 GiB free at EOU; a 1.9 GiB pre-gate therefore forced an 80-second
 # CPU conversion without ever trying the much faster GPU path.  Try CUDA from
 # 1.5 GiB and let the real allocation result (rather than a coarse snapshot) decide.
-RVC_GPU_MIN_FREE_MIB = 1500
+#
+# 8/10：全套服务起来之后实测空闲只有 1109~1122 MiB，1500 这道闸把每一次回哼都
+# 推到了 CPU，CUDA 那条路一次都没试过。降到 900 实测同一段 20.4s 素材：
+#     CUDA  8.70 / 8.71 / 8.82s   (n=3，含服务重启后的第一次)
+#     CPU  12.53 / 12.73s         (n=2)
+# 省约 3.9s（31%），4/4 成功，转换期间空闲显存降到 157~198 MiB。
+# 注意两件事：
+#  · 首次启用时第一次转换要 33s（CUDA 内核自动调优）。那份缓存落在磁盘上，
+#    之后重启服务也不会再付——上面第三个 8.70s 就是重启后的第一次。
+#  · 实际空闲显存随负载在 1100~2200 MiB 之间浮动，1000 这个闸是按低点定的。
+#    真正的安全网仍是 attempts=[True, False]：CUDA OOM 会自动退回 CPU。
+# 环境变量可覆盖，便于在不同显存占用下重新量而不用改代码。
+RVC_GPU_MIN_FREE_MIB = int(os.environ.get("RVC_GPU_MIN_FREE_MIB", "1000"))
 
 
 def _is_recoverable_cuda_failure(details: str) -> bool:
@@ -198,6 +210,264 @@ def _parse_rvc_metadata(stdout: str) -> dict[str, object]:
     return {}
 
 
+def _finish_rvc_result(
+    source_path: Path,
+    target_path: Path,
+    output_path: Path,
+    runner_metadata: dict,
+    source_seconds: float,
+    free_mib: int | None,
+    auto_f0_adjust: bool,
+    semitone_shift: int,
+    performance_seed: int,
+    rms_mix_rate: float,
+    protect: float,
+    index_rate: float,
+    request_id: str,
+    started: float,
+    used_cuda: bool,
+    fell_back_to_cpu: bool,
+    via_worker: bool = False,
+) -> tuple[bytes, dict[str, str]]:
+    """把转换结果整理成响应。常驻 worker 与一次性进程两条路共用，避免两份元数据走样。"""
+    if not output_path.is_file():
+        raise HTTPException(500, "RVC completed without producing a WAV")
+
+    wav_bytes, output_seconds = _normalise_result(output_path)
+    try:
+        _require_complete_result(source_seconds, output_seconds)
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc)) from exc
+    metadata: dict[str, object] = {
+        "backend": "rvc-character-v2",
+        "request_id": request_id,
+        "source_seconds": round(source_seconds, 3),
+        "output_seconds": round(output_seconds, 3),
+        "complete": True,
+        "target_path": str(target_path),
+        "auto_f0_adjust": auto_f0_adjust,
+        "requested_semitone_shift": semitone_shift,
+        "requested_performance_seed": performance_seed,
+        "requested_rms_mix_rate": rms_mix_rate,
+        "requested_protect": protect,
+        "requested_index_rate": index_rate,
+        "device": runner_metadata.get("device", "cuda" if used_cuda else "cpu-low-vram"),
+        "free_vram_mib_before": free_mib,
+        "gpu_min_free_mib": RVC_GPU_MIN_FREE_MIB,
+        "cpu_fallback": fell_back_to_cpu,
+        "via_worker": via_worker,
+    }
+    metadata.update(runner_metadata)
+    _save_last_conversion(source_path, target_path, output_path, metadata)
+
+    elapsed = time.perf_counter() - started
+    actual_shift = runner_metadata.get("semitone_shift", semitone_shift)
+    return wav_bytes, {
+        "X-SVC-Backend": "rvc-character-v2",
+        "X-SVC-Device": str(metadata["device"]),
+        "X-SVC-Free-VRAM-MiB": "unknown" if free_mib is None else str(free_mib),
+        "X-SVC-Source-Seconds": f"{source_seconds:.2f}",
+        "X-SVC-Output-Seconds": f"{output_seconds:.2f}",
+        "X-SVC-Complete": "true",
+        "X-SVC-Elapsed-Seconds": f"{elapsed:.2f}",
+        "X-SVC-CPU-Fallback": str(fell_back_to_cpu).lower(),
+        "X-SVC-Steps": "trained",
+        "X-SVC-Auto-F0-Adjust": str(auto_f0_adjust).lower(),
+        "X-SVC-Semitone-Shift": str(actual_shift),
+        "X-SVC-Seed": str(runner_metadata.get("seed", "unknown")),
+        "X-SVC-RMS-Mix-Rate": str(runner_metadata.get("rms_mix_rate", rms_mix_rate)),
+        "X-SVC-Protect": str(runner_metadata.get("protect", protect)),
+        "X-SVC-Index-Rate": str(runner_metadata.get("index_rate", index_rate)),
+        "X-SVC-Via-Worker": str(via_worker).lower(),
+    }
+
+
+# 每次转换 spawn 一个新 Python 是这条路上最贵的一步：实测 import torch + fairseq +
+# faiss + librosa 就要 11.2 秒，而真正的计算只有约 0.21 秒/每秒音频。逐段移调要连送
+# 三次，光 import 就 33 秒。常驻 worker 把这份开销摊成一次。
+#
+# 显存：worker 活着期间模型是驻留的。空闲超过 RVC_WORKER_IDLE_SECONDS 就自己退出，
+# 把显存还回去——所以省下的是"一串转换之内"的重复 import，而不是常年占着卡。
+# 设成 0 可以完全关掉常驻模式，回到每次一个新进程。
+RVC_WORKER_IDLE_SECONDS = float(os.environ.get("NEEEVA_RVC_WORKER_IDLE", "90"))
+
+
+class _RvcWorker:
+    """一个长期活着的 rvc_convert.py --serve 子进程。任何异常都降级回一次性进程。"""
+
+    def __init__(self) -> None:
+        self._process: subprocess.Popen[str] | None = None
+        self._lock = threading.Lock()
+        self._last_used = 0.0
+        self._timer: threading.Timer | None = None
+        self._device = ""
+        # worker 起来之后设备就固定了(CUDA_VISIBLE_DEVICES 是进程级的)，
+        # 所以记住它是哪一种；下一次请求要的模式不同就得重开。
+        self._force_cpu: bool | None = None
+
+    def _spawn(self, force_cpu: bool) -> bool:
+        rvc_python = _rvc_python()
+        if rvc_python is None:
+            return False
+        environment = os.environ.copy()
+        environment["PYTHONUTF8"] = "1"
+        environment.pop("NEEEVA_RVC_FORCE_CPU", None)
+        if force_cpu:
+            # 与一次性进程那条路用同一套开关，保证两边行为一致。
+            environment["CUDA_VISIBLE_DEVICES"] = "-1"
+            environment["NEEEVA_RVC_FORCE_CPU"] = "1"
+        try:
+            process = subprocess.Popen(
+                [
+                    str(rvc_python), str(RVC_RUNNER), "--serve",
+                    "--model", str(RVC_MODEL), "--index", str(RVC_INDEX),
+                ],
+                cwd=str(RVC_ROOT),
+                env=environment,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except OSError as exc:
+            print(f"[RVC/worker] spawn failed: {exc}", file=sys.stderr, flush=True)
+            return False
+        # 启动要跑完那 11 秒 import 再加载模型，给足余量。
+        ready_line = _read_line_with_timeout(process, 300.0)
+        if not ready_line:
+            _kill_quietly(process)
+            return False
+        try:
+            ready = json.loads(ready_line)
+        except ValueError:
+            _kill_quietly(process)
+            return False
+        if not ready.get("ready"):
+            _kill_quietly(process)
+            return False
+        self._process = process
+        self._device = str(ready.get("device", ""))
+        self._force_cpu = force_cpu
+        print(f"[RVC/worker] ready on {self._device}", flush=True)
+        return True
+
+    def _alive(self) -> bool:
+        return self._process is not None and self._process.poll() is None
+
+    def _schedule_idle_shutdown(self) -> None:
+        if self._timer is not None:
+            self._timer.cancel()
+        if RVC_WORKER_IDLE_SECONDS <= 0:
+            return
+        self._timer = threading.Timer(
+            RVC_WORKER_IDLE_SECONDS, self.shutdown, kwargs={"idle_only": True})
+        self._timer.daemon = True
+        self._timer.start()
+
+    def shutdown(self, idle_only: bool = False) -> None:
+        with self._lock:
+            # 定时器可能在等锁期间又来了一次转换：那就不该杀刚用过的 worker，
+            # 否则下一次请求要白等一遍 11 秒的 import。重排一次即可。
+            if idle_only and time.time() - self._last_used < RVC_WORKER_IDLE_SECONDS:
+                self._schedule_idle_shutdown()
+                return
+            self._shutdown_locked()
+
+    def _shutdown_locked(self) -> None:
+        process = self._process
+        self._process = None
+        self._force_cpu = None
+        if process is None:
+            return
+        try:
+            if process.stdin is not None:
+                process.stdin.write(json.dumps({"shutdown": True}) + "\n")
+                process.stdin.flush()
+            process.wait(timeout=10)
+        except Exception:
+            _kill_quietly(process)
+        print("[RVC/worker] released", flush=True)
+
+    def convert(self, params: dict, timeout: float, force_cpu: bool) -> dict | None:
+        """成功返回 runner 元数据；返回 None 表示"用不了"，调用方走一次性进程。
+
+        显存紧张时整条路会退到 CPU——而那 11 秒 import 在 CPU 上一分不少，
+        所以 worker 必须同样服务 CPU 路线。8/21 实测显存只剩 484MiB，九次转换
+        全走了 CPU：worker 若只挂在 CUDA 分支上，一次都不会被用到。
+        """
+        if RVC_WORKER_IDLE_SECONDS <= 0:
+            return None
+        with self._lock:
+            if self._alive() and self._force_cpu != force_cpu:
+                # 设备模式是进程级的，改不了，只能换一个 worker。
+                self._shutdown_locked()
+            if not self._alive() and not self._spawn(force_cpu):
+                return None
+            process = self._process
+            assert process is not None and process.stdin is not None
+            try:
+                process.stdin.write(json.dumps(params) + "\n")
+                process.stdin.flush()
+            except OSError as exc:
+                print(f"[RVC/worker] write failed: {exc}", file=sys.stderr, flush=True)
+                _kill_quietly(process)
+                self._process = None
+                return None
+            line = _read_line_with_timeout(process, timeout)
+            if not line:
+                # 超时或进程死了：这条 worker 状态已经不可信，杀掉重来。
+                _kill_quietly(process)
+                self._process = None
+                return None
+            try:
+                result = json.loads(line)
+            except ValueError:
+                _kill_quietly(process)
+                self._process = None
+                return None
+            self._last_used = time.time()
+            self._schedule_idle_shutdown()
+            if "error" in result:
+                # 单次转换失败不代表 worker 坏了，但这一次要让调用方降级重试。
+                print(f"[RVC/worker] convert error: {result['error']}",
+                      file=sys.stderr, flush=True)
+                return None
+            return result
+
+
+def _kill_quietly(process: "subprocess.Popen[str]") -> None:
+    try:
+        process.kill()
+        process.communicate(timeout=5)
+    except Exception:
+        pass
+
+
+def _read_line_with_timeout(process: "subprocess.Popen[str]", timeout: float) -> str:
+    """在超时内读 worker 的一行 stdout。子进程死掉时立刻返回空串。"""
+    if process.stdout is None:
+        return ""
+    box: list[str] = []
+
+    def reader() -> None:
+        try:
+            line = process.stdout.readline()  # type: ignore[union-attr]
+            if line:
+                box.append(line)
+        except Exception:
+            pass
+
+    thread = threading.Thread(target=reader, daemon=True)
+    thread.start()
+    thread.join(timeout)
+    return box[0].strip() if box else ""
+
+
+_rvc_worker = _RvcWorker()
+
+
 def _run_rvc_conversion(
     source_bytes: bytes,
     target_path: Path,
@@ -255,9 +525,35 @@ def _run_rvc_conversion(
             "--index-rate",
             str(index_rate),
         ]
-        attempts = [True, False] if prefer_cuda else [False]
+        # 先试常驻 worker。CUDA 和 CPU 两条路都走它——省下的 11 秒 import 与设备无关。
+        # 出任何岔子都返回 None，下面那套"一次性进程 + CUDA 失败退 CPU"的老路原样兜底。
         runner_metadata: dict[str, object] = {}
         used_cuda = False
+        worker_result = _rvc_worker.convert(
+            {
+                "source": str(source_path),
+                "output": str(output_path),
+                "semitone_shift": semitone_shift,
+                "auto_f0_adjust": "True" if auto_f0_adjust else "False",
+                "seed": performance_seed,
+                "rms_mix_rate": rms_mix_rate,
+                "protect": protect,
+                "index_rate": index_rate,
+                "interpretation": interpretation,
+            },
+            timeout=max(180.0, min(600.0, source_seconds * (4 if prefer_cuda else 12) + 60)),
+            force_cpu=not prefer_cuda,
+        )
+        if worker_result is not None and output_path.is_file():
+            return _finish_rvc_result(
+                source_path, target_path, output_path, worker_result,
+                source_seconds, free_mib, auto_f0_adjust, semitone_shift,
+                performance_seed, rms_mix_rate, protect, index_rate,
+                request_id, started, used_cuda=prefer_cuda,
+                fell_back_to_cpu=not prefer_cuda, via_worker=True,
+            )
+
+        attempts = [True, False] if prefer_cuda else [False]
         fell_back_to_cpu = False
         stdout = ""
         stderr = ""
@@ -333,54 +629,12 @@ def _run_rvc_conversion(
                 raise HTTPException(507, "RVC ran out of memory on both GPU and CPU")
             raise HTTPException(500, f"RVC failed:\n{details}")
 
-        if not output_path.is_file():
-            raise HTTPException(500, "RVC completed without producing a WAV")
-
-        wav_bytes, output_seconds = _normalise_result(output_path)
-        try:
-            _require_complete_result(source_seconds, output_seconds)
-        except RuntimeError as exc:
-            raise HTTPException(500, str(exc)) from exc
-        metadata: dict[str, object] = {
-            "backend": "rvc-character-v2",
-            "request_id": request_id,
-            "source_seconds": round(source_seconds, 3),
-            "output_seconds": round(output_seconds, 3),
-            "complete": True,
-            "target_path": str(target_path),
-            "auto_f0_adjust": auto_f0_adjust,
-            "requested_semitone_shift": semitone_shift,
-            "requested_performance_seed": performance_seed,
-            "requested_rms_mix_rate": rms_mix_rate,
-            "requested_protect": protect,
-            "requested_index_rate": index_rate,
-            "device": runner_metadata.get("device", "cuda" if used_cuda else "cpu-low-vram"),
-            "free_vram_mib_before": free_mib,
-            "gpu_min_free_mib": RVC_GPU_MIN_FREE_MIB,
-            "cpu_fallback": fell_back_to_cpu,
-        }
-        metadata.update(runner_metadata)
-        _save_last_conversion(source_path, target_path, output_path, metadata)
-
-    elapsed = time.perf_counter() - started
-    actual_shift = runner_metadata.get("semitone_shift", semitone_shift)
-    return wav_bytes, {
-        "X-SVC-Backend": "rvc-character-v2",
-        "X-SVC-Device": str(metadata["device"]),
-        "X-SVC-Free-VRAM-MiB": "unknown" if free_mib is None else str(free_mib),
-        "X-SVC-Source-Seconds": f"{source_seconds:.2f}",
-        "X-SVC-Output-Seconds": f"{output_seconds:.2f}",
-        "X-SVC-Complete": "true",
-        "X-SVC-Elapsed-Seconds": f"{elapsed:.2f}",
-        "X-SVC-CPU-Fallback": str(fell_back_to_cpu).lower(),
-        "X-SVC-Steps": "trained",
-        "X-SVC-Auto-F0-Adjust": str(auto_f0_adjust).lower(),
-        "X-SVC-Semitone-Shift": str(actual_shift),
-        "X-SVC-Seed": str(runner_metadata.get("seed", "unknown")),
-        "X-SVC-RMS-Mix-Rate": str(runner_metadata.get("rms_mix_rate", rms_mix_rate)),
-        "X-SVC-Protect": str(runner_metadata.get("protect", protect)),
-        "X-SVC-Index-Rate": str(runner_metadata.get("index_rate", index_rate)),
-    }
+        return _finish_rvc_result(
+            source_path, target_path, output_path, runner_metadata,
+            source_seconds, free_mib, auto_f0_adjust, semitone_shift,
+            performance_seed, rms_mix_rate, protect, index_rate,
+            request_id, started, used_cuda, fell_back_to_cpu,
+        )
 
 
 def _save_last_conversion(

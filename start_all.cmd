@@ -1,5 +1,11 @@
 @echo off
-rem 一键启动 NeEEvA 的全部本地服务（LLM / 嵌入 / TTS / ASR / 歌声转换 / 歌声合成）
-rem 已在运行的服务会自动跳过。日志在 Server\RuntimeLogs\
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Tools\neeeva_services.ps1" start %*
+rem Default stack: qwen3.6 + embeddings on RTX 5090, voice services on RTX 4090.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Tools\neeeva_remote_llm.ps1" start
+if errorlevel 1 goto :failed
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Tools\neeeva_services.ps1" start -Only tts,asr,vc,svs %*
 pause
+exit /b 0
+:failed
+echo Remote LLM failed to start. Nothing else was started.
+pause
+exit /b 1

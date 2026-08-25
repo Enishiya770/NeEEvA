@@ -170,6 +170,29 @@ namespace AIChat.Memory
             return true;
         }
 
+        /// <summary>
+        /// 写入一条有向边。同向已存在则更新强度，返回 false 表示"更新"而非"新增"。
+        /// strength &lt;= 0 视为删除该边——她改主意时要能撤销联想。
+        ///
+        /// 不做去重之外的校验：两端节点是否存在由调用方判断。边是 LLM 自己建立的
+        /// 语义关联，工程层不替她判断"这两个该不该连"。
+        /// </summary>
+        public bool SetEdge(string from, string to, float strength)
+        {
+            if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to) || from == to) return false;
+            for (int i = 0; i < m_File.edges.Count; i++)
+            {
+                var e = m_File.edges[i];
+                if (e == null || e.from != from || e.to != to) continue;
+                if (strength <= 0f) { m_File.edges.RemoveAt(i); return false; }
+                e.strength = Mathf.Clamp01(strength);
+                return false;
+            }
+            if (strength <= 0f) return false;
+            m_File.edges.Add(new MemoryEdge(from, to, Mathf.Clamp01(strength)));
+            return true;
+        }
+
         public List<MemoryEdge> GetOutgoingEdges(string nodeName)
         {
             var result = new List<MemoryEdge>();

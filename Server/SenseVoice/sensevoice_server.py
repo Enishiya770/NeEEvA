@@ -37,6 +37,8 @@ SenseVoiceSmall 本地 ASR 服务 (给 Unity 客户端用)
 import argparse
 import asyncio
 import base64
+import collections
+import hashlib
 import io
 import json
 import os
@@ -51,6 +53,7 @@ import uvicorn
 from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from funasr import AutoModel
+from japanese_lyrics import normalise_japanese_lyrics
 from speaker_identity import SpeakerIdentityStore
 from singing_analysis import SingingAnalyzer
 from song_search import SongSearchEngine
@@ -137,6 +140,19 @@ def load_model(
         device=pitch_device,
         enable_torchcrepe=enable_torchcrepe,
     )
+    # 让逐岛打分能拿到该岛自己的转写。分析器本身没有 ASR，必须由这里注入。
+    # 不注入时它退回 lyrics=""，speech_density_penalty 失效——那正是 8/11 三次
+    # 【说话+唱歌】被整段复读的原因（说话岛 0.60/0.63 擦着下限过闸）。
+    # generate_asr 自带 _asr_lock，而 analyze 一律在锁外调用，不会重入死锁。
+    def _transcribe_island(piece: np.ndarray) -> str:
+        try:
+            res = generate_asr(piece, "auto")
+        except Exception as exc:
+            print(f"[Island] 岛内转写失败: {exc}", flush=True)
+            return ""
+        return (parse_output(res[0]["text"] if res else "")[0] or "").strip()
+
+    _singing_analyzer.island_transcriber = _transcribe_island
     _song_search_engine = SongSearchEngine(song_catalog_path, _singing_analyzer)
     print(
         f"[Singing] 感知已启用（快速FFT + "
@@ -230,6 +246,28 @@ def recognize_stream_partial(wav: np.ndarray, language: str):
     return result
 
 
+def build_song_recall(analysis: Optional[dict], query_text: str, limit: int = 3):
+    """唱歌轮自动回忆：曲库里有没有像这一段的。
+
+    做成"自动"而不是"她想查才查"，是因为认出一段听过的调子不是一个决定——
+    人不会先决定再认出来。<song_search/> 留给它本来的用途(查外部歌名)。
+
+    只在整段判为唱歌时跑，普通说话轮一分钱不花。
+    """
+    if _song_search_engine is None or not analysis:
+        return []
+    if not bool(analysis.get("is_singing", False)):
+        return []
+    contour = analysis.get("pitch_contour_midi") or []
+    if len(contour) < 8:
+        return []
+    try:
+        return _song_search_engine.recall(query_text or "", contour, limit)
+    except Exception as exc:
+        print(f"[Recall] 曲库回忆失败: {exc}", flush=True)
+        return []
+
+
 def singing_response_fields(analysis: Optional[dict], include_contour: bool = True):
     """Flatten singing output for Unity JsonUtility while retaining one schema."""
     analysis = analysis or {}
@@ -250,6 +288,7 @@ def singing_response_fields(analysis: Optional[dict], include_contour: bool = Tr
         "note_sequence": str(analysis.get("note_sequence", "")),
         "singing_summary": str(analysis.get("summary", "")),
         "singing_start_seconds": float(analysis.get("singing_start_seconds", 0.0)),
+        "singing_end_seconds": float(analysis.get("singing_end_seconds", 0.0)),
         "pitch_timeline_start_seconds": float(
             analysis.get("pitch_timeline_start_seconds", 0.0)
         ),
@@ -264,6 +303,223 @@ def singing_response_fields(analysis: Optional[dict], include_contour: bool = Tr
     return fields
 
 
+#: 人声基频的合理区间(Hz)。低于下限的"周期性信号"是机器，不是人——风扇、机箱、
+#: 桌面震动的嗡鸣周期性比人哼唱**还高**，所以只看周期性必然放行它们。实测被误放行的
+#: 噪音音域是 A1~B1(55~62Hz)，而男低音哼唱的下限约 E2(82Hz)，中间有充足余量。
+#:
+#: 上限 700 是量出来的，不是拍的。singing_analysis 的 voiced 掩码写着
+#:     voiced = (pitch >= 55.0) & (pitch <= 900.0) & (periodicity >= 0.42)
+#: 而快速 FFT 跟踪器找不到真实基频时会输出 ~889Hz 的退化值——**卡在它自己 900 上限
+#: 的下方一点点**，于是被当成有效浊音帧统计进去，quick 分析就报出一个"音高稳定的人声"。
+#: 实测一场里(用户刻意制造环境噪音):
+#:     噪音 22 条: 889Hz ×21, 797Hz ×1        —— 全部 >= 797
+#:     真人 127 条: 主体 262~407Hz, 尾巴到 810, 另有 889Hz ×23
+#: 上限取 400~700 都能挡住 22/22 的噪音；取 800 会漏掉 797 那条；取 900/1200 一条都挡不住
+#: (原来的 1200 比分析器自己的 900 还宽，等于完全没起作用)。
+#: 700 挡住全部实测噪音，同时给哼唱留最大余量——哼唱基频通常 100~400Hz，
+#: quick 会系统性高估(真人说话 85~255Hz 被报成 262~407)，但到不了 700。
+#: 极高音域的女高音可能超过 700，需要时用环境变量放宽。
+VOCAL_MIN_HZ = float(os.environ.get("NEEEVA_ASR_VOCAL_MIN_HZ", "75"))
+VOCAL_MAX_HZ = float(os.environ.get("NEEEVA_ASR_VOCAL_MAX_HZ", "700"))
+
+
+def has_plausible_vocal_pitch(analysis: Optional[dict]):
+    """基频是否落在人声区间。周期性区分不了机器和人，音高可以。"""
+    if not analysis:
+        return False
+    median_hz = float(analysis.get("pitch_median_hz", 0.0) or 0.0)
+    if median_hz <= 0.0:
+        return False
+    return VOCAL_MIN_HZ <= median_hz <= VOCAL_MAX_HZ
+
+
+# 落盘用来量「按岛算 prob」值不值得做。8/10 实测同一首《演员》被判成说话五次，
+# 整段 prob 0.34~0.57，而岛占比 ≥69% 的两轮 prob ≥0.63——怀疑整段统计被前面十几秒
+# 说话稀释了。但被判成说话的轮次不会写进 song_library，手上没有原始音频可算，
+# 所以先把边界附近的整轮音频连同当时的分析一起存下来。
+# 存的是 trim_to_speech 之后的 content(分析器真正看到的那份)，不是原始录音。
+_BAND_DUMP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "band_dumps")
+_BAND_DUMP_ENABLED = os.environ.get("NEEEVA_BAND_DUMP", "1") != "0"
+# 区间取得比 Unity 的模糊带(0.40~0.58)两头都宽：定阈值需要边界两侧的样本，
+# 只存带内的话拟合不出该往哪边挪。
+_BAND_DUMP_LOW = float(os.environ.get("NEEEVA_BAND_DUMP_LOW", "0.25"))
+_BAND_DUMP_HIGH = float(os.environ.get("NEEEVA_BAND_DUMP_HIGH", "0.70"))
+_BAND_DUMP_KEEP = 80
+# 一轮说话在流式期间会被反复分析，trim 之后的 content 每次完全一样：8/10 实测
+# 20 个文件只对应 9 个不同轮次(一轮最多重复 5 次)。按音频内容去重，否则人工
+# 标注有一半是白做工。只记指纹，不留音频。
+_band_dump_seen: "collections.OrderedDict[str, float]" = collections.OrderedDict()
+_band_dump_lock = threading.Lock()
+
+
+def dump_band_sample(
+    wav: np.ndarray,
+    analysis: Optional[dict],
+    result: dict,
+    text: str,
+    expect_singing: bool,
+) -> None:
+    """整段 prob 落在边界附近时，把音频与分析一起存一份，供离线定阈值。"""
+    if not _BAND_DUMP_ENABLED or not analysis or wav is None or not len(wav):
+        return
+    prob = float(analysis.get("singing_probability", 0.0) or 0.0)
+    if not (_BAND_DUMP_LOW <= prob <= _BAND_DUMP_HIGH):
+        return
+    try:
+        fingerprint = hashlib.sha1(
+            np.ascontiguousarray(wav, dtype=np.float32).tobytes()
+        ).hexdigest()
+        with _band_dump_lock:
+            if fingerprint in _band_dump_seen:
+                return
+            _band_dump_seen[fingerprint] = time.time()
+            while len(_band_dump_seen) > 4 * _BAND_DUMP_KEEP:
+                _band_dump_seen.popitem(last=False)
+        os.makedirs(_BAND_DUMP_DIR, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
+        base = os.path.join(_BAND_DUMP_DIR, f"{stamp}_p{prob:.2f}")
+        sf.write(base + ".wav", wav, 16000, format="WAV", subtype="PCM_16")
+        meta = {
+            "singing_probability": prob,
+            "is_singing": bool(result.get("is_singing", False)),
+            "duration": float(analysis.get("duration", 0.0) or 0.0),
+            "singing_start_seconds": float(analysis.get("singing_start_seconds", 0.0) or 0.0),
+            "singing_end_seconds": float(analysis.get("singing_end_seconds", 0.0) or 0.0),
+            "pitch_timeline_start_seconds": float(
+                analysis.get("pitch_timeline_start_seconds", 0.0) or 0.0),
+            "voiced_ratio": float(analysis.get("voiced_ratio", 0.0) or 0.0),
+            "periodicity_mean": float(analysis.get("periodicity_mean", 0.0) or 0.0),
+            "pitch_stability": float(analysis.get("pitch_stability", 0.0) or 0.0),
+            "sustained_ratio": float(analysis.get("sustained_ratio", 0.0) or 0.0),
+            "pitch_backend": str(analysis.get("pitch_backend", "")),
+            "expect_singing": bool(expect_singing),
+            "singing_expected_override": bool(
+                result.get("singing_expected_override", False)),
+            "language": str(result.get("language", "")),
+            "text": text,
+            "singing_text": str(result.get("singing_text", "")),
+            # 人工标注用：这一轮到底唱了没有。落盘时留空，离线看波形/听音频后填。
+            "label": "",
+        }
+        with io.open(base + ".json", "w", encoding="utf-8") as handle:
+            json.dump(meta, handle, ensure_ascii=False, indent=2)
+        # 只留最近若干组，别把磁盘吃满
+        stems = sorted(
+            name[:-4] for name in os.listdir(_BAND_DUMP_DIR) if name.endswith(".wav")
+        )
+        for stem in stems[:-_BAND_DUMP_KEEP]:
+            for suffix in (".wav", ".json"):
+                try:
+                    os.remove(os.path.join(_BAND_DUMP_DIR, stem + suffix))
+                except OSError:
+                    pass
+        print(f"[BandDump] prob={prob:.2f} dur={meta['duration']:.2f}s "
+              f"岛=({meta['singing_start_seconds']:.2f},{meta['singing_end_seconds']:.2f}) "
+              f"→ {os.path.basename(base)}.wav", flush=True)
+    except Exception as exc:                       # 落盘失败绝不能影响 ASR
+        print(f"[BandDump] 跳过: {exc}", flush=True)
+
+
+def transcribe_singing_tail(
+    wav: np.ndarray,
+    analysis: Optional[dict],
+    language: str,
+) -> str:
+    """唱完之后那截说话的单独转写。
+
+    整轮 ASR 在长的混合录音上只转得出开头：8/10 实测一段 26.7s 的
+    【说话6.5s + 日文演唱14.4s + 说话5.8s】，整轮转写只有开头那 6.5 秒，
+    演唱和尾巴全丢了。单独切片一跑，尾巴是
+        「呃，后面好像有点唱错了，停一下停一下，这一段不算这一段不算，我们重新唱。」
+    ——用户明确作废了刚才那段演唱，而这句话此前没有任何子系统看得见。
+
+    跟 transcribe_singing_segment 一样只在确认歌唱时做，多这一次识别相对于
+    随后十几秒的歌声合成可以忽略。
+    """
+    if not analysis or not bool(analysis.get("is_singing", False)):
+        return ""
+    total = wav.size / 16000.0
+    end = float(analysis.get("singing_end_seconds", 0.0) or 0.0)
+    if end <= 0.0 or total - end < 1.2:      # 没有尾巴，或短到不可能是一句话
+        return ""
+    lo = min(int(wav.size), max(0, int(end * 16000)))
+    if wav.size - lo < 16000:
+        return ""
+    try:
+        res = generate_asr(wav[lo:], language)
+    except Exception as exc:                 # 失败不能拖垮整轮
+        print(f"[SingingTail] tail ASR failed: {exc}")
+        return ""
+    tail_text = parse_output(res[0]["text"] if res else "")[0]
+    tail_text = (tail_text or "").strip()
+    if tail_text:
+        print(f"[SingingTail] {end:.2f}s~{total:.2f}s: {tail_text!r}", flush=True)
+    return tail_text
+
+
+def transcribe_singing_segment(
+    wav: np.ndarray,
+    analysis: Optional[dict],
+    full_text: str,
+    language: str,
+) -> dict:
+    """只对裁出来的[唱歌开始, 唱歌结束]窗口再识别一次，返回这段的歌词。
+
+    回哼素材是裁过的，而 text 是整轮转写(含唱前唱后的说话)。把整轮的字铺到几秒
+    的旋律上，SVS 会按 acoustic_voiced_time 把它们硬塞进音符里——8/7 实测 67 个字
+    塞进 9.7s / 59 个音符，唱出来完全听不清。
+
+    **语言必须跟着这一段单独判**，不能沿用整轮的：8/8 实测用户中文说话、中间唱
+    日文歌，整轮判 zh，而分段歌词是纯假名；乐谱带着 zh 标签送到 9883，中文 G2P
+    对不上假名 (ValueError: Chinese G2P length does not match lyric units)，整份
+    乐谱被弃用、退化成 backend-transcription，于是旋律对而歌词全是瞎猜的。
+    日语还要连假名一起产出——9883 明确要求 SenseVoice 提供 lyrics_reading，
+    它自己不会生成。
+
+    只在真的裁掉了 0.45s 以上、且本轮确认是歌唱时才做。这两个条件成立时后面必然
+    要跑慢得多的歌声合成，多这一次识别的耗时可以忽略。
+    """
+    empty = {"text": "", "language": ""}
+    if not analysis or not bool(analysis.get("is_singing", False)):
+        return empty
+    total = wav.size / 16000.0
+    start = max(0.0, float(analysis.get("singing_start_seconds", 0.0) or 0.0))
+    end = float(analysis.get("singing_end_seconds", 0.0) or 0.0)
+    if end <= 0.0 or end > total:
+        end = total
+    if start + (total - end) < 0.45 or end - start < 1.2:
+        return empty
+
+    lo = max(0, int(start * 16000))
+    hi = min(int(wav.size), int(end * 16000))
+    if hi - lo < 16000:
+        return empty
+    t0 = time.time()
+    try:
+        res = generate_asr(wav[lo:hi], language)
+    except Exception as exc:  # 识别失败不能拖垮整轮，退回整轮转写即可
+        print(f"[SingingText] segment ASR failed: {exc}")
+        return empty
+    seg_text, seg_lang = parse_output(res[0]["text"] if res else "")[:2]
+    if not seg_text.strip():
+        return empty
+    result = {"text": seg_text, "language": seg_lang or ""}
+    if str(seg_lang).lower().startswith("ja"):
+        result.update(normalise_japanese_lyrics(seg_text))
+    # 字/秒是判断「歌词够不够铺满旋律」的直接指标。实测干净的一段唱在 1.6~1.8，
+    # 明显偏低时(<0.9) SVS 会把前半段唱完就没词了，后半段听起来就不像在唱词。
+    chars = len("".join(ch for ch in seg_text if not ch.isspace()))
+    density = chars / max(0.1, end - start)
+    print(
+        f"[SingingText] seg=[{start:.2f},{end:.2f}]s/{total:.2f}s "
+        f"dt={time.time() - t0:.2f}s chars={chars} density={density:.2f}/s "
+        f"lang={seg_lang}(整轮={language}) "
+        f"kana={result.get('lyrics_reading_complete', False)} "
+        f"full={full_text!r} seg={seg_text!r}"
+    )
+    return result
+
+
 def is_tonal_vocal(analysis: Optional[dict], short_probe: bool = False):
     """Allow humming through speech VAD without opening the gate for noise."""
     if not analysis or not analysis.get("analysis_available"):
@@ -275,6 +531,20 @@ def is_tonal_vocal(analysis: Optional[dict], short_probe: bool = False):
         float(analysis.get("singing_probability", 0.0)) >= probability_floor
         and float(analysis.get("periodicity_mean", 0.0)) >= periodicity_floor
         and float(analysis.get("voiced_ratio", 0.0)) >= voiced_floor
+        and has_plausible_vocal_pitch(analysis)
+    )
+
+
+def describe_vocal_probe(analysis: Optional[dict]) -> str:
+    """把一次音高分析压成一行，用于日志。闸门的输入必须可观测——上一版就是因为
+    日志打的是 thorough 分析、闸门用的却是 quick 探针，两个数对不上，导致
+    'rejected hallucination 一次都没出现' 这件事查了很久才定位。"""
+    a = analysis or {}
+    return (
+        f"sing={float(a.get('singing_probability', 0.0)):.2f} "
+        f"period={float(a.get('periodicity_mean', 0.0)):.2f} "
+        f"voiced={float(a.get('voiced_ratio', 0.0)):.2f} "
+        f"med={float(a.get('pitch_median_hz', 0.0) or 0.0):.0f}Hz"
     )
 
 
@@ -435,12 +705,23 @@ def trim_to_speech(wav: np.ndarray, segments, margin_ms: int = 120):
     return trim_to_speech_with_offset(wav, segments, margin_ms)[0]
 
 
-def trim_to_speech_with_offset(wav: np.ndarray, segments, margin_ms: int = 120):
-    """Trim outer silence and return the start offset in the uploaded WAV."""
+def trim_to_speech_with_offset(
+    wav: np.ndarray, segments, margin_ms: int = 120, tail_margin_ms: int = 0
+):
+    """Trim outer silence and return the start offset in the uploaded WAV.
+
+    tail_margin_ms 让尾部单独用更大的余量。歌声的收尾是渐弱长音，能量低，FSMN
+    会把它判成静音——8/9 实测一段 15.73s 的演唱被切成 14.30s，尾部去掉 1.43s，
+    最后一个音的收尾整个没了(用户直接反馈"没有尾音")。说话没有这个问题，所以
+    只在本轮像唱歌时才放宽，避免给普通说话轮平白加一截静音。
+    """
     if not segments:
         return wav, 0.0
     begin_ms = max(0, segments[0][0] - margin_ms)
-    end_ms = min(int(wav.size * 1000 / 16000), segments[-1][1] + margin_ms)
+    end_ms = min(
+        int(wav.size * 1000 / 16000),
+        segments[-1][1] + max(margin_ms, tail_margin_ms),
+    )
     begin = int(begin_ms * 16)
     end = int(end_ms * 16)
     if end <= begin:
@@ -487,6 +768,9 @@ def unknown_speaker_meta():
 #: 视为噪音。实测真实语音最短 6 字且一律带 NEUTRAL，噪音最长 5 字且一律 EMO_UNKNOWN。
 HALLUCINATION_MAX_CHARS = int(os.environ.get("NEEEVA_ASR_HALLUCINATION_MAX_CHARS", "5"))
 
+#: 打印每次 /vad 探测的判定细节。VAD 调用频率远高于 /asr，排查完建议置 0。
+LOG_VAD = os.environ.get("NEEEVA_LOG_VAD", "1") != "0"
+
 
 def _is_hallucinated_transcript(text: str, emotion: str, speaker_meta: dict) -> bool:
     """识别结果是否更像非语音噪音而非真人短句。
@@ -505,17 +789,36 @@ def _is_hallucinated_transcript(text: str, emotion: str, speaker_meta: dict) -> 
 
 
 def identify_speaker(wav: np.ndarray, speech_ms: int, learn: bool = True):
+    """返回 (identity, elapsed, pending_embedding)。
+
+    **这里不再直接写库。** 声纹识别必须在 ASR 之前(要拿 speaker_kind 判 AI 自回声、
+    也要给幻听闸判 owner)，但学习必须等幻听闸放行之后——顺序错了实测有后果：被判为
+    噪音丢弃的音频照样教过声纹库，而机器嗡鸣的"声纹"比真人还稳定，反而更容易累积
+    注册进度(实测一个纯噪音 ID 已经到 33%，再几次就会晋升成持久档案)。
+
+    learn=True 时把 embedding 交回调用方，由它在放行后调用 commit_speaker_learning。
+    """
     if _speaker_store is None:
-        return unknown_speaker_meta(), 0.0
+        return unknown_speaker_meta(), 0.0, None
     embedding, elapsed = extract_speaker_embedding(wav)
     if embedding is None:
-        return unknown_speaker_meta(), elapsed
-    identity = (
-        _speaker_store.identify_and_learn(embedding, speech_ms)
-        if learn
-        else _speaker_store.identify_only(embedding, speech_ms)
-    )
-    return identity, elapsed
+        return unknown_speaker_meta(), elapsed, None
+    identity = _speaker_store.identify_only(embedding, speech_ms)
+    return identity, elapsed, (embedding if learn else None)
+
+
+def commit_speaker_learning(embedding, speech_ms: int, identified: dict) -> dict:
+    """幻听闸放行之后，才真正把这段音频记进声纹库。"""
+    if _speaker_store is None or embedding is None:
+        return identified
+    learned = _speaker_store.identify_and_learn(embedding, speech_ms)
+    # identify_and_learn 不产出 speaker_self_confidence，而 barge-in 的 AI 自回声
+    # 否决要用它，从 identify_only 的结果里补回来。
+    if "speaker_self_confidence" in (identified or {}):
+        learned.setdefault(
+            "speaker_self_confidence", identified["speaker_self_confidence"]
+        )
+    return learned
 
 
 # ------------------------------ FastAPI ------------------------------
@@ -753,12 +1056,38 @@ async def vad(
             if _singing_analyzer is not None
             else None
         )
+        # FSMN 的原始输出必须在被 override 改写之前留存。
+        # 上一版日志把救回后的 speech_ms 当成 FSMN 的判据打了出来，导致误读——
+        # 那个值是 duration_ms * voiced_ratio 重算的，和 FSMN 数出多少语音无关。
+        raw_is_speech = is_speech
+        raw_speech_ms = speech_ms
+        raw_segments = len(segments)
         singing_override = not is_speech and is_tonal_vocal(singing, short_probe=True)
         if singing_override:
             is_speech = True
             duration_ms = int(round(wav.size * 1000.0 / 16000.0))
             speech_ms = max(speech_ms, int(duration_ms * float(singing.get("voiced_ratio", 0.0))))
             segments = [[0, duration_ms]]
+
+        # 排查用：语音 VAD 到底认不认，以及为什么。
+        # raw_* 是 FSMN 的原始输出；override 之后的值另外打，两者不能混。
+        #
+        # 已知事实(别再重复验证)：
+        #   - is_singing 只在 `not is_speech` 时才可能为真，所以每个"正在倾听演唱"
+        #     都意味着 FSMN 拒绝了这段音频。
+        #   - 探测窗口不是原因：0.5s 改成 1.0s 之后误判反而从 6:2 变成 10:1，已撤回。
+        #   - 45 条 override 里 period 全部 >= 0.77、med 全部是 889Hz(FFT 谱峰伪影)，
+        #     而 short_probe 的门槛只要求 period >= 0.67——正常说话的周期性就在
+        #     0.77~0.90，这个维度根本分不开人声和噪音。
+        # 待查：FSMN 的 raw_speech_ms 到底是多少，以此判断是"听不到"还是别的原因。
+        # 排查完可用 NEEEVA_LOG_VAD=0 关掉。
+        if LOG_VAD:
+            print(
+                f"[VAD] dur={wav.size / 16000:.2f}s min_req={min_ms}ms "
+                f"fsmn(speech={raw_is_speech} ms={raw_speech_ms} segs={raw_segments}) "
+                f"override={singing_override} final(speech={is_speech} ms={speech_ms}) "
+                f"({describe_vocal_probe(singing)})"
+            )
         result = {
             "is_speech": is_speech,
             "speech_ms": speech_ms,
@@ -776,7 +1105,7 @@ async def vad(
             speaker_dt = 0.0
             if is_speech:
                 speaker_wav = trim_to_speech(wav, segments)
-                speaker_meta, speaker_dt = identify_speaker(speaker_wav, speech_ms, learn=False)
+                speaker_meta, speaker_dt, _ = identify_speaker(speaker_wav, speech_ms, learn=False)
             result.update(speaker_meta)
             result["speaker_elapsed"] = round(speaker_dt, 3)
             result["elapsed"] = round(elapsed + speaker_dt, 3)
@@ -839,9 +1168,23 @@ async def asr(
             result.update(unknown_speaker_meta())
             return result
 
-        wav, audio_content_start_seconds = trim_to_speech_with_offset(wav, segments)
+        # 像唱歌就给尾部留足余量。判据用 quick 探针的 tonal 或"本轮约好了跟唱"——
+        # 两者都在 thorough 分析之前就有，而裁剪必须发生在分析之前。
+        singing_tail_margin = (
+            600
+            if (expect_singing or is_tonal_vocal(quick_singing))
+            else 0
+        )
+        wav, audio_content_start_seconds = trim_to_speech_with_offset(
+            wav, segments, tail_margin_ms=singing_tail_margin
+        )
+        if singing_tail_margin and LOG_VAD:
+            print(f"[VAD] 歌声尾部余量 {singing_tail_margin}ms "
+                  f"(tonal={is_tonal_vocal(quick_singing)} expect={expect_singing})")
 
-        speaker_meta, speaker_dt = identify_speaker(wav, speech_ms, learn=learn_speaker)
+        speaker_meta, speaker_dt, pending_embedding = identify_speaker(
+            wav, speech_ms, learn=learn_speaker
+        )
         if speaker_meta.get("speaker_kind") == "ai":
             print(
                 f"[ASR] rejected AI_SELF echo score={speaker_meta.get('speaker_confidence')} "
@@ -878,17 +1221,45 @@ async def asr(
         # 哼唱必须豁免：它本来就没有词，识别结果天然极短、情绪 EMO_UNKNOWN，声纹也
         # 与说话时不同而被判成陌生人——三个条件全部命中，会被当成噪音丢掉(实测把
         # 'Da.' 'The.' 这类哼唱残片全拦了，角色对哼曲子不再有反应)。
-        # is_tonal_vocal 就是为"放行哼唱、挡住噪音"设计的：要求歌唱概率≥0.45 且
-        # 周期性≥0.60 且有声比≥0.34，噪音那批实测只有 0.35-0.44 且周期性不足。
-        tonal = is_tonal_vocal(quick_singing)
-        if (not expect_singing and not tonal and not singing_vad_override
+        # is_tonal_vocal 就是为"放行哼唱、挡住噪音"设计的。闸门本身在下面——必须等
+        # thorough 分析出来才判，见那里的注释。
+        singing = (
+            _singing_analyzer.analyze(
+                wav,
+                lyrics=text,
+                audio_event=audio_event,
+                thorough=True,
+                language=lang,
+                force_score=expect_singing,
+            )
+            if _singing_analyzer is not None
+            else quick_singing
+        )
+        # 幻听闸。放在 thorough 分析之后，因为要求两遍分析都认为这是人声才豁免。
+        # 上一版放在 quick 之后、只看 quick，结果是: quick 探针把次低频嗡鸣判成
+        # tonal(周期性极高)，闸门被短路，'I.' / '.' 一路进到角色那里；而 [ASR] 日志
+        # 打的是 thorough 的 sing 值(0.42/0.31/0.00)，和闸门实际看到的数对不上，
+        # 于是 'rejected hallucination' 一次都没出现，看上去像闸门不存在。
+        #
+        # **只信 thorough 分析。** quick 探针的音高估计不可用——实测同一段音频
+        # quick med=889Hz / full med=58Hz，而 889Hz 在多条记录里反复出现，是个 FFT
+        # 谱峰伪影；真人语音也被 quick 报成 821/889/375Hz(真值 132/154/149Hz)。
+        # 拿它做音高合理性判断就是垃圾进垃圾出。
+        #
+        # singing_vad_override 也不再豁免本闸: 它由 quick 算出，让哼唱绕过语音 VAD
+        # 是它的正当职责，但"绕过 VAD"不等于"确认是人声"。上一版漏掉这一项，于是
+        # tonal 判对了(False)、闸门却仍被 vad_override 短路，噪音照样进到角色那里。
+        #
+        # thorough 的分离度很干净: 真人 med 125~154Hz / voiced 0.54~0.69；
+        # 噪音 med 58~59Hz / voiced 0.05~0.24——voiced 一项就已低于 0.34 的门槛。
+        tonal = is_tonal_vocal(singing)
+        if (not expect_singing and not tonal
                 and _is_hallucinated_transcript(text, emotion, speaker_meta)):
             print(
                 f"[ASR] rejected hallucination emo={emotion} lang={lang} "
                 f"spk={speaker_meta.get('speaker_id')} "
-                f"sing={float((quick_singing or {}).get('singing_probability', 0.0)):.2f} "
-                f"period={float((quick_singing or {}).get('periodicity_mean', 0.0)):.2f} "
-                f"voiced={float((quick_singing or {}).get('voiced_ratio', 0.0)):.2f} "
+                f"quick({describe_vocal_probe(quick_singing)}) "
+                f"full({describe_vocal_probe(singing)}) "
                 f"text={text!r}"
             )
             result = {
@@ -902,22 +1273,15 @@ async def asr(
                 "speaker_elapsed": round(speaker_dt, 3),
                 "elapsed": round(vad_dt + speaker_dt + dt, 3),
             }
-            result.update(singing_response_fields(quick_singing))
+            # 注意这里**不**调用 commit_speaker_learning——被判为噪音的音频不该进
+            # 声纹库。机器嗡鸣的"声纹"比真人还稳定，学进去反而比真人更快累积注册进度。
+            result.update(singing_response_fields(singing))
             result.update(unknown_speaker_meta())
             return result
 
-        singing = (
-            _singing_analyzer.analyze(
-                wav,
-                lyrics=text,
-                audio_event=audio_event,
-                thorough=True,
-                language=lang,
-                force_score=expect_singing,
-            )
-            if _singing_analyzer is not None
-            else quick_singing
-        )
+        # 闸门放行了，这段音频才算真话，现在才写进声纹库。
+        speaker_meta = commit_speaker_learning(pending_embedding, speech_ms, speaker_meta)
+
         # Keep the full-turn score even if armed sing-along recovery later
         # chooses a tail-only acoustic classifier. Unity crops scores in the
         # full post-VAD time base; a tail-relative score would otherwise lose
@@ -958,6 +1322,10 @@ async def asr(
                 expected_analysis["singing_start_seconds"] = tail_offset + float(
                     expected_analysis.get("singing_start_seconds", 0.0)
                 )
+                if float(expected_analysis.get("singing_end_seconds", 0.0)) > 0.0:
+                    expected_analysis["singing_end_seconds"] = tail_offset + float(
+                        expected_analysis.get("singing_end_seconds", 0.0)
+                    )
                 expected_analysis["pitch_timeline_start_seconds"] = tail_offset + float(
                     expected_analysis.get("pitch_timeline_start_seconds", 0.0)
                 )
@@ -980,7 +1348,9 @@ async def asr(
             f"[ASR] dt={dt:.2f}s lang={lang} emo={emotion} evt={audio_event} "
             f"spk={speaker_meta.get('speaker_id')}({speaker_meta.get('speaker_confidence')}) "
             f"learn={learn_speaker} expect_sing={expect_singing} "
-            f"sing={float((singing or {}).get('singing_probability', 0.0)):.2f} "
+            f"tonal={tonal} vad_override={singing_vad_override} "
+            f"quick({describe_vocal_probe(quick_singing)}) "
+            f"full({describe_vocal_probe(singing)}) "
             f"expected_override={expected_singing_override} "
             f"text={text!r}"
         )
@@ -996,12 +1366,31 @@ async def asr(
             "elapsed": round(dt + vad_dt + speaker_dt, 3),
         }
         result.update(singing_response_fields(singing))
+        segment_lyrics = transcribe_singing_segment(wav, singing, text, language)
+        result["singing_text"] = segment_lyrics.get("text", "")
+        # 歌词换成了分段的，随它而来的语言与假名也必须一起换，否则 9883 会拿
+        # 整轮的语言去解析这一段(实测中文 G2P 撞上假名，整份乐谱被弃用)。
+        result["singing_language"] = segment_lyrics.get("language", "")
+        result["singing_lyrics_reading"] = segment_lyrics.get("lyrics_reading", "")
+        result["singing_lyrics_reading_source"] = segment_lyrics.get(
+            "lyrics_reading_source", ""
+        )
+        result["singing_lyrics_reading_complete"] = bool(
+            segment_lyrics.get("lyrics_reading_complete", False)
+        )
+        result["singing_lyrics_mora"] = segment_lyrics.get("lyrics_mora", []) or []
+        result["singing_tail_text"] = transcribe_singing_tail(wav, singing, language)
+        #分段歌词比整轮文本更贴近真正唱的内容，优先拿它去回忆
+        result["song_recall"] = build_song_recall(
+            singing, result.get("singing_text") or text
+        )
         result["audio_content_start_seconds"] = round(audio_content_start_seconds, 3)
         result["singing_expected"] = bool(expect_singing)
         result["singing_expected_override"] = bool(expected_singing_override)
         if singing_vad_override:
             result["is_singing"] = True
         result.update(speaker_meta)
+        dump_band_sample(wav, singing, result, text, expect_singing)
         return result
     except Exception as e:
         import traceback
@@ -1146,6 +1535,9 @@ async def sing_remembered_song(
     mode: str = Form("memory"),
     max_seconds: float = Form(60.0),
     seed: int = Form(1234),
+    # 按歌词点某一段。用户是用词句指段的（"那段 can you give me one last kiss"），
+    # 不是用序号；给了这个就只唱那一段，忽略 mode。
+    segment_lyrics: str = Form(""),
 ):
     """Resolve local remembered audio; never invent an unavailable continuation."""
     if _song_search_engine is None:
@@ -1172,6 +1564,7 @@ async def sing_remembered_song(
                 query_lyrics=query,
                 max_seconds=max_seconds,
                 seed=seed,
+                segment_lyrics=segment_lyrics,
             ),
         )
         wav_bytes, timeline, duration_seconds = await asyncio.get_running_loop().run_in_executor(

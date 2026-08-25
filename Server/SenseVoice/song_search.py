@@ -48,6 +48,24 @@ _WINDOWS_RESERVED_NAMES = {
 }
 
 
+
+_KANA_CHARS = re.compile(r"[\u3040-\u309f\u30a0-\u30ff]")
+_HAN_CHARS = re.compile(r"[\u4e00-\u9fff]")
+_LATIN_WORDS = re.compile(r"[A-Za-z]{3,}")
+
+
+def _script_of(text: str) -> str:
+    """粗判这段歌词属于哪种书写系统。只回答确定的，拿不准回 ''。"""
+    value = str(text or "")
+    if _KANA_CHARS.search(value):
+        return "ja"
+    if _HAN_CHARS.search(value):
+        return "zh"
+    if _LATIN_WORDS.search(value):
+        return "latin"
+    return ""
+
+
 def _safe_filename_component(value: str, fallback: str, max_length: int = 60) -> str:
     cleaned = _INVALID_FILENAME_CHARS.sub("_", (value or "").strip())
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" .")
@@ -66,6 +84,107 @@ def _resample_sequence(values: Iterable[float], max_points: int = 220) -> np.nda
     x_old = np.linspace(0.0, 1.0, arr.size)
     x_new = np.linspace(0.0, 1.0, max_points)
     return np.interp(x_new, x_old, arr).astype(np.float32)
+
+
+#音名序列：给 LLM 看的旋律文本形式。18 音是实测的够用长度——同一批四选一题上
+#18/36/72/不截断分别 66%/70%/66%/66%，差异全在噪声内，而字符数从 62 涨到 187。
+NOTE_SEQUENCE_MAX_NOTES = 18
+
+
+def notes_from_contour(contour: Iterable[float], limit: int = NOTE_SEQUENCE_MAX_NOTES) -> str:
+    """与 SingingAnalyzer._note_sequence 同一算法，独立实现一份供曲库补算用。"""
+    names: List[str] = []
+    for value in contour or []:
+        try:
+            f = float(value)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(f):
+            continue
+        n = _midi_to_note_name(f)
+        if n and (not names or names[-1] != n):
+            names.append(n)
+    if limit and len(names) > limit:
+        names = names[:limit] + ["…"]
+    return "-".join(names)
+
+
+_NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+
+def _midi_to_note_name(midi: float) -> str:
+    if not math.isfinite(midi) or midi <= 0:
+        return ""
+    index = int(round(midi))
+    if index < 12 or index > 127:
+        return ""
+    return f"{_NOTE_NAMES[index % 12]}{index // 12 - 1}"
+
+
+def semitone_tokens(contour: Iterable[float]) -> List[int]:
+    """把轮廓量化成半音、合并相邻重复——音名序列的数值等价物。
+
+    与 SingingAnalyzer._note_sequence 同一口径(那边输出音名字符串给 LLM 看)，
+    只是留成整数便于移调归一。
+    """
+    out: List[int] = []
+    for value in contour or []:
+        if not math.isfinite(float(value)):
+            continue
+        s = int(round(float(value)))
+        if not out or out[-1] != s:
+            out.append(s)
+    return out
+
+
+def token_alignment_similarity(query: Iterable[float], reference: Iterable[float]) -> float:
+    """音名 token 对齐 + 移调归一，用于**候选排序**。
+
+    8/17 拿曲库已有的重复组量过(63 条参考、515 同歌对 vs 1438 异歌对)，
+    按 AUC(随机取一对同歌、一对异歌，同歌得分更高的概率)比较：
+
+        现役 melody_similarity      全部 0.531   长度悬殊 0.613   长度接近 0.511
+        本函数(对称 token + 移调)    全部 0.648   长度悬殊 0.666   长度接近 0.753
+        含有率(移调归一)             全部 0.633   长度悬殊 0.661   长度接近 0.661
+
+    melody_similarity 把轮廓重采样到 220 点再取差分，**时长和调高都被抹掉**，
+    只剩起伏形状——而人声旋律的起伏形状天生相似，所以它在长度接近时 AUC 0.511，
+    等于抛硬币。改成按量化音名逐 token 对齐、并在 ±6 半音内取最好的移调，
+    三档都不输，是唯一没有明显短板的。
+
+    注意：这里只用于**排序取前几名**，不设阈值。0.65 的 AUC 撑不起判定——
+    实测任何阈值要么只认出两成，要么带进一堆错。谁是谁最终由 LLM 看歌词判断。
+    """
+    q = semitone_tokens(query)
+    r = semitone_tokens(reference)
+    if len(q) < 4 or len(r) < 4:
+        return 0.0
+    best = 0.0
+    for shift in range(-6, 7):
+        shifted = [v + shift for v in q]
+        best = max(best, SequenceMatcher(None, shifted, r).ratio())
+    return float(max(0.0, min(1.0, best)))
+
+
+def melody_containment(query: Iterable[float], reference: Iterable[float]) -> float:
+    """较短那条里有多少音在另一条里找到了（移调归一）。
+
+    与上面的对称相似度是**不同的问题**：对称回答"这两次录音是不是同一段"，
+    含有率回答"我唱的这一小段是不是那首歌的一部分"。用户唱 6 个音、曲库存着
+    50 个音时，完美前缀的对称分只有 2×6/56=0.21，而含有率是 1.00。
+    排序用对称(AUC 更高)，含有率作为一条**有直观含义**的线索展示给她。
+    """
+    q = semitone_tokens(query)
+    r = semitone_tokens(reference)
+    if not q or not r:
+        return 0.0
+    shorter = min(len(q), len(r))
+    best = 0
+    for shift in range(-6, 7):
+        shifted = [v + shift for v in q]
+        hit = sum(b.size for b in SequenceMatcher(None, shifted, r).get_matching_blocks())
+        best = max(best, hit)
+    return float(max(0.0, min(1.0, best / float(shorter))))
 
 
 def melody_similarity(query: Iterable[float], reference: Iterable[float]) -> float:
@@ -229,10 +348,44 @@ class SongSearchEngine:
         with self._lock:
             entry = None
             requested_song_id = (song_id or "").strip()
+            merge_note = ""
             if requested_song_id:
                 entry = self._find_entry_locked(requested_song_id)
                 if entry is None:
                     raise KeyError(f"song not found: {requested_song_id}")
+                # 填 id 等于断言"这段和条目里已有的段是同一首歌"，而这个断言
+                # **服务端没有能力核实**：实测跨歌合并的旋律相似度中位 0.654，
+                # 同一首歌不同段落中位 0.618——错误合并反而更高，任何阈值都会
+                # 连带挡住"教下一段"这个核心用法。所以这里不设相似度门槛。
+                #
+                # 唯一精确的信号是书写系统：6 个真实错误合并里 3 个是中日混排，
+                # 25 个合法样本里 0 个。这一条硬拦；其余情况照常追加但说破依据有多弱，
+                # 因为能分辨"下一段"和"另一首歌"的信息在对话里，只有她看得到。
+                new_script = _script_of(lyrics)
+                existing_scripts = {
+                    _script_of(str(ref.get("lyrics", "")))
+                    for ref in (entry.get("references") or [])
+                }
+                existing_scripts.discard("")
+                if new_script and existing_scripts and new_script not in existing_scripts:
+                    entry = None
+                    merge_note = (
+                        "没有并入 %s：这段歌词是 %s，而那个条目里已有的是 %s，"
+                        "几乎不可能是同一首歌，已另存为新条目。"
+                        "如果确实是同一首，请先向用户确认。"
+                        % (requested_song_id, new_script, "/".join(sorted(existing_scripts)))
+                    )
+                elif entry is not None and (entry.get("references") or []):
+                    merge_note = (
+                        "注意：填了 id 就等于你断定这段和「%s」里已有的 %d 段是同一首歌。"
+                        "候选给出的旋律相似度**没有能力支持这个判断**"
+                        "（实测跨歌中位 0.654、同一首歌不同段落中位 0.618，分不开）。"
+                        "能分辨的只有对话——用户说过“换一首歌”还是“接着唱下一段”。"
+                        "不确定就先问他，问清楚再记也不迟。"
+                        % (str(entry.get("title") or "").strip() or requested_song_id,
+                           len({str(r.get("segment_group_id", "") or r.get("id", ""))
+                                for r in (entry.get("references") or [])}))
+                    )
             elif clean_title:
                 key = (_normalize_text(clean_title), _normalize_text(clean_artist))
                 for item in self._catalog:
@@ -276,7 +429,8 @@ class SongSearchEngine:
 
             song_id = str(entry["id"])
             clip_id = uuid.uuid4().hex[:12]
-            filename = self._build_audio_filename(song_id, clip_id, entry.get("title", ""), entry.get("artist", ""))
+            filename = self._build_audio_filename(
+                song_id, clip_id, entry.get("title", ""), entry.get("artist", ""), lyrics)
             absolute_path = os.path.join(self.audio_dir, filename)
             os.makedirs(self.audio_dir, exist_ok=True)
             temp_path = absolute_path + ".tmp"
@@ -288,6 +442,10 @@ class SongSearchEngine:
                 "id": clip_id,
                 "wav_file": self._relative_audio_path(absolute_path),
                 "pitch_contour_midi": contour,
+                #旋律的文本形式。分析结果里本来就有(note_sequence)，以前算完就丢，
+                #于是回忆候选拿不到旋律、她只能靠歌词认歌。存一份即可，不额外算。
+                "note_sequence": (str(analysis.get("note_sequence", "")).strip()
+                                  or notes_from_contour(contour)),
                 "pitch_timeline_midi": analysis.get("pitch_timeline_midi", []) or [],
                 "pitch_timeline_frame_seconds": float(
                     analysis.get("pitch_timeline_frame_seconds", 0.10)
@@ -314,6 +472,9 @@ class SongSearchEngine:
                 "sequence_index": int(reference["sequence_index"]),
                 "segment_status": segment_status,
                 "score_available": bool(reference.get("singing_score")),
+                # 合并判断的依据有多弱，要跟着结果一起交回去，否则她无从知道
+                # 自己刚才做了一个没有证据支撑的断言。
+                "merge_note": merge_note,
             })
             return result
 
@@ -420,7 +581,10 @@ class SongSearchEngine:
                     old_path = self._absolute_audio_path(old_relative)
                     clip_id = str(reference.get("id", "")) or uuid.uuid4().hex[:12]
                     reference["id"] = clip_id
-                    new_name = self._build_audio_filename(clean_id, clip_id, clean_title, final_artist)
+                    #改名时也带上这条自己的歌词，保持与新存入的文件同一格式。
+                    new_name = self._build_audio_filename(
+                        clean_id, clip_id, clean_title, final_artist,
+                        str(reference.get("lyrics", "")))
                     new_path = os.path.join(self.audio_dir, new_name)
                     if os.path.normcase(old_path) != os.path.normcase(new_path) and os.path.isfile(old_path):
                         os.replace(old_path, new_path)
@@ -475,12 +639,18 @@ class SongSearchEngine:
         query_lyrics: str = "",
         max_seconds: float = 60.0,
         seed: int = 1234,
+        segment_lyrics: str = "",
     ) -> Dict:
         """Resolve managed WAV material for autonomous remembered-song singing.
 
         memory: sing each unique learned segment once, choosing one take per group.
         continue: align the user's newest melody, then return only material after it.
         Repeated takes are variants of one segment and are never concatenated.
+
+        segment_lyrics: pick exactly ONE learned segment by its lyrics and sing only
+        that.  Users ask for parts by words ("那段 can you give me one last kiss 怎么唱"),
+        never by index — and the character cannot see indices anyway, so an index
+        selector would only invite guessing.  Overrides mode when given.
         """
         clean_mode = (mode or "memory").strip().lower()
         if clean_mode == "auto":
@@ -509,7 +679,46 @@ class SongSearchEngine:
         matched_sequence = -1
         match_confidence = 0.0
         lyrics_confidence = 0.0
-        if clean_mode == "memory":
+
+        wanted = _normalize_text(segment_lyrics or "")
+        if wanted:
+            best_index, best_score = -1, 0.0
+            for index, group in enumerate(groups):
+                for item in group:
+                    stored = _normalize_text(str(item.get("lyrics", "")))
+                    if not stored:
+                        continue
+                    # 曲库歌词来自歌唱 ASR，错字很多，所以包含关系优先、相似度兜底。
+                    if wanted in stored or stored in wanted:
+                        score = 1.0
+                    else:
+                        score = SequenceMatcher(None, wanted, stored).ratio()
+                    if score > best_score:
+                        best_score, best_index = score, index
+            # 门槛要容错字，但不能低到什么都能命中——挑一个"最像的"唱出去，
+            # 就等于把点段变成了新的编造入口。
+            if best_index < 0 or best_score < 0.55:
+                available = []
+                for index, group in enumerate(groups):
+                    text = ""
+                    for item in group:
+                        text = str(item.get("lyrics", "")).strip()
+                        if text:
+                            break
+                    available.append(f"[{index + 1}] {text[:40] or '（无歌词）'}")
+                raise ValueError(
+                    "这首歌你记住的 %d 段里没有匹配「%s」的（最接近的只有 %.2f）。"
+                    "已记住的是：%s。请用户教这一段，或者如实说你还没学过这一句。"
+                    % (len(groups), (segment_lyrics or "").strip()[:40], best_score,
+                       "；".join(available))
+                )
+            selected.append(self._pick_group_variant(groups[best_index], seed, best_index))
+            matched_sequence = int(
+                groups[best_index][0].get("sequence_index", best_index))
+            match_confidence = best_score
+            lyrics_confidence = best_score
+            continuation_basis = "lyrics_selected_segment"
+        elif clean_mode == "memory":
             for group_offset, group in enumerate(groups):
                 selected.append(self._pick_group_variant(group, seed, group_offset))
         else:
@@ -700,11 +909,30 @@ class SongSearchEngine:
     def _find_entry_locked(self, song_id: str) -> Optional[Dict]:
         return next((item for item in self._catalog if str(item.get("id", "")) == song_id), None)
 
-    def _build_audio_filename(self, song_id: str, clip_id: str, title: str, artist: str) -> str:
+    def _build_audio_filename(
+        self, song_id: str, clip_id: str, title: str, artist: str, lyrics: str = ""
+    ) -> str:
+        """文件名带上这一段的歌词开头，纯粹为了人能读。
+
+        曲库里一多半条目是未命名的（实测 69 个文件里 37 个叫 unknown），
+        对它们来说歌词是唯一能人读的标识——离线排查时不用再回头翻 JSON。
+        歌词只是**存入那一刻的快照**，之后歌词被修正也不改名：文件名是标签，
+        真相在 song_catalog.json 里，为一次错字修正搅动文件不值得。
+        song_id 仍然打头，同一条目的录音在文件夹里照旧排在一起。
+        """
         safe_title = _safe_filename_component(title, "unknown")
         safe_artist = _safe_filename_component(artist, "", 40) if artist else ""
-        middle = f"{safe_title}_{safe_artist}" if safe_artist else safe_title
-        return f"{song_id}_{middle}_{clip_id}.wav"
+        # 只取首行、并砍到 16 字：Windows 整条路径上限 260，
+        # 目录本身已占 61，留足余量给标题和歌手。
+        first_line = str(lyrics or "").strip().splitlines()[0] if str(lyrics or "").strip() else ""
+        safe_lyrics = _safe_filename_component(first_line, "", 16) if first_line else ""
+        parts = [song_id, safe_title]
+        if safe_artist:
+            parts.append(safe_artist)
+        if safe_lyrics:
+            parts.append(safe_lyrics)
+        parts.append(clip_id)
+        return "_".join(parts) + ".wav"
 
     def _relative_audio_path(self, absolute_path: str) -> str:
         return os.path.relpath(absolute_path, self.catalog_root).replace("\\", "/")
@@ -809,6 +1037,59 @@ class SongSearchEngine:
             "privacy": "raw_audio_kept_local",
         }
 
+    def recall(self, query: str, contour: List[float], limit: int = 3) -> List[Dict]:
+        """听到一段歌声时"想起了什么"——只查本机，不打外部目录。
+
+        **刻意不设置信度门槛。** 8/12 拿曲库现有的重复组量过：同一首歌的不同录音
+        与不同歌之间，melody_similarity 的分布几乎完全重合(组内中位 0.701 /
+        跨组中位 0.675，213 对 vs 490 对)，0.80 以上才干净但只认得出 9/213。
+        原因在实现本身：轮廓重采样到 220 点再取差分，时长和调性都被抹掉，
+        只剩起伏形状——而人声旋律的起伏形状天生相似。
+
+        所以这里只按分数取前几名，把歌词和上次听到的时间一并带出去，判断留给上层：
+        能分辨这几条的是歌词语义，不是旋律数字。
+        """
+        ranked = self._search_local(query or "", list(contour or []), max(1, int(limit)))
+        with self._lock:
+            index = {str(item.get("id", "")): item for item in self._catalog}
+        out: List[Dict] = []
+        for match in ranked:
+            entry = index.get(str(match.get("source_id", "")))
+            if entry is None:
+                continue
+            references = [
+                item for item in (entry.get("references") or [])
+                if isinstance(item, dict)
+            ]
+            stamps = [int(_safe_float(item.get("created_at"), 0.0)) for item in references]
+            stamps.append(int(_safe_float(entry.get("updated_at"), 0.0)))
+            #旋律的文本形式一并带出去。8/17 实测：候选里只有歌词时她四选一 50%，
+            #只有旋律文本 58%，两个都给 66%——它们是互补的而不是冗余。
+            #歌词来自唱歌 ASR、错字很多(「几十长旋天边」)，音高提取相对稳，
+            #所以旋律文本单独反而比歌词强。
+            note_seq = ""
+            for item in references:
+                cand = str(item.get("note_sequence", "")).strip()
+                if cand:
+                    note_seq = cand
+                    break
+            if not note_seq:
+                note_seq = notes_from_contour(entry.get("pitch_contour_midi") or [])
+            out.append({
+                "song_id": str(entry.get("id", "")),
+                "display_name": str(match.get("title", "")),
+                "named": bool(match.get("named")),
+                "lyrics": " ".join(str(entry.get("lyrics", "")).split()),
+                "note_sequence": note_seq,
+                "confidence": _safe_float(match.get("confidence"), 0.0),
+                "melody_score": _safe_float(match.get("melody_score"), 0.0),
+                "containment": _safe_float(match.get("containment"), 0.0),
+                "match_reason": str(match.get("match_reason", "")),
+                "last_heard": max(stamps) if stamps else 0,
+                "take_count": len(references),
+            })
+        return out
+
     def _search_local(self, query: str, contour: List[float], limit: int) -> List[Dict]:
         normalized_query = _normalize_text(query)
         with self._lock:
@@ -839,8 +1120,18 @@ class SongSearchEngine:
             for reference in item.get("references", []):
                 if isinstance(reference, dict) and reference.get("pitch_contour_midi"):
                     reference_contours.append(reference.get("pitch_contour_midi", []))
+            #排序判据换成 token 对齐(见 token_alignment_similarity 的注释：
+            #AUC 0.531 → 0.648，长度接近时 0.511 → 0.753)。
+            #去重与 mode=continue 仍用旧的 performance_similarity /
+            #melody_subsequence_alignment——那两处的语义不同，不在这次改动范围内。
             melody_score = max(
-                (melody_similarity(contour, reference) for reference in reference_contours),
+                (token_alignment_similarity(contour, reference)
+                 for reference in reference_contours),
+                default=0.0,
+            )
+            containment = max(
+                (melody_containment(contour, reference)
+                 for reference in reference_contours),
                 default=0.0,
             )
             if text_score > 0 and melody_score > 0:
@@ -864,6 +1155,8 @@ class SongSearchEngine:
                         else (f"旋律{melody_score:.2f}" if melody_score > 0 else f"文字{text_score:.2f}")
                     ),
                     "url": str(item.get("url", "")),
+                    "melody_score": round(float(melody_score), 3),
+                    "containment": round(float(containment), 3),
                 }
             )
         output.sort(key=lambda item: item["confidence"], reverse=True)

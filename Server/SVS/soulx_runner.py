@@ -625,6 +625,7 @@ def _acoustic_target_metadata(
     cleaning: dict,
     alignment: dict,
     g2p_transformer,
+    japanese_adapter: bool = False,
 ) -> tuple[list[dict], int] | None:
     raw_words = alignment.get("words", [])
     raw_durations = alignment.get("durations", [])
@@ -648,7 +649,9 @@ def _acoustic_target_metadata(
                 words.append("<SP>")
                 durations.append(duration)
             continue
-        units = lyric_units(word, language)
+        # 日语路径下 alignment 里的词是中文对齐器识出来的汉字(阿/纳/塔…)，
+        # 只用来定位音节边界，所以一律按中文逐字切。
+        units = lyric_units(word, "Mandarin" if japanese_adapter else language)
         if not units:
             continue
         share = duration / len(units)
@@ -675,7 +678,12 @@ def _acoustic_target_metadata(
         acoustic_group_by_position[position] = len(acoustic_units) - 1
 
     explicit_override = bool(score.get("lyrics_override", False))
-    if explicit_override and lyrics:
+    if japanese_adapter:
+        # 声学单元是汉字，对假名渲染器毫无意义——只有它的时间有用。
+        # 唱什么一律以 SenseVoice 的假名为准。
+        resolved_units = lyrics
+        transcript_source = "kana-on-acoustic-timing"
+    elif explicit_override and lyrics:
         resolved_units = lyrics
         transcript_source = "explicit-lyrics-override"
     elif acoustic_units and (
@@ -691,6 +699,47 @@ def _acoustic_target_metadata(
         return None
 
     group_mapping = _sequence_index_mapping(acoustic_units, resolved_units)
+
+    # 中文对齐器在日文上切分偏粗：8/8 实测 16 个假名只切出 13 个音节，两段长片段
+    # 的覆盖率都是 81%。而 group_mapping 是「一个声学槽位发一个假名」，装不下的
+    # 假名会被直接丢掉——少三个音节，词就听不出来了。
+    # 所以假名多于槽位时改成按时长摊：每个槽位至少一个，多出来的按时长比例分给
+    # 最长的那些槽位并在其内部等分。时间仍来自真实时间戳，误差被限制在单个槽位内。
+    position_lyrics: dict[int, list[int]] = {}
+    if japanese_adapter and len(resolved_units) > len(lexical_positions) > 0:
+        counts = [1] * len(lexical_positions)
+        spare = len(resolved_units) - len(lexical_positions)
+        if spare > 0:
+            weights = [durations[position] for position in lexical_positions]
+            span = sum(weights) or 1.0
+            quota = [weight / span * spare for weight in weights]
+            extra = [int(math.floor(value)) for value in quota]
+            for index in sorted(
+                range(len(quota)),
+                key=lambda i: -(quota[i] - extra[i]),
+            )[: spare - sum(extra)]:
+                extra[index] += 1
+            counts = [base + more for base, more in zip(counts, extra)]
+        cursor = 0
+        for position, count in zip(lexical_positions, counts):
+            position_lyrics[position] = list(range(cursor, cursor + count))
+            cursor += count
+
+    if japanese_adapter:
+        emitted = (
+            sum(len(v) for v in position_lyrics.values())
+            if position_lyrics
+            else len(set(group_mapping.values()))
+        )
+        print(
+            f"[SoulX/JA] 声学音节 {len(acoustic_units)}(槽位 {len(lexical_positions)}) "
+            f"vs 假名 {len(resolved_units)} → 实发 {emitted} "
+            f"覆盖 {100 * emitted / max(1, len(resolved_units)):.0f}% "
+            f"摊分={bool(position_lyrics)}",
+            file=sys.stderr,
+            flush=True,
+        )
+
     total = sum(durations)
     score_duration = max(0.0, float(score.get("duration_seconds", 0.0)))
     if total <= 0 or score_duration <= 0:
@@ -726,21 +775,33 @@ def _acoustic_target_metadata(
             note_type.append(1)
             continue
         group = acoustic_group_by_position[position]
-        lyric_index = group_mapping[group]
-        boundaries = [word_start]
-        candidates = [
-            (boundary, pitch_change)
-            for boundary, pitch_change in pitch_boundaries
-            if boundary - word_start >= 0.08
-            and word_end - boundary >= 0.08
-        ]
-        if candidates and duration >= 0.4:
-            # One syllable may span two notes, but turning every vibrato or
-            # ornamental bend into a new consonant makes the singer stutter.
-            boundary, _ = max(candidates, key=lambda item: item[1])
-            boundaries.append(boundary)
-        boundaries.append(word_end)
-        for part_start, part_end in zip(boundaries, boundaries[1:]):
+        carried = position_lyrics.get(position)
+        if carried and len(carried) > 1:
+            # 这个槽位要带多个假名：在它自己的时间跨度内等分，每份一个假名。
+            # 不再借音高边界做花腔切分——那会让同一个假名重复发音。
+            step = duration / len(carried)
+            boundaries = [word_start + step * i for i in range(len(carried) + 1)]
+            part_lyrics = list(carried)
+        else:
+            lyric_index = carried[0] if carried else group_mapping[group]
+            boundaries = [word_start]
+            candidates = [
+                (boundary, pitch_change)
+                for boundary, pitch_change in pitch_boundaries
+                if boundary - word_start >= 0.08
+                and word_end - boundary >= 0.08
+            ]
+            if candidates and duration >= 0.4:
+                # One syllable may span two notes, but turning every vibrato or
+                # ornamental bend into a new consonant makes the singer stutter.
+                boundary, _ = max(candidates, key=lambda item: item[1])
+                boundaries.append(boundary)
+            boundaries.append(word_end)
+            part_lyrics = [lyric_index] * (len(boundaries) - 1)
+        for part_index, (part_start, part_end) in enumerate(
+            zip(boundaries, boundaries[1:])
+        ):
+            lyric_index = part_lyrics[min(part_index, len(part_lyrics) - 1)]
             part_duration = part_end - part_start
             start_frame = max(
                 0, int(math.floor(part_start / SOULX_FRAME_SECONDS))
@@ -818,7 +879,7 @@ def build_direct_target_metadata(
         lyrics = lyric_units(str(score.get("lyrics", "")), language)
     duration = max(0.0, float(score.get("duration_seconds", 0.0)))
     f0, clean_diagnostic = _clean_score_f0(score, duration)
-    if acoustic_alignment and not japanese_adapter:
+    if acoustic_alignment:
         acoustic_metadata = _acoustic_target_metadata(
             score,
             language,
@@ -827,6 +888,7 @@ def build_direct_target_metadata(
             clean_diagnostic,
             acoustic_alignment,
             g2p_transformer,
+            japanese_adapter=japanese_adapter,
         )
         if acoustic_metadata is not None:
             return acoustic_metadata
