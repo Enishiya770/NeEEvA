@@ -188,6 +188,42 @@ class SongMemoryTests(unittest.TestCase):
             self.assertEqual(plan["selected_references"][0]["sequence_index"], 1)
             self.assertEqual(plan["lyrics_confidence"], 1.0)
 
+    def test_explicit_full_song_uses_zero_as_unlimited_total_duration(self):
+        contours = [
+            [60, 60, 62, 64, 65, 67, 69, 71, 72, 71, 69, 67],
+            [48, 52, 55, 59, 62, 66, 69, 73, 76, 73, 69, 66],
+            [72, 69, 65, 60, 56, 53, 49, 46, 43, 46, 49, 53],
+            [61, 68, 62, 70, 63, 72, 64, 73, 65, 71, 66, 69],
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            engine = SongSearchEngine(
+                os.path.join(temp_dir, "song_catalog.json"),
+                _SequenceSingingAnalyzer(contours),
+            )
+            audio = _silent_wav_bytes(seconds=1.0)
+            wav = np.zeros(16000, dtype=np.float32)
+            first = engine.remember_clip(
+                "Long Song", "Artist", wav, audio, lyrics="part one"
+            )
+            for index in range(1, 4):
+                engine.remember_clip(
+                    "",
+                    "",
+                    wav,
+                    audio,
+                    lyrics=f"part {index + 1}",
+                    song_id=first["song_id"],
+                )
+
+            with self.assertRaisesRegex(ValueError, "一次演唱上限"):
+                engine.resolve_performance(
+                    song_id=first["song_id"], mode="memory", max_seconds=3.0
+                )
+            full_plan = engine.resolve_performance(
+                song_id=first["song_id"], mode="memory", max_seconds=0.0
+            )
+            self.assertEqual(full_plan["selected_segment_count"], 4)
+
 
 if __name__ == "__main__":
     unittest.main()

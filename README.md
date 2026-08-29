@@ -190,6 +190,10 @@ llama-server.exe -m qwen36.gguf --mmproj mmproj-Q8_0.gguf --host 127.0.0.1 --por
 
 配套机制：连续多轮无用户回应会强制等待用户开口（`m_MaxConsecutiveAITurns`，默认 8，防独白循环）；环境突发声响可把下一次思考拉前（`m_BringForwardOnSpike`），模拟"被动静拽回注意力"；感知帧还会回显她最近几条发言，提醒她避免重复车轱辘话。相关提示词约定见 `Assets/AIChatTookit/Prompts/behavior.txt`。
 
+提示词支持按需技能：`Prompts/Skills/` 下的文本不会进入常驻 system prompt；本轮检测到对应意图时，LLM 层才把技能作为临时 system context 插在最后一条用户消息之前，且不写入聊天历史。当前 `singing.txt` 覆盖歌唱感知、查歌、曲库演唱、回唱/练唱和本地歌曲记忆；普通聊天会卸载它，以减少固定 token 和长提示导致的输出收敛。基础 `behavior.txt` 中的 `SKILL-BEGIN/END` 块只保留迁移对照，运行时会被剥离。
+
+Skill 的路由规则集中在 `ChatSample.s_SkillRouteDefinitions`；每个 Skill 需声明激活、追问、显式停用及双重否定覆盖信号。显式停用优先于同句内的激活关键词，会立即清空追问窗口，并阻止迟到的工具回调自动重启；只有用户后续新的明确激活指令才会解除。同一轮可激活多个 Skill，路由器会聚合后一次性交给 LLM，不会相互覆盖。
+
 ## 流式倾听、临时理解与心里话
 
 用户尚未说完时，WebSocket partial 会持续触发一条**可撤销的认知支路**。它与最终回答使用不同的短提示，不朗读、不中断用户，也不直接写入聊天历史或长期记忆。每次更新包含：
@@ -355,6 +359,7 @@ Assets/
     QwenOmni/           通义千问 Omni 多模态接入
     Scene/              chatSample 主对话场景（NeEEvA 形象 + 完整对话栈）
     Prompts/            角色人设 / 行为 / 语言提示词
+      Skills/           按当前轮次动态装载的领域提示词（当前为 singing）
     MemoryData/         种子记忆 seed_memory.json
   Editor/             编辑器工具（NeEEvARoomBuilder 白盒房间生成、MemoryGraphWindow 记忆网络可视化编辑）
   Model/              NeEEvA.vrm 虚拟形象及贴图

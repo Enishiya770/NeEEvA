@@ -81,7 +81,7 @@ public class ChatQW : LLM
     /// 副作用：发送前会调 PruneOldImagesInPlace 把历史里超出 m_KeepRecentImages 的旧图剥掉，
     /// 避免视觉 token 累积爆掉上下文。
     /// </summary>
-    private string BuildRequestJson(bool stream)
+    private string BuildRequestJson(bool stream, string transientSystemContext = null)
     {
         PruneOldImagesInPlace(m_DataList, m_KeepRecentImages);
 
@@ -93,7 +93,7 @@ public class ChatQW : LLM
         //顶层 enable_thinking 给 DashScope 用；Local 后端会再注入 chat_template_kwargs(下方)
         sb.Append(",\"enable_thinking\":").Append(m_EnableThinking ? "true" : "false");
         sb.Append(",\"messages\":[");
-        // 易变上下文(记忆块)排在**最后一条用户消息之前**，而不是整个列表末尾。
+        // 易变上下文(按需技能、记忆块)排在**最后一条用户消息之前**，而不是整个列表末尾。
         //
         // 曾经拼在末尾，结果是她读到的最后一段不是用户的话而是记忆块——而记忆块末尾的
         // 气泡段落正是用第三人称复述用户刚说过的话。实测一整场里冒出 6 句
@@ -107,7 +107,9 @@ public class ChatQW : LLM
         //
         // 缓存行为不变：记忆块每轮都变，重算量仍然是"记忆块 + 用户这一句"。
         int trailingAt = -1;
-        if (!string.IsNullOrEmpty(TrailingContext))
+        if (!string.IsNullOrEmpty(ActiveSkillContext) ||
+            !string.IsNullOrEmpty(TrailingContext) ||
+            !string.IsNullOrEmpty(transientSystemContext))
         {
             trailingAt = m_DataList.Count;   //没有 user 消息时退回原来的"拼在末尾"
             for (int i = m_DataList.Count - 1; i >= 0; i--)
@@ -120,8 +122,21 @@ public class ChatQW : LLM
         {
             if (i == trailingAt)
             {
-                if (sb[sb.Length - 1] != '[') sb.Append(',');
-                AppendMessage(sb, new SendData("system", TrailingContext));
+                if (!string.IsNullOrEmpty(ActiveSkillContext))
+                {
+                    if (sb[sb.Length - 1] != '[') sb.Append(',');
+                    AppendMessage(sb, new SendData("system", ActiveSkillContext));
+                }
+                if (!string.IsNullOrEmpty(TrailingContext))
+                {
+                    if (sb[sb.Length - 1] != '[') sb.Append(',');
+                    AppendMessage(sb, new SendData("system", TrailingContext));
+                }
+                if (!string.IsNullOrEmpty(transientSystemContext))
+                {
+                    if (sb[sb.Length - 1] != '[') sb.Append(',');
+                    AppendMessage(sb, new SendData("system", transientSystemContext));
+                }
             }
             var msg = m_DataList[i];
             if (msg == null) continue;
@@ -130,8 +145,21 @@ public class ChatQW : LLM
         }
         if (trailingAt >= m_DataList.Count)
         {
-            if (sb[sb.Length - 1] != '[') sb.Append(',');
-            AppendMessage(sb, new SendData("system", TrailingContext));
+            if (!string.IsNullOrEmpty(ActiveSkillContext))
+            {
+                if (sb[sb.Length - 1] != '[') sb.Append(',');
+                AppendMessage(sb, new SendData("system", ActiveSkillContext));
+            }
+            if (!string.IsNullOrEmpty(TrailingContext))
+            {
+                if (sb[sb.Length - 1] != '[') sb.Append(',');
+                AppendMessage(sb, new SendData("system", TrailingContext));
+            }
+            if (!string.IsNullOrEmpty(transientSystemContext))
+            {
+                if (sb[sb.Length - 1] != '[') sb.Append(',');
+                AppendMessage(sb, new SendData("system", transientSystemContext));
+            }
         }
         //已经出声的开场排在最后：用户的话仍是最后一条 user，它跟在后面，
         //本轮回复于是变成"接着这句往下说"而不是"另写一段"。不要在这里再补一条
@@ -280,7 +308,13 @@ public class ChatQW : LLM
     //8/23 实测 18 轮对话就触发了裁剪(移除25条、只剩8条=4轮)，而对话预算还剩一大半
     //(系统提示 15117 / 预算 20000 → 留给对话 4883，48 条只用约 4100)。
     //裁剪本身还会让前缀缓存整段失效、prompt 全量重算，所以抬高上限是两头都好。
-    [Range(4, 64)] public int m_LowLatencyHistoryLimit = 48;
+    //上限从 64 放宽、默认 48 → 128。原因是它比 token 预算先触顶：48 条 = 24 轮，
+    //而 42000 的 token 预算能装 62 轮，条数闸让预算白提。
+    //更关键的是两条闸的裁剪方式不同——条数闸触顶后**一次砍到 25%**(48→12 条，
+    //她当场少掉 18 轮)，而 token 闸是逐条裁到刚好进预算。把 token 变成绑定条件
+    //之后，裁剪从"断崖"变成"渐进"。128 条 ≈ 64 轮，略高于 token 能装的 62 轮，
+    //所以它退回成一道防病态输入的保险，正常情况下不会先触发。
+    [Range(4, 256)] public int m_LowLatencyHistoryLimit = 128;
 
     [Header("prompt token 上限。超过就继续裁历史，不管条数够不够")]
     //只按条数裁是不够的：8/22 实测连着 6 次 400
@@ -288,7 +322,25 @@ public class ChatQW : LLM
     //系统提示已经 14000 token、演唱轮每条带 265~296 token 的方括号前缀，
     //32 条历史轻易就把 24576 撑破，而条数规则对此一无所知。
     //留出的余量要够放感知帧(约 1500~2500)和这一轮要生成的内容。
-    [Range(4096, 131072)] public int m_MaxPromptTokens = 20000;
+    //
+    //8/25 实测 20000 已经不够用了：系统提示 16298，留给对话只剩 3702，
+    //一场 42 轮里裁剪了 22 次、丢掉 61 条消息——她因此说出「今はまだこの一段しか
+    //保存できてないの」，而那一场她实际存了三首，其中一首还是四分钟前自己确认过的。
+    //
+    //提到 22500 之前量过延迟(打 5090 上的真服务，真 behavior.txt + 日志里的真感知帧)：
+    //  稳态 TTFT   0.19s → 0.19s   前缀缓存全吃掉了，而稳态才是每轮的常态
+    //  裁剪后 TTFT 0.33s → 0.63s   贵 0.30s，但裁剪频率会减半，折算下来相互抵消
+    //  能装下      3 轮  → 6 轮
+    //上限仍受 llama-server 的 -c 49152 --parallel 2 约束(每槽 24576)，
+    //22500 之后还剩 2076 给输出——本场回复中位 62 / P90 112 / 最长 168 token，够。
+    //8/26 二次上调 22500 → 42000。起因是查"复读为什么变频繁"时量到的：
+    //behavior.txt 在 8/25 那次提交里从 28014 涨到 52300 字节，系统提示随之从 9659
+    //涨到 16120 token，于是**静态:变化 的比值从 0.9:1 变成 4.2:1**——她的上下文
+    //八成是不变的指令，加上相邻两帧本身就有 0.798 的相似度、抗复读采样又全是关的，
+    //输出收敛到同一句几乎是必然。42000 把这个比值拉回 0.7:1，比 7 月还宽松。
+    //延迟实测：稳态 0.22s → 0.26s；完全不命中缓存 4.14s → 7.83s，但后者的主因
+    //(裁剪)会因此基本消失。服务端 n_ctx_seq=65536，留给输出 23536，绰绰有余。
+    [Range(4096, 131072)] public int m_MaxPromptTokens = 42000;
 
     [Header("Debug：打印LLM请求大小/消息数（不打印正文和密钥）")]
     public bool m_LogRequestStats = true;
@@ -855,7 +907,12 @@ public class ChatQW : LLM
     /// 流式发送，边吐token边触发回调。
     /// imageDataUrl 可选——传入则会作为多模态消息附图(需多模态模型如 Qwen3-VL 支持)。
     /// </summary>
-    public override void PostMsgStream(string _msg, Action<string> _onDelta, Action<string> _onComplete, string imageDataUrl = null)
+    public override void PostMsgStream(
+        string _msg,
+        Action<string> _onDelta,
+        Action<string> _onComplete,
+        string imageDataUrl = null,
+        bool recordAssistantHistory = true)
     {
         //Agent loop 的正式回复走这条流式路径，所以抢占预热必须放在这里——只加在
         //PostMsg/PostEphemeralMsg 上会漏掉它，实测首轮排在 14.82s 的预热后面，
@@ -884,7 +941,37 @@ public class ChatQW : LLM
         var entry = new SendData("user", message);
         entry.imageDataUrl = imageDataUrl;
         m_DataList.Add(entry);
-        StartCoroutine(RequestStream(message, generation, _onDelta, _onComplete));
+        StartCoroutine(RequestStream(
+            message,
+            generation,
+            _onDelta,
+            _onComplete,
+            recordAssistantHistory,
+            null));
+    }
+
+    /// <summary>
+    /// 异步工具完成后继续原来的真实 user 轮次。工具结果作为本次临时 system 上下文
+    /// 插在最后一条 user 之前，不向 m_DataList 追加“这不是用户发言”的伪 user。
+    /// </summary>
+    public override void PostContinuationStream(
+        string transientSystemContext,
+        Action<string> _onDelta,
+        Action<string> _onComplete,
+        string imageDataUrl = null)
+    {
+        AbortPrewarmIfRunning();
+        CancelEphemeralMsg();
+        CancelActiveResponse();
+        int generation = m_StreamRequestGeneration;
+        CheckHistory();
+        StartCoroutine(RequestStream(
+            "",
+            generation,
+            _onDelta,
+            _onComplete,
+            true,
+            transientSystemContext));
     }
 
     public override void CancelActiveResponse()
@@ -997,8 +1084,10 @@ public class ChatQW : LLM
             if (item == null || item.role == "system") continue;
             selected.Add(new SendData(item.role, item.content ?? ""));
         }
-        // 顺序必须与主对话一致：[system][历史][记忆块]，草稿只在其后多一条指令。
+        // 顺序必须与主对话一致：[system][历史][技能][记忆块]，草稿只在其后多一条指令。
         // 这样草稿 prompt 是主对话 prompt 的严格延长，两者共享同一段长前缀。
+        if (!string.IsNullOrEmpty(ActiveSkillContext))
+            selected.Add(new SendData("system", ActiveSkillContext));
         if (!string.IsNullOrEmpty(TrailingContext))
             selected.Add(new SendData("system", TrailingContext));
         selected.Add(new SendData("user", prompt));
@@ -1030,7 +1119,9 @@ public class ChatQW : LLM
         string _postWord,
         int generation,
         Action<string> _onDelta,
-        Action<string> _onComplete)
+        Action<string> _onComplete,
+        bool recordAssistantHistory,
+        string transientSystemContext)
     {
         stopwatch.Restart();
         ResetThinkStrip();
@@ -1038,7 +1129,9 @@ public class ChatQW : LLM
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
             m_ActiveStreamRequest = request;
-            string _jsonText = BuildRequestJson(stream: true);
+            string _jsonText = BuildRequestJson(
+                stream: true,
+                transientSystemContext: transientSystemContext);
             byte[] data = System.Text.Encoding.UTF8.GetBytes(_jsonText);
             if (m_LogRequestStats) LogRequestStats(data.Length);
             request.uploadHandler = new UploadHandlerRaw(data);
@@ -1072,7 +1165,9 @@ public class ChatQW : LLM
             if (request.responseCode == 200)
             {
                 string full = StripLeadingThinkBlock(handler.GetFullContent(), true);
-                m_DataList.Add(new SendData("assistant", MergeSpokenPrefix(full)));
+                string merged = MergeSpokenPrefix(full);
+                if (recordAssistantHistory)
+                    m_DataList.Add(new SendData("assistant", merged));
                 if (_onComplete != null) _onComplete(full);
             }
             else
@@ -1190,6 +1285,9 @@ public class ChatQW : LLM
                 if (!string.IsNullOrEmpty(m_DataList[i].imageDataUrl)) total += 1024;
             }
         }
+        //按需技能与记忆块不在 m_DataList，但会真实进入本轮请求，预算必须把它们算上。
+        total += EstimateTokens(ActiveSkillContext);
+        total += EstimateTokens(TrailingContext);
         return total;
     }
 
@@ -1219,9 +1317,9 @@ public class ChatQW : LLM
             if (removeIndex < 0)
             {
                 Debug.LogError(
-                    $"[ChatQW] 系统提示本身已约 {EstimatePromptTokens()} token，" +
-                    $"超过 prompt 预算 {budget}——裁历史无法解决，请精简 behavior.txt " +
-                    "或调大服务端上下文。");
+                    $"[ChatQW] 常驻提示、按需技能与动态记忆合计已约 " +
+                    $"{EstimatePromptTokens()} token，超过 prompt 预算 {budget}——" +
+                    "裁历史无法解决，请精简对应 prompt/skill 或调大服务端上下文。");
                 return;
             }
             m_DataList.RemoveAt(removeIndex);
@@ -1237,6 +1335,7 @@ public class ChatQW : LLM
     //也随节点增长——直到 8/22 连续 6 次 400 才发现。变化超过阈值就打一行，
     //启动时自然会打第一次。
     private int m_LastReportedSystemTokens = -1;
+    private int m_LastReportedSkillTokens = -1;
     private const int k_SystemTokenReportDelta = 200;
 
     private void ReportSystemPromptSizeIfChanged()
@@ -1253,8 +1352,10 @@ public class ChatQW : LLM
             parts.Append(t);
         }
         if (systemTokens <= 0) return;
+        int skillTokens = EstimateTokens(ActiveSkillContext);
         if (m_LastReportedSystemTokens >= 0 &&
-            Mathf.Abs(systemTokens - m_LastReportedSystemTokens) < k_SystemTokenReportDelta)
+            Mathf.Abs(systemTokens - m_LastReportedSystemTokens) < k_SystemTokenReportDelta &&
+            skillTokens == m_LastReportedSkillTokens)
             return;
 
         int budget = Mathf.Max(4096, m_MaxPromptTokens);
@@ -1264,8 +1365,11 @@ public class ChatQW : LLM
                     $"{(systemTokens > m_LastReportedSystemTokens ? "+" : "")}" +
                     $"{systemTokens - m_LastReportedSystemTokens}）";
         m_LastReportedSystemTokens = systemTokens;
-        Debug.Log($"[LLM上下文] 系统提示 ≈{systemTokens} token（{parts}）/ " +
-                  $"prompt 预算 {budget} → 留给对话 ≈{budget - systemTokens} token{trend}");
+        m_LastReportedSkillTokens = skillTokens;
+        string skillPart = skillTokens > 0 ? $" + 按需技能 {skillTokens}" : "";
+        Debug.Log($"[LLM上下文] 常驻系统提示 ≈{systemTokens} token（{parts}）{skillPart} / " +
+                  $"prompt 预算 {budget} → 留给历史、记忆与本轮输入 ≈" +
+                  $"{budget - systemTokens - skillTokens} token{trend}");
     }
 
     public override void CheckHistory()

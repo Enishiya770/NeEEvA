@@ -113,6 +113,19 @@ namespace AIChat.Agent
         }
 
         /// <summary>
+        /// 丢掉已经排好的旧点火，但保留“用户沉默了多久”和本段环境额度。
+        /// 异步工具确认或内部意图预判接管当前节奏时使用；若调用 Reset，角色会把
+        /// 一次内部流程误当成用户刚刚开口，孤独时间也被不自然地清零。
+        /// </summary>
+        public void ClearPendingTrigger()
+        {
+            m_U = 0f;
+            m_Rate = 0f;
+            m_RequestedSec = m_EffectiveSec = 0f;
+            m_AccBase = m_AccLonely = m_AccMemory = m_AccSpike = 0f;
+        }
+
+        /// <summary>
         /// 相当于原来的 ScheduleNextTick：把"N 秒后再醒"翻译成一个速率。
         ///
         /// 速率按**剩余缺口**现算(而不是固定值)，这样无论 U 当前是多少，无事发生时都恰好

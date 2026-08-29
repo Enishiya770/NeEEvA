@@ -44,6 +44,15 @@ public sealed class PlaybackEchoReferenceTap : MonoBehaviour
 
     private void OnAudioFilterRead(float[] data, int channels)
     {
+        ProcessAudioSamplesRaw(data, channels);
+    }
+
+    /// <summary>
+    /// Lets a dedicated secondary playback object feed the same AEC reference buffer without
+    /// placing a second AudioSource beside this filter (which Unity does not support reliably).
+    /// </summary>
+    public void ProcessAudioSamplesRaw(float[] data, int channels)
+    {
         if (data == null || data.Length == 0 || channels <= 0 || m_Ring == null) return;
 
         int frames = data.Length / channels;

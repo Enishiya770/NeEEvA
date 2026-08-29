@@ -2985,6 +2985,8 @@ MonoBehaviour:
   - {fileID: 4900000, guid: f88e7ad97dbd08049b97a017e7faeffd, type: 3}
   - {fileID: 4900000, guid: e7e8645f8194c8d4b9ea44884a4cb609, type: 3}
   - {fileID: 4900000, guid: 0c78d1db2ef151f4c8c147d9ada5082a, type: 3}
+  m_SkillFiles:
+  - {fileID: 4900000, guid: f0f8b0b5b7504a7ca01f7b430cedec21, type: 3}
   m_Backend: 1
   m_LocalUrl: http://127.0.0.1:8080/v1/chat/completions
   m_LocalModelName: antoneva
@@ -5182,7 +5184,11 @@ MonoBehaviour:
   m_HumSVCTimeoutSeconds: 600
   m_AllowLegacyHumFallback: 0
   m_CharacterHumCarrierClip: {fileID: 0}
-  m_HumBackMaxSeconds: 60
+  m_HumBackMaxSeconds: 120
+  m_EnableStreamedFullSongSVC: 1
+  m_HumStreamTargetChunkSeconds: 30
+  m_HumStreamMaxBufferedSeconds: 60
+  m_AutonomousSingingMaxSeconds: 60
   m_EnableStreamingHumBackPrefix: 1
   m_HumBackPrefixOverlapSeconds: 0.08
   m_HumPreferredMedianMidi: 69

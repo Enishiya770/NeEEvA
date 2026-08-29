@@ -84,6 +84,9 @@ public class SenseVoiceSpeechToText : STT
     public bool LastNoSpeech { get; private set; } = false;
     public string LastSpeakerName { get; private set; } = "";
     public string LastSpeakerKind { get; private set; } = "";
+    /// <summary>最近一次匹配到的具体声纹；LastSpeakerId 是稳定的身份文件夹 ID。</summary>
+    public string LastSpeakerVoiceprintId { get; private set; } = "";
+    public string LastSpeakerVoiceprintStatus { get; private set; } = "";
     /// <summary>最近一次**真的认出**的非 AI 说话人；噪音/无人声轮次不会擦掉它。</summary>
     public string LastKnownSpeakerId { get; private set; } = "";
     public string LastKnownSpeakerName { get; private set; } = "";
@@ -331,15 +334,34 @@ public class SenseVoiceSpeechToText : STT
         //各段自己的起调(MIDI)。移调后的结果 = 这个数 + 实际发出的半音数，
         //回报给她之后她才能看出还差多少，而不是一次加一个半音地试。
         public List<float> SegmentMedians;
+        //每一段来自练唱清单的第几段(1 起)。用户永远用清单段号说话("把第四段调高")，
+        //而 key 的下标是 order 里的位置——8/25 实测 order="4,5,6" 时她把"第四段"
+        //当成了第 4 项，抬高了清单第 5 段，用户当场纠正。回报里要用清单段号。
+        public List<int> SegmentSourceIndices;
         //整条的有声音高中位数。auto_f0_adjust 关掉之后要自己补上它本来会给的抬升，
         //公式见 Server/SeedVC/vendor/seed-vc/app_svc.py:315：目标中位 − 源中位。
         public float MedianMidi;
     }
 
     private readonly List<PracticePhrase> m_PracticePhrases = new List<PracticePhrase>();
+    //order 里有一部分没认出来、但还有认出来的：照常唱，但要如实说漏了哪些。
+    private string m_LastPracticeOrderProblem = "";
+    public string ConsumeLastPracticeOrderProblem()
+    {
+        string value = m_LastPracticeOrderProblem;
+        m_LastPracticeOrderProblem = "";
+        return value;
+    }
     private int m_LastCommittedPracticeSignature = 0;
     private float m_LastPracticeCommitTime = -999f;
-    private const int MaxPracticePhraseCount = 16;
+    //一首完整歌曲很容易超过 16 个自然句。这里是会话内的素材保留量，不是一次推理
+    //要吃下的块数；实际转换会在 ChatSample 里按块排队并及时释放，所以可以适度放宽。
+    private const int MaxPracticePhraseCount = 64;
+    //旋律相似度分不开不同的歌——实测**跨歌**中位 0.654、同一首歌不同段落中位 0.618，
+    //错误合并的那些反而更高。所以这里没有"判对"的阈值可用，只有"判它没意义"的下界：
+    //0.654 就是随机拿两首不相干的歌配对能拿到的分。低于它的候选携带的信息量是零，
+    //印在感知帧上只会被当成身份依据用。这个数来自实测，不是拍的。
+    private const float k_RecallIdentityFloor = 0.654f;
     // Final ASR can conservatively label a mixed “spoken lead-in + singing” turn as speech even
     // though streaming analysis already heard stable singing. Keep this response's playable
     // candidate until ChatSample reconciles the two signals in the same callback.
@@ -823,6 +845,8 @@ public class SenseVoiceSpeechToText : STT
                 result.SpeakerName = response.speaker_name ?? "";
                 result.SpeakerKind = response.speaker_kind ?? "";
                 result.SpeakerStatus = response.speaker_status ?? "";
+                result.SpeakerVoiceprintId = response.speaker_voiceprint_id ?? "";
+                result.SpeakerVoiceprintStatus = response.speaker_voiceprint_status ?? "";
                 result.SpeakerConfidence = response.speaker_confidence;
                 result.SelfConfidence = response.speaker_self_confidence;
                 result.IsSinging = response.is_singing;
@@ -890,6 +914,8 @@ public class SenseVoiceSpeechToText : STT
                     LastSpeakerName = _response.speaker_name ?? "";
                     LastSpeakerKind = _response.speaker_kind ?? "";
                     LastSpeakerStatus = _response.speaker_status ?? "";
+                    LastSpeakerVoiceprintId = _response.speaker_voiceprint_id ?? "";
+                    LastSpeakerVoiceprintStatus = _response.speaker_voiceprint_status ?? "";
                     //粘性身份：只在真的认出人时更新，噪音/无人声轮次不擦掉它。
                     //LastSpeakerId 会被**每一次** ASR 结果覆盖，包括被幻听闸拒绝的轮次
                     //(那时服务端返回 unknown_speaker_meta)。实测后果：她隔一轮才反应过来
@@ -1207,6 +1233,7 @@ public class SenseVoiceSpeechToText : STT
                         Debug.Log($"[SenseVoice] text=\"{LastText}\" lang={LastLanguage} " +
                                   $"emo={LastEmotion} evt={LastEvent} " +
                                   $"speaker={LastSpeakerName}/{LastSpeakerId} " +
+                                  $"voiceprint={LastSpeakerVoiceprintId}/{LastSpeakerVoiceprintStatus} " +
                                   $"score={LastSpeakerConfidence:F3} status={LastSpeakerStatus} " +
                                   $"progress={LastSpeakerEnrollmentProgress:P0} dt={_response.elapsed:F2}s");
                     }
@@ -1981,6 +2008,77 @@ public class SenseVoiceSpeechToText : STT
         StartCoroutine(SimpleSpeakerPost("/speakers/reset-owner", new WWWForm(), callback));
     }
 
+    /// <summary>
+    /// 角色侧的受限声纹管理入口。服务端只开放 review/auto/merge/move/detach/undo，
+    /// 不允许角色删除身份或声纹。
+    /// </summary>
+    public void ManageSpeakers(
+        string action,
+        string sourceId,
+        string targetId,
+        string voiceprintId,
+        string operationId,
+        string displayName,
+        Action<SpeakerManagementResult> callback)
+    {
+        StartCoroutine(ManageSpeakersRequest(
+            action,
+            sourceId,
+            targetId,
+            voiceprintId,
+            operationId,
+            displayName,
+            callback));
+    }
+
+    private IEnumerator ManageSpeakersRequest(
+        string action,
+        string sourceId,
+        string targetId,
+        string voiceprintId,
+        string operationId,
+        string displayName,
+        Action<SpeakerManagementResult> callback)
+    {
+        WWWForm form = new WWWForm();
+        form.AddField("action", (action ?? "review").Trim());
+        form.AddField("source_id", (sourceId ?? "").Trim());
+        form.AddField("target_id", (targetId ?? "").Trim());
+        form.AddField("voiceprint_id", (voiceprintId ?? "").Trim());
+        form.AddField("operation_id", (operationId ?? "").Trim());
+        form.AddField("display_name", (displayName ?? "").Trim());
+
+        using (UnityWebRequest www = UnityWebRequest.Post(
+                   m_ServerSetting.TrimEnd('/') + "/speakers/manage", form))
+        {
+            yield return www.SendWebRequest();
+            SpeakerManagementResult result = null;
+            try
+            {
+                result = JsonUtility.FromJson<SpeakerManagementResult>(
+                    www.downloadHandler.text);
+            }
+            catch (Exception exception)
+            {
+                if (m_VerboseLog)
+                    Debug.LogWarning("[Speaker/Manage] 响应解析失败: " + exception.Message);
+            }
+            if (result == null) result = new SpeakerManagementResult();
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                result.ok = false;
+                if (string.IsNullOrWhiteSpace(result.error))
+                    result.error = string.IsNullOrWhiteSpace(www.downloadHandler.text)
+                        ? www.error
+                        : www.downloadHandler.text;
+            }
+            if (m_VerboseLog)
+                Debug.Log($"[Speaker/Manage] action={action} ok={result.ok} " +
+                          $"error={result.error}");
+            if (callback != null) callback(result);
+        }
+    }
+
     private IEnumerator RenameSpeakerRequest(string speakerId, string displayName, Action<bool> callback)
     {
         WWWForm form = new WWWForm();
@@ -2274,20 +2372,142 @@ public class SenseVoiceSpeechToText : STT
     /// 空串／解析不出任何合法序号时返回 null，调用方按原顺序走。
     /// 允许只取其中几段，也允许重复(用户可能要求"再唱一遍第一段")。
     /// </summary>
+    /// <summary>
+    /// 解析 order。每一项可以是段号("3")，也可以是那一段的歌词片段("卢浮宫")。
+    /// </summary>
+    /// <remarks>
+    /// 段号是纯机器编号，人和她都记不住——8/25 实测用户说"把第四段调高"，
+    /// 而 order="4,5,6" 时 key 的第 1 项才是清单第 4 段，她抬错了一段；
+    /// 用户自己也说"聊着聊着我自己都不记得段落情况了"。
+    /// 用歌词指段是双方本来就在用的说法，不需要任何一边记编号。
+    /// 段号仍然可用，两种写法可以混着写。
+    /// </remarks>
     private List<int> ParsePracticeOrder(string order)
     {
+        return ParsePracticeOrder(order, out _);
+    }
+
+    private List<int> ParsePracticeOrder(string order, out string failure)
+    {
+        failure = "";
         if (string.IsNullOrWhiteSpace(order)) return null;
         var picked = new List<int>();
-        foreach (string piece in order.Split(',', '，', ' ', '、', '-', '>'))
+        var problems = new List<string>();
+        //分隔符只认**半角** , ; |。歌词里的标点是全角的（「谁对谁错，爱对爱少」），
+        //日文 ASR 的输出还是空格分隔的（「初めて の ルーブル は」）——
+        //拿全角逗号、顿号或空格断项会把一句歌词切碎。半角逗号只会是她打的分隔符。
+        //纯段号的老写法用的分隔符更宽松，单独处理。
+        //引号括起来的整体永远算一项，给"歌词里真的有半角逗号"留后路。
+        foreach (string piece in SplitOrderItems(order, LooksLikeNumericOrder(order)))
         {
-            string t = piece.Trim();
+            string t = piece.Trim().Trim('"', '\'', '“', '”', '「', '」').Trim();
             if (t.Length == 0) continue;
-            int n;
-            if (!int.TryParse(t, out n)) continue;
-            if (n < 1 || n > m_PracticePhrases.Count) continue;
-            picked.Add(n - 1);
+            if (int.TryParse(t, out int n))
+            {
+                if (n < 1 || n > m_PracticePhrases.Count)
+                {
+                    problems.Add($"段号 {n} 超出范围（当前只有 {m_PracticePhrases.Count} 段）");
+                    continue;
+                }
+                picked.Add(n - 1);
+                continue;
+            }
+            var hits = MatchPracticePhrasesByLyric(t);
+            if (hits.Count == 0)
+            {
+                problems.Add($"「{t}」在练唱会话里找不到对应的段");
+            }
+            else if (hits.Count > 1)
+            {
+                //同一句被唱过好几遍时歌词必然多重命中。不替她挑，让她用段号定。
+                problems.Add(
+                    $"「{t}」同时命中第 {string.Join("、", hits.ConvertAll(x => (x + 1).ToString()))} 段" +
+                    "（同一句的多遍），请改用段号指明要哪一遍");
+            }
+            else if (!picked.Contains(hits[0]))
+            {
+                picked.Add(hits[0]);
+            }
         }
+        if (problems.Count > 0)
+            failure = string.Join("；", problems);
         return picked.Count > 0 ? picked : null;
+    }
+
+    /// <summary>歌词片段 → 段下标。包含关系优先，其次相似度；曲库歌词错字多，要容错。</summary>
+    /// <summary>把 order 切成项。引号内的内容永远是一整项。</summary>
+    private static List<string> SplitOrderItems(string order, bool numericMode)
+    {
+        var items = new List<string>();
+        var current = new StringBuilder();
+        bool quoted = false;
+        foreach (char ch in order ?? "")
+        {
+            if (ch == '"' || ch == '“' || ch == '”' || ch == '「' || ch == '」')
+            {
+                quoted = !quoted;
+                continue;
+            }
+            bool isSeparator = !quoted &&
+                (ch == ',' || ch == ';' || ch == '|' ||
+                 (numericMode && (ch == '，' || ch == '、' || ch == ' ' ||
+                                  ch == '；' || ch == '>')));
+            if (isSeparator)
+            {
+                items.Add(current.ToString());
+                current.Length = 0;
+                continue;
+            }
+            current.Append(ch);
+        }
+        items.Add(current.ToString());
+        return items;
+    }
+
+    /// <summary>整串只有数字和分隔符时按老写法(逗号分隔段号)处理。</summary>
+    private static bool LooksLikeNumericOrder(string order)
+    {
+        foreach (char ch in order ?? "")
+        {
+            if (char.IsDigit(ch)) continue;
+            if (ch == ',' || ch == '，' || ch == ' ' || ch == '、' ||
+                ch == ';' || ch == '；' || ch == '>' || ch == '|') continue;
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// 歌词片段有多少落在这一段里。**不用对称相似度**——短片段配长句子会被长度差
+    /// 惩罚到过不了线（"你的眼泪像一颗虎珀" 对整句只得 0.39），而片段匹配天生长度悬殊。
+    /// </summary>
+    private static float LyricContainment(string fragment, string stored)
+    {
+        if (fragment.Length < 2 || stored.Length < 2) return 0f;
+        var a = new HashSet<string>();
+        for (int i = 0; i + 1 < fragment.Length; i++) a.Add(fragment.Substring(i, 2));
+        var b = new HashSet<string>();
+        for (int i = 0; i + 1 < stored.Length; i++) b.Add(stored.Substring(i, 2));
+        if (a.Count == 0 || b.Count == 0) return 0f;
+        int shared = 0;
+        foreach (string g in a) if (b.Contains(g)) shared++;
+        return shared / (float)Mathf.Min(a.Count, b.Count);
+    }
+
+    private List<int> MatchPracticePhrasesByLyric(string fragment)
+    {
+        var exact = new List<int>();
+        var fuzzy = new List<int>();
+        string probe = NormalizeLyricForTake(fragment);
+        if (probe.Length == 0) return exact;
+        for (int i = 0; i < m_PracticePhrases.Count; i++)
+        {
+            string stored = NormalizeLyricForTake(m_PracticePhrases[i].Lyrics);
+            if (stored.Length == 0) continue;
+            if (stored.Contains(probe) || probe.Contains(stored)) exact.Add(i);
+            else if (LyricContainment(probe, stored) >= 0.60f) fuzzy.Add(i);
+        }
+        return exact.Count > 0 ? exact : fuzzy;
     }
 
     /// <summary>
@@ -2299,6 +2519,44 @@ public class SenseVoiceSpeechToText : STT
         m_LastCommittedPracticeSignature = 0;
         m_LastPracticeCommitTime = -999f;
         Debug.Log("[SenseVoice/Practice] 新练唱会话已开始；等待最终确认的歌唱片段");
+    }
+
+    /// <summary>
+    /// Agent Loop 重启时调用：**不清空**，只丢掉真正陈旧的片段。
+    ///
+    /// 原来这里是无条件 Clear。而 Loop 停/起并不结束对话——m_DataList 一个字都不会掉，
+    /// 她记的 note、memory 全都还在。8/25 实测：用户手动停了一次实时模式，
+    /// 五段刚教的旋律当场蒸发，她的笔记却还写着「第5段是ウピラントア遥かな」，
+    /// 于是照着笔记发 order="5"，两次都撞上"练唱会话里还没有任何片段"，
+    /// 最后说出「私の記憶が壊れてしまったかしら？」。
+    ///
+    /// 这和 8/17 那次是同一个道理：清空是一个决定，不该是"重启了一下"的副作用。
+    /// 段落自己带着"多久以前唱的"，感知帧也照实报出来——真正该丢的只有陈旧的那些。
+    /// </summary>
+    /// <param name="maxAgeSeconds">超过这个岁数的片段才丢。</param>
+    public void ResumeSingingPracticeSession(
+        float maxAgeSeconds, out int kept, out int dropped)
+    {
+        dropped = 0;
+        //按时间追加，陈旧的必然都在前面；从头丢到第一个还新鲜的为止。
+        while (m_PracticePhrases.Count > 0 &&
+               Time.realtimeSinceStartup - m_PracticePhrases[0].AtRealtime > maxAgeSeconds)
+        {
+            m_PracticePhrases.RemoveAt(0);
+            dropped++;
+        }
+        kept = m_PracticePhrases.Count;
+        //丢过东西就得让签名失效：段号已经整体前移，旧签名对应的不再是同一段。
+        if (dropped > 0)
+        {
+            m_LastCommittedPracticeSignature = 0;
+            m_LastPracticeCommitTime = -999f;
+        }
+        if (kept == 0 && dropped == 0)
+            Debug.Log("[SenseVoice/Practice] 新练唱会话已开始；等待最终确认的歌唱片段");
+        else
+            Debug.Log($"[SenseVoice/Practice] 练唱会话已延续：留下 {kept} 段" +
+                      (dropped > 0 ? $"，丢掉 {dropped} 段陈旧片段（超过 {maxAgeSeconds:F0} 秒）" : ""));
     }
 
     /// <summary>
@@ -2327,6 +2585,12 @@ public class SenseVoiceSpeechToText : STT
         //本轮回忆的首选候选：只在够像时才当身份线索用。相似度分不开不同的歌
         //(实测组内中位 0.701 / 跨组 0.675)，所以这里要的不是"判定"，而是"提示"——
         //她最终仍然靠歌词自己判断，写错也只是少一条线索。
+        //
+        //8/25：上面这段注释写了三个月，**代码里一个阈值都没有**——直接取第一条。
+        //代价当场兑现：用户唱的日文段被标上 `疑似曲库 id=0947a4b23e25`，
+        //而那条是 8/24 的一首中文歌「一瞬间紧紧拥抱，无处可逃…」，相似度 0.43。
+        //练唱会话被削到只剩这一段之后，她照着这个 id 发了 <song_sing/>，
+        //系统就把那首中文歌唱了出来——她是**照着帧做的**，错的是帧。
         string topRecallId = "";
         string topRecallName = "";
         if (m_LastSongRecall != null)
@@ -2334,6 +2598,15 @@ public class SenseVoiceSpeechToText : STT
             foreach (var item in m_LastSongRecall)
             {
                 if (item == null || string.IsNullOrEmpty(item.song_id)) continue;
+                //低于这条线的候选不是"弱线索"，是**负线索**：随便挑两首不相干的歌
+                //都能得到比它更高的分。印出来只会把她往错的方向推。
+                if (item.confidence < k_RecallIdentityFloor)
+                {
+                    Debug.Log($"[SenseVoice/Practice] 首选候选 {item.song_id} 相似 " +
+                              $"{item.confidence:F2} < {k_RecallIdentityFloor:F2}(跨歌中位)，" +
+                              "不作为身份线索写进练唱清单");
+                    break;
+                }
                 topRecallId = item.song_id;
                 topRecallName = item.named ? (item.display_name ?? "").Trim() : "";
                 break;
@@ -2500,7 +2773,7 @@ public class SenseVoiceSpeechToText : STT
             return false;
         }
 
-        List<int> sequence = ParsePracticeOrder(order);
+        List<int> sequence = ParsePracticeOrder(order, out string orderFailure);
         //原来这里卡的是**库存量** < 2。于是会话里只有一段时，就算用户指名要那一段
         //也一律拒绝——而三段的会话里 order="3" 唱单段却是正常工作的，同样是唱一段，
         //两种结果。真正该卡的是"这次请求解析出来的序列是不是空的"。
@@ -2508,9 +2781,11 @@ public class SenseVoiceSpeechToText : STT
         {
             //给了 order 却一个合法段号都没有：原来会静默退回"全唱"，
             //她写错段号时用户听到的是一整串，而工具结果还报成功。
-            failure = $"order=\"{order.Trim()}\" 里没有任何有效段号：" +
+            //order 现在也接受歌词片段，所以失败原因要说清是哪一项、为什么。
+            failure = $"order=\"{order.Trim()}\" 没有解析出任何段落" +
+                      (string.IsNullOrEmpty(orderFailure) ? "：" : "——" + orderFailure + "。") +
                       $"练唱会话现在有 {m_PracticePhrases.Count} 段" +
-                      $"(段号 1~{m_PracticePhrases.Count})，请照感知帧里的清单重填";
+                      $"(可以写段号 1~{m_PracticePhrases.Count}，也可以直接写那一段的歌词片段)";
             return false;
         }
         if (sequence == null)
@@ -2518,6 +2793,7 @@ public class SenseVoiceSpeechToText : STT
             sequence = new List<int>(m_PracticePhrases.Count);
             for (int i = 0; i < m_PracticePhrases.Count; i++) sequence.Add(i);
         }
+        if (!string.IsNullOrEmpty(orderFailure)) m_LastPracticeOrderProblem = orderFailure;
         if (sequence.Count == 0)
         {
             failure = "这次请求没有解析出任何要唱的段落";
@@ -2554,6 +2830,7 @@ public class SenseVoiceSpeechToText : STT
         var segmentWavs = new List<byte[]>(decoded.Count);
         var gaps = new List<float>(decoded.Count);
         var segmentMedians = new List<float>(decoded.Count);
+        var segmentSources = new List<int>(decoded.Count);
 
         for (int i = 0; i < decoded.Count; i++)
         {
@@ -2581,6 +2858,7 @@ public class SenseVoiceSpeechToText : STT
             else gaps.Add(0f);
             segmentWavs.Add(EncodeMonoPcm16Wav(phrase, outputRate));
             segmentMedians.Add(MedianVoicedPitch(m_PracticePhrases[sequence[i]].MidiTimeline));
+            segmentSources.Add(sequence[i] + 1);
 
             int src = sequence[i];
             output.AddRange(phrase);
@@ -2597,7 +2875,9 @@ public class SenseVoiceSpeechToText : STT
         }
 
         float duration = output.Count / (float)Mathf.Max(1, outputRate);
-        if (duration > maxSeconds + 0.02f)
+        //maxSeconds <= 0 表示不限制整次演唱总长。长歌由调用方按自然段拆成独立
+        //转换块；这里仍然完整保留开头和顺序，不再因为总长而整次拒绝。
+        if (maxSeconds > 0f && duration > maxSeconds + 0.02f)
         {
             failure = $"连续演唱需要 {duration:F1}s，超过当前完整转换上限 {maxSeconds:F1}s；没有裁掉开头";
             return false;
@@ -2620,10 +2900,132 @@ public class SenseVoiceSpeechToText : STT
             SegmentWavs = segmentWavs,
             Gaps = gaps,
             SegmentMedians = segmentMedians,
+            SegmentSourceIndices = segmentSources,
             MedianMidi = MedianVoicedPitch(midi.ToArray()),
         };
         return composition.WavBytes != null && composition.WavBytes.Length > 44 &&
             HasPlayablePitchTimeline(composition.MidiTimeline);
+    }
+
+    /// <summary>
+    /// 把一条 PCM WAV 拆成不超过 <paramref name="maxChunkSeconds"/> 的流式转换块。
+    /// 有旋律时间轴时优先在靠近块尾的静音处切；没有时才按时长硬切。所有采样恰好
+    /// 出现一次，因此它只改变推理粒度，不裁歌、不重叠，也不改变总时长。
+    /// </summary>
+    public bool TryBuildSingingStreamChunks(
+        byte[] wavBytes,
+        float[] midiTimeline,
+        float frameSeconds,
+        float maxChunkSeconds,
+        out PracticeComposition composition,
+        out string failure)
+    {
+        composition = null;
+        failure = "";
+        if (!TryDecodePcmWav(wavBytes, out float[] samples, out int sampleRate) ||
+            samples == null || samples.Length == 0)
+        {
+            failure = "源歌声不是可分块的 PCM WAV";
+            return false;
+        }
+
+        float chunkLimit = Mathf.Max(3f, maxChunkSeconds);
+        int maxChunkSamples = Mathf.Max(1, Mathf.FloorToInt(chunkLimit * sampleRate));
+        float safeFrameSeconds = Mathf.Clamp(frameSeconds, 0.02f, 0.25f);
+        var chunks = new List<byte[]>();
+        var gaps = new List<float>();
+        var medians = new List<float>();
+        var sources = new List<int>();
+        int startSample = 0;
+        while (startSample < samples.Length)
+        {
+            int hardEnd = Mathf.Min(samples.Length, startSample + maxChunkSamples);
+            int endSample = hardEnd;
+            if (hardEnd < samples.Length && midiTimeline != null && midiTimeline.Length > 0)
+            {
+                endSample = FindStreamingSplitSample(
+                    midiTimeline,
+                    safeFrameSeconds,
+                    sampleRate,
+                    startSample,
+                    hardEnd);
+            }
+            //极短尾块既增加固定推理开销又容易爆音；找不到可靠静音点时按上限硬切。
+            if (endSample <= startSample + sampleRate / 2 || endSample > hardEnd)
+                endSample = hardEnd;
+
+            int count = endSample - startSample;
+            var chunkSamples = new float[count];
+            Array.Copy(samples, startSample, chunkSamples, 0, count);
+            //只有真正位于连续有声区的硬切才需要极短淡入淡出；静音切点上的处理不可闻。
+            ApplyShortEdgeFade(chunkSamples, sampleRate, 0.006f);
+            chunks.Add(EncodeMonoPcm16Wav(chunkSamples, sampleRate));
+            gaps.Add(0f);
+            sources.Add(chunks.Count);
+
+            float startSeconds = startSample / (float)sampleRate;
+            float endSeconds = endSample / (float)sampleRate;
+            int frameStart = Mathf.Clamp(
+                Mathf.FloorToInt(startSeconds / safeFrameSeconds), 0,
+                midiTimeline == null ? 0 : midiTimeline.Length);
+            int frameEnd = Mathf.Clamp(
+                Mathf.CeilToInt(endSeconds / safeFrameSeconds), frameStart,
+                midiTimeline == null ? 0 : midiTimeline.Length);
+            if (midiTimeline != null && frameEnd > frameStart)
+            {
+                var slice = new float[frameEnd - frameStart];
+                Array.Copy(midiTimeline, frameStart, slice, 0, slice.Length);
+                medians.Add(MedianVoicedPitch(slice));
+            }
+            else medians.Add(0f);
+            startSample = endSample;
+        }
+
+        composition = new PracticeComposition
+        {
+            WavBytes = wavBytes,
+            MidiTimeline = midiTimeline ?? new float[0],
+            FrameSeconds = safeFrameSeconds,
+            PhraseCount = chunks.Count,
+            DurationSeconds = samples.Length / (float)Mathf.Max(1, sampleRate),
+            SegmentWavs = chunks,
+            Gaps = gaps,
+            SegmentMedians = medians,
+            SegmentSourceIndices = sources,
+            MedianMidi = MedianVoicedPitch(midiTimeline),
+        };
+        return chunks.Count > 0;
+    }
+
+    private static int FindStreamingSplitSample(
+        float[] timeline,
+        float frameSeconds,
+        int sampleRate,
+        int startSample,
+        int hardEndSample)
+    {
+        float startSeconds = startSample / (float)Mathf.Max(1, sampleRate);
+        float hardEndSeconds = hardEndSample / (float)Mathf.Max(1, sampleRate);
+        int firstFrame = Mathf.Clamp(
+            Mathf.CeilToInt((startSeconds + 3f) / frameSeconds), 0, timeline.Length - 1);
+        int hardEndFrame = Mathf.Clamp(
+            Mathf.FloorToInt(hardEndSeconds / frameSeconds), firstFrame, timeline.Length - 1);
+        //最多往回看 8 秒；这样块不会为了找静音而变得过短。
+        int searchStart = Mathf.Max(
+            firstFrame,
+            hardEndFrame - Mathf.CeilToInt(8f / frameSeconds));
+        for (int frame = hardEndFrame; frame >= searchStart; frame--)
+        {
+            if (timeline[frame] > 1f) continue;
+            int runStart = frame;
+            int runEnd = frame;
+            while (runStart > searchStart && timeline[runStart - 1] <= 1f) runStart--;
+            while (runEnd + 1 <= hardEndFrame && timeline[runEnd + 1] <= 1f) runEnd++;
+            int middle = (runStart + runEnd + 1) / 2;
+            int sample = Mathf.RoundToInt(middle * frameSeconds * sampleRate);
+            return Mathf.Clamp(sample, startSample + 1, hardEndSample);
+        }
+        return hardEndSample;
     }
 
     /// <summary>
@@ -3000,7 +3402,9 @@ public class SenseVoiceSpeechToText : STT
         //按歌词点某一段：给了就只唱那一段，服务端会忽略 mode。用户是用词句指段的
         //（"那段 can you give me one last kiss 怎么唱"），不是用序号——而她也看不到序号。
         form.AddField("segment_lyrics", (segmentLyrics ?? "").Trim());
-        form.AddField("max_seconds", Mathf.Clamp(maxSeconds, 3f, 180f).ToString(
+        //0 表示用户明确要求完整演唱，不设整曲总长；正数只用于自主歌唱软限制。
+        float submittedMaxSeconds = maxSeconds <= 0f ? 0f : Mathf.Max(3f, maxSeconds);
+        form.AddField("max_seconds", submittedMaxSeconds.ToString(
             System.Globalization.CultureInfo.InvariantCulture));
         form.AddField("seed", seed.ToString(System.Globalization.CultureInfo.InvariantCulture));
         bool hasFreshAudio = needsAlignment && HasFreshSingingAudio();
@@ -3248,6 +3652,9 @@ public class SenseVoiceSpeechToText : STT
         public string speaker_name = "";
         public string speaker_kind = "";
         public string speaker_status = "";
+        public string speaker_identity_id = "";
+        public string speaker_voiceprint_id = "";
+        public string speaker_voiceprint_status = "";
         public float speaker_confidence = 0f;
         public float speaker_enrollment_progress = 0f;
         public bool speaker_is_new = false;
@@ -3329,6 +3736,9 @@ public class SenseVoiceSpeechToText : STT
         public string speaker_name = "";
         public string speaker_kind = "";
         public string speaker_status = "";
+        public string speaker_identity_id = "";
+        public string speaker_voiceprint_id = "";
+        public string speaker_voiceprint_status = "";
         public float speaker_confidence = 0f;
         public float speaker_self_confidence = 0f;
         public float elapsed = 0f;
@@ -3344,10 +3754,21 @@ public class SenseVoiceSpeechToText : STT
         public string SpeakerName = "";
         public string SpeakerKind = "";
         public string SpeakerStatus = "";
+        public string SpeakerVoiceprintId = "";
+        public string SpeakerVoiceprintStatus = "";
         public float SpeakerConfidence = 0f;
         public float SelfConfidence = 0f;
         public bool IsSinging = false;
         public float SingingProbability = 0f;
+    }
+
+    [Serializable]
+    public class SpeakerManagementResult
+    {
+        public bool ok = false;
+        public string action = "";
+        public string summary = "";
+        public string error = "";
     }
 
     [Serializable]

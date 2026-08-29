@@ -657,7 +657,10 @@ class SongSearchEngine:
             clean_mode = "continue" if query_contour else "memory"
         if clean_mode not in ("memory", "continue"):
             raise ValueError("song singing mode must be memory, continue, or auto")
-        max_seconds = max(3.0, min(180.0, float(max_seconds)))
+        # 0 means an explicit full-song request.  Positive values are a caller-owned
+        # autonomy soft limit, not a transport/model ceiling.
+        requested_max_seconds = float(max_seconds)
+        max_seconds = 0.0 if requested_max_seconds <= 0.0 else max(3.0, requested_max_seconds)
 
         with self._lock:
             entry = self._find_performance_entry_locked(song_id, title, query_contour or [])
@@ -790,9 +793,13 @@ class SongSearchEngine:
                     if score >= 0.68 and remaining_seconds >= 1.2 and score > best_tail_score:
                         best_tail = deepcopy(item)
                         best_tail["slice_start_seconds"] = round(start_frame * frame_seconds, 3)
+                        full_tail_end = len(timeline) * frame_seconds
                         best_tail["slice_end_seconds"] = round(
-                            min(len(timeline) * frame_seconds,
-                                start_frame * frame_seconds + max_seconds), 3
+                            full_tail_end if max_seconds <= 0.0 else min(
+                                full_tail_end,
+                                start_frame * frame_seconds + max_seconds,
+                            ),
+                            3,
                         )
                         best_tail_score = score
                 if best_tail is not None:
@@ -821,7 +828,7 @@ class SongSearchEngine:
                 duration = end - start
             total_seconds += max(0.0, duration - start if end <= start else duration)
 
-        if total_seconds > max_seconds + 0.25:
+        if max_seconds > 0.0 and total_seconds > max_seconds + 0.25:
             raise ValueError(
                 f"已记住的独立段合计约 {total_seconds:.1f} 秒，超过当前一次演唱上限 "
                 f"{max_seconds:.1f} 秒；为避免裁掉开头，本次没有播放"

@@ -753,6 +753,9 @@ def extract_speaker_embedding(wav: np.ndarray):
 def unknown_speaker_meta():
     return {
         "speaker_id": "unknown",
+        "speaker_identity_id": "",
+        "speaker_voiceprint_id": "",
+        "speaker_voiceprint_status": "unknown",
         "speaker_name": "无法确认的说话人",
         "speaker_kind": "unknown",
         "speaker_status": "unknown",
@@ -800,6 +803,12 @@ def identify_speaker(wav: np.ndarray, speech_ms: int, learn: bool = True):
     """
     if _speaker_store is None:
         return unknown_speaker_meta(), 0.0, None
+    # New confirmed identities are organized on the next speaker-bearing request.
+    # The store uses conservative mutual-nearest matching and is internally locked.
+    try:
+        _speaker_store.auto_organize()
+    except Exception as exc:
+        print(f"[Speaker/Auto] organize failed (recognition continues): {exc}", flush=True)
     embedding, elapsed = extract_speaker_embedding(wav)
     if embedding is None:
         return unknown_speaker_meta(), elapsed, None
@@ -965,9 +974,11 @@ async def stream_asr(websocket: WebSocket):
 def speakers(include_session: bool = True):
     if _speaker_store is None:
         return JSONResponse({"error": "speaker store not loaded"}, status_code=503)
+    repository = _speaker_store.list_repository(include_session)
     return {
         "profile_path": _speaker_store.path,
         "profiles": _speaker_store.list_profiles(include_session),
+        **repository,
     }
 
 
@@ -1013,9 +1024,152 @@ def rename_speaker(
 def merge_speakers(
     source_id: str = Form(...),
     target_id: str = Form(...),
+    display_name: str = Form(""),
 ):
     try:
-        return {"ok": True, "profile": _speaker_store.merge(source_id, target_id)}
+        identity = _speaker_store.merge_identities(
+            source_id, target_id, display_name, operation_mode="manual"
+        )
+        return {"ok": True, "identity": identity}
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/speakers/merge-preview")
+def preview_speaker_merge(
+    source_id: str = Form(...),
+    target_id: str = Form(...),
+    source_type: str = Form(""),
+):
+    try:
+        return {
+            "ok": True,
+            "preview": _speaker_store.merge_preview(source_id, target_id, source_type),
+        }
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/speakers/assign-voiceprint")
+def assign_speaker_voiceprint(
+    voiceprint_id: str = Form(...),
+    target_identity_id: str = Form(...),
+):
+    try:
+        identity = _speaker_store.assign_voiceprint(voiceprint_id, target_identity_id)
+        return {"ok": True, "identity": identity}
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/speakers/detach-voiceprint")
+def detach_speaker_voiceprint(voiceprint_id: str = Form(...)):
+    try:
+        voiceprint = _speaker_store.detach_voiceprint(voiceprint_id)
+        return {"ok": True, "voiceprint": voiceprint}
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/speakers/confirm-voiceprint")
+def confirm_speaker_voiceprint(voiceprint_id: str = Form(...)):
+    try:
+        voiceprint = _speaker_store.confirm_voiceprint(voiceprint_id)
+        return {"ok": True, "voiceprint": voiceprint}
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/speakers/delete-voiceprint")
+def delete_speaker_voiceprint(voiceprint_id: str = Form(...)):
+    try:
+        _speaker_store.delete_voiceprint(voiceprint_id)
+        return {"ok": True}
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/speakers/delete-identity")
+def delete_speaker_identity(identity_id: str = Form(...)):
+    try:
+        _speaker_store.delete_identity(identity_id)
+        return {"ok": True}
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/speakers/auto-organize")
+def auto_organize_speakers():
+    if _speaker_store is None:
+        return JSONResponse({"error": "speaker store not loaded"}, status_code=503)
+    try:
+        operations = _speaker_store.auto_organize(force=True)
+        return {
+            "ok": True,
+            "operations": operations,
+            "summary": _speaker_store.describe_repository(),
+        }
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/speakers/undo")
+def undo_speaker_merge(operation_id: str = Form(...)):
+    if _speaker_store is None:
+        return JSONResponse({"error": "speaker store not loaded"}, status_code=503)
+    try:
+        result = _speaker_store.undo_merge(operation_id)
+        return {
+            "ok": True,
+            **result,
+            "summary": _speaker_store.describe_repository(),
+        }
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/speakers/manage")
+def manage_speakers_for_character(
+    action: str = Form("review"),
+    source_id: str = Form(""),
+    target_id: str = Form(""),
+    voiceprint_id: str = Form(""),
+    operation_id: str = Form(""),
+    display_name: str = Form(""),
+):
+    """Character-facing management surface. Deletion is intentionally absent."""
+    if _speaker_store is None:
+        return JSONResponse({"error": "speaker store not loaded"}, status_code=503)
+    normalized = action.strip().lower()
+    try:
+        result = None
+        if normalized == "review":
+            pass
+        elif normalized == "auto":
+            result = _speaker_store.auto_organize(force=True)
+        elif normalized == "merge":
+            result = _speaker_store.merge_identities(
+                source_id,
+                target_id,
+                display_name,
+                operation_mode="character",
+            )
+        elif normalized == "move":
+            result = _speaker_store.assign_voiceprint(voiceprint_id, target_id)
+        elif normalized == "detach":
+            result = _speaker_store.detach_voiceprint(voiceprint_id)
+        elif normalized == "undo":
+            result = _speaker_store.undo_merge(operation_id)
+        else:
+            raise ValueError(
+                "unsupported action; use review, auto, merge, move, detach, or undo"
+            )
+        return {
+            "ok": True,
+            "action": normalized,
+            "result": result,
+            "summary": _speaker_store.describe_repository(),
+        }
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
@@ -1514,7 +1668,7 @@ def _compose_catalog_performance(plan: dict, max_seconds: float):
         raise ValueError("remembered song WAV has no playable audio")
     combined = np.concatenate(audio_parts)
     duration_seconds = float(combined.size) / 16000.0
-    if duration_seconds > float(max_seconds) + 0.25:
+    if float(max_seconds) > 0.0 and duration_seconds > float(max_seconds) + 0.25:
         raise ValueError(
             f"resolved song audio is {duration_seconds:.1f}s, above the {float(max_seconds):.1f}s limit"
         )

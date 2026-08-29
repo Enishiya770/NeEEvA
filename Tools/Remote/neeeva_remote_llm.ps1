@@ -26,7 +26,16 @@ $Services = [ordered]@{
         Args = @(
             '-m', 'qwen36.gguf', '--mmproj', 'mmproj-Q8_0.gguf',
             '--host', '127.0.0.1', '--port', '8080',
-            '-c', '49152', '--parallel', '2',
+            # 49152 (24576/slot) was sized for the old 4090 where the LLM shared
+            # the GPU with the whole voice stack. On the dedicated 5090 that ceiling
+            # was costing us memory, not VRAM: 2026-08-25 a 42-turn session trimmed
+            # history 22 times and dropped 61 messages, and the character forgot
+            # three songs she had saved herself minutes earlier.
+            # This model is cheap to extend: only 10 of 40 layers keep a KV cache
+            # (hybrid attention), so 20 KiB/token -> 131072 costs 2560 MiB total,
+            # up 1600 MiB from 960. Recurrent state (126 MiB) scales with seqs,
+            # not context, and n_ctx_train is 262144 so no rope scaling is needed.
+            '-c', '131072', '--parallel', '2',
             '--slot-prompt-similarity', '0.8', '-ngl', '99',
             '--jinja', '--flash-attn', 'on'
         )

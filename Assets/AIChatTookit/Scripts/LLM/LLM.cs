@@ -51,6 +51,16 @@ public class LLM:MonoBehaviour
     /// </summary>
     [System.NonSerialized] public string TrailingContext = "";
     /// <summary>
+    /// 本轮按需加载的技能提示词。和 TrailingContext 一样只在请求序列化时临时插入，
+    /// 不写进 m_DataList；因此技能启停不会改写稳定的 system 前缀，也不会在历史里复制。
+    /// </summary>
+    [System.NonSerialized] public string ActiveSkillContext = "";
+    /// <summary>
+    /// 很短的常驻能力目录。它只告诉角色“有哪些 Skill 可以申请”以及当前权限状态，
+    /// 不包含任何具体工具规则；详细规则仍由 SetActiveSkills 按需加载。
+    /// </summary>
+    [System.NonSerialized] public string SkillCatalogContext = "";
+    /// <summary>
     /// 本轮已经通过快速回应出声、但还没进历史的那句开场。非空时它会作为一条
     /// **assistant 消息挂在用户消息之后**，正式回复相当于从它往下续写。
     ///
@@ -77,6 +87,17 @@ public class LLM:MonoBehaviour
     [SerializeField] protected TextAsset[] m_PromptFiles;
 
     /// <summary>
+    /// 可按需加载的技能提示词。文件名就是技能名，例如 singing.txt 对应 singing。
+    /// 它们不会进入基础 system prompt，只有调用 SetActiveSkills 后才随当前请求发送。
+    /// </summary>
+    [Header("按需技能Prompt(文件名即技能名，不进入基础system)")]
+    [SerializeField] protected TextAsset[] m_SkillFiles;
+    private readonly HashSet<string> m_MissingSkillWarnings =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> m_EditorFallbackSkillWarnings =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// 是否启用文件式system prompt
     /// </summary>
     public bool HasPromptFiles
@@ -97,9 +118,111 @@ public class LLM:MonoBehaviour
             TextAsset ta = m_PromptFiles[i];
             if (ta == null || string.IsNullOrEmpty(ta.text)) continue;
             if (sb.Length > 0) sb.Append("\n\n");
-            sb.Append(ta.text);
+            sb.Append(StripEmbeddedSkillBlocks(ta.text));
         }
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Prompt 源文件里可以暂存已迁移到按需技能的旧规则，便于人工对照；标记内文本
+    /// 不进入基础 system prompt。真正运行时使用的是 m_SkillFiles 中的独立技能文件。
+    /// </summary>
+    private static string StripEmbeddedSkillBlocks(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? "";
+        const string begin = "<!-- SKILL-BEGIN:";
+        const string end = "<!-- SKILL-END -->";
+        int searchAt = 0;
+        var sb = new StringBuilder(text.Length);
+        while (searchAt < text.Length)
+        {
+            int blockStart = text.IndexOf(begin, searchAt, StringComparison.Ordinal);
+            if (blockStart < 0)
+            {
+                sb.Append(text, searchAt, text.Length - searchAt);
+                break;
+            }
+            sb.Append(text, searchAt, blockStart - searchAt);
+            int blockEnd = text.IndexOf(end, blockStart + begin.Length, StringComparison.Ordinal);
+            if (blockEnd < 0)
+            {
+                UnityEngine.Debug.LogError("[LLM技能] Prompt 中有未闭合的 SKILL-BEGIN 标记");
+                //配置错误时宁可退回原始完整提示，也不能静默丢掉标记后的基础规则。
+                return text;
+            }
+            searchAt = blockEnd + end.Length;
+        }
+        return sb.ToString().Trim();
+    }
+
+    /// <summary>
+    /// 设置当前请求需要的技能。每次调用都会替换上一轮技能；传空值即可卸载。
+    /// 返回 false 表示至少有一个技能文件未在 Inspector 中配置。
+    /// </summary>
+    public virtual bool SetActiveSkills(params string[] skillNames)
+    {
+        bool allFound = true;
+        var sb = new StringBuilder();
+        if (!string.IsNullOrWhiteSpace(SkillCatalogContext))
+            sb.Append(SkillCatalogContext.Trim());
+
+        if (skillNames == null || skillNames.Length == 0)
+        {
+            ActiveSkillContext = sb.ToString();
+            return true;
+        }
+
+        for (int n = 0; n < skillNames.Length; n++)
+        {
+            string wanted = (skillNames[n] ?? "").Trim();
+            if (wanted.Length == 0) continue;
+
+            TextAsset match = null;
+            if (m_SkillFiles != null)
+            {
+                for (int i = 0; i < m_SkillFiles.Length; i++)
+                {
+                    TextAsset candidate = m_SkillFiles[i];
+                    if (candidate != null &&
+                        string.Equals(candidate.name, wanted, StringComparison.OrdinalIgnoreCase))
+                    {
+                        match = candidate;
+                        break;
+                    }
+                }
+            }
+
+#if UNITY_EDITOR
+            //私有整合场景可能是在新增 m_SkillFiles 字段之前生成的。此时场景里的数组为空，
+            //但技能资产已经存在。Editor 下按规范路径后备加载，避免必须重建/重开整个场景；
+            //正式 Player 仍要求场景序列化真实引用，保证打包时资产会被纳入。
+            if (match == null)
+            {
+                string editorPath =
+                    $"Assets/AIChatTookit/Prompts/Skills/{wanted}.txt";
+                match = UnityEditor.AssetDatabase.LoadAssetAtPath<TextAsset>(editorPath);
+                if (match != null && m_EditorFallbackSkillWarnings.Add(wanted))
+                    UnityEngine.Debug.LogWarning(
+                        $"[LLM技能] 当前场景未序列化 '{wanted}'，已从 {editorPath} 后备加载。" +
+                        "重新生成或保存该场景后可消除此警告。");
+            }
+#endif
+
+            if (match == null || string.IsNullOrWhiteSpace(match.text))
+            {
+                allFound = false;
+                if (m_MissingSkillWarnings.Add(wanted))
+                    UnityEngine.Debug.LogError(
+                        $"[LLM技能] 找不到技能 '{wanted}'。请把 {wanted}.txt 加到 Skill Files。");
+                continue;
+            }
+
+            if (sb.Length > 0) sb.Append("\n\n");
+            sb.Append("[已加载技能: ").Append(wanted).Append("]\n");
+            sb.Append(match.text.Trim());
+        }
+        ActiveSkillContext = sb.ToString();
+        return allFound;
     }
 
     /// <summary>
@@ -160,13 +283,34 @@ public class LLM:MonoBehaviour
         string _msg,
         System.Action<string> _onDelta,
         System.Action<string> _onComplete,
-        string imageDataUrl = null)
+        string imageDataUrl = null,
+        bool recordAssistantHistory = true)
     {
         PostMsg(_msg, (full) =>
         {
             if (_onDelta != null) _onDelta(full);
             if (_onComplete != null) _onComplete(full);
         });
+    }
+
+    /// <summary>
+    /// 在最后一条真实 user 消息上继续生成，不追加一条伪造的 user 消息。
+    /// transientSystemContext 只进入这一次请求，不写进历史。用于异步工具已经返回、
+    /// 而用户仍在等待同一轮最终答复的场景。默认 provider 退回普通流式消息；支持
+    /// 原生历史控制的 provider 应覆写，保持一个真实 user 对应一个最终 assistant。
+    /// </summary>
+    public virtual void PostContinuationStream(
+        string transientSystemContext,
+        System.Action<string> _onDelta,
+        System.Action<string> _onComplete,
+        string imageDataUrl = null)
+    {
+        PostMsgStream(
+            transientSystemContext ?? "",
+            _onDelta,
+            _onComplete,
+            imageDataUrl,
+            true);
     }
 
     /// <summary>
