@@ -5063,15 +5063,23 @@ public partial class ChatSample : MonoBehaviour
                 "不要自行改变权限；根据本轮已加载的 Skill 规则回答或自然询问用户。");
         }
         bool autonomousSkillApproved = false;
+        bool skillRequestAlreadyLoaded = false;
         string skillRequestRejection = "";
         if (!selfRepeat && skillRequest != null)
         {
-            autonomousSkillApproved = TryApproveAutonomousSkillRequest(
+            SkillRequestDisposition disposition = ResolveAutonomousSkillRequest(
                 skillRequest, out skillRequestRejection);
-            if (!autonomousSkillApproved && m_LogAgentLoop)
+            autonomousSkillApproved = disposition == SkillRequestDisposition.Granted;
+            skillRequestAlreadyLoaded = disposition == SkillRequestDisposition.AlreadyLoaded;
+            if (skillRequestAlreadyLoaded)
+            {
+                m_PendingSkillStatusFrame = $"\n[Skill {skillRequest.Name}=already_loaded；规则已加载，本次为幂等查询，未续期或新增授权。]";
+                if (m_LogAgentLoop) Debug.Log($"[LLM技能] {skillRequest.Name} already_loaded；幂等返回，不进入工具纠错。");
+            }
+            if (disposition == SkillRequestDisposition.Rejected && m_LogAgentLoop)
                 Debug.LogWarning($"[LLM技能] {skillRequest.Name} 自主申请未执行：" +
                                  skillRequestRejection);
-            if (!autonomousSkillApproved)
+            if (disposition == SkillRequestDisposition.Rejected)
             {
                 string requestCode = string.IsNullOrWhiteSpace(skillRequest.Name)
                     ? "missing_required_attributes"
@@ -5080,9 +5088,7 @@ public partial class ChatSample : MonoBehaviour
                     "skill_request",
                     requestCode,
                     skillRequestRejection,
-                    "这是真实用户轮，相关详细 Skill 规则已由路由器按语境加载；" +
-                    "不要重试 skill_request。直接按已加载规则回答或调用正确业务工具；" +
-                    "只读数据查询不需要开启有副作用的动作权限。");
+                    "申请没有改变权限或加载状态；根据实际已加载规则回答或询问用户，不要重复同一失败申请。");
             }
         }
         bool hadSingingAction = s_PracticeConfirmTagRegex.IsMatch(cleanFull) ||
@@ -5277,7 +5283,7 @@ public partial class ChatSample : MonoBehaviour
                 wantsContinue = true;
                 nextInSec = null;
             }
-            else if (skillRequest != null && wantsContinue &&
+            else if (skillRequest != null && !skillRequestAlreadyLoaded && wantsContinue &&
                 !m_ToolCorrectionContinuationPending)
             {
                 //拒绝的申请不能靠它自带的 <continue/> 绕过权限闸反复重试。
@@ -7489,49 +7495,50 @@ public partial class ChatSample : MonoBehaviour
         return true;
     }
 
-    private bool TryApproveAutonomousSkillRequest(
+    private enum SkillRequestDisposition { Rejected, AlreadyLoaded, Granted }
+
+    private SkillRequestDisposition ResolveAutonomousSkillRequest(
         AgentSkillRequest request, out string rejectionReason)
     {
         rejectionReason = "";
-        if (request == null) return false;
+        if (request == null) return SkillRequestDisposition.Rejected;
         SkillRouteDefinition definition = FindSkillDefinition(request.Name);
         if (definition == null)
         {
             rejectionReason = $"不存在 Skill '{request.Name}'";
-            return false;
+            return SkillRequestDisposition.Rejected;
         }
+        SkillRouteState state = GetSkillRouteState(definition.Name);
+        // This is a status query, not a new grant. Actual actions still pass
+        // CanExecuteSkillAction; no lifetime, cooldown or pending grant is changed.
+        if (state.ActiveThisRound && m_ActiveSkillsThisRound.Contains(definition.Name))
+            return SkillRequestDisposition.AlreadyLoaded;
         if (!m_AgentRunning || !definition.AllowsAutonomousRequest)
         {
             rejectionReason = "当前模式不允许角色自主申请该 Skill";
-            return false;
+            return SkillRequestDisposition.Rejected;
         }
-        SkillRouteState state = GetSkillRouteState(definition.Name);
         if (state.Access == SkillAccess.UserDisabled)
         {
             rejectionReason = "用户已明确禁用，角色不能自行恢复";
-            return false;
+            return SkillRequestDisposition.Rejected;
         }
         if (state.Access == SkillAccess.SoftSuppressed)
         {
             rejectionReason = "当前处于暂不主动使用状态";
-            return false;
-        }
-        if (state.ActiveThisRound)
-        {
-            rejectionReason = "详细 Skill 本轮已经加载，无需再次申请";
-            return false;
+            return SkillRequestDisposition.Rejected;
         }
         float elapsed = Time.realtimeSinceStartup - state.LastAutonomousGrantAt;
         if (elapsed < definition.AutonomousCooldownSeconds)
         {
             rejectionReason =
                 $"自主申请仍在冷却中（剩余约 {definition.AutonomousCooldownSeconds - elapsed:F0}s）";
-            return false;
+            return SkillRequestDisposition.Rejected;
         }
         if (!string.IsNullOrEmpty(m_PendingAutonomousSkillName))
         {
             rejectionReason = "已有另一个 Skill 申请等待进入下一轮";
-            return false;
+            return SkillRequestDisposition.Rejected;
         }
 
         state.LastAutonomousGrantAt = Time.realtimeSinceStartup;
@@ -7542,7 +7549,7 @@ public partial class ChatSample : MonoBehaviour
         if (m_LogAgentLoop)
             Debug.Log($"[LLM技能] {definition.Name} 自主申请获准：" +
                       m_PendingAutonomousSkillReason);
-        return true;
+        return SkillRequestDisposition.Granted;
     }
 
     private void PrepareActiveSkillsForRound(string freshUserText, string triggerReason)

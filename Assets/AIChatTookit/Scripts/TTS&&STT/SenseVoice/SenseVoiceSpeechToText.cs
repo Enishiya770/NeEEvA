@@ -356,6 +356,7 @@ public partial class SenseVoiceSpeechToText : STT
         // One identity from quarantine through confirmation/revision. Never derived
         // from list position, candidate number, or the latest-audio cache.
         public string ClipRef = "clip:" + Guid.NewGuid().ToString("N");
+        public string FullClipRef;
         public SingingEvidenceSnapshot RecordingEvidence;
         public SingingEvidenceSnapshot LatestRecordingEvidence;
         public int RecordingSequence;
@@ -671,6 +672,9 @@ public partial class SenseVoiceSpeechToText : STT
     //即使旋律岛不足 3 秒或离线标签为 speech，语义/声学冲突仍能进入 quarantine。
     private sealed class SingingEvidenceSnapshot
     {
+        public string RecordingId = Guid.NewGuid().ToString("N");
+        public string AcousticMode = "unavailable";
+        public string AudioEvent = "";
         public float TimelineOriginSeconds;
         public int CaptureSessionSerial;
         public byte[] RawWavBytes;
@@ -720,6 +724,9 @@ public partial class SenseVoiceSpeechToText : STT
         return new SingingEvidenceSnapshot
         {
             CaptureSessionSerial = source.CaptureSessionSerial,
+            RecordingId = source.RecordingId,
+            AcousticMode = source.AcousticMode,
+            AudioEvent = source.AudioEvent,
             TimelineOriginSeconds = source.TimelineOriginSeconds,
             RawWavBytes = source.RawWavBytes == null
                 ? null : (byte[])source.RawWavBytes.Clone(),
@@ -1077,6 +1084,8 @@ public partial class SenseVoiceSpeechToText : STT
             RecoveryStartSeconds = Mathf.Max(0f, recoveryStartSeconds),
             RecoveryEndSeconds = Mathf.Max(0f, recoveryEndSeconds),
             SingingProbability = LastSingingProbability,
+            AcousticMode = LastAcousticMode,
+            AudioEvent = LastEvent,
             PitchStability = LastPitchStability,
             MelodicIslandSeconds = LastSingingIslandSeconds,
             ContentSeconds = LastSingingContentSeconds,
@@ -3914,10 +3923,11 @@ public partial class SenseVoiceSpeechToText : STT
         var list = new List<PracticePhraseInfo>(m_PracticePhrases.Count);
         for (int i = 0; i < m_PracticePhrases.Count; i++)
         {
+            EnsureRecordingSequence(m_PracticePhrases[i]);
             list.Add(new PracticePhraseInfo
             {
                 ClipRef = m_PracticePhrases[i].ClipRef,
-                RecordingSequence = EnsureRecordingSequence(m_PracticePhrases[i]),
+                RecordingSequence = m_PracticePhrases[i].RecordingSequence,
                 RecordingTranscript = m_PracticePhrases[i].RecordingEvidence?.Text ?? "",
                 RawSeconds = m_PracticePhrases[i].RecordingEvidence?.RawSeconds ?? 0f,
                 CleanStartSeconds = m_PracticePhrases[i].RecordingEvidence?.CleanStartSeconds ?? 0f,
@@ -4468,8 +4478,13 @@ public partial class SenseVoiceSpeechToText : STT
             return false;
 
         int signature = ComputePracticeSignature(wavBytes, timeline);
+        int captureSerial = m_LastSingingCacheEvidence != null
+            ? m_LastSingingCacheEvidence.CaptureSessionSerial : m_LastSingingCacheCaptureSessionSerial;
+        if (captureSerial > 0 && m_RejectedQuarantineSessionSerials.Contains(captureSerial))
+            return false;
         if (signature == m_LastCommittedPracticeSignature &&
-            Time.realtimeSinceStartup - m_LastPracticeCommitTime < 8f)
+            Time.realtimeSinceStartup - m_LastPracticeCommitTime < 8f &&
+            (captureSerial <= 0 || m_PracticePhrases.Exists(p => p.CaptureSessionSerial == captureSerial)))
             return false;
 
         //本轮回忆的首选候选：只在够像时才当身份线索用。相似度分不开不同的歌
@@ -4591,17 +4606,16 @@ public partial class SenseVoiceSpeechToText : STT
                 ? cachedEvidence.CleanLeadInEvidenceProbability
                 : m_LastCleanLeadInEvidenceProbability,
         };
-        var priorCandidate = m_QuarantinedSingingCandidates.Find(c =>
-            (phrase.CaptureSessionSerial > 0 && c.Phrase.CaptureSessionSerial == phrase.CaptureSessionSerial) ||
-            (phrase.AtRealtime > 0f && c.Phrase.AtRealtime == phrase.AtRealtime));
+        var priorCandidate = m_QuarantinedSingingCandidates.Find(c => SameRecordingIdentity(c.Phrase, phrase));
         if (priorCandidate != null)
         {
             phrase.ClipRef = priorCandidate.Phrase.ClipRef;
+            phrase.FullClipRef = priorCandidate.Phrase.FullClipRef;
             phrase.RecordingSequence = EnsureRecordingSequence(priorCandidate.Phrase);
             RetainRecordingEvidence(phrase, priorCandidate.Phrase.LatestRecordingEvidence);
         }
         phraseCount = StorePracticeCapture(phrase);
-        RemoveQuarantinedCandidateCapturedAt(phrase.AtRealtime);
+        RemoveQuarantinedCandidateForRecording(phrase);
         m_LastCommittedPracticeSignature = signature;
         m_LastPracticeCommitTime = Time.realtimeSinceStartup;
         float recoverySeconds = m_LastSingingRecoveryAudioBytes != null
@@ -4622,17 +4636,17 @@ public partial class SenseVoiceSpeechToText : STT
         EnsureRecordingSequence(phrase);
         RetainRecordingEvidence(phrase, phrase.RecordingEvidence);
         RetainRecordingEvidence(phrase, m_LastSingingEvidence);
-        // A resumed, unheard capture is the same recording with more samples,
-        // not a second performance. Keep its identity if an early result was stored.
+        // Time is display metadata, never an identity or a speaker decision.
         for (int i = 0; i < m_PracticePhrases.Count; i++)
         {
-            if (phrase.AtRealtime <= 0f || m_PracticePhrases[i].AtRealtime != phrase.AtRealtime) continue;
+            if (!SameRecordingIdentity(m_PracticePhrases[i], phrase)) continue;
+            if (m_PracticePhrases[i].ClipRef != phrase.ClipRef)
+                throw new InvalidOperationException("同一录音的公开引用发生冲突；未替换已有素材。");
             phrase.StableId = m_PracticePhrases[i].StableId;
-            phrase.ClipRef = m_PracticePhrases[i].ClipRef;
             phrase.RecordingSequence = EnsureRecordingSequence(m_PracticePhrases[i]);
             RetainRecordingEvidence(phrase, m_PracticePhrases[i].LatestRecordingEvidence);
             m_PracticePhrases[i] = phrase;
-            Debug.Log($"[SenseVoice/Practice] 续音更新同一录音 practice={i + 1} stable_id={phrase.StableId}");
+            Debug.Log($"[SenseVoice/Practice] 同身份版本更新 ref={phrase.ClipRef} practice={i + 1} stable_id={phrase.StableId}");
             return i + 1;
         }
         if (m_PracticePhrases.Count >= MaxPracticePhraseCount)
@@ -4700,10 +4714,7 @@ public partial class SenseVoiceSpeechToText : STT
         // Follow-up text/ticks cannot resurrect an explicitly dropped clip from
         // the still-current raw snapshot. Only a new recording resets publication.
         m_CurrentRecordingEvidencePublished = true;
-        bool SameCapture(PracticePhrase p) => p != null &&
-            (evidence.CaptureSessionSerial > 0
-                ? p.CaptureSessionSerial == evidence.CaptureSessionSerial
-                : Mathf.Abs(p.AtRealtime - evidence.AtRealtime) < .001f);
+        bool SameCapture(PracticePhrase p) => SameRecording(p, evidence);
         if (m_PracticePhrases.Any(SameCapture) ||
             m_QuarantinedSingingCandidates.Any(c => SameCapture(c.Phrase)))
             return false;
@@ -4806,9 +4817,7 @@ public partial class SenseVoiceSpeechToText : STT
         {
             QuarantinedSingingCandidate existing = m_QuarantinedSingingCandidates[i];
             if (existing.Phrase == null) continue;
-            bool sameRecording = captureSessionSerial > 0 &&
-                existing.Phrase.CaptureSessionSerial == captureSessionSerial;
-            if (!sameRecording && (captureSessionSerial > 0 || existing.Phrase.Signature != signature)) continue;
+            if (!SameRecording(existing.Phrase, evidence)) continue;
             candidateId = existing.CandidateId;
             seconds = existing.Phrase.Seconds;
             if (ownsCurrentPlaybackAlias)
@@ -4994,6 +5003,10 @@ public partial class SenseVoiceSpeechToText : STT
             RawSeconds = duration, CleanStartSeconds = start, CleanEndSeconds = end,
             RecoveryStartSeconds = recoveryStart, RecoveryEndSeconds = recoveryEnd,
             SingingProbability = response.singing_probability, PitchStability = response.pitch_stability,
+            AcousticMode = !response.singing_analysis_available ? "unavailable" :
+                IsAcousticProbabilityUncertain(response.singing_probability) ? "uncertain" :
+                response.is_singing ? "singing" : "speech",
+            AudioEvent = response.audio_event ?? "",
             MelodicIslandSeconds = end - start, ContentSeconds = duration - response.audio_content_start_seconds,
             HeadExtraSeconds = Mathf.Max(0f, response.singing_head_extra_end_seconds - response.singing_head_extra_start_seconds),
             TailExtraSeconds = Mathf.Max(0f, response.singing_tail_extra_end_seconds - response.singing_tail_extra_start_seconds),
@@ -5035,10 +5048,11 @@ public partial class SenseVoiceSpeechToText : STT
         {
             QuarantinedSingingCandidate item = m_QuarantinedSingingCandidates[i];
             if (item == null || item.Phrase == null) continue;
+            EnsureRecordingSequence(item.Phrase);
             list.Add(new QuarantinedSingingCandidateInfo
             {
                 ClipRef = item.Phrase.ClipRef,
-                RecordingSequence = EnsureRecordingSequence(item.Phrase),
+                RecordingSequence = item.Phrase.RecordingSequence,
                 CurrentCapture = item.PlaybackStatus == "ready" ? item.Phrase.ActiveCapture : "unselected",
                 CurrentStartSeconds = (item.Phrase.ActiveCapture == "expanded"
                     ? item.Evidence?.RecoveryStartSeconds ?? 0f : item.Evidence?.CleanStartSeconds ?? 0f) + item.Phrase.ActiveTrimHeadSeconds,
@@ -5139,9 +5153,9 @@ public partial class SenseVoiceSpeechToText : STT
         candidateId = 0;
         if (string.IsNullOrWhiteSpace(clipRef)) return false;
         clipRef = clipRef.Trim();
-        var phrase = m_PracticePhrases.Find(p => p.ClipRef == clipRef);
+        var phrase = m_PracticePhrases.Find(p => MatchesClipReference(p, clipRef));
         if (phrase != null) { stableId = phrase.StableId; return true; }
-        var candidate = m_QuarantinedSingingCandidates.Find(c => c.Phrase.ClipRef == clipRef);
+        var candidate = m_QuarantinedSingingCandidates.Find(c => MatchesClipReference(c.Phrase, clipRef));
         if (candidate == null) return false;
         candidateId = candidate.CandidateId;
         return true;
@@ -5150,7 +5164,7 @@ public partial class SenseVoiceSpeechToText : STT
     // Called only after action authorization. Source assertions come from the
     // model, not keywords in user text. A failed request never substitutes audio.
     public bool TryPrepareSingingClip(string clipRef, bool confirmUser, string range,
-        out int stableId, out string failure)
+        out int stableId, out string failure, bool excludeSpeech = false)
     {
         failure = "";
         if (!TryResolveSingingClip(clipRef, out stableId, out int candidateId))
@@ -5163,15 +5177,12 @@ public partial class SenseVoiceSpeechToText : STT
             var candidate = m_QuarantinedSingingCandidates.Find(c => c.CandidateId == candidateId);
             if (candidate.PlaybackStatus != "ready" && range == "current")
             { failure = $"{clipRef} 原始录音仍在，但当前没有可播放版本。请根据边界证据选择 range=\"clean\" 或 \"expanded\"，也可询问；来源确认不是播放成功。"; return false; }
-            if (range != "current" && !PrepareQuarantinedCaptureForConfirmation(
-                    candidateId, range, 0f, 0f, out failure)) return false;
-            if (!AdmitSelectedSingingCandidate(candidateId, confirmUser, out _, out _) ||
-                !TryResolveSingingClip(clipRef, out stableId, out _) || stableId <= 0)
-            { failure = $"{clipRef} 所选音频仍不可播放；未选择其它素材。"; return false; }
+            return TryPrepareAndAdmitSingingClip(candidate, range, 0f, 0f,
+                confirmUser, excludeSpeech, out stableId, out failure);
         }
         else if (range != "current")
         {
-            if (!TryRevisePracticePhrase(stableId, range, 0f, 0f, false, out _, out failure, 1f))
+            if (!TryRevisePracticePhrase(stableId, range, 0f, 0f, excludeSpeech, out _, out failure, 1f))
                 return false;
         }
         if (confirmUser) ConfirmSingingClipSource(clipRef, out _);
@@ -5197,12 +5208,8 @@ public partial class SenseVoiceSpeechToText : STT
         float tail = evidence.RecoveryEndSeconds - endSeconds;
         if (record != null)
         {
-            if (!PrepareQuarantinedCaptureForConfirmation(candidateId, "expanded", head, tail, out failure)) return false;
-            if (!AdmitSelectedSingingCandidate(candidateId, confirmUser, out _, out _) ||
-                !TryResolveSingingClip(clipRef, out stableId, out _) || stableId <= 0)
-            { failure = "范围准备后仍不可播放。"; return false; }
-            // The regular execution validator still checks speech-boundary conflicts.
-            return true;
+            return TryPrepareAndAdmitSingingClip(record, "expanded", head, tail,
+                confirmUser, excludeSpeech, out stableId, out failure);
         }
         bool revised = TryRevisePracticePhrase(stableId, "expanded", head, tail, excludeSpeech,
             out _, out failure, 1f);
@@ -5261,7 +5268,7 @@ public partial class SenseVoiceSpeechToText : STT
     }
 
     private bool AdmitSelectedSingingCandidate(int candidateId, bool confirmSource,
-        out int phraseIndex, out string playbackStatus)
+        out int phraseIndex, out string playbackStatus, PracticePhrase prepared = null)
     {
         phraseIndex = 0;
         playbackStatus = "unavailable";
@@ -5285,20 +5292,22 @@ public partial class SenseVoiceSpeechToText : STT
         if (candidateIndex < 0) return false;
 
         QuarantinedSingingCandidate record = m_QuarantinedSingingCandidates[candidateIndex];
-        PracticePhrase candidate = record.Phrase;
-        if (confirmSource && !record.SourceConfirmed)
-        {
-            record.SourceConfirmed = true;
-            candidate.ConfirmedAtRealtime = Time.realtimeSinceStartup;
-        }
-        candidate.PendingConfirmation = !record.SourceConfirmed;
+        PracticePhrase candidate = (prepared ?? record.Phrase).CopyForRevision();
+        if (!SameRecordingIdentity(candidate, record.Phrase) || candidate.ClipRef != record.Phrase.ClipRef ||
+            m_PracticePhrases.Exists(p => SameRecordingIdentity(p, candidate) && p.ClipRef != candidate.ClipRef))
+        { playbackStatus = "identity_conflict"; return false; }
+        bool sourceConfirmed = record.SourceConfirmed || confirmSource;
+        if (confirmSource && !record.SourceConfirmed) candidate.ConfirmedAtRealtime = Time.realtimeSinceStartup;
+        candidate.PendingConfirmation = !sourceConfirmed;
         candidate.OriginCandidateId = record.CandidateId;
-        playbackStatus = string.IsNullOrWhiteSpace(record.PlaybackStatus)
+        playbackStatus = prepared != null ? "ready" : string.IsNullOrWhiteSpace(record.PlaybackStatus)
             ? "unavailable" : record.PlaybackStatus;
         if (playbackStatus != "ready" || candidate.WavBytes == null ||
             candidate.WavBytes.Length <= 44 ||
             !HasPlayablePitchTimeline(candidate.MidiTimeline))
         {
+            record.SourceConfirmed = sourceConfirmed;
+            record.Phrase = candidate;
             Debug.Log($"[SenseVoice/Quarantine] candidate={candidateId} " +
                       $"source={(record.SourceConfirmed ? "confirmed_user" : "pending")} playback={playbackStatus}，" +
                       "原始证据继续保留，未写入可播放练唱清单");
@@ -5310,7 +5319,7 @@ public partial class SenseVoiceSpeechToText : STT
         m_LastCommittedPracticeSignature = candidate.Signature;
         m_LastPracticeCommitTime = Time.realtimeSinceStartup;
         m_QuarantinedSingingCandidates.RemoveAt(candidateIndex);
-        Debug.Log($"[SenseVoice/Quarantine] LLM 选用 candidate={candidateId}，source={(record.SourceConfirmed ? "confirmed_user" : "pending")}；" +
+        Debug.Log($"[SenseVoice/Quarantine] LLM 选用 candidate={candidateId}，source={(sourceConfirmed ? "confirmed_user" : "pending")}；" +
                   $"已提交 practice={phraseIndex}，剩余候选=" +
                   m_QuarantinedSingingCandidates.Count);
         return true;
@@ -5357,12 +5366,12 @@ public partial class SenseVoiceSpeechToText : STT
         return -1;
     }
 
-    private void RemoveQuarantinedCandidateCapturedAt(float capturedAt)
+    private void RemoveQuarantinedCandidateForRecording(PracticePhrase selected)
     {
         for (int i = m_QuarantinedSingingCandidates.Count - 1; i >= 0; i--)
         {
             PracticePhrase phrase = m_QuarantinedSingingCandidates[i].Phrase;
-            if (phrase != null && phrase.AtRealtime == capturedAt)
+            if (SameRecordingIdentity(phrase, selected))
                 m_QuarantinedSingingCandidates.RemoveAt(i);
         }
     }
@@ -5431,7 +5440,10 @@ public partial class SenseVoiceSpeechToText : STT
                   $" {phrase.Seconds:F1}s";
         m_PracticePhrases.RemoveAt(index1Based - 1);
         remaining = m_PracticePhrases.Count;
-        //删掉之后同一段音频要允许重新收进来，否则用户"撤回再唱一次"会被去重挡住。
+        // A late analysis of this deleted capture must not recreate its clip.
+        // A genuinely new recording has a new session and remains admissible.
+        if (phrase.CaptureSessionSerial > 0)
+            m_RejectedQuarantineSessionSerials.Add(phrase.CaptureSessionSerial);
         m_LastCommittedPracticeSignature = 0;
         Debug.Log($"[SenseVoice/Practice] 已去掉第 {index1Based} 段 {dropped}；" +
                   $"剩余 {remaining} 段，段号已前移");

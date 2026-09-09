@@ -20,6 +20,7 @@ public partial class SenseVoiceSpeechToText
     {
         if (phrase.RecordingSequence <= 0)
             phrase.RecordingSequence = ReserveRecordingSequence(phrase.CaptureSessionSerial);
+        EnsureClipIdentity(phrase);
         return phrase.RecordingSequence;
     }
 
@@ -28,7 +29,8 @@ public partial class SenseVoiceSpeechToText
         return phrase != null && evidence != null &&
             (evidence.CaptureSessionSerial > 0
                 ? phrase.CaptureSessionSerial == evidence.CaptureSessionSerial
-                : phrase.CaptureSessionSerial <= 0 && Mathf.Abs(phrase.AtRealtime - evidence.AtRealtime) < .001f);
+                : phrase.CaptureSessionSerial <= 0 && phrase.RecordingEvidence != null &&
+                  phrase.RecordingEvidence.RecordingId == evidence.RecordingId);
     }
 
     private static void RetainRecordingEvidence(PracticePhrase phrase, SingingEvidenceSnapshot evidence)
@@ -50,6 +52,7 @@ public partial class SenseVoiceSpeechToText
         if (ReferenceEquals(a, b)) return true;
         if (a == null || b == null) return false;
         return a.TimelineOriginSeconds == b.TimelineOriginSeconds &&
+            a.AcousticMode == b.AcousticMode && a.AudioEvent == b.AudioEvent &&
             a.CaptureSessionSerial == b.CaptureSessionSerial &&
             a.FrameSeconds == b.FrameSeconds &&
             a.Text == b.Text &&
@@ -105,8 +108,7 @@ public partial class SenseVoiceSpeechToText
     // uses this evidence; merely receiving a final ASR result never revises playback.
     public string DescribeLatestSingingRecordingEvidence(string clipRef)
     {
-        var phrase = m_PracticePhrases.Find(p => p.ClipRef == clipRef) ??
-            m_QuarantinedSingingCandidates.Find(c => c.Phrase.ClipRef == clipRef)?.Phrase;
+        var phrase = FindSingingClip(clipRef);
         var e = phrase?.LatestRecordingEvidence;
         if (e == null || ReferenceEquals(e, phrase.RecordingEvidence)) return "";
         string Text(string value) => (value ?? "").Replace("\r", " ").Replace("\n", " ");
@@ -115,7 +117,7 @@ public partial class SenseVoiceSpeechToText
                 $"raw_window=[{e.RecoveryStartSeconds + s.expanded_start_seconds:F2}," +
                 $"{e.RecoveryStartSeconds + s.expanded_end_seconds:F2}] type={s.type}")) + "]";
         return
-            $"[Sing/LatestRecording] ref={clipRef} current_audio={phrase.Seconds:F2}s raw={e.RawSeconds:F2}s " +
+            $"[Sing/LatestRecording] ref={phrase.ClipRef} current_audio={phrase.Seconds:F2}s raw={e.RawSeconds:F2}s " +
             $"clean=[{e.CleanStartSeconds:F2},{e.CleanEndSeconds:F2}] expanded=[{e.RecoveryStartSeconds:F2},{e.RecoveryEndSeconds:F2}] " +
             $"pitch_timeline={(HasPlayablePitchTimeline(e.PitchTimelineMidi) ? "available" : "unavailable")} acoustic_p={e.SingingProbability:F3} " +
             $"transcript=\"{Text(e.Text)}\" singing_transcript=\"{Text(e.SingingText)}\" " +
@@ -156,14 +158,46 @@ public partial class SenseVoiceSpeechToText
     {
         // The existing validator is synchronous and side-effect-free. Scope its
         // view to the staged version, restoring the real list even on failure.
-        var original = m_PracticePhrases[index];
+        bool stagedNew = index == m_PracticePhrases.Count;
+        var original = stagedNew ? null : m_PracticePhrases[index];
         try
         {
-            m_PracticePhrases[index] = prepared;
+            if (stagedNew) m_PracticePhrases.Add(prepared);
+            else m_PracticePhrases[index] = prepared;
             return TryValidatePracticeBoundarySelection("stable:" + prepared.StableId,
                 false, 0f, 0f, excludeSpeech, out failure);
         }
-        finally { m_PracticePhrases[index] = original; }
+        finally
+        {
+            if (stagedNew) m_PracticePhrases.RemoveAt(index);
+            else m_PracticePhrases[index] = original;
+        }
+    }
+
+    private bool TryPrepareAndAdmitSingingClip(QuarantinedSingingCandidate record,
+        string capture, float head, float tail, bool confirmSource, bool excludeSpeech,
+        out int stableId, out string failure)
+    {
+        stableId = 0;
+        failure = "";
+        var prepared = record.Phrase.CopyForRevision();
+        if (capture != "current" && !TryPrepareEvidenceRange(record.Phrase,
+                record.Phrase.LatestRecordingEvidence ?? record.Evidence, capture, head, tail,
+                out prepared, out failure)) return false;
+        if (!HasUsableWavPayload(prepared.WavBytes) || !HasPlayablePitchTimeline(prepared.MidiTimeline))
+        { failure = "所选音频仍不可播放；原候选和来源状态未改动。"; return false; }
+        // Validate a staged copy before committing or removing the candidate.
+        // This temporary stable ID is private to the synchronous validator.
+        prepared.StableId = m_NextPracticePhraseStableId + 1;
+        if (!ValidatePreparedEvidenceRange(m_PracticePhrases.Count, prepared, excludeSpeech, out failure))
+            return false;
+        prepared.StableId = record.Phrase.StableId;
+        if (!AdmitSelectedSingingCandidate(record.CandidateId, confirmSource, out int index,
+                out string status, prepared) || status != "ready")
+        { failure = "所选音频提交失败（" + status + "）；原候选保留，未改选其它素材。"; return false; }
+        stableId = m_PracticePhrases[index - 1].StableId;
+        Debug.Log($"[Sing/Prepare] ref={prepared.ClipRef} stable_id={stableId} range={capture} audio={prepared.Seconds:F2}s；身份与范围校验后提交，尚未播放");
+        return true;
     }
 
     private static bool TryPrepareEvidenceRange(PracticePhrase original, SingingEvidenceSnapshot evidence,

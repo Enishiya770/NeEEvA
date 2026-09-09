@@ -271,6 +271,7 @@ public class RTSpeechHandler : MonoBehaviour
     private readonly List<float[]> m_UnheardCapture = new List<float[]>();
     private float m_UnheardCaptureClosedAt = -1f, m_RecordingCapturedAt;
     private float m_UnheardCapturedAt;
+    private int m_UnheardCaptureSessionSerial;
     private int m_UnheardEndPos, m_UnheardFrames, m_UnheardChannels, m_UnheardFrequency, m_UnheardVoiceRevision;
     private AudioClip m_UnheardMic;
     private int m_RecordingCaptureLastPos = -1;
@@ -1650,7 +1651,12 @@ public class RTSpeechHandler : MonoBehaviour
         PrintLog(m_LikelySinging ? "正在倾听演唱..." : "正在录制对话...");
 
         if (m_NeuralVadClient != null)
+        {
             m_NeuralVadClient.BeginLiveRecordingCandidateSession();
+            if (resumeCapture)
+                m_NeuralVadClient.SetInputCaptureOverlap(m_UnheardCaptureSessionSerial,
+                    m_UnheardFrames / (float)Mathf.Max(1, m_UnheardFrequency));
+        }
 
         //用户主动开口——通知 agent loop：撤销待 tick、清零连续 AI 轮次计数。
         //即将到来的用户文本会自动触发新一轮 LLM 调用(走 SendData → PrepareUserTurn → StartStreaming)。
@@ -1816,6 +1822,7 @@ public class RTSpeechHandler : MonoBehaviour
         m_UnheardCapture.AddRange(m_RecordingPcmChunks);
         m_UnheardCaptureClosedAt = Time.realtimeSinceStartup;
         m_UnheardCapturedAt = m_RecordingCapturedAt;
+        m_UnheardCaptureSessionSerial = m_NeuralVadClient != null ? m_NeuralVadClient.InputCaptureSessionSerial : 0;
         m_UnheardEndPos = endPos;
         m_UnheardFrames = m_RecordingCapturedFrames;
         m_UnheardChannels = m_RecordingCaptureChannels;

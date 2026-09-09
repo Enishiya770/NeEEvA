@@ -21,9 +21,14 @@ library item. These interfaces do not authorize automatic deletion.
 <sing refs="song:123456abcdef" lyrics="selected stored passage"/>
 ```
 
-Examples contain placeholders, not usable references. Clip IDs are opaque GUIDs,
-created when a retained recording becomes a candidate/phrase. Confirmation and
-revision keep the same ID; a same-recording continuation preserves it too.
+Examples contain placeholders, not usable references. Model-facing clips use
+opaque short handles (`clip:<session namespace>-<serial>`); full GUID identities
+remain internal and accepted as exact legacy aliases by the same resolver.
+Confirmation, revision and preview/final versions of one capture keep its handle.
+Every new capture gets a separate identity, even when ASR prepends unheard audio
+from an earlier capture. Timestamps, lyrics and lack of a reply never merge clips
+or infer a continuous speaker. Summaries expose that shared prefix in raw seconds
+with its earlier ref and `speaker_continuity=unknown`, so the model can decide or ask.
 They are session material IDs, not a new on-disk song-library database. Library
 IDs remain separate, and saving does not change the in-session clip identity.
 
@@ -72,6 +77,21 @@ but new prompting uses sing/clip calls. Error codes are not tool names.
   latency; these require a fresh live test.
 
 ## Regression coverage
+
+### 2026-09-09: independent captures and idempotent skill requests
+
+- Timestamp collisions no longer replace or clean up another recording. Candidate
+  range preparation validates a staged copy before admission/removal; failed
+  preparation preserves audio, identity and source state.
+- All clip tools resolve short handles and exact legacy GUID aliases, without
+  fuzzy matching. Removed aliases do not resolve or get reused; late results
+  from a deleted capture cannot recreate it, while a new capture is admissible.
+- Inventory supplies whole-recording transcript, acoustic mode/probability and
+  ASR event independently of source confirmation and playback readiness. A ready
+  speech recording is not described as established singing.
+- Requesting an already-loaded Skill is a normal idempotent status result. It
+  does not enter tool correction, renew lifetime/cooldown, grant action permission
+  or force a continuation. Missing/denied requests still report real failures.
 
 ### 2026-09-08: speech channels, per-clip pitch and boundary facts
 

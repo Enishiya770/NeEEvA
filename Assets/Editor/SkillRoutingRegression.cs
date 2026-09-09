@@ -50,6 +50,8 @@ public static partial class SkillRoutingRegression
         RunTimeOrderedTranscriptRegression();
         RunCompletedCaptureArchiveRegression();
         RunRecordingEvidenceRetentionRegression();
+        RunIndependentClipIdentityRegression();
+        RunLoadedSkillRequestRegression();
         RunShortMixedRecordingAdmissionRegression();
         RunRoleOutputChannelsRegression();
         RunPlainSpeechPromptRegression();
@@ -1362,13 +1364,15 @@ public static partial class SkillRoutingRegression
             MethodInfo store = senseType.GetMethod("StorePracticeCapture", flags);
             float currentCapture = Mathf.Max(.001f, Time.realtimeSinceStartup);
             var first = NewPhrase(currentCapture);
+            phraseType.GetField("CaptureSessionSerial").SetValue(first, 1);
             store.Invoke(sense, new[] { first });
             var continued = NewPhrase(currentCapture);
+            phraseType.GetField("CaptureSessionSerial").SetValue(continued, 1);
             int index = (int)store.Invoke(sense, new[] { continued });
             var phrases = (System.Collections.IList)senseType.GetField("m_PracticePhrases", flags).GetValue(sense);
             if (index != 1 || phrases.Count != 1 ||
                 (int)phraseType.GetField("StableId").GetValue(first) != (int)phraseType.GetField("StableId").GetValue(continued))
-                throw new InvalidOperationException("A resumed capture is being stored as two performances.");
+                throw new InvalidOperationException("Preview/final evidence of the same capture duplicated a clip.");
 
             Type candidateType = senseType.GetNestedType(
                 "QuarantinedSingingCandidate", BindingFlags.NonPublic);
@@ -1413,10 +1417,14 @@ public static partial class SkillRoutingRegression
                     "Same-turn semantic confirmation cannot see every newly isolated performance.");
 
             object olderCandidate = candidateType.GetField("Phrase").GetValue(candidates[1]);
-            if (!sense.ConfirmQuarantinedSingingCandidate(7, out int confirmedIndex) || confirmedIndex != 2 ||
-                (float)phraseType.GetField("AtRealtime").GetValue(olderCandidate) != olderCapturedAt ||
-                (float)phraseType.GetField("ConfirmedAtRealtime").GetValue(olderCandidate) < olderCapturedAt + 9f ||
-                (int)phraseType.GetField("OriginCandidateId").GetValue(olderCandidate) != 7)
+            if (!sense.ConfirmQuarantinedSingingCandidate(7, out int confirmedIndex) || confirmedIndex != 2)
+                throw new InvalidOperationException("Candidate confirmation failed.");
+            // Admission commits a validated copy rather than mutating a snapshot held by callers.
+            object admitted = phrases[confirmedIndex - 1];
+            if ((float)phraseType.GetField("AtRealtime").GetValue(admitted) != olderCapturedAt ||
+                (float)phraseType.GetField("ConfirmedAtRealtime").GetValue(admitted) < olderCapturedAt + 9f ||
+                (int)phraseType.GetField("OriginCandidateId").GetValue(admitted) != 7 ||
+                (string)phraseType.GetField("ClipRef").GetValue(admitted) != (string)phraseType.GetField("ClipRef").GetValue(olderCandidate))
                 throw new InvalidOperationException(
                     "Candidate confirmation loses its stable identity or original capture time.");
             described = sense.DescribeQuarantinedSingingCandidates();
@@ -1439,6 +1447,7 @@ public static partial class SkillRoutingRegression
             if (!sense.ConfirmQuarantinedSingingCandidate(8, out int newerIndex) || newerIndex != 2)
                 throw new InvalidOperationException(
                     "A later unresolved candidate cannot be confirmed after an earlier one expires.");
+            newerCandidatePhrase = phrases[newerIndex - 1];
             if (!sense.TryResolveConfirmedSingingCandidate(
                     8, out int confirmedStableId, out int resolvedIndex) ||
                 confirmedStableId <= 0 || resolvedIndex != newerIndex ||

@@ -44,13 +44,15 @@ public partial class ChatSample
             .OrderBy(p => p.RecordingSequence).ToList();
         var sb = new StringBuilder();
         sb.AppendLine($"\n[Sing/Inventory] retained={rows.Count} confirmed_list={rows.Count(p => p.Source == "confirmed_user")} pending_list={rows.Count(p => p.Source == "pending")}；以下按录音先后并列，不是播放顺序。来源待确认不等于没有录到。");
-        sb.AppendLine("最近留存的用户歌唱证据=" + (rows.LastOrDefault()?.ClipRef ?? "none") + "；只是录音时间事实，不替你选择或确认来源。");
+        sb.AppendLine("最近留存的录音证据=" + (rows.LastOrDefault()?.ClipRef ?? "none") + "；只是录音时间事实，不替你选择或确认来源。");
+        sb.AppendLine("playback=ready仅表示音频可执行，不是歌唱判定；结合整段转写、声学证据和语境选择或询问。shared_prefix表示联合识别复用了前段音频，不是又唱了一次，也不证明是同一说话人。");
         sb.AppendLine("录音先后（早→晚；不是角色播放顺序）见下列 recording 编号；不是练唱清单编号。");
         for (int i = 0; i < rows.Count; i++)
         {
             var p = rows[i];
             string lyric = TruncateForFrame(p.Lyrics, 64).Replace('\n', ' ').Replace('\r', ' ');
-            sb.AppendLine($"[Sing/Clip] recording={p.RecordingSequence} ref={p.ClipRef} source={p.Source} playback={p.Playback} audio={p.Seconds:F2}s lyrics={lyric}");
+            sb.AppendLine($"[Sing/Clip] recording={p.RecordingSequence} ref={p.ClipRef} source={p.Source} playback={p.Playback} audio={p.Seconds:F2}s lyrics={lyric}" +
+                sense.DescribeSingingClipObservation(p.ClipRef));
             string latest = sense.DescribeLatestSingingRecordingEvidence(p.ClipRef);
             if (!string.IsNullOrEmpty(latest)) sb.AppendLine(latest);
         }
@@ -131,6 +133,7 @@ public partial class ChatSample
                 RecordPracticeEditFailureForLlm("clip_drop 存在未知 ref，整批未删除。", "unknown_clip", "重新查看清单，不猜编号。", "clip_drop");
                 return;
             }
+            clip = sense.CanonicalSingingClipReference(clip);
             if (!clips.Contains(clip)) clips.Add(clip);
         }
         foreach (string clip in clips)
@@ -162,6 +165,7 @@ public partial class ChatSample
                 RecordPracticeEditFailureForLlm("clip_confirm 的 ref 不存在；没有改用同号候选或旧素材。", "unknown_clip", "复制素材清单的具体 ref，或询问用户。");
                 return;
             }
+            clip = sense.CanonicalSingingClipReference(clip);
             string range = ReadToolAttribute(attrs, "range");
             int oldRevision = sense.DescribePracticePhrases().Find(p => p.StableId == stable)?.Revision ?? -1;
             string failure = "";
@@ -256,6 +260,8 @@ public partial class ChatSample
                         "当前真实录音引用=" + available + "；存在不等于已确认或可播放，请结合素材状态选范围，也可询问。");
                 return false;
             }
+        refs = refs.Select(sense.CanonicalSingingClipReference).ToArray();
+        request.ClipRefs = string.Join(",", refs);
         if (refs.Length > 1 && !float.IsNaN(request.StartSeconds))
         { failure = "单组 start_seconds/end_seconds 只能指定一个 clip 的原录音坐标；本次多 refs 尚未准备或播放。" +
                 "可逐段 clip_revise 后 sing 当前版本；统一 range=clean/expanded 可直接用于多 refs。"; return false; }
@@ -271,7 +277,7 @@ public partial class ChatSample
             bool ready = !float.IsNaN(request.StartSeconds)
                 ? sense.TrySelectSingingClipWindow(clip, request.ConfirmUser, request.StartSeconds,
                     request.EndSeconds, request.ExcludeSpeech, out stableId, out failure)
-                : sense.TryPrepareSingingClip(clip, request.ConfirmUser, request.Range, out stableId, out failure);
+                : sense.TryPrepareSingingClip(clip, request.ConfirmUser, request.Range, out stableId, out failure, request.ExcludeSpeech);
             if (!ready)
             {
                 failure = $"{clip} range={request.Range} 准备失败：" + failure;
