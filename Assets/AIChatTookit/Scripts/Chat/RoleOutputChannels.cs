@@ -21,6 +21,16 @@ public sealed class RoleOutputChannels
     private bool silent, inSay, inCode;
     private int thoughtDepth;
     private char quote;
+    private readonly Action<SpeechText> onSpeech;
+    private readonly StringBuilder pendingSpeech = new StringBuilder();
+    private string languageCode;
+    public bool HasInvalidLanguage { get; private set; }
+    public bool HasUndeclaredSpeech { get; private set; }
+
+    public RoleOutputChannels(Action<SpeechText> onSpeech = null)
+    {
+        this.onSpeech = onSpeech;
+    }
     public int PrivateCharacters { get; private set; }
     public bool HasSpeech => speech.ToString().Trim().Length > 0;
     public bool HasActions => actions.Length > 0;
@@ -83,13 +93,27 @@ public sealed class RoleOutputChannels
             if (c == '<' && !inCode) { tag.Append(c); continue; }
             Emit(c, emitted);
         }
+        FlushSpeech();
         return emitted.ToString();
     }
 
     private void Emit(char c, StringBuilder emitted)
     {
-        if (!silent && thoughtDepth == 0 && !inCode) { speech.Append(c); emitted.Append(c); }
+        if (!silent && thoughtDepth == 0 && !inCode)
+        {
+            speech.Append(c); emitted.Append(c);
+            pendingSpeech.Append(c);
+            if (languageCode == null && char.IsLetterOrDigit(c)) HasUndeclaredSpeech = true;
+        }
         else if (!char.IsWhiteSpace(c)) PrivateCharacters++;
+    }
+
+    private void FlushSpeech()
+    {
+        if (pendingSpeech.Length == 0) return;
+        var part = new SpeechText(pendingSpeech.ToString(), languageCode);
+        pendingSpeech.Length = 0;
+        onSpeech?.Invoke(part);
     }
 
     public string Finish()
@@ -97,6 +121,10 @@ public sealed class RoleOutputChannels
         var emitted = new StringBuilder();
         foreach (char c in suspicious.ToString()) Emit(c, emitted);
         suspicious.Length = 0;
+        // An unfinished metadata tag is discarded, never read aloud.
+        if (Regex.IsMatch(tag.ToString(), @"^<\s*lang\b", RegexOptions.IgnoreCase))
+            HasInvalidLanguage = true;
+        FlushSpeech();
         return emitted.ToString();
     }
 
@@ -113,13 +141,28 @@ public sealed class RoleOutputChannels
             return;
         }
         if (thoughtDepth > 0) return;
+        if (name == "lang")
+        {
+            // A declaration is metadata, never an action. Private declarations cannot
+            // alter the language of subsequent audible text.
+            if (silent || inCode) return;
+            var declaration = Regex.Match(token,
+                "^<lang\\s+code\\s*=\\s*(?<q>[\"'])(?<code>[a-zA-Z-]+)\\k<q>\\s*/>$",
+                RegexOptions.IgnoreCase);
+            string code = declaration.Success
+                ? SpeechText.NormalizeLanguage(declaration.Groups["code"].Value) : null;
+            FlushSpeech();
+            languageCode = code;
+            if (code == null) HasInvalidLanguage = true;
+            return;
+        }
         if (name == "say")
         {
             // Compatibility wrapper only. Closing say does not mute plain prose,
             // and a later say cannot undo an explicit silent tail in this reply.
             inSay = !closing && !token.EndsWith("/>", StringComparison.Ordinal);
             if (closing && !silent && speech.Length > 0)
-            { speech.Append('\n'); emitted.Append('\n'); }
+                Emit('\n', emitted);
             return;
         }
         if (name == "silent")

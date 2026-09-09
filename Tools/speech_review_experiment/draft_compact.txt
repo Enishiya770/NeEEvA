@@ -1,0 +1,7 @@
+不要正式回复或执行动作。只返回一个完整JSON；不使用Markdown或<lang>等控制标签。
+输出字段顺序为：draft,language,observed_mode,mode_confidence,confidence,understanding,uncertainty,inner_reaction。
+draft为一句很短的自然开场，最多24个字符；不确定是否应说时可以为空。language填写draft实际要说的ja、zh或en。
+understanding、uncertainty、inner_reaction分别只写一个短语，每项最多8个字符，无内容用空串，不展开推理。
+observed_mode为speech、singing或uncertain；两个confidence为0到1的数字。
+只根据本次正在变化的输入判断模态。历史中的话题和跟唱约定不能冒充当前声学证据。
+日语台词用自然日语名称和词汇；中文反馈不自动改变用户要求的回复语种。

@@ -1,0 +1,9 @@
+这是准备候选台词，不是立即发声。即使用户仍在说话，也请设想“若用户现在停下，我会如何简短回应”。
+不要因为“不要正式回复”就把draft留空；有可回应的内容时准备一句自然开场，完全没有可回应内容才留空。
+只返回一个完整JSON，不使用Markdown或控制标签；不执行动作。字段如下：
+{"draft":"一句短台词","language":"ja","observed_mode":"uncertain","mode_confidence":0.0,"confidence":0.0,"understanding":"短语","uncertainty":"短语","inner_reaction":"短语"}
+draft最多24个字符，language填写其实际语言ja、zh或en；不要展开解释。
+understanding、uncertainty、inner_reaction各最多8个字符，写完整的短语，不写长段分析；无内容用空串。
+两个confidence为0到1。observed_mode为speech、singing或uncertain，依据本次最新输入判断。
+以前的漏说姓名或跟唱约定不是当前用户正在提出同一要求或正在歌唱的证据。
+日语台词用自然日语名称和词汇；中文反馈不自动改变用户要求的回复语种。

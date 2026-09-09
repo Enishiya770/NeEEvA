@@ -1329,6 +1329,18 @@ public class ChatQW : LLM
         string imageDataUrl = null,
         bool recordAssistantHistory = true)
     {
+        BeginSpeechRequest(_msg, _onDelta, _onComplete, imageDataUrl, recordAssistantHistory, null);
+    }
+
+    public override void PostSpeechStream(string message, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl = null, bool recordAssistantHistory = true)
+    {
+        BeginSpeechRequest(message, null, onComplete, imageDataUrl, recordAssistantHistory, onSpeech);
+    }
+
+    private void BeginSpeechRequest(string _msg, Action<string> _onDelta, Action<string> _onComplete,
+        string imageDataUrl, bool recordAssistantHistory, Action<SpeechText> onSpeech)
+    {
         //Agent loop 的正式回复走这条流式路径，所以抢占预热必须放在这里——只加在
         //PostMsg/PostEphemeralMsg 上会漏掉它，实测首轮排在 14.82s 的预热后面，
         //首 token 被拖到 11.76s。
@@ -1365,7 +1377,7 @@ public class ChatQW : LLM
             _onDelta,
             _onComplete,
             recordAssistantHistory,
-            context));
+            onSpeech == null ? context : AddSpeechOutputContract(context), onSpeech));
     }
 
     /// <summary>
@@ -1377,6 +1389,18 @@ public class ChatQW : LLM
         Action<string> _onDelta,
         Action<string> _onComplete,
         string imageDataUrl = null)
+    {
+        BeginSpeechContinuation(transientSystemContext, _onDelta, _onComplete, imageDataUrl, null);
+    }
+
+    public override void PostSpeechContinuationStream(string context, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl = null)
+    {
+        BeginSpeechContinuation(context, null, onComplete, imageDataUrl, onSpeech);
+    }
+
+    private void BeginSpeechContinuation(string transientSystemContext, Action<string> _onDelta,
+        Action<string> _onComplete, string imageDataUrl, Action<SpeechText> onSpeech)
     {
         AbortPrewarmIfRunning();
         CancelEphemeralMsg();
@@ -1390,7 +1414,13 @@ public class ChatQW : LLM
             _onDelta,
             _onComplete,
             true,
-            transientSystemContext));
+            onSpeech == null ? transientSystemContext : AddSpeechOutputContract(transientSystemContext), onSpeech));
+    }
+
+    private static string AddSpeechOutputContract(string context)
+    {
+        return string.IsNullOrWhiteSpace(context) ? SpeechText.OutputContract
+            : context.TrimEnd() + "\n\n" + SpeechText.OutputContract;
     }
 
     public override void CancelActiveResponse()
@@ -1771,12 +1801,13 @@ public class ChatQW : LLM
         Action<string> _onDelta,
         Action<string> _onComplete,
         bool recordAssistantHistory,
-        string transientSystemContext)
+        string transientSystemContext,
+        Action<SpeechText> onSpeech = null)
     {
         stopwatch.Restart();
         ResetThinkStrip();
 
-        var channels = new RoleOutputChannels();
+        var channels = new RoleOutputChannels(onSpeech);
 
         PruneOldImagesInPlace(m_DataList, m_KeepRecentImages);
         List<SendData> requestHistory = CreateRequestHistory(transientSystemContext);
@@ -1827,6 +1858,8 @@ public class ChatQW : LLM
                     rawEstimate - imageAllowance, hasImages);
                 string rawContent = handler.GetFullContent();
                 string lastSpoken = channels.Finish();
+                if (channels.HasInvalidLanguage || channels.HasUndeclaredSpeech)
+                    Debug.LogWarning($"[LLM语言] invalid={channels.HasInvalidLanguage} undeclared={channels.HasUndeclaredSpeech}; 未声明片段将回退TTS自动识别");
                 if (lastSpoken.Length > 0) _onDelta?.Invoke(lastSpoken);
                 RaiseRawResponse(rawContent);
                 string full = StripLeadingThinkBlock(rawContent, true);

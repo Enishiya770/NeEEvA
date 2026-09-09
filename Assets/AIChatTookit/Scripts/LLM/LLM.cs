@@ -361,6 +361,36 @@ public class LLM:MonoBehaviour
             true);
     }
 
+    /// <summary>Typed speech path. Each invocation owns its parser and language state.</summary>
+    public virtual void PostSpeechMessage(string message, Action<List<SpeechText>, string> onComplete)
+    {
+        var buffer = new SpeechTextBuffer();
+        PostSpeechStream(message, part => buffer.Append(part),
+            full => onComplete?.Invoke(buffer.Snapshot(), full));
+    }
+
+    public virtual void PostSpeechStream(string message, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl = null, bool recordAssistantHistory = true)
+    {
+        var channels = new RoleOutputChannels(onSpeech);
+        PostMsgStream(message, delta => channels.Push(delta), full =>
+        {
+            channels.Finish();
+            onComplete?.Invoke(string.IsNullOrWhiteSpace(full) ? "" : RoleOutputChannels.Parse(full).ToExecutableText());
+        }, imageDataUrl, recordAssistantHistory);
+    }
+
+    public virtual void PostSpeechContinuationStream(string context, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl = null)
+    {
+        var channels = new RoleOutputChannels(onSpeech);
+        PostContinuationStream(context, delta => channels.Push(delta), full =>
+        {
+            channels.Finish();
+            onComplete?.Invoke(string.IsNullOrWhiteSpace(full) ? "" : RoleOutputChannels.Parse(full).ToExecutableText());
+        }, imageDataUrl);
+    }
+
     /// <summary>
     /// 临时推理：给“用户仍在说话”的可撤销草稿使用。
     /// 实现必须保证请求和回答都不写入 m_DataList；不支持的 provider 返回空结果。

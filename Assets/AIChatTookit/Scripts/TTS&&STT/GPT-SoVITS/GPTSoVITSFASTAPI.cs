@@ -85,8 +85,14 @@ public class GPTSoVITSFASTAPI : TTS
 
     public override void Speak(string _msg, Action<AudioClip, string> _callback)
     {
+        Speak(new SpeechText(_msg), _callback);
+    }
+
+    public override void Speak(SpeechText speech, Action<AudioClip, string> callback)
+    {
         CancelWarmUpForRealRequest();
-        StartCoroutine(GetVoice(_msg, _callback));
+        SpeechText resolved = ResolveSpeech(speech);
+        StartCoroutine(GetVoice(resolved.Text, callback, resolved.LanguageCode));
     }
 
     public override bool SupportsStreamingPlayback => true;
@@ -107,10 +113,19 @@ public class GPTSoVITSFASTAPI : TTS
         string text, AudioSource output, Action<string> onStarted,
         Action<bool, string, float> onCompleted, Func<StreamingPlaybackPermission> playbackGate)
     {
+        SpeakStreamingWithPlaybackGate(new SpeechText(text), output, onStarted, onCompleted, playbackGate);
+    }
+
+    public override void SpeakStreamingWithPlaybackGate(
+        SpeechText speech, AudioSource output, Action<string> onStarted,
+        Action<bool, string, float> onCompleted, Func<StreamingPlaybackPermission> playbackGate)
+    {
         CancelWarmUpForRealRequest();
         CancelStreaming();
         m_StreamCancelled = false;
-        StartCoroutine(StreamVoice(text, output, onStarted, onCompleted, playbackGate, m_StreamGeneration));
+        SpeechText resolved = ResolveSpeech(speech);
+        StartCoroutine(StreamVoice(resolved.Text, output, onStarted, onCompleted, playbackGate,
+            m_StreamGeneration, resolved.LanguageCode));
     }
 
     public override void CancelStreaming()
@@ -354,8 +369,13 @@ public class GPTSoVITSFASTAPI : TTS
 
     public override void PrepareSpeech(string text, Action<AudioClip, string> callback)
     {
+        PrepareSpeech(new SpeechText(text), callback);
+    }
+
+    public override void PrepareSpeech(SpeechText speech, Action<AudioClip, string> callback)
+    {
         CancelWarmUpForRealRequest();
-        text = Regex.Replace(text ?? string.Empty, "<think>.*?</think>", "", RegexOptions.Singleline).Trim();
+        string text = Regex.Replace(speech.Text ?? string.Empty, "<think>.*?</think>", "", RegexOptions.Singleline).Trim();
         if (string.IsNullOrEmpty(text))
         {
             callback?.Invoke(null, text);
@@ -364,7 +384,8 @@ public class GPTSoVITSFASTAPI : TTS
 
         CancelPreparedSpeech();
         int generation = ++m_PreparedSpeechGeneration;
-        StartCoroutine(GetPreparedVoice(text, generation, callback));
+        SpeechText resolved = ResolveSpeech(new SpeechText(text, speech.LanguageCode, speech.LanguageSource));
+        StartCoroutine(GetPreparedVoice(resolved.Text, generation, callback, resolved.LanguageCode));
     }
 
     public override void CancelPreparedSpeech()
@@ -378,18 +399,9 @@ public class GPTSoVITSFASTAPI : TTS
     private IEnumerator GetPreparedVoice(
         string text,
         int generation,
-        Action<AudioClip, string> callback)
+        Action<AudioClip, string> callback, string languageCode)
     {
-        RequestData requestData = new RequestData
-        {
-            ref_audio_path = ResolveReferenceAudioPath(),
-            prompt_text = m_ReferenceText,
-            prompt_lang = ConvertLanguageEnum(m_ReferenceTextLan),
-            text = text,
-            text_lang = ConvertLanguageEnum(ResolveTargetLanguage(text)),
-            streaming_mode = 0,
-            media_type = "wav"
-        };
+        RequestData requestData = CreateSpeechRequest(text, languageCode, 0);
 
         string postJson = JsonUtility.ToJson(requestData);
         using (UnityWebRequest request = new UnityWebRequest(m_PostURL, "POST"))
@@ -423,21 +435,14 @@ public class GPTSoVITSFASTAPI : TTS
         }
     }
 
-    private IEnumerator GetVoice(string _msg, Action<AudioClip, string> _callback)
+    private IEnumerator GetVoice(string _msg, Action<AudioClip, string> _callback, string languageCode)
     {
         stopwatch.Restart();
 
     // ✅ 在这里清除 <think> 标签
     _msg = Regex.Replace(_msg, "<think>.*?</think>", "", RegexOptions.Singleline).Trim();
 
-        RequestData _requestData = new RequestData
-        {
-            ref_audio_path = ResolveReferenceAudioPath(),
-            prompt_text = m_ReferenceText,
-            prompt_lang = ConvertLanguageEnum(m_ReferenceTextLan),
-            text = _msg,
-            text_lang = ConvertLanguageEnum(ResolveTargetLanguage(_msg))
-        };
+        RequestData _requestData = CreateSpeechRequest(_msg, languageCode, 0);
 
         string _postJson = JsonUtility.ToJson(_requestData);
 
@@ -478,7 +483,7 @@ public class GPTSoVITSFASTAPI : TTS
         AudioSource output,
         Action<string> onStarted,
         Action<bool, string, float> onCompleted,
-        Func<StreamingPlaybackPermission> playbackGate, int generation)
+        Func<StreamingPlaybackPermission> playbackGate, int generation, string languageCode)
     {
         bool gateCancelled = false;
         bool IsCurrent()
@@ -495,17 +500,7 @@ public class GPTSoVITSFASTAPI : TTS
             yield break;
         }
 
-        RequestData requestData = new RequestData
-        {
-            ref_audio_path = ResolveReferenceAudioPath(),
-            prompt_text = m_ReferenceText,
-            prompt_lang = ConvertLanguageEnum(m_ReferenceTextLan),
-            text = text,
-            text_lang = ConvertLanguageEnum(ResolveTargetLanguage(text)),
-            streaming_mode = m_StreamingMode,
-            media_type = "wav",
-            min_chunk_length = m_MinStreamingChunkLength
-        };
+        RequestData requestData = CreateSpeechRequest(text, languageCode, m_StreamingMode);
 
         string postJson = JsonUtility.ToJson(requestData);
         var pcmHandler = new PcmStreamingDownloadHandler();
@@ -1133,6 +1128,50 @@ public class GPTSoVITSFASTAPI : TTS
         }
         m_TargetTextLan = detected;
         return detected;
+    }
+
+    private RequestData CreateSpeechRequest(string text, string languageCode, int streamingMode)
+    {
+        return new RequestData
+        {
+            ref_audio_path = ResolveReferenceAudioPath(),
+            prompt_text = m_ReferenceText,
+            prompt_lang = ConvertLanguageEnum(m_ReferenceTextLan),
+            text = text,
+            text_lang = languageCode,
+            streaming_mode = streamingMode,
+            media_type = "wav",
+            min_chunk_length = m_MinStreamingChunkLength
+        };
+    }
+
+    public override SpeechText ResolveSpeech(SpeechText speech)
+    {
+        // Legacy callers may include private analysis; detect only the spoken text.
+        speech = new SpeechText(Regex.Replace(speech.Text ?? string.Empty,
+            "<think>.*?</think>", "", RegexOptions.Singleline).Trim(),
+            speech.LanguageCode, speech.LanguageSource);
+        string source;
+        string code;
+        if (m_TargetLanguageMode == TargetLanguageMode.固定语言)
+        {
+            source = "fixed";
+            code = ConvertLanguageEnum(m_TargetTextLan);
+        }
+        else if (speech.LanguageCode != null)
+        {
+            // A queued or prefetched utterance must not change another request's language.
+            source = speech.LanguageSource ?? "declared";
+            code = speech.LanguageCode;
+        }
+        else
+        {
+            source = "auto-fallback";
+            code = ConvertLanguageEnum(ResolveTargetLanguage(speech.Text));
+        }
+        if (m_LogLanguageChanges)
+            Debug.Log($"[TTS语言] source={source} lang={code} text=\"{speech.Text}\"");
+        return new SpeechText(speech.Text, code, source);
     }
 
     private static Language DetectLanguage(string text, Language fallback)

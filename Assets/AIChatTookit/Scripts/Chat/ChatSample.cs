@@ -483,7 +483,7 @@ public partial class ChatSample : MonoBehaviour
             m_HoldSpeechForHumBackResult = ShouldHoldSpeechForExplicitHumBack();
             PublishSpokenPrefixToLlm();
             m_ChatSettings.m_ChatModel.RequestContext = speculativeHint ?? "";
-            m_ChatSettings.m_ChatModel.PostMsg(llmInput, CallBack);
+            m_ChatSettings.m_ChatModel.PostSpeechMessage(llmInput, CallBackWithSpeech);
         }
     }
 
@@ -1010,6 +1010,15 @@ public partial class ChatSample : MonoBehaviour
     /// <param name="_response"></param>
     private void CallBack(string _response)
     {
+        var speech = new SpeechTextBuffer();
+        var channels = new RoleOutputChannels(part => speech.Append(part));
+        channels.Push(_response);
+        channels.Finish();
+        CallBackWithSpeech(speech.Snapshot(), channels.ToExecutableText());
+    }
+
+    private void CallBackWithSpeech(List<SpeechText> speech, string _response)
+    {
         _response = (_response ?? "").Trim();
         // Markdown code spans quote protocol syntax for explanation; they are not
         // actions. Remove quoted known tags before every non-streaming extractor so
@@ -1212,7 +1221,15 @@ public partial class ChatSample : MonoBehaviour
         }
 
         //切句分段合成+队列播放，降低首音延迟
-        StartCoroutine(SpeakInChunks(_response));
+        // Use only the final sanitized text. Language spans may be reused if cleanup
+        // changed no spoken words; a legacy text rewrite must not bypass that cleanup.
+        string sourceSpeech = string.Concat(speech.ConvertAll(part => part.Text)).Trim();
+        if (!string.Equals(sourceSpeech, _response.Trim(), StringComparison.Ordinal))
+        {
+            Debug.LogWarning("[LLM语言] 非流式正文经过额外清理，回退语种检测");
+            speech = new List<SpeechText> { new SpeechText(_response) };
+        }
+        StartCoroutine(SpeakLanguageChunks(speech));
     }
 
 #endregion
@@ -1366,6 +1383,8 @@ public partial class ChatSample : MonoBehaviour
     private AudioClip m_PreparedSingingBridgeClip;
     private AudioClip m_DeferredPreparedClipToDestroy;
     private string m_PreparedSingingBridgeText = "";
+    private string m_PreparedSingingBridgeLanguage;
+    private string m_PendingBridgeLanguage;
     //预合成开场对应的 partial。最终 ASR 到达后必须用它做一致度提交，不能只看开场文本。
     private string m_PreparedBridgeSourceTranscript = "";
     //预合成时角色自己给出的模态判断。最终确认可以推翻它来生成正式回复，
@@ -2161,6 +2180,7 @@ public partial class ChatSample : MonoBehaviour
             "只输出一个紧凑 JSON 对象，不要 Markdown、不要控制标签：" +
             "{\"understanding\":\"当前理解摘要\",\"uncertainty\":\"可能听错或尚未说完的点\"," +
             "\"inner_reaction\":\"角色当下很短的内心反应\",\"draft\":\"若用户现在结束，准备说出口的话\"," +
+            "\"language\":\"ja|zh|en（填写draft实际使用的一种语言）\"," +
             "\"confidence\":0.0,\"observed_mode\":\"speech|singing|uncertain\"," +
             "\"mode_confidence\":0.0}";
 
@@ -2267,6 +2287,7 @@ public partial class ChatSample : MonoBehaviour
             "宣称识别成功或评价唱功。只输出紧凑JSON，不要Markdown和控制标签：" +
             "{\"understanding\":\"当前听觉理解\",\"uncertainty\":\"不确定之处\"," +
             "\"inner_reaction\":\"角色此刻很短的心里话\",\"draft\":\"根据实际模态准备的一句自然开场\"," +
+            "\"language\":\"ja|zh|en（填写draft实际使用的一种语言）\"," +
             "\"confidence\":0.0,\"observed_mode\":\"speech|singing|uncertain\"," +
             "\"mode_confidence\":0.0}";
 
@@ -2624,8 +2645,10 @@ public partial class ChatSample : MonoBehaviour
             IsPurePunctuation(bridgeText))
             return;
 
-        if ((bridgeText == m_PreparedSingingBridgeText && m_PreparedSingingBridgeClip != null) ||
-            (bridgeText == m_PendingBridgeText && m_SingingBridgeTtsInFlight))
+        SpeechText bridgeSpeech = m_ChatSettings.m_TextToSpeech.ResolveSpeech(
+            new SpeechText(bridgeText, draft.language));
+        if ((bridgeText == m_PreparedSingingBridgeText && bridgeSpeech.LanguageCode == m_PreparedSingingBridgeLanguage && m_PreparedSingingBridgeClip != null) ||
+            (bridgeText == m_PendingBridgeText && bridgeSpeech.LanguageCode == m_PendingBridgeLanguage && m_SingingBridgeTtsInFlight))
             return;
 
         //不销毁已就绪的旧开场。草稿在用户说话期间每 1.4 秒刷新一次，若一进来就
@@ -2634,6 +2657,7 @@ public partial class ChatSample : MonoBehaviour
         int generation = ++m_SingingBridgeGeneration;
         m_SingingBridgeTtsInFlight = true;
         m_PendingBridgeText = bridgeText;
+        m_PendingBridgeLanguage = bridgeSpeech.LanguageCode;
         m_PendingBridgeConfidence = draft.confidence;
         m_PendingBridgeIsSinging = singing;
         m_PendingBridgeObservedMode = NormalizeObservedMode(draft.observed_mode);
@@ -2644,7 +2668,7 @@ public partial class ChatSample : MonoBehaviour
         if (m_LogSpeculativeListening)
             Debug.Log($"[{label}] 开始静默预合成(conf={draft.confidence:F2})：\"{bridgeText}\"");
 
-        m_ChatSettings.m_TextToSpeech.PrepareSpeech(bridgeText, (clip, text) =>
+        m_ChatSettings.m_TextToSpeech.PrepareSpeech(bridgeSpeech, (clip, text) =>
         {
             if (generation != m_SingingBridgeGeneration ||
                 (singing && !m_StreamingTurnIsSinging))
@@ -2667,6 +2691,7 @@ public partial class ChatSample : MonoBehaviour
             AudioClip previous = m_PreparedSingingBridgeClip;
             m_PreparedSingingBridgeClip = clip;
             m_PreparedSingingBridgeText = text;
+            m_PreparedSingingBridgeLanguage = bridgeSpeech.LanguageCode;
             m_PreparedBridgeSourceTranscript = bridgeSourceTranscript;
             m_PreparedBridgeObservedMode = bridgeObservedMode;
             m_PreparedSingingBridgeConfidence = m_PendingBridgeConfidence;
@@ -2844,9 +2869,9 @@ public partial class ChatSample : MonoBehaviour
 
     // The final model has already selected these exact spoken words. This is an
     // audio-cache lookup, never an ASR similarity test or a program-chosen answer.
-    private AudioClip TakePreparedFormalReply(string selectedText)
+    private AudioClip TakePreparedFormalReply(string selectedText, string languageCode)
     {
-        if (m_PreparedSingingBridgeClip == null ||
+        if (m_PreparedSingingBridgeClip == null || languageCode != m_PreparedSingingBridgeLanguage ||
             !string.Equals(selectedText.Trim(), m_PreparedSingingBridgeText.Trim(), StringComparison.Ordinal))
             return null;
         AudioClip clip = m_PreparedSingingBridgeClip;
@@ -2921,6 +2946,7 @@ public partial class ChatSample : MonoBehaviour
         }
         m_PreparedSingingBridgeClip = null;
         m_PreparedSingingBridgeText = "";
+        m_PreparedSingingBridgeLanguage = null;
         m_PreparedBridgeSourceTranscript = "";
         m_PreparedBridgeObservedMode = "";
         m_PreparedSingingBridgeConfidence = 0f;
@@ -3294,6 +3320,7 @@ public partial class ChatSample : MonoBehaviour
         public string uncertainty = "";
         public string inner_reaction = "";
         public string draft = "";
+        public string language = "";
         public float confidence = 0f;
         public string observed_mode = "uncertain";
         public float mode_confidence = 0f;
@@ -4027,8 +4054,20 @@ public partial class ChatSample : MonoBehaviour
     /// </summary>
     private IEnumerator SpeakInChunks(string _response)
     {
+        var speech = new SpeechTextBuffer();
+        var channels = new RoleOutputChannels(part => speech.Append(part));
+        channels.Push(_response);
+        channels.Finish();
+        yield return SpeakLanguageChunks(speech.Snapshot());
+    }
+
+    private IEnumerator SpeakLanguageChunks(List<SpeechText> speech)
+    {
         int responseGeneration = m_FormalResponseGeneration;
-        List<string> chunks = SplitResponseIntoChunks(_response);
+        var chunks = new List<SpeechText>();
+        foreach (SpeechText part in speech)
+            foreach (string text in SplitResponseIntoChunks(part.Text))
+                chunks.Add(new SpeechText(text, part.LanguageCode));
         if (chunks.Count == 0)
         {
             TryBeginPendingHumBack();
@@ -4067,7 +4106,7 @@ public partial class ChatSample : MonoBehaviour
             }
 
             AudioClip currentClip = pending;
-            string currentText = chunks[i];
+            string currentText = chunks[i].Text;
 
             //马上串行发送下一段（保证server按接收顺序处理）
             pending = null;
@@ -4197,7 +4236,7 @@ public partial class ChatSample : MonoBehaviour
 #region 流式生成（LLM边吐边播）
 
     //LLM吐出未成句的暂存
-    private System.Text.StringBuilder m_SentenceBuffer = new System.Text.StringBuilder();
+    private SpeechTextBuffer m_SentenceBuffer = new SpeechTextBuffer();
     //continue chain 的多个 LLM round 共用同一条 TTS pipeline。每个队列项带上
     //round id，这样判定某一轮是复读时，只删它自己尚未播放的内容，
     //不会误删上一节仍在排队的正常发言。
@@ -4205,13 +4244,20 @@ public partial class ChatSample : MonoBehaviour
     {
         public int RoundId;
         public string Text;
+        public string LanguageCode;
     }
 
     private sealed class PendingSpeechClip
     {
         public int RoundId;
         public string Text;
+        public string LanguageCode;
         public AudioClip Clip;
+    }
+
+    private static bool MatchesPreparedSpeech(PendingSpeechClip clip, PendingSpeechChunk chunk, string text)
+    {
+        return clip.RoundId == chunk.RoundId && clip.Text == text && clip.LanguageCode == chunk.LanguageCode;
     }
 
     //待合成文本队列（LLM切句后推入，TTSSender消费）
@@ -4502,17 +4548,18 @@ public partial class ChatSample : MonoBehaviour
         PublishSpokenPrefixToLlm();
         m_ChatSettings.m_ChatModel.RequestContext = transientSystemContext ?? "";
         m_FormalResponseInFlight = true;
-        m_ChatSettings.m_ChatModel.PostMsgStream(
+        m_ChatSettings.m_ChatModel.PostSpeechStream(
             prompt,
             delta =>
             {
                 if (responseGeneration != m_FormalResponseGeneration) return;
-                OnStreamDelta(delta);
+                OnSpeechStreamDelta(delta);
             },
             full =>
             {
                 if (responseGeneration != m_FormalResponseGeneration) return;
                 m_FormalResponseInFlight = false;
+                if ((full ?? "").StartsWith("<silent/>", StringComparison.Ordinal)) OnStreamDelta("<silent/>");
                 OnStreamComplete(full);
             },
             imageUrl,
@@ -4530,17 +4577,18 @@ public partial class ChatSample : MonoBehaviour
     {
         PublishSpokenPrefixToLlm();
         m_FormalResponseInFlight = true;
-        m_ChatSettings.m_ChatModel.PostContinuationStream(
+        m_ChatSettings.m_ChatModel.PostSpeechContinuationStream(
             transientSystemContext,
             delta =>
             {
                 if (responseGeneration != m_FormalResponseGeneration) return;
-                OnStreamDelta(delta);
+                OnSpeechStreamDelta(delta);
             },
             full =>
             {
                 if (responseGeneration != m_FormalResponseGeneration) return;
                 m_FormalResponseInFlight = false;
+                if ((full ?? "").StartsWith("<silent/>", StringComparison.Ordinal)) OnStreamDelta("<silent/>");
                 OnStreamComplete(full);
             },
             imageUrl);
@@ -4878,7 +4926,12 @@ public partial class ChatSample : MonoBehaviour
     /// </summary>
     private void OnStreamDelta(string delta)
     {
-        if (string.IsNullOrEmpty(delta)) return;
+        OnSpeechStreamDelta(new SpeechText(delta));
+    }
+
+    private void OnSpeechStreamDelta(SpeechText delta)
+    {
+        if (string.IsNullOrEmpty(delta.Text)) return;
         if (m_LogStreamTimings && !m_FirstDeltaLogged)
         {
             m_FirstDeltaLogged = true;
@@ -5389,8 +5442,13 @@ public partial class ChatSample : MonoBehaviour
                 AgentSongSingRequest ignoredSongSing = ExtractSongSingTag(ref cleanTail);
                 AgentHumBackRequest ignoredHumBack = ExtractHumBackTag(ref cleanTail);
                 cleanTail = StripAgentTagsForTTS(cleanTail);
-                m_SentenceBuffer.Length = 0;
-                if (!string.IsNullOrEmpty(cleanTail)) m_SentenceBuffer.Append(cleanTail);
+                // Typed speech is already clean. Rebuilding it would discard language spans.
+                if (!string.Equals(cleanTail, m_SentenceBuffer.ToString().Trim(), StringComparison.Ordinal))
+                {
+                    string tailLanguage = m_SentenceBuffer.LanguageCode;
+                    m_SentenceBuffer.Length = 0;
+                    if (!string.IsNullOrEmpty(cleanTail)) m_SentenceBuffer.Append(new SpeechText(cleanTail, tailLanguage));
+                }
             }
             else
             {
@@ -5668,73 +5726,54 @@ public partial class ChatSample : MonoBehaviour
     /// </summary>
     private void FlushCompleteSentences(bool flushAll)
     {
-        string buf = m_SentenceBuffer.ToString();
-        //工具标签是流式逐字到达的。完整标签可以靠正则剥掉，但标签尚未闭合时，
-        //属性里的“，/。/\n”会被句子切分器误认为正文边界，导致半截标签提前进入 TTS。
-        //因此一旦看到已知标签的起始（哪怕当前只有“<mem”），整段后缀都先扣在 buffer 里，
-        //只允许标签之前的正文参与切句；OnStreamComplete 收到完整标签后再解析/丢弃。
-        int pendingTagStart = FindPotentialAgentTagStart(buf);
-        string speakable = pendingTagStart >= 0 ? buf.Substring(0, pendingTagStart) : buf;
-        int boundary = FindFlushBoundary(speakable, !m_FirstChunkFlushed);
-        if (!m_FirstChunkFlushed && m_PreparedSingingBridgeClip != null)
+        while (m_SentenceBuffer.Length > 0)
         {
-            int preparedBoundary = PreparedReplyBoundary(speakable, m_PreparedSingingBridgeText,
-                flushAll || pendingTagStart >= 0);
-            if (preparedBoundary == -2) return; // wait only for the remaining LLM text, not new inference
-            if (preparedBoundary >= 0) boundary = preparedBoundary;
-        }
-
-        if (boundary >= 0)
-        {
-            string completed = buf.Substring(0, boundary + 1).Trim();
-            string remaining = buf.Substring(boundary + 1);
-            m_SentenceBuffer.Length = 0;
-            m_SentenceBuffer.Append(remaining);
-            //过滤 agent 标签——LLM 把 <continue/> 单写一行时，"<continue/>\n" 会被
-            //\n strong boundary 切出当成"一句"推进队列，TTS 就读出来了。这里兜底。
-            //不看 agent 开关:system prompt 无条件教标签,直接对话模式模型也会输出。
-            completed = StripAgentTagsForTTS(completed);
-            //过滤纯标点段(LLM偶尔会单独吐"…"或"。。。")，避免TTS 400
-            if (!string.IsNullOrEmpty(completed) && !IsPurePunctuation(completed))
+            string buf = m_SentenceBuffer.ToString();
+            string language = m_SentenceBuffer.LanguageCode;
+            int languageBoundary = m_SentenceBuffer.FirstLanguageBoundary;
+            int pendingTagStart = FindPotentialAgentTagStart(buf);
+            int available = languageBoundary >= 0 ? languageBoundary : buf.Length;
+            if (pendingTagStart >= 0) available = Math.Min(available, pendingTagStart);
+            string speakable = buf.Substring(0, available);
+            bool languageEnded = languageBoundary >= 0 && available == languageBoundary;
+            int boundary = FindFlushBoundary(speakable, !m_FirstChunkFlushed);
+            if (!m_FirstChunkFlushed && m_PreparedSingingBridgeClip != null &&
+                language == m_PreparedSingingBridgeLanguage)
             {
-                m_PendingChunks.Enqueue(new PendingSpeechChunk
-                {
-                    RoundId = m_CurrentSpeechRoundId,
-                    Text = completed
-                });
-                if (m_SubtitleOverlay != null)
-                {
-                    string semanticProbe = completed.TrimEnd();
-                    bool semanticBoundary = semanticProbe.Length > 0 &&
-                        IsStrongBoundary(semanticProbe[semanticProbe.Length - 1]);
-                    m_SubtitleOverlay.QueueTranslationChunk(
-                        m_FormalResponseGeneration, completed, semanticBoundary);
-                }
-                if (!m_FirstChunkFlushed)
-                {
-                    m_FirstChunkFlushed = true;
-                    if (m_LogStreamTimings) Debug.Log($"[Stream] T+{Elapsed():F2}s 首块切出: \"{completed}\"");
-                }
+                int preparedBoundary = PreparedReplyBoundary(speakable, m_PreparedSingingBridgeText,
+                    flushAll || pendingTagStart >= 0 || languageEnded);
+                if (preparedBoundary == -2) return;
+                if (preparedBoundary >= 0) boundary = preparedBoundary;
+            }
+            // Never combine two declared languages in one synthesis request. A language
+            // boundary can end a quoted foreign fragment without ending the sentence.
+            if (boundary < 0 && (languageEnded || flushAll)) boundary = available - 1;
+            if (boundary < 0) break;
+
+            string completed = StripAgentTagsForTTS(buf.Substring(0, boundary + 1).Trim());
+            m_SentenceBuffer.Remove(0, boundary + 1);
+            if (string.IsNullOrEmpty(completed) || IsPurePunctuation(completed)) continue;
+            m_PendingChunks.Enqueue(new PendingSpeechChunk
+            {
+                RoundId = m_CurrentSpeechRoundId,
+                Text = completed,
+                LanguageCode = language
+            });
+            if (m_SubtitleOverlay != null)
+            {
+                string probe = completed.TrimEnd();
+                bool semanticBoundary = IsStrongBoundary(probe[probe.Length - 1]) ||
+                    (flushAll && m_SentenceBuffer.Length == 0);
+                m_SubtitleOverlay.QueueTranslationChunk(m_FormalResponseGeneration, completed, semanticBoundary);
+            }
+            if (!m_FirstChunkFlushed)
+            {
+                m_FirstChunkFlushed = true;
+                if (m_LogStreamTimings) Debug.Log($"[Stream] T+{Elapsed():F2}s 首块切出: \"{completed}\" lang={language ?? "auto"}");
             }
         }
-
-        if (flushAll)
-        {
-            string tail = m_SentenceBuffer.ToString().Trim();
-            m_SentenceBuffer.Length = 0;
-            tail = StripAgentTagsForTTS(tail);
-            if (!string.IsNullOrEmpty(tail) && !IsPurePunctuation(tail))
-            {
-                m_PendingChunks.Enqueue(new PendingSpeechChunk
-                {
-                    RoundId = m_CurrentSpeechRoundId,
-                    Text = tail
-                });
-                if (m_SubtitleOverlay != null)
-                    m_SubtitleOverlay.QueueTranslationChunk(
-                        m_FormalResponseGeneration, tail, true);
-            }
-        }
+        // Any remaining incomplete control tag is deliberately discarded at EOF.
+        if (flushAll) m_SentenceBuffer.Length = 0;
     }
 
     /// <summary>
@@ -5842,7 +5881,7 @@ public partial class ChatSample : MonoBehaviour
             pending = null;
             pendingDone = false;
             if (m_LogStreamTimings) Debug.Log($"[Stream] T+{Elapsed():F2}s TTS请求发出: \"{chunk}\"");
-            m_ChatSettings.m_TextToSpeech.Speak(chunk, onReceive);
+            m_ChatSettings.m_TextToSpeech.Speak(new SpeechText(chunk, speechChunk.LanguageCode), onReceive);
 
             //TTS客户端正常会在20s内回调(成功或失败都会调)。这里的25s只是兜底，
             //防止TTS客户端自己挂掉永远不回调。GPT-SoVITS内部失败也会调callback(null,..)
@@ -5872,6 +5911,7 @@ public partial class ChatSample : MonoBehaviour
                     {
                         RoundId = speechChunk.RoundId,
                         Text = chunk,
+                        LanguageCode = speechChunk.LanguageCode,
                         Clip = pending
                     });
                 }
@@ -5917,10 +5957,11 @@ public partial class ChatSample : MonoBehaviour
             // Long paragraphs keep the PCM-streaming path; waiting for an entire
             // long WAV could cost more than the lookahead saves. No text is truncated.
             if (string.IsNullOrWhiteSpace(future) || future.Length > 64 || IsPurePunctuation(future)) return;
-            var slot = new PendingSpeechClip { RoundId = queued.RoundId, Text = future };
+            SpeechText preparedSpeech = tts.ResolveSpeech(new SpeechText(future, queued.LanguageCode));
+            var slot = new PendingSpeechClip { RoundId = queued.RoundId, Text = future, LanguageCode = preparedSpeech.LanguageCode };
             next = slot; nextDone = false; nextRequestedAt = Time.realtimeSinceStartup;
             Debug.Log($"[TTS/Lookahead] 当前句合成已完成，播放期间预取下一句: \"{future}\"");
-            tts.PrepareSpeech(future, (clip, ignored) =>
+            tts.PrepareSpeech(preparedSpeech, (clip, ignored) =>
             {
                 if (!alive || responseGeneration != m_FormalResponseGeneration ||
                     !ReferenceEquals(next, slot) || m_SilencedSpeechRoundIds.Contains(slot.RoundId))
@@ -5957,12 +5998,15 @@ public partial class ChatSample : MonoBehaviour
                 text = StripAgentTagsForTTS(text);
                 if (string.IsNullOrEmpty(text) || IsPurePunctuation(text)) continue;
 
+                SpeechText speechRequest = tts.ResolveSpeech(new SpeechText(text, speechChunk.LanguageCode));
+                speechChunk.LanguageCode = speechRequest.LanguageCode;
+
                 bool started = false;
                 bool completed = false;
                 bool succeeded = false;
                 float audioDuration = 0f;
 
-                if (next != null && (next.RoundId != speechChunk.RoundId || next.Text != text)) ClearNext();
+                if (next != null && !MatchesPreparedSpeech(next, speechChunk, text)) ClearNext();
                 if (next != null)
                 {
                     while (!nextDone && Time.realtimeSinceStartup - nextRequestedAt < 25f)
@@ -5984,7 +6028,7 @@ public partial class ChatSample : MonoBehaviour
                     ownedClip = null;
                     continue;
                 }
-                if (firstChunk && ownedClip == null) ownedClip = TakePreparedFormalReply(text);
+                if (firstChunk && ownedClip == null) ownedClip = TakePreparedFormalReply(text, speechChunk.LanguageCode);
 
                 // Send synthesis immediately. PCM waits behind a playback gate while the
                 // opener speaks, instead of delaying the expensive network/model request.
@@ -6009,7 +6053,7 @@ public partial class ChatSample : MonoBehaviour
                     if (m_LogStreamTimings) Debug.Log($"[Stream] T+{Elapsed():F2}s TTS流请求发出: \"{text}\"");
 
                     m_ChatSettings.m_TextToSpeech.SpeakStreamingWithPlaybackGate(
-                        text,
+                        speechRequest,
                         m_AudioSource,
                         _ => { started = true; },
                         (success, _, duration) =>
@@ -16857,7 +16901,7 @@ public partial class ChatSample : MonoBehaviour
         else
         {
             PublishSpokenPrefixToLlm();
-            m_ChatSettings.m_ChatModel.PostMsg(llmInput, CallBack);
+            m_ChatSettings.m_ChatModel.PostSpeechMessage(llmInput, CallBackWithSpeech);
         }
     }
 

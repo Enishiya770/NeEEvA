@@ -6,6 +6,26 @@ using UnityEngine;
 
 public class TTS : MonoBehaviour
 {
+    /// <summary>Resolve before caching so text-identical replies in different languages cannot collide.</summary>
+    public virtual SpeechText ResolveSpeech(SpeechText speech) { return speech; }
+
+    public virtual void Speak(SpeechText speech, Action<AudioClip, string> callback)
+    {
+        Speak(speech.Text, callback);
+    }
+
+    public virtual void PrepareSpeech(SpeechText speech, Action<AudioClip, string> callback)
+    {
+        PrepareSpeech(speech.Text, callback);
+    }
+
+    public virtual void SpeakStreamingWithPlaybackGate(SpeechText speech, AudioSource output,
+        Action<string> onStarted, Action<bool, string, float> onCompleted,
+        Func<StreamingPlaybackPermission> playbackGate)
+    {
+        SpeakStreamingWithPlaybackGate(speech.Text, output, onStarted, onCompleted, playbackGate);
+    }
+
     /// <summary>
     /// �����ϳɵ�api��ַ
     /// </summary>
