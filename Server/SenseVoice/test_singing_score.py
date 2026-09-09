@@ -8,6 +8,30 @@ from japanese_lyrics import normalise_japanese_lyrics, split_japanese_mora
 
 
 class SingingScoreTests(unittest.TestCase):
+    def test_identical_analysis_is_stable_and_cache_isolation_is_deep(self):
+        class CountingAnalyzer(SingingAnalyzer):
+            def __init__(self):
+                super().__init__(enable_torchcrepe=False)
+                self.calls = 0
+
+            def _analyze(
+                self, wav, lyrics, audio_event, thorough, language,
+                force_score, build_score,
+            ):
+                self.calls += 1
+                return {"call": self.calls, "nested": {"values": [1, 2]}}
+
+        analyzer = CountingAnalyzer()
+        signal = np.linspace(-0.1, 0.1, 3200, dtype=np.float32)
+        first = analyzer.analyze(signal, lyrics="same", thorough=True)
+        first["nested"]["values"].append(99)
+        second = analyzer.analyze(signal.copy(), lyrics="same", thorough=True)
+
+        self.assertEqual(analyzer.calls, 1)
+        self.assertEqual(second["nested"]["values"], [1, 2])
+        analyzer.analyze(signal, lyrics="different", thorough=True)
+        self.assertEqual(analyzer.calls, 2)
+
     def test_japanese_kana_is_normalised_without_second_asr(self):
         result = normalise_japanese_lyrics("キミノコトガ、スキ。")
         self.assertEqual(result["lyrics_reading"], "きみのことがすき")
@@ -101,6 +125,51 @@ class SingingScoreTests(unittest.TestCase):
         self.assertEqual(thorough["singing_score"]["schema_version"], 1)
         self.assertEqual(thorough["singing_score"]["language"], "zh")
         self.assertGreater(len(thorough["singing_score"]["notes"]), 0)
+
+    def test_recovery_envelope_keeps_adjacent_low_confidence_melodic_island(self):
+        hop = 0.01
+        duration = 12.0
+        frames = int(duration / hop)
+        smoothed_midi = np.full(frames, 60.0, dtype=np.float32)
+        voiced = np.zeros(frames, dtype=bool)
+        periodicity = np.zeros(frames, dtype=np.float32)
+        # 两座相邻旋律岛：第一座单独复核时低于 clean 门槛，第二座是主锚。
+        # 默认边界应只采用主锚；可选恢复边界应保留前一座，避免素材永久丢失。
+        for begin, end in ((50, 300), (390, 760)):
+            voiced[begin:end] = True
+            periodicity[begin:end] = 0.9
+
+        def island_probability(_start, end):
+            return 0.4 if end < 4.0 else 0.8
+
+        clean_start, clean_end, recovery_start, recovery_end = (
+            SingingAnalyzer._estimate_singing_start(
+                smoothed_midi,
+                voiced,
+                periodicity,
+                hop,
+                duration,
+                island_probability,
+            )
+        )
+
+        self.assertGreater(clean_start, 3.0)
+        self.assertLess(recovery_start, 0.5)
+        self.assertAlmostEqual(recovery_end, clean_end, places=2)
+
+    def test_one_minute_take_keeps_its_opening_in_analysis_and_timeline(self):
+        sample_rate = 16000
+        time = np.arange(sample_rate * 60, dtype=np.float32) / sample_rate
+        signal = (0.12 * np.sin(2.0 * np.pi * 220.0 * time)).astype(np.float32)
+        analyzer = SingingAnalyzer(enable_torchcrepe=False)
+
+        result = analyzer.analyze(signal, thorough=False)
+
+        self.assertEqual(result["analysis_window_offset_seconds"], 0.0)
+        self.assertLess(result["singing_start_seconds"], 1.0)
+        # 0.10-second playable frames: a complete minute must not regress to
+        # the old 45-second/450-frame tail-only timeline.
+        self.assertGreaterEqual(len(result["pitch_timeline_midi"]), 590)
 
 
 if __name__ == "__main__":

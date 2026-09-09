@@ -38,6 +38,7 @@ import argparse
 import asyncio
 import base64
 import collections
+import difflib
 import hashlib
 import io
 import json
@@ -57,6 +58,11 @@ from japanese_lyrics import normalise_japanese_lyrics
 from speaker_identity import SpeakerIdentityStore
 from singing_analysis import SingingAnalyzer
 from song_search import SongSearchEngine
+from asr_timing import AsrTiming
+from asr_window_cache import AsrWindowCache
+from streaming_activity import recent_activity_fields
+from asr_scheduler import AnalysisScheduler, checkpoint
+from mixed_turn_asr import transcribe_segments, dump_mixed_sample
 
 # ------------------------------ 模型 ------------------------------
 
@@ -71,16 +77,26 @@ _vad_min_speech_ms = 160
 # EOU 后的正式 /asr 共用这一把锁；单次 SenseVoice 推理很短，正式请求最多
 # 只会等待当前 partial 收尾，不会同时把两份模型塞进显存。
 _asr_lock = threading.Lock()
+_asr_window_cache = AsrWindowCache()
+_vad_lock = threading.Lock()
+_speaker_model_lock = threading.Lock()
+# Full pitch/segmentation must never occupy the asyncio WebSocket event loop.
+# Serialize final requests without occupying the executor used by partial ASR.
+_final_asr_scheduler = AnalysisScheduler()
+# Fast probes have their own analyzer: mutable nested-island state from a final
+# analysis must not leak into concurrent streaming/VAD evidence.
+_streaming_analyzer = SingingAnalyzer(enable_torchcrepe=False)
 
 
 def generate_asr(wav: np.ndarray, language: str = "auto"):
     with _asr_lock:
-        return _model.generate(
-            input=wav,
-            cache={},
-            language=language,
-            use_itn=True,
-        )
+        checkpoint()
+        result, reused = _asr_window_cache.resolve(
+            id(_model), language, wav.shape, wav.dtype, wav.tobytes(),
+            lambda: _model.generate(input=wav, cache={}, language=language, use_itn=True))
+        if reused:
+            print(f"[ASR/WindowCache] exact window reused samples={wav.size} language={language}", flush=True)
+        return result
 
 
 def load_model(
@@ -223,6 +239,89 @@ def common_prefix(a: str, b: str):
     return a[:i]
 
 
+def _stream_text_key(value: str) -> str:
+    """Normalize spacing/punctuation only for overlap matching."""
+    return re.sub(r"[\s\W_]+", "", str(value or ""), flags=re.UNICODE).lower()
+
+
+def _original_index_after_key_chars(value: str, key_chars: int) -> int:
+    """Map a normalized-character count back to an index in the original string."""
+    if key_chars <= 0:
+        return 0
+    seen = 0
+    for index, char in enumerate(str(value or "")):
+        if _stream_text_key(char):
+            seen += 1
+            if seen >= key_chars:
+                return index + 1
+    return len(str(value or ""))
+
+
+def merge_streaming_transcripts(committed: str, window_text: str) -> str:
+    """Join adjacent rolling-window hypotheses without repeating their overlap.
+
+    The ASR window retains a few seconds from the previous window so words crossing
+    the boundary are not clipped.  Exact text can differ in whitespace or
+    punctuation between inferences, therefore overlap matching uses a normalized
+    key while the returned text keeps the original ASR formatting.
+    """
+    committed = str(committed or "").strip()
+    window_text = str(window_text or "").strip()
+    if not committed:
+        return window_text
+    if not window_text:
+        return committed
+
+    left = _stream_text_key(committed)
+    right = _stream_text_key(window_text)
+    if not left:
+        return window_text
+    if not right:
+        return committed
+
+    # Eight seconds of overlap is normally far below 160 characters.  Bounding the
+    # comparison keeps this helper cheap even after a multi-minute song.
+    max_overlap = min(len(left), len(right), 240)
+    overlap = 0
+    for size in range(max_overlap, 1, -1):
+        if left[-size:] == right[:size]:
+            overlap = size
+            break
+
+    if overlap <= 0:
+        # Rolling re-recognition often changes one kana/character around the
+        # boundary.  Accept only a high-similarity suffix/prefix of meaningful
+        # length; shorter fuzzy matches are too risky for repetitive lyrics.
+        fuzzy_limit = min(max_overlap, 160)
+        best_size = 0
+        best_ratio = 0.0
+        for size in range(8, fuzzy_limit + 1):
+            ratio = difflib.SequenceMatcher(
+                None, left[-size:], right[:size], autojunk=False
+            ).ratio()
+            if ratio > best_ratio + 1e-6 or (
+                abs(ratio - best_ratio) <= 1e-6 and size > best_size
+            ):
+                best_ratio = ratio
+                best_size = size
+        if best_ratio >= 0.84:
+            overlap = best_size
+
+    if overlap <= 0:
+        # A boundary revision can replace one or two characters.  Do not attempt a
+        # broad fuzzy merge here: a false match would delete real lyrics.  A space
+        # makes the conservative fallback readable and keeps all evidence.
+        separator = "" if committed[-1:].isspace() or window_text[:1].isspace() else " "
+        return committed + separator + window_text
+
+    append_from = _original_index_after_key_chars(window_text, overlap)
+    suffix = window_text[append_from:].lstrip()
+    if not suffix:
+        return committed
+    separator = "" if committed[-1:].isspace() else " "
+    return committed + separator + suffix
+
+
 def recognize_stream_partial(wav: np.ndarray, language: str):
     """流式会话的轻量 partial：不做声纹学习，也不写任何持久状态。"""
     t0 = time.time()
@@ -239,10 +338,13 @@ def recognize_stream_partial(wav: np.ndarray, language: str):
     }
     if _singing_analyzer is not None:
         # 只看最近 8 秒并走快速跟踪器，避免长会话 partial 的 CPU 开销递增。
-        singing = _singing_analyzer.analyze(
+        singing = _streaming_analyzer.analyze(
             wav[-8 * 16000 :], text, audio_event, thorough=False
         )
         result.update(singing_response_fields(singing, include_contour=False))
+    # Separate whole-window singing similarity from activity at the audio tail.
+    result.update(recent_activity_fields(wav, _streaming_analyzer,
+                                       vad_probe=run_vad if _vad_model is not None else None))
     return result
 
 
@@ -289,8 +391,25 @@ def singing_response_fields(analysis: Optional[dict], include_contour: bool = Tr
         "singing_summary": str(analysis.get("summary", "")),
         "singing_start_seconds": float(analysis.get("singing_start_seconds", 0.0)),
         "singing_end_seconds": float(analysis.get("singing_end_seconds", 0.0)),
+        "singing_recovery_start_seconds": float(
+            analysis.get("singing_recovery_start_seconds",
+                         analysis.get("singing_start_seconds", 0.0))
+        ),
+        "singing_recovery_end_seconds": float(
+            analysis.get("singing_recovery_end_seconds",
+                         analysis.get("singing_end_seconds", 0.0))
+        ),
         "pitch_timeline_start_seconds": float(
             analysis.get("pitch_timeline_start_seconds", 0.0)
+        ),
+        "singing_analysis_window_offset_seconds": float(
+            analysis.get("analysis_window_offset_seconds", 0.0)
+        ),
+        "singing_score_window_offset_seconds": float(
+            analysis.get(
+                "singing_score_window_offset_seconds",
+                analysis.get("analysis_window_offset_seconds", 0.0),
+            )
         ),
     }
     if include_contour:
@@ -385,6 +504,12 @@ def dump_band_sample(
             "duration": float(analysis.get("duration", 0.0) or 0.0),
             "singing_start_seconds": float(analysis.get("singing_start_seconds", 0.0) or 0.0),
             "singing_end_seconds": float(analysis.get("singing_end_seconds", 0.0) or 0.0),
+            "singing_recovery_start_seconds": float(
+                analysis.get("singing_recovery_start_seconds",
+                             analysis.get("singing_start_seconds", 0.0)) or 0.0),
+            "singing_recovery_end_seconds": float(
+                analysis.get("singing_recovery_end_seconds",
+                             analysis.get("singing_end_seconds", 0.0)) or 0.0),
             "pitch_timeline_start_seconds": float(
                 analysis.get("pitch_timeline_start_seconds", 0.0) or 0.0),
             "voiced_ratio": float(analysis.get("voiced_ratio", 0.0) or 0.0),
@@ -462,6 +587,7 @@ def transcribe_singing_segment(
     analysis: Optional[dict],
     full_text: str,
     language: str,
+    allow_acoustic_candidate: bool = False,
 ) -> dict:
     """只对裁出来的[唱歌开始, 唱歌结束]窗口再识别一次，返回这段的歌词。
 
@@ -476,11 +602,14 @@ def transcribe_singing_segment(
     日语还要连假名一起产出——9883 明确要求 SenseVoice 提供 lyrics_reading，
     它自己不会生成。
 
-    只在真的裁掉了 0.45s 以上、且本轮确认是歌唱时才做。这两个条件成立时后面必然
-    要跑慢得多的歌声合成，多这一次识别的耗时可以忽略。
+    只在真的裁掉了 0.45s 以上、且本轮已确认是歌唱或有足够的多帧声学候选
+    证据时才做。allow_acoustic_candidate 只允许为 LLM 和练唱缓存补充这段文字，
+    不会把 is_singing 改成 true，也不替语义层做最终判断。
     """
     empty = {"text": "", "language": ""}
-    if not analysis or not bool(analysis.get("is_singing", False)):
+    if not analysis or not (
+        bool(analysis.get("is_singing", False)) or allow_acoustic_candidate
+    ):
         return empty
     total = wav.size / 16000.0
     start = max(0.0, float(analysis.get("singing_start_seconds", 0.0) or 0.0))
@@ -668,7 +797,8 @@ def run_vad(wav: np.ndarray, min_speech_ms: Optional[int] = None):
 
     threshold_ms = _vad_min_speech_ms if min_speech_ms is None else min_speech_ms
     t0 = time.time()
-    result = _vad_model.generate(input=wav, cache={}, disable_pbar=True)
+    with _vad_lock:
+        result = _vad_model.generate(input=wav, cache={}, disable_pbar=True)
     elapsed = time.time() - t0
 
     raw_segments = []
@@ -734,7 +864,8 @@ def extract_speaker_embedding(wav: np.ndarray):
     if _speaker_model is None or wav.size < 16000 * 0.6:
         return None, 0.0
     t0 = time.time()
-    result = _speaker_model.generate(input=wav, cache={}, disable_pbar=True)
+    with _speaker_model_lock:
+        result = _speaker_model.generate(input=wav, cache={}, disable_pbar=True)
     elapsed = time.time() - t0
     if not result or not isinstance(result[0], dict):
         return None, elapsed
@@ -838,6 +969,13 @@ app = FastAPI(title="SenseVoiceSmall ASR Server")
 @app.get("/health")
 def health():
     return {
+        "turn_segments_schema": 1,
+        "turn_segments_revision": "2026-09-07-recovery-context",
+        "stream_activity_schema": 2,
+        "analysis_dispatch_schema": 2,
+        "final_asr_worker": True,
+        "asr_timing_schema": 1,
+        "asr_window_cache_schema": 1,
         "ok": _model is not None and _vad_model is not None and _speaker_model is not None,
         "asr_ok": _model is not None,
         "vad_ok": _vad_model is not None,
@@ -875,9 +1013,17 @@ async def stream_asr(websocket: WebSocket):
     language = "auto"
     partial_interval_ms = 850
     min_audio_ms = 800
+    # SenseVoice is not a native streaming model.  Keep each inference bounded to a
+    # 30 second rolling window, but retain overlap and return cumulative text/time.
+    # The old implementation simply stopped appending at 30 seconds, which made
+    # Unity believe a long song had gone silent while recording continued.
     max_audio_ms = 30000
+    overlap_audio_ms = 8000
     audio = bytearray()
-    last_inferred_bytes = 0
+    total_audio_bytes = 0
+    last_inferred_total_bytes = 0
+    window_start_bytes = 0
+    committed_text = ""
     last_text = ""
     started = False
 
@@ -927,12 +1073,28 @@ async def stream_asr(websocket: WebSocket):
                 continue
 
             max_bytes = max_audio_ms * 16 * 2
-            room = max_bytes - len(audio)
-            if room > 0:
-                audio.extend(chunk[:room])
+            overlap_bytes = overlap_audio_ms * 16 * 2
+            # Roll before adding the next frame.  last_text is the latest cumulative
+            # hypothesis, so it is safe to commit while the retained overlap gives
+            # the next window a chance to repair the boundary.
+            if len(audio) + len(chunk) > max_bytes:
+                committed_text = last_text or committed_text
+                keep = min(len(audio), overlap_bytes)
+                audio = bytearray(audio[-keep:]) if keep > 0 else bytearray()
+                window_start_bytes = max(0, total_audio_bytes - len(audio))
+                print(
+                    f"[Stream/Roll] total={total_audio_bytes // (16 * 2)}ms "
+                    f"window_start={window_start_bytes // (16 * 2)}ms "
+                    f"overlap={len(audio) // (16 * 2)}ms "
+                    f"committed_chars={len(committed_text)}",
+                    flush=True,
+                )
 
-            audio_ms = len(audio) // (16 * 2)
-            new_audio_ms = (len(audio) - last_inferred_bytes) // (16 * 2)
+            audio.extend(chunk)
+            total_audio_bytes += len(chunk)
+
+            audio_ms = total_audio_bytes // (16 * 2)
+            new_audio_ms = (total_audio_bytes - last_inferred_total_bytes) // (16 * 2)
             if audio_ms < min_audio_ms or new_audio_ms < partial_interval_ms:
                 continue
 
@@ -942,12 +1104,14 @@ async def stream_asr(websocket: WebSocket):
             result = await loop.run_in_executor(
                 None, recognize_stream_partial, pcm, language
             )
-            last_inferred_bytes = len(audio)
+            last_inferred_total_bytes = total_audio_bytes
 
-            current = result.get("text", "") or ""
+            window_text = result.get("text", "") or ""
+            current = merge_streaming_transcripts(committed_text, window_text)
             stable = common_prefix(last_text, current) if last_text else ""
             revision = bool(last_text and not current.startswith(last_text))
             last_text = current
+            result["text"] = current
             result.update(
                 {
                     "event": "partial",
@@ -955,6 +1119,7 @@ async def stream_asr(websocket: WebSocket):
                     "unstable_text": current[len(stable):],
                     "revision": revision,
                     "audio_ms": audio_ms,
+                    "window_start_ms": window_start_bytes // (16 * 2),
                 }
             )
             await websocket.send_json(result)
@@ -1206,7 +1371,7 @@ async def vad(
         min_ms = max(80, min(2000, int(min_speech_ms)))
         is_speech, speech_ms, segments, elapsed = run_vad(wav, min_ms)
         singing = (
-            _singing_analyzer.analyze(wav, thorough=False)
+            _streaming_analyzer.analyze(wav, thorough=False)
             if _singing_analyzer is not None
             else None
         )
@@ -1271,29 +1436,392 @@ async def vad(
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+def empty_asr_result(reason: str, elapsed: float = 0.0):
+    """Return a normal no-speech result for an audio boundary, not a server fault."""
+    result = {
+        "text": "",
+        "language": "",
+        "emotion": "",
+        "audio_event": "NoSpeech",
+        "no_speech": True,
+        "speech_ms": 0,
+        "vad_elapsed": round(elapsed, 3),
+        "elapsed": round(elapsed, 3),
+        "no_speech_reason": reason,
+    }
+    result.update(unknown_speaker_meta())
+    return result
+
+
+def build_pitch_boundary_subsegments(
+    analysis: Optional[dict],
+    start: float,
+    end: float,
+    recovery_start: float,
+) -> list:
+    """Return cheap, timestamped melodic-shape facts from an existing timeline.
+
+    No recognizer or pitch model is invoked here. The aggregate boundary ASR owns
+    the text; these windows only reveal an internal speech/melody transition that
+    a single label for the entire margin would hide.
+    """
+    analysis = analysis or {}
+    duration = max(0.0, end - start)
+    timeline = analysis.get("pitch_timeline_midi", [])
+    if timeline is None or duration < 1.0 or len(timeline) == 0:
+        return []
+    frame_seconds = max(
+        0.02, float(analysis.get("pitch_timeline_frame_seconds", 0.10) or 0.10)
+    )
+    timeline_start = float(
+        analysis.get("pitch_timeline_start_seconds", 0.0) or 0.0
+    )
+    segments = []
+    cursor = start
+    while cursor < end - 0.18 and len(segments) < 12:
+        window_end = min(end, cursor + 1.0)
+        if end - window_end < 0.35:
+            window_end = end
+        frame_lo = max(0, int((cursor - timeline_start) / frame_seconds))
+        frame_hi = min(
+            len(timeline),
+            max(frame_lo + 1, int(np.ceil((window_end - timeline_start) / frame_seconds))),
+        )
+        values = np.asarray(timeline[frame_lo:frame_hi], dtype=np.float32)
+        voiced = values[np.isfinite(values) & (values > 1.0)]
+        voiced_ratio = float(voiced.size / max(1, values.size))
+        if voiced.size >= 3:
+            steps = np.abs(np.diff(voiced))
+            smooth_ratio = float(np.mean(steps <= 1.5)) if steps.size else 1.0
+        else:
+            smooth_ratio = 0.0
+        if voiced_ratio >= 0.45 and smooth_ratio >= 0.60:
+            evidence_type = "melodic"
+        elif voiced_ratio >= 0.22 and smooth_ratio >= 0.35:
+            evidence_type = "uncertain"
+        else:
+            evidence_type = "non_melodic"
+        segments.append(
+            {
+                "start_seconds": round(cursor, 3),
+                "end_seconds": round(window_end, 3),
+                "expanded_start_seconds": round(cursor - recovery_start, 3),
+                "expanded_end_seconds": round(window_end - recovery_start, 3),
+                "type": evidence_type,
+                "voiced_ratio": round(voiced_ratio, 4),
+                "pitch_smooth_ratio": round(smooth_ratio, 4),
+            }
+        )
+        cursor = window_end
+    return segments
+
+
+def summarize_boundary_subsegment_conflict(kind: str, segments: list) -> dict:
+    """Summarise disagreement without turning it into an automatic verdict.
+
+    The aggregate short-ASR/acoustic probe and the full-take pitch timeline are
+    independent observations.  A several-second melodic run inside a margin that
+    the aggregate probe called ``speech`` is exactly the case that must reach the
+    role for semantic review; neither observation is allowed to erase the other.
+    """
+    total_seconds = 0.0
+    melodic_seconds = 0.0
+    current_run = 0.0
+    longest_run = 0.0
+    for segment in segments or []:
+        duration = max(
+            0.0,
+            float(segment.get("end_seconds", 0.0) or 0.0)
+            - float(segment.get("start_seconds", 0.0) or 0.0),
+        )
+        total_seconds += duration
+        if str(segment.get("type", "")).lower() == "melodic":
+            melodic_seconds += duration
+            current_run += duration
+            longest_run = max(longest_run, current_run)
+        else:
+            current_run = 0.0
+    melodic_ratio = melodic_seconds / total_seconds if total_seconds > 1e-6 else 0.0
+    aggregate_non_singing = str(kind or "").lower() in {
+        "speech", "non_singing", "uncertain", "unknown", "too_short"
+    }
+    review_required = aggregate_non_singing and (
+        longest_run >= 1.5
+        or (melodic_seconds >= 2.0 and melodic_ratio >= 0.45)
+    )
+    reason = ""
+    if review_required:
+        reason = (
+            f"aggregate={kind or 'unknown'} but timestamped pitch windows contain "
+            f"{melodic_seconds:.2f}s melodic evidence "
+            f"(longest continuous run {longest_run:.2f}s); semantic boundary review required"
+        )
+    return {
+        "review_required": bool(review_required),
+        "melodic_seconds": round(melodic_seconds, 3),
+        "melodic_ratio": round(melodic_ratio, 4),
+        "longest_melodic_run_seconds": round(longest_run, 3),
+        "review_reason": reason,
+    }
+
+
+def analyze_singing_boundary_extras(
+    wav: np.ndarray,
+    analysis: Optional[dict],
+    language: str,
+    allow_acoustic_candidate: bool = False,
+) -> dict:
+    """Inspect recoverable audio outside the clean singing island.
+
+    These are timestamped facts for the role, not an execution policy. ASR text
+    alone cannot distinguish lyrics from speech, so each margin also gets a short
+    acoustic probe. Unity later lets the LLM choose clean, expanded, or a crop.
+    """
+    empty = {
+        "singing_head_extra_start_seconds": 0.0,
+        "singing_head_extra_end_seconds": 0.0,
+        "singing_head_extra_text": "",
+        "singing_head_extra_type": "none",
+        "singing_head_extra_probability": 0.0,
+        "singing_head_extra_acoustic_available": False,
+        "singing_head_extra_asr_available": False,
+        "singing_head_extra_segments": [],
+        "singing_head_extra_review_required": False,
+        "singing_head_extra_melodic_seconds": 0.0,
+        "singing_head_extra_melodic_ratio": 0.0,
+        "singing_head_extra_longest_melodic_run_seconds": 0.0,
+        "singing_head_extra_review_reason": "",
+        "singing_tail_extra_start_seconds": 0.0,
+        "singing_tail_extra_end_seconds": 0.0,
+        "singing_tail_extra_text": "",
+        "singing_tail_extra_type": "none",
+        "singing_tail_extra_probability": 0.0,
+        "singing_tail_extra_acoustic_available": False,
+        "singing_tail_extra_asr_available": False,
+        "singing_tail_extra_segments": [],
+        "singing_tail_extra_review_required": False,
+        "singing_tail_extra_melodic_seconds": 0.0,
+        "singing_tail_extra_melodic_ratio": 0.0,
+        "singing_tail_extra_longest_melodic_run_seconds": 0.0,
+        "singing_tail_extra_review_reason": "",
+    }
+    if not analysis or not (
+        bool(analysis.get("is_singing", False)) or allow_acoustic_candidate
+    ):
+        return empty
+
+    total = wav.size / 16000.0
+    clean_start = max(
+        0.0, min(total, float(analysis.get("singing_start_seconds", 0.0) or 0.0))
+    )
+    clean_end = float(analysis.get("singing_end_seconds", 0.0) or 0.0)
+    if clean_end <= 0.0 or clean_end > total:
+        clean_end = total
+    raw_recovery_start = analysis.get("singing_recovery_start_seconds", clean_start)
+    if raw_recovery_start is None:
+        raw_recovery_start = clean_start
+    recovery_start = max(
+        0.0,
+        min(
+            clean_start,
+            float(raw_recovery_start),
+        ),
+    )
+    recovery_end = float(
+        analysis.get("singing_recovery_end_seconds", clean_end) or clean_end
+    )
+    recovery_end = max(clean_end, min(total, recovery_end if recovery_end > 0 else clean_end))
+
+    def inspect(label: str, start: float, end: float) -> dict:
+        start = max(0.0, min(total, start))
+        end = max(start, min(total, end))
+        duration = end - start
+        fact = {
+            f"singing_{label}_extra_start_seconds": round(start, 3),
+            f"singing_{label}_extra_end_seconds": round(end, 3),
+            f"singing_{label}_extra_text": "",
+            f"singing_{label}_extra_type": "none" if duration < 0.18 else "too_short",
+            f"singing_{label}_extra_probability": 0.0,
+            f"singing_{label}_extra_acoustic_available": False,
+            f"singing_{label}_extra_asr_available": False,
+            f"singing_{label}_extra_segments": [],
+            f"singing_{label}_extra_review_required": False,
+            f"singing_{label}_extra_melodic_seconds": 0.0,
+            f"singing_{label}_extra_melodic_ratio": 0.0,
+            f"singing_{label}_extra_longest_melodic_run_seconds": 0.0,
+            f"singing_{label}_extra_review_reason": "",
+        }
+        if duration < 0.18:
+            return fact
+        lo = max(0, int(start * 16000))
+        hi = min(int(wav.size), int(end * 16000))
+        segment = wav[lo:hi]
+        text = ""
+        boundary_event = ""
+        asr_available = False
+        if duration >= 0.45 and segment.size >= 7200:
+            try:
+                recognized = generate_asr(segment, language)
+                parsed = parse_output(recognized[0]["text"] if recognized else "")
+                text = parsed[0]
+                boundary_event = parsed[3]
+                text = (text or "").strip()
+                asr_available = True
+            except Exception as exc:
+                print(f"[SingingBoundary] {label} ASR failed: {exc}", flush=True)
+
+        # Fuse the short transcript into the acoustic probability.  Without the
+        # lyrics-density penalty, ordinary speech probes measured p≈.55 and were
+        # incorrectly labelled uncertain before their ASR text was even considered.
+        probe = None
+        acoustic_available = False
+        if duration >= 0.45 and _singing_analyzer is not None and segment.size >= 7200:
+            try:
+                probe = _singing_analyzer.analyze(
+                    segment,
+                    lyrics=text,
+                    audio_event=boundary_event,
+                    thorough=False,
+                    language=language,
+                )
+                acoustic_available = True
+            except Exception as exc:
+                print(f"[SingingBoundary] {label} acoustic probe failed: {exc}", flush=True)
+        probability = float((probe or {}).get("singing_probability", 0.0) or 0.0)
+
+        if not acoustic_available and not asr_available:
+            kind = "too_short" if duration < 0.45 else "unknown"
+        elif acoustic_available and probability >= 0.58:
+            kind = "singing"
+        elif acoustic_available and probability >= 0.52:
+            kind = "uncertain"
+        elif text:
+            kind = "speech"
+        elif acoustic_available:
+            # Empty short ASR plus low singing probability only proves that this
+            # margin is not confidently melodic. It may be breath, noise, or
+            # unrecognised quiet speech, so do not manufacture a "noise" fact.
+            kind = "non_singing"
+        else:
+            kind = "unknown"
+        fact[f"singing_{label}_extra_text"] = text
+        fact[f"singing_{label}_extra_type"] = kind
+        fact[f"singing_{label}_extra_probability"] = round(probability, 4)
+        fact[f"singing_{label}_extra_acoustic_available"] = acoustic_available
+        fact[f"singing_{label}_extra_asr_available"] = asr_available
+
+        # A single 4-5 second "speech" label hides the important shape
+        # speech -> opening melody.  Expose short timestamped acoustic windows
+        # from the already-computed full-take pitch timeline.  This does not run
+        # extra ASR/model passes, so boundary detail does not increase EOU latency;
+        # the one short ASR above remains the transcript for the whole margin.
+        segments = build_pitch_boundary_subsegments(
+            analysis, start, end, recovery_start
+        )
+        fact[f"singing_{label}_extra_segments"] = segments
+        shape = summarize_boundary_subsegment_conflict(kind, segments)
+        fact[f"singing_{label}_extra_review_required"] = shape["review_required"]
+        fact[f"singing_{label}_extra_melodic_seconds"] = shape["melodic_seconds"]
+        fact[f"singing_{label}_extra_melodic_ratio"] = shape["melodic_ratio"]
+        fact[f"singing_{label}_extra_longest_melodic_run_seconds"] = (
+            shape["longest_melodic_run_seconds"]
+        )
+        fact[f"singing_{label}_extra_review_reason"] = shape["review_reason"]
+        print(
+            f"[SingingBoundary] {label}=[{start:.2f},{end:.2f}]s "
+            f"type={kind} p={probability:.2f} text={text!r} "
+            f"subsegments={len(segments)} review={shape['review_required']} "
+            f"melodic={shape['melodic_seconds']:.2f}s/"
+            f"run={shape['longest_melodic_run_seconds']:.2f}s",
+            flush=True,
+        )
+        return fact
+
+    empty.update(inspect("head", recovery_start, clean_start))
+    empty.update(inspect("tail", clean_end, recovery_end))
+    return empty
+
+
+def is_empty_tensor_list_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "non-empty tensorlist" in message or "non empty tensorlist" in message
+
+
 @app.post("/asr")
 async def asr(
     audio_file: UploadFile = File(...),
     language: str = Form("auto"),
     learn_speaker: bool = Form(True),
     expect_singing: bool = Form(False),
+    request_id: str = Form(""),
+    channel_id: str = Form(""),
+    speculative: bool = Form(False),
 ):
     if _model is None:
         return JSONResponse({"error": "model not loaded"}, status_code=503)
+    data = await audio_file.read()
+    submitted_at = time.perf_counter()
+    # Direct Python callers (tests/tools) do not resolve FastAPI Form defaults.
+    request_id = request_id if isinstance(request_id, str) else ""
+    channel_id = channel_id if isinstance(channel_id, str) else ""
+    speculative = speculative if isinstance(speculative, bool) else False
+    job = _final_asr_scheduler.submit(recognize_final_audio,
+        (data, language, learn_speaker, expect_singing, submitted_at),
+        request_id, channel_id, speculative)
+    return await _final_asr_scheduler.wait(job)
 
+
+@app.post("/asr/cancel")
+async def cancel_asr(request_id: str = Form(...)):
+    return {"ok": True, "found": _final_asr_scheduler.cancel(request_id)}
+
+
+@app.post("/asr/promote")
+async def promote_asr(request_id: str = Form(...)):
+    return {"ok": _final_asr_scheduler.promote(request_id)}
+
+
+def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
+                          expect_singing=False, submitted_at=None):
+    """Authoritative complete analysis on the single final worker, not the event loop."""
+    queue_wait = max(0.0, time.perf_counter() - submitted_at) if submitted_at is not None else 0.0
+    timing = AsrTiming()
     try:
-        data = await audio_file.read()
-
-        wav = decode_wav(data)
+        if not data:
+            return empty_asr_result("empty_upload")
+        try:
+            wav = decode_wav(data)
+        except Exception as exc:
+            return JSONResponse(
+                {"error": f"invalid audio: {exc}"}, status_code=400
+            )
+        if wav.size < 160:
+            return empty_asr_result("empty_or_too_short_audio")
+        if not np.isfinite(wav).all():
+            return JSONResponse(
+                {"error": "invalid audio: non-finite samples"}, status_code=400
+            )
+        raw_wav = wav
+        timing.mark("decode")
 
         # 第二道保险：没有足够长的人声就不运行 SenseVoice，避免噪声幻听。
         # 纯哼唱可能被 speech-VAD 拒绝，所以并行的音高门可有条件放行。
-        has_speech, speech_ms, segments, vad_dt = run_vad(wav)
+        try:
+            has_speech, speech_ms, segments, vad_dt = run_vad(wav)
+        except RuntimeError as exc:
+            if is_empty_tensor_list_error(exc):
+                print(f"[ASR] empty tensor boundary in VAD: {exc}")
+                return empty_asr_result("empty_tensor_vad")
+            raise
+        timing.mark("vad")
+        checkpoint()
         quick_singing = (
             _singing_analyzer.analyze(wav, thorough=False)
             if _singing_analyzer is not None
             else None
         )
+        timing.mark("quick_pitch")
+        checkpoint()
         singing_vad_override = not has_speech and is_tonal_vocal(quick_singing)
         if singing_vad_override:
             has_speech = True
@@ -1332,6 +1860,8 @@ async def asr(
         wav, audio_content_start_seconds = trim_to_speech_with_offset(
             wav, segments, tail_margin_ms=singing_tail_margin
         )
+        if wav.size < 160:
+            return empty_asr_result("empty_after_vad_trim", vad_dt)
         if singing_tail_margin and LOG_VAD:
             print(f"[VAD] 歌声尾部余量 {singing_tail_margin}ms "
                   f"(tonal={is_tonal_vocal(quick_singing)} expect={expect_singing})")
@@ -1339,6 +1869,8 @@ async def asr(
         speaker_meta, speaker_dt, pending_embedding = identify_speaker(
             wav, speech_ms, learn=learn_speaker
         )
+        timing.mark("speaker")
+        checkpoint()
         if speaker_meta.get("speaker_kind") == "ai":
             print(
                 f"[ASR] rejected AI_SELF echo score={speaker_meta.get('speaker_confidence')} "
@@ -1359,11 +1891,19 @@ async def asr(
             return result
 
         t0 = time.time()
-        res = generate_asr(wav, language)
+        try:
+            res = generate_asr(wav, language)
+        except RuntimeError as exc:
+            if is_empty_tensor_list_error(exc):
+                print(f"[ASR] empty tensor boundary in recognizer: {exc}")
+                return empty_asr_result("empty_tensor_asr", vad_dt + speaker_dt)
+            raise
         dt = time.time() - t0
 
         raw = res[0]["text"] if res else ""
         text, lang, emotion, audio_event = parse_output(raw)
+        timing.mark("recognizer")
+        checkpoint()
 
         # 识别后的幻听闸。SenseVoice 在非语音音频上会吐出极短的固定残片——实测同一段
         # 环境噪音反复被识别成 'I.' / '.'，语种判成 en(而对话是中日文)，情绪一律
@@ -1389,6 +1929,8 @@ async def asr(
             if _singing_analyzer is not None
             else quick_singing
         )
+        timing.mark("full_pitch")
+        checkpoint()
         # 幻听闸。放在 thorough 分析之后，因为要求两遍分析都认为这是人声才豁免。
         # 上一版放在 quick 之后、只看 quick，结果是: quick 探针把次低频嗡鸣判成
         # tonal(周期性极高)，闸门被短路，'I.' / '.' 一路进到角色那里；而 [ASR] 日志
@@ -1441,6 +1983,9 @@ async def asr(
         # full post-VAD time base; a tail-relative score would otherwise lose
         # the opening notes a second time.
         full_turn_singing_score = (singing or {}).get("singing_score")
+        full_turn_score_window_offset = float(
+            (singing or {}).get("analysis_window_offset_seconds", 0.0) or 0.0
+        )
         expected_singing_override = False
         # In armed sing-along mode, recover a long acoustically melodic clip
         # before the transcript-free tail fallback. Keeping the full analysis
@@ -1480,12 +2025,29 @@ async def asr(
                     expected_analysis["singing_end_seconds"] = tail_offset + float(
                         expected_analysis.get("singing_end_seconds", 0.0)
                     )
+                # 0.0 is a valid local start, not a missing-value sentinel.
+                expected_analysis["singing_recovery_start_seconds"] = tail_offset + float(
+                    expected_analysis.get("singing_recovery_start_seconds", 0.0)
+                )
+                if float(expected_analysis.get("singing_recovery_end_seconds", 0.0)) > 0.0:
+                    expected_analysis["singing_recovery_end_seconds"] = tail_offset + float(
+                        expected_analysis.get("singing_recovery_end_seconds", 0.0)
+                    )
                 expected_analysis["pitch_timeline_start_seconds"] = tail_offset + float(
                     expected_analysis.get("pitch_timeline_start_seconds", 0.0)
                 )
+                expected_analysis["analysis_window_offset_seconds"] = tail_offset + float(
+                    expected_analysis.get("analysis_window_offset_seconds", 0.0)
+                )
+                expected_analysis["asr_boundary_candidates"] = [
+                    tail_offset + float(value)
+                    for value in expected_analysis.get("asr_boundary_candidates", [])]
                 singing = expected_analysis
                 if full_turn_singing_score:
                     singing["singing_score"] = full_turn_singing_score
+                    singing["singing_score_window_offset_seconds"] = (
+                        full_turn_score_window_offset
+                    )
                 singing["is_singing"] = True
                 singing["summary"] = (
                     "待唱状态下由尾部多帧音高证据确认；" +
@@ -1498,6 +2060,7 @@ async def asr(
                 f"full=({describe_expected_singing_gate(singing)}) "
                 f"tail=({describe_expected_singing_gate(expected_analysis)})"
             )
+        timing.mark("recovery")
         print(
             f"[ASR] dt={dt:.2f}s lang={lang} emo={emotion} evt={audio_event} "
             f"spk={speaker_meta.get('speaker_id')}({speaker_meta.get('speaker_confidence')}) "
@@ -1520,7 +2083,48 @@ async def asr(
             "elapsed": round(dt + vad_dt + speaker_dt, 3),
         }
         result.update(singing_response_fields(singing))
-        segment_lyrics = transcribe_singing_segment(wav, singing, text, language)
+        # 这里是取证，不是改判：整轮可以仍是 speech/uncertain，
+        # 但只要长旋律岛有足够的多帧声学依据，就单独转写它。
+        # Unity 会把 singing_text 与前面的说话分开保存，并交由 LLM 判断语义。
+        acoustic_segment_candidate = bool(
+            singing and is_expected_singing_performance(singing)
+        )
+        # The whole pass remains an acoustic-analysis hint and a fallback. Final
+        # semantics are decoded independently per time span, including margins
+        # outside expanded, even when the whole-turn acoustic label is speech.
+        def recognize_piece(piece):
+            checkpoint()
+            recognized = generate_asr(piece, "auto")
+            parsed = parse_output(recognized[0]["text"] if recognized else "")
+            return dict(text=parsed[0], language=parsed[1], audio_event=parsed[3])
+
+        mixed = transcribe_segments(wav, singing, recognize_piece, text)
+        result.update(mixed)
+        if mixed:
+            island_parts = [s for s in mixed["turn_segments"] if (acoustic_segment_candidate or singing.get("is_singing")) and s["region"] == "island"
+                            and s["start_seconds"] >= float(singing.get("singing_start_seconds", 0)) - .001
+                            and s["end_seconds"] <= float(singing.get("singing_end_seconds", 0)) + .001]
+            island_text = " ".join(s["text"] for s in island_parts if s["text"])
+            island_languages = set(s["language"] for s in island_parts if s["text"] and s["language"])
+            segment_lyrics = dict(text=island_text,
+                                 language=next(iter(island_languages)) if len(island_languages) == 1 else "")
+            if segment_lyrics["language"].startswith("ja"):
+                segment_lyrics.update(normalise_japanese_lyrics(island_text))
+            if not island_parts:
+                # Transcript windows may straddle a tiny margin. Playback lyrics
+                # still have to correspond to the exact clean audio crop.
+                segment_lyrics = transcribe_singing_segment(
+                    wav, singing, text, language,
+                    allow_acoustic_candidate=acoustic_segment_candidate)
+            print("[ASR/Segments] " + json.dumps(mixed, ensure_ascii=False), flush=True)
+        else:
+            segment_lyrics = transcribe_singing_segment(
+                wav,
+                singing,
+                text,
+                language,
+                allow_acoustic_candidate=acoustic_segment_candidate,
+            )
         result["singing_text"] = segment_lyrics.get("text", "")
         # 歌词换成了分段的，随它而来的语言与假名也必须一起换，否则 9883 会拿
         # 整轮的语言去解析这一段(实测中文 G2P 撞上假名，整份乐谱被弃用)。
@@ -1533,24 +2137,70 @@ async def asr(
             segment_lyrics.get("lyrics_reading_complete", False)
         )
         result["singing_lyrics_mora"] = segment_lyrics.get("lyrics_mora", []) or []
-        result["singing_tail_text"] = transcribe_singing_tail(wav, singing, language)
+        timing.mark("segment_asr")
+        boundary_facts = analyze_singing_boundary_extras(
+            wav,
+            singing,
+            language,
+            allow_acoustic_candidate=acoustic_segment_candidate,
+        )
+        result.update(boundary_facts)
+        timing.mark("boundary_asr")
+        # If the recoverable tail already reaches the end of this content WAV,
+        # boundary ASR inspected exactly the same interval as singing_tail would.
+        # Reuse it instead of serializing a duplicate recognizer pass.
+        tail_extra_end = float(
+            boundary_facts.get("singing_tail_extra_end_seconds", 0.0) or 0.0
+        )
+        if mixed:
+            result["singing_tail_text"] = " ".join(
+                s["text"] for s in mixed["turn_segments"] if s["region"] == "tail" and s["text"])
+        elif (boundary_facts.get("singing_tail_extra_asr_available") and
+                abs(tail_extra_end - wav.size / 16000.0) <= 0.05):
+            result["singing_tail_text"] = boundary_facts["singing_tail_extra_text"]
+        else:
+            result["singing_tail_text"] = transcribe_singing_tail(
+                wav, singing, language
+            )
+        timing.mark("tail_asr")
         #分段歌词比整轮文本更贴近真正唱的内容，优先拿它去回忆
         result["song_recall"] = build_song_recall(
             singing, result.get("singing_text") or text
         )
+        timing.mark("song_recall")
         result["audio_content_start_seconds"] = round(audio_content_start_seconds, 3)
         result["singing_expected"] = bool(expect_singing)
         result["singing_expected_override"] = bool(expected_singing_override)
         if singing_vad_override:
             result["is_singing"] = True
         result.update(speaker_meta)
+        try:
+            dump_mixed_sample(raw_wav, wav, result,
+                              os.path.join(os.path.dirname(__file__), "mixed_dumps"))
+        except Exception as exc:
+            print(f"[ASR/MixedDump] snapshot failed: {exc}", flush=True)
         dump_band_sample(wav, singing, result, text, expect_singing)
+        timing.mark("dump")
+        result["timings"] = timing.finish()
+        result["timings"]["queue_wait"] = round(queue_wait, 4)
+        result["timing_schema"] = 1
         return result
     except Exception as e:
+        # FunASR/PyTorch occasionally reaches an empty internal segment after the
+        # upload and VAD checks. Treat that known boundary as normal silence even
+        # when it originated in an auxiliary analyzer rather than the two guarded
+        # calls above; malformed/unknown failures still remain real server errors.
+        if is_empty_tensor_list_error(e):
+            print(f"[ASR] empty tensor boundary in pipeline: {e}", flush=True)
+            return empty_asr_result("empty_tensor_pipeline")
         import traceback
 
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        phases = timing.finish()
+        phases["queue_wait"] = round(queue_wait, 4)
+        print("[ASR/Timing] " + json.dumps(phases, ensure_ascii=False), flush=True)
 
 
 # ------------------------------ 歌曲检索 ------------------------------
@@ -1561,8 +2211,15 @@ async def extract_singing_score(
     audio_file: UploadFile = File(...),
     lyrics: str = Form(""),
     language: str = Form(""),
+    pitch_only: bool = Form(False),
 ):
-    """Extract a renderer-neutral singing score without running speech ASR."""
+    """Extract singing facts without running speech ASR or mutating memory.
+
+    ``pitch_only`` is used to verify audio the character has just rendered.  It
+    accepts a reliable F0 centre even when note segmentation is too weak to
+    build a renderer-neutral score; normal score callers retain the stricter
+    historical contract.
+    """
     if _singing_analyzer is None:
         return JSONResponse({"error": "singing analyzer not loaded"}, status_code=503)
     try:
@@ -1578,9 +2235,18 @@ async def extract_singing_score(
             ),
         )
         score = analysis.get("singing_score")
-        if not score or not score.get("notes"):
+        pitch_median_hz = float(analysis.get("pitch_median_hz", 0.0))
+        has_score = bool(score and score.get("notes"))
+        if not has_score and not (pitch_only and pitch_median_hz > 0.0):
             return JSONResponse(
-                {"ok": False, "error": "no reliable singing score"},
+                {
+                    "ok": False,
+                    "error": (
+                        "no reliable rendered pitch"
+                        if pitch_only
+                        else "no reliable singing score"
+                    ),
+                },
                 status_code=422,
             )
         return {
@@ -1589,7 +2255,17 @@ async def extract_singing_score(
             "singing_probability": float(
                 analysis.get("singing_probability", 0.0)
             ),
-            "singing_score": score,
+            # This endpoint is also the side-effect-free verifier for rendered
+            # character audio.  Keep the compact pitch facts outside the score so
+            # Unity does not need to reconstruct them from a large f0 array.
+            "pitch_backend": str(analysis.get("pitch_backend", "")),
+            "pitch_stability": float(analysis.get("pitch_stability", 0.0)),
+            "voiced_ratio": float(analysis.get("voiced_ratio", 0.0)),
+            "pitch_median_hz": pitch_median_hz,
+            "pitch_median_note": str(analysis.get("pitch_median_note", "")),
+            "pitch_low_note": str(analysis.get("pitch_low_note", "")),
+            "pitch_high_note": str(analysis.get("pitch_high_note", "")),
+            "singing_score": score if has_score else None,
         }
     except Exception as exc:
         import traceback
@@ -1687,7 +2363,9 @@ async def sing_remembered_song(
     title: str = Form(""),
     query: str = Form(""),
     mode: str = Form("memory"),
-    max_seconds: float = Form(60.0),
+    # 0 = no whole-song transport ceiling. Unity performs natural chunking before
+    # voice conversion; a positive value remains available to explicit callers.
+    max_seconds: float = Form(0.0),
     seed: int = Form(1234),
     # 按歌词点某一段。用户是用词句指段的（"那段 can you give me one last kiss"），
     # 不是用序号；给了这个就只唱那一段，忽略 mode。
@@ -1695,7 +2373,12 @@ async def sing_remembered_song(
 ):
     """Resolve local remembered audio; never invent an unavailable continuation."""
     if _song_search_engine is None:
-        return JSONResponse({"error": "song search engine not loaded"}, status_code=503)
+        return JSONResponse({
+            "ok": False,
+            "action": "sing",
+            "error_code": "server_unavailable",
+            "error": "song search engine not loaded",
+        }, status_code=503)
     try:
         query_contour = []
         if audio_file is not None:
@@ -1743,17 +2426,48 @@ async def sing_remembered_song(
             "external_audio_upload": False,
         })
         return plan
-    except (ValueError, KeyError, FileNotFoundError) as exc:
+    except KeyError as exc:
         return JSONResponse({
             "ok": False,
             "action": "sing",
+            "error_code": "not_found",
             "error": str(exc),
+        }, status_code=400)
+    except FileNotFoundError as exc:
+        return JSONResponse({
+            "ok": False,
+            "action": "sing",
+            "error_code": "audio_missing",
+            "error": str(exc),
+        }, status_code=400)
+    except ValueError as exc:
+        detail = str(exc)
+        lowered = detail.lower()
+        if "上限" in detail or "above the" in lowered or " limit" in lowered:
+            error_code = "duration_limit"
+        elif ("no audio" in lowered or "no playable" in lowered or
+              "no managed audio" in lowered):
+            error_code = "no_playable_audio"
+        elif "没有匹配" in detail or "no matching" in lowered:
+            error_code = "invalid_selector"
+        else:
+            error_code = "invalid_request"
+        return JSONResponse({
+            "ok": False,
+            "action": "sing",
+            "error_code": error_code,
+            "error": detail,
         }, status_code=400)
     except Exception as exc:
         import traceback
 
         traceback.print_exc()
-        return JSONResponse({"ok": False, "action": "sing", "error": str(exc)}, status_code=500)
+        return JSONResponse({
+            "ok": False,
+            "action": "sing",
+            "error_code": "server_error",
+            "error": str(exc),
+        }, status_code=500)
 
 
 @app.post("/songs/search")

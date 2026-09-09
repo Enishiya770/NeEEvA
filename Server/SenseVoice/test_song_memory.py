@@ -188,7 +188,7 @@ class SongMemoryTests(unittest.TestCase):
             self.assertEqual(plan["selected_references"][0]["sequence_index"], 1)
             self.assertEqual(plan["lyrics_confidence"], 1.0)
 
-    def test_explicit_full_song_uses_zero_as_unlimited_total_duration(self):
+    def test_default_full_song_has_no_sixty_second_total_limit(self):
         contours = [
             [60, 60, 62, 64, 65, 67, 69, 71, 72, 71, 69, 67],
             [48, 52, 55, 59, 62, 66, 69, 73, 76, 73, 69, 66],
@@ -200,8 +200,10 @@ class SongMemoryTests(unittest.TestCase):
                 os.path.join(temp_dir, "song_catalog.json"),
                 _SequenceSingingAnalyzer(contours),
             )
-            audio = _silent_wav_bytes(seconds=1.0)
-            wav = np.zeros(16000, dtype=np.float32)
+            # Four independent 20-second references reproduce the 79.8s catalog case.
+            # The old 60s default must fail this test; the new default is unlimited.
+            audio = _silent_wav_bytes(seconds=20.0)
+            wav = np.zeros(20 * 16000, dtype=np.float32)
             first = engine.remember_clip(
                 "Long Song", "Artist", wav, audio, lyrics="part one"
             )
@@ -220,9 +222,15 @@ class SongMemoryTests(unittest.TestCase):
                     song_id=first["song_id"], mode="memory", max_seconds=3.0
                 )
             full_plan = engine.resolve_performance(
-                song_id=first["song_id"], mode="memory", max_seconds=0.0
+                song_id=first["song_id"], mode="memory"
             )
             self.assertEqual(full_plan["selected_segment_count"], 4)
+            selected_seconds = sum(
+                float(item.get("duration_seconds", 0.0))
+                for item in full_plan["selected_references"]
+            )
+            self.assertGreater(selected_seconds, 60.0)
+            self.assertAlmostEqual(selected_seconds, 80.0, delta=0.25)
 
 
 if __name__ == "__main__":

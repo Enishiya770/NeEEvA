@@ -8,9 +8,12 @@ starting; the deterministic NumPy fallback remains available.
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import math
 import os
 import threading
+from collections import OrderedDict
 from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
@@ -18,6 +21,13 @@ from singing_score import build_singing_score
 
 
 NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+# A single recorded practice take can legitimately last up to one minute.  Keep
+# modest headroom for spoken lead-ins and note tails, while retaining a bounded
+# FFT/CREPE workload for accidentally unclosed recordings.  Every downstream
+# frame cap must derive from this value so audio coordinates and pitch timelines
+# cannot silently describe different windows.
+_MAX_ANALYSIS_SECONDS = 75.0
 
 # 排查「回哼从哪句开始/到哪句结束」时用。一次 thorough 分析只打一行，
 # 排查完可用 NEEEVA_LOG_ISLAND=0 关掉。
@@ -107,15 +117,23 @@ class SingingAnalyzer:
         self._crepe = None
         self._crepe_checked = False
         self._crepe_lock = threading.Lock()
+        self._analysis_lock = threading.RLock()
         # 细化候选岛时会对切片再调一次 analyze()，用这个标志挡住无限递归。
         self._nested_island_probe = False
         # 可选：f(wav) -> str，把一小段音频转写成文字。由服务端注入(它才有 ASR)。
         # 给了之后逐岛打分会带上该岛自己的转写，speech_density_penalty 随之生效——
         # 那是把"说得快"和"唱得慢"分开的关键，见 _ISLAND_PROB_FLOOR 的说明。
         self.island_transcriber = None
-        # 音频指纹 → (已累计次数, 平均后的周期性)。同一段音频被重复分析时用来降方差，
-        # 见 _track_crepe 里的说明。只保留最近几段。
-        self._periodicity_history: Dict[tuple, Tuple[int, np.ndarray]] = {}
+        # torchcrepe 的 GPU 推理对同一输入并非严格确定。边界判断处在几个相邻窗口的
+        # 临界值上时，同一份 WAV 重跑会得到不同 clean 起点。缓存“第一次真实结果”而
+        # 不是滚动平均：平均值每调用一次都会变化，本身正是另一种非确定性。
+        self._crepe_track_cache: OrderedDict[tuple, Tuple[np.ndarray, np.ndarray]] = (
+            OrderedDict()
+        )
+        # 边界分析还会调用短 ASR 做逐岛复核；只稳定 pitch 仍不足以保证完整结果稳定。
+        # 因此同一实例内对完全相同的输入/选项缓存最终分析，并深拷贝进出，避免调用方
+        # 后续给 result 添字段时污染缓存。上限只覆盖最近的真实会话，不形成长期记忆。
+        self._analysis_cache: OrderedDict[tuple, Dict] = OrderedDict()
 
     @property
     def torchcrepe_available(self) -> bool:
@@ -148,24 +166,65 @@ class SingingAnalyzer:
         thorough: bool = False,
         language: str = "",
         force_score: bool = False,
+        build_score: bool = True,
     ) -> Dict:
+        # Serialize this instance's recursive-island state/cache. Streaming
+        # has a separate lightweight instance and never waits for full analysis.
+        with self._analysis_lock:
+            signal = np.asarray(wav, dtype=np.float32).reshape(-1)
+            cache_key = (
+                self._signal_key(signal),
+                str(lyrics or ""),
+                str(audio_event or ""),
+                bool(thorough),
+                str(language or ""),
+                bool(force_score),
+                bool(build_score),
+                bool(self._nested_island_probe),
+            )
+            cached = self._analysis_cache.get(cache_key)
+            if cached is not None:
+                self._analysis_cache.move_to_end(cache_key)
+                return copy.deepcopy(cached)
+            result = self._analyze(
+                signal, lyrics, audio_event, thorough, language, force_score, build_score
+            )
+            self._analysis_cache[cache_key] = copy.deepcopy(result)
+            self._analysis_cache.move_to_end(cache_key)
+            while len(self._analysis_cache) > 96:
+                self._analysis_cache.popitem(last=False)
+            return result
+
+    def _analyze(self, wav, lyrics, audio_event, thorough, language, force_score, build_score):
+        from asr_scheduler import checkpoint
+        checkpoint()
         signal = np.asarray(wav, dtype=np.float32).reshape(-1)
-        if signal.size > self.sample_rate * 45:
-            signal = signal[-self.sample_rate * 45 :]
+        max_analysis_samples = int(round(self.sample_rate * _MAX_ANALYSIS_SECONDS))
+        analysis_window_offset_seconds = max(
+            0.0,
+            signal.size / float(self.sample_rate) - _MAX_ANALYSIS_SECONDS,
+        )
+        if signal.size > max_analysis_samples:
+            signal = signal[-max_analysis_samples:]
 
         duration = signal.size / float(self.sample_rate)
         if duration < 0.35 or signal.size == 0:
-            return self._empty(duration)
+            return self._apply_analysis_window_offset(
+                self._empty(duration), analysis_window_offset_seconds
+            )
 
         # Remove DC and scale only enough to make the tracker insensitive to
         # microphone gain.  Do not hard-normalize silence into a loud signal.
         signal = signal - float(np.mean(signal))
         rms = float(np.sqrt(np.mean(signal * signal) + 1e-12))
         if rms < 2e-4:
-            return self._empty(duration)
+            return self._apply_analysis_window_offset(
+                self._empty(duration), analysis_window_offset_seconds
+            )
         tracker_signal = np.clip(signal / max(rms * 8.0, 1.0), -1.0, 1.0)
 
         pitch, periodicity, hop_seconds = self._track_fft(tracker_signal)
+        fft_pitch, fft_periodicity, fft_hop = pitch, periodicity, hop_seconds
         result = self._summarize(
             pitch,
             periodicity,
@@ -176,7 +235,9 @@ class SingingAnalyzer:
             backend="fft-autocorrelation",
             signal=signal,
             language=language,
-            include_score=thorough,
+            #First decide the acoustic backend. Do not construct a full score that
+            #will immediately be discarded when CREPE upgrades this same signal.
+            include_score=False,
             force_score=force_score,
         )
 
@@ -207,7 +268,7 @@ class SingingAnalyzer:
                         backend="torchcrepe-tiny",
                         signal=signal,
                         language=language,
-                        include_score=thorough,
+                        include_score=thorough and build_score,
                         force_score=force_score,
                         # 只有 crepe 这一遍做候选岛细化：FFT 那一遍的结果马上就被
                         # 覆盖，白花时间；嵌套调用里也必须关掉，否则无限递归。
@@ -219,6 +280,47 @@ class SingingAnalyzer:
                 result["pitch_backend"] = "fft-autocorrelation"
                 result["pitch_warning"] = str(exc)[:160]
 
+        if (thorough and build_score and result.get("voiced_ratio", 0.0) > 0
+                and result.get("pitch_backend") == "fft-autocorrelation"
+                and (force_score or result["singing_probability"] >= 0.30
+                     or str(audio_event).lower() == "bgm")):
+            result["singing_score"] = build_singing_score(
+                fft_pitch, fft_periodicity, fft_hop, duration,
+                lyrics=lyrics, language=language, signal=signal,
+                sample_rate=self.sample_rate, extractor_backend="fft-autocorrelation",
+                confidence=result["singing_probability"],
+            )
+        return self._apply_analysis_window_offset(
+            result, analysis_window_offset_seconds
+        )
+
+    @staticmethod
+    def _apply_analysis_window_offset(result: Dict, offset_seconds: float) -> Dict:
+        """Express pitch boundaries in the caller's complete-audio coordinates.
+
+        Pitch/score arrays still describe only the retained analysis window.  The
+        explicit offset lets consumers crop those arrays locally while using the
+        shifted timestamps to slice the original WAV.  Inputs beyond the bounded
+        analysis window therefore remain aligned to the original recording.
+        """
+        offset = max(0.0, float(offset_seconds or 0.0))
+        result["analysis_window_offset_seconds"] = round(offset, 3)
+        if offset <= 0.0:
+            return result
+        for key in (
+            "singing_start_seconds",
+            "singing_end_seconds",
+            "singing_recovery_start_seconds",
+            "singing_recovery_end_seconds",
+            "pitch_timeline_start_seconds",
+        ):
+            value = float(result.get(key, 0.0) or 0.0)
+            # End=0 is an explicit "unknown/end of audio" sentinel. Preserve it.
+            if value > 0.0 or key.endswith("start_seconds"):
+                result[key] = round(offset + value, 3)
+        result["asr_boundary_candidates"] = [
+            round(offset + float(value), 3)
+            for value in result.get("asr_boundary_candidates", [])]
         return result
 
     def _track_fft(self, signal: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float]:
@@ -228,8 +330,9 @@ class SingingAnalyzer:
             signal = np.pad(signal, (0, frame_length - signal.size))
 
         frames = np.lib.stride_tricks.sliding_window_view(signal, frame_length)[::hop]
-        if frames.shape[0] > 4500:
-            frames = frames[-4500:]
+        max_frames = max(1, int(math.ceil(_MAX_ANALYSIS_SECONDS / (hop / self.sample_rate))))
+        if frames.shape[0] > max_frames:
+            frames = frames[-max_frames:]
         window = np.hanning(frame_length).astype(np.float32)
         framed = frames.astype(np.float32, copy=False) * window
         energy = np.sqrt(np.mean(framed * framed, axis=1) + 1e-12)
@@ -266,13 +369,10 @@ class SingingAnalyzer:
 
     @staticmethod
     def _signal_key(signal: np.ndarray) -> tuple:
-        """给同一段音频一个廉价指纹。长度 + 首尾/中段抽样的字节哈希即可——
-        我们要区分的是"同一轮被重复分析"和"不同的音频"，不需要抗碰撞。"""
-        raw = signal.tobytes()
-        head = raw[:4096]
-        tail = raw[-4096:]
-        middle = raw[len(raw) // 2: len(raw) // 2 + 4096]
-        return (signal.size, hash(head), hash(middle), hash(tail))
+        """给完整 PCM 一个进程内稳定指纹，避免相似录音误共享边界结果。"""
+        contiguous = np.ascontiguousarray(signal, dtype=np.float32)
+        digest = hashlib.blake2b(contiguous.view(np.uint8), digest_size=16).digest()
+        return (int(contiguous.size), digest)
 
     def _track_crepe(self, signal: np.ndarray):
         torchcrepe = self._load_torchcrepe()
@@ -280,8 +380,16 @@ class SingingAnalyzer:
             return None
         import torch
 
-        audio = torch.from_numpy(signal.astype(np.float32)).unsqueeze(0)
+        key = self._signal_key(signal)
+        from asr_scheduler import checkpoint
+        checkpoint()
         with self._crepe_lock:
+            cached = self._crepe_track_cache.get(key)
+            if cached is not None:
+                self._crepe_track_cache.move_to_end(key)
+                return cached[0].copy(), cached[1].copy(), 0.01
+            checkpoint()
+            audio = torch.from_numpy(signal.astype(np.float32)).unsqueeze(0)
             pitch, periodicity = torchcrepe.predict(
                 audio,
                 self.sample_rate,
@@ -293,6 +401,7 @@ class SingingAnalyzer:
                 device=self.device,
                 return_periodicity=True,
             )
+        checkpoint()
         pitch = pitch.squeeze(0).detach().cpu().numpy().astype(np.float32)
         periodicity = periodicity.squeeze(0).detach().cpu().numpy().astype(np.float32)
 
@@ -301,24 +410,13 @@ class SingingAnalyzer:
         # 岛的分数只在十几个窗口上平均，抖动被放大——8/9 实测同一段尾部说话三次分别
         # 打了 0.69 / 0.66 / 0.78，而下限就在 0.78，最后那次擦线通过，多留了 1.7s 说话。
         #
-        # 而同一段音频本来就会被分析多次(推测 ASR 与最终 ASR 各一次，日志里可见两条
-        # 完全相同的 dur)。把历次周期性做平均，方差按 √n 下降，成本为零。
-        key = self._signal_key(signal)
+        # 旧实现把历次 periodicity 做滚动平均；这会令第 1/2/3 次请求各自得到不同结果，
+        # 于是同一 WAV 的 clean 起点仍会漂移。现在锁定第一次完整 track，后续直接复用。
         with self._crepe_lock:
-            previous = self._periodicity_history.get(key)
-            if previous is not None and previous[1].shape == periodicity.shape:
-                count = previous[0] + 1
-                periodicity = (previous[1] * previous[0] + periodicity) / count
-                self._periodicity_history[key] = (count, periodicity)
-            else:
-                self._periodicity_history[key] = (1, periodicity)
-                count = 1
-            # 只保留最近若干段，防止长会话把内存吃光
-            while len(self._periodicity_history) > 8:
-                self._periodicity_history.pop(next(iter(self._periodicity_history)))
-        if count > 1 and _LOG_ISLAND:
-            print(f"[Island] 周期性取 {count} 次分析的平均(同一段音频重复分析)",
-                  flush=True)
+            self._crepe_track_cache[key] = (pitch.copy(), periodicity.copy())
+            self._crepe_track_cache.move_to_end(key)
+            while len(self._crepe_track_cache) > 128:
+                self._crepe_track_cache.popitem(last=False)
         return pitch, periodicity, 0.01
 
     def _make_island_prober(self, signal: np.ndarray):
@@ -344,7 +442,7 @@ class SingingAnalyzer:
             self._nested_island_probe = True
             try:
                 got = self.analyze(
-                    piece, lyrics=lyrics, thorough=True, force_score=True)
+                    piece, lyrics=lyrics, thorough=True, force_score=True, build_score=False)
             except Exception:
                 return float("nan")
             finally:
@@ -472,13 +570,20 @@ class SingingAnalyzer:
             and duration >= _ISLAND_REFINE_MIN_SECONDS
             and (probability >= _ISLAND_REFINE_MIN_PROBABILITY or force_score)
         )
-        singing_start_seconds, singing_end_seconds = self._estimate_singing_start(
+        asr_boundary_candidates = []
+        (
+            singing_start_seconds,
+            singing_end_seconds,
+            singing_recovery_start_seconds,
+            singing_recovery_end_seconds,
+        ) = self._estimate_singing_start(
             smoothed,
             voiced,
             periodicity,
             hop_seconds,
             duration,
             self._make_island_prober(island_signal) if refine_islands else None,
+            asr_boundary_candidates,
         )
 
         low_hz = float(440.0 * (2.0 ** ((low - 69.0) / 12.0)))
@@ -512,7 +617,19 @@ class SingingAnalyzer:
             # voice-converting a sing-along, while retaining a small breath/
             # attack pre-roll at the first sung phrase.
             "singing_start_seconds": round(singing_start_seconds, 3),
+            "asr_boundary_candidates": asr_boundary_candidates,
             "singing_end_seconds": round(singing_end_seconds, 3),
+            # The normal span is deliberately conservative so speech around a
+            # sung phrase is not voice-converted.  Keep a second, opt-in span
+            # that joins adjacent melodic islands.  The client stores both and
+            # only uses this recovery envelope when the character deliberately
+            # chooses it after hearing that a phrase was clipped.
+            "singing_recovery_start_seconds": round(
+                singing_recovery_start_seconds, 3
+            ),
+            "singing_recovery_end_seconds": round(
+                singing_recovery_end_seconds, 3
+            ),
             "pitch_timeline_start_seconds": round(timeline_start_seconds, 3),
             "note_sequence": note_sequence,
             "note_change_rate": round(note_change_rate, 3),
@@ -546,16 +663,19 @@ class SingingAnalyzer:
         hop_seconds: float,
         duration: float,
         island_prob=None,
-    ) -> Tuple[float, float]:
+        asr_boundary_candidates=None,
+    ) -> Tuple[float, float, float, float]:
         """Locate the sustained melodic region in a mixed utterance.
 
         ``island_prob(start, end) -> float`` 可选：给出把某座候选岛单独分析得到的
         singing_probability。给了就用它取舍候选岛（更准，代价是每座岛一次分析），
         没给就退回候选窗均分那套。返回 NaN 表示这座岛测不了，该岛退回旧判据。
 
-        Returns ``(start, end)`` in seconds.  ``(0.0, duration)`` is the
-        conservative fallback: failure to find a boundary must never cut away
-        real singing.
+        Returns ``(start, end, recovery_start, recovery_end)`` in seconds.
+        The first pair is the clean default window.  The second pair is an
+        opt-in recovery envelope that also joins nearby lower-confidence
+        melodic islands. ``(0.0, duration, 0.0, duration)`` is the conservative
+        fallback: failure to find a boundary must never cut away real singing.
 
         A single clean spoken vowel can look tonal, so the detector scores
         overlapping 1.1 s windows and then chooses a long run of windows rather
@@ -564,13 +684,13 @@ class SingingAnalyzer:
         """
         count = min(smoothed_midi.size, voiced.size, periodicity.size)
         if count <= 0 or duration < 2.0:
-            return 0.0, float(duration)
+            return 0.0, float(duration), 0.0, float(duration)
 
         hop = max(float(hop_seconds), 1e-3)
         window = max(8, int(round(1.10 / hop)))
         stride = max(1, int(round(0.10 / hop)))
         if count < window:
-            return 0.0, float(duration)
+            return 0.0, float(duration), 0.0, float(duration)
 
         candidates: List[Tuple[int, float]] = []
         for start in range(0, count - window + 1, stride):
@@ -601,7 +721,7 @@ class SingingAnalyzer:
                 candidates.append((start, score))
 
         if not candidates:
-            return 0.0, float(duration)
+            return 0.0, float(duration), 0.0, float(duration)
 
         # Merge neighbouring melodic windows, tolerating consonants and short
         # breaths.  A spoken preface may create a tiny candidate island; the
@@ -632,7 +752,14 @@ class SingingAnalyzer:
             if (run[1] - run[0]) * hop >= 1.65 and run[3] >= 4
         ]
         if not viable:
-            return 0.0, float(duration)
+            return 0.0, float(duration), 0.0, float(duration)
+
+        # Preserve internal phrase transitions before playback's probability
+        # filter/merging. Adjacent sung phrases may change language; ASR needs
+        # independent contexts even when playback uses one joined singing span.
+        if asr_boundary_candidates is not None:
+            for left, right in zip(viable, viable[1:]):
+                asr_boundary_candidates.append(round((left[1] + right[0]) * hop / 2, 3))
 
         best = max(
             viable,
@@ -736,6 +863,26 @@ class SingingAnalyzer:
                     span_end = run[1]
                     merged = True
 
+        # Keep the clean span above unchanged: its probability gate is what
+        # prevents a tonal spoken tail from being sung back.  Separately build
+        # a recovery envelope from *all* nearby melodic runs.  A breath or one
+        # unstable note can make a real phrase miss the viable/probability gate;
+        # using the longest island alone then permanently deletes that phrase.
+        # This envelope is only an alternative source, never the default.
+        recovery_span_start, recovery_span_end = span_start, span_end
+        recovery_merged = True
+        while recovery_merged:
+            recovery_merged = False
+            for run in runs:
+                if (run[0] < recovery_span_start and
+                        uncovered(run[1], recovery_span_start) <= bridge_frames):
+                    recovery_span_start = run[0]
+                    recovery_merged = True
+                if (run[1] > recovery_span_end and
+                        uncovered(recovery_span_end, run[0]) <= bridge_frames):
+                    recovery_span_end = run[1]
+                    recovery_merged = True
+
         # The first qualifying 1.1 s window normally straddles the transition
         # from speech into song. Its midpoint is a better onset estimate than
         # its leading edge; then retain 220 ms for breath and note attack.
@@ -748,6 +895,17 @@ class SingingAnalyzer:
         end_frame = max(start_frame, span_end - window // 2)
         end_seconds = min(duration, end_frame * hop + 0.22)
 
+        recovery_start_frame = recovery_span_start + window // 2
+        recovery_start_seconds = max(
+            0.0, recovery_start_frame * hop - 0.22
+        )
+        recovery_end_frame = max(
+            recovery_start_frame, recovery_span_end - window // 2
+        )
+        recovery_end_seconds = min(
+            duration, recovery_end_frame * hop + 0.22
+        )
+
         # Tiny trims are inaudible and risk shaving the opening note of an
         # already-pure singing clip.
         if start_seconds < 0.45 or duration - start_seconds < 1.2:
@@ -755,6 +913,11 @@ class SingingAnalyzer:
         # 尾部同理：裁不到 0.45s 就别裁，免得削掉最后一个音的收尾
         if duration - end_seconds < 0.45 or end_seconds - start_seconds < 1.2:
             end_seconds = duration
+        if recovery_start_seconds < 0.45 or duration - recovery_start_seconds < 1.2:
+            recovery_start_seconds = 0.0
+        if (duration - recovery_end_seconds < 0.45 or
+                recovery_end_seconds - recovery_start_seconds < 1.2):
+            recovery_end_seconds = duration
 
         # 被分数下限挡掉的岛：记下它在跨度的哪一侧、分数、以及**与跨度的间隔**
         # （负数表示重叠）。
@@ -815,7 +978,12 @@ class SingingAnalyzer:
                     end_seconds,
                 )
             )
-        return float(start_seconds), float(end_seconds)
+        return (
+            float(start_seconds),
+            float(end_seconds),
+            float(recovery_start_seconds),
+            float(recovery_end_seconds),
+        )
 
     def _build_contour(
         self, smoothed_midi: np.ndarray, voiced: np.ndarray, hop_seconds: float
@@ -856,10 +1024,13 @@ class SingingAnalyzer:
                 continue
             values.append(round(float(np.median(smoothed_midi[start:end][local_mask])), 2))
 
-        # Match the analyser's 45 s signal window.  A 30 s tail cap used to discard
-        # the opening of otherwise valid long performances before Unity could apply
-        # its streaming onset anchor.
-        max_frames = max(1, int(round(45.0 / max(frame_seconds, 1e-3))))
+        # Match the analyser's bounded signal window.  Keeping this derived from
+        # the same constant prevents a playable timeline from silently losing the
+        # opening of a complete one-minute practice take.
+        max_frames = max(
+            1,
+            int(round(_MAX_ANALYSIS_SECONDS / max(frame_seconds, 1e-3))),
+        )
         if len(values) > max_frames:
             values = values[-max_frames:]
         return values
@@ -911,6 +1082,8 @@ class SingingAnalyzer:
             "pitch_timeline_frame_seconds": 0.10,
             "singing_start_seconds": 0.0,
             "singing_end_seconds": 0.0,
+            "singing_recovery_start_seconds": 0.0,
+            "singing_recovery_end_seconds": 0.0,
             "pitch_timeline_start_seconds": 0.0,
             "note_sequence": "",
             "note_change_rate": 0.0,

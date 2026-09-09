@@ -133,6 +133,7 @@ Server/RVC/*_headers.txt
 /Assets/Model/41041.json.meta
 # 边界附近的整轮音频落盘，只用于离线定阈值，不入库
 /Server/SenseVoice/band_dumps/
+/Server/SenseVoice/mixed_dumps/
 # Local singing/voice diagnostics and recovery snapshots are runtime data.
 /Server/SenseVoice/practice_dumps/
 /Server/SenseVoice/song_library_removed/

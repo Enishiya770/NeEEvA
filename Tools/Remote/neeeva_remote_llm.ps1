@@ -7,7 +7,7 @@ reaches them through an SSH local-forward tunnel.
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('start', 'start-llm', 'start-embed', 'stop', 'status', 'restart')]
+    [ValidateSet('start', 'start-llm', 'start-embed', 'stop', 'status', 'restart', 'restart-llm')]
     [string]$Action = 'status'
 )
 
@@ -17,6 +17,7 @@ $ErrorActionPreference = 'Stop'
 $LlamaRoot = 'D:\NeEEvA\llamacpp-b8919-cuda131-sm120'
 $LogRoot = 'D:\NeEEvA\logs'
 $ServerExe = Join-Path $LlamaRoot 'llama-server.exe'
+$ChatTemplate = 'D:\NeEEvA\services\qwen36_chat_template.jinja'
 
 $Services = [ordered]@{
     llm = @{
@@ -26,6 +27,11 @@ $Services = [ordered]@{
         Args = @(
             '-m', 'qwen36.gguf', '--mmproj', 'mmproj-Q8_0.gguf',
             '--host', '127.0.0.1', '--port', '8080',
+            # The GGUF template only renders the first one or two system/developer
+            # messages. NeEEvA deliberately places per-turn Skill, memory and
+            # evidence blocks immediately before the current user message, so use
+            # the checked-in compatible template that preserves those roles.
+            '--jinja', '--chat-template-file', $ChatTemplate,
             # 49152 (24576/slot) was sized for the old 4090 where the LLM shared
             # the GPU with the whole voice stack. On the dedicated 5090 that ceiling
             # was costing us memory, not VRAM: 2026-08-25 a 42-turn session trimmed
@@ -35,9 +41,12 @@ $Services = [ordered]@{
             # (hybrid attention), so 20 KiB/token -> 131072 costs 2560 MiB total,
             # up 1600 MiB from 960. Recurrent state (126 MiB) scales with seqs,
             # not context, and n_ctx_train is 262144 so no rope scaling is needed.
-            '-c', '131072', '--parallel', '2',
+            # Three independent caches: main=0, auxiliary=1, turn boundary=2.
+            # Keep 65536 tokens per slot (do not shrink conversation memory).
+            # +1280 MiB KV vs two slots; 2026-09-03 measured 8476 MiB free before change.
+            '-c', '196608', '--parallel', '3',
             '--slot-prompt-similarity', '0.8', '-ngl', '99',
-            '--jinja', '--flash-attn', 'on'
+            '--flash-attn', 'on'
         )
     }
     embed = @{
@@ -67,6 +76,10 @@ function Assert-ServiceFiles($Service) {
     foreach ($name in $Service.ModelFiles) {
         $path = Join-Path $LlamaRoot $name
         if (-not (Test-Path -LiteralPath $path)) { throw "Missing model: $path" }
+    }
+    if ($Service.Name -eq 'qwen3.6 multimodal LLM' -and
+        -not (Test-Path -LiteralPath $ChatTemplate)) {
+        throw "Missing chat template: $ChatTemplate"
     }
 }
 
@@ -103,7 +116,23 @@ function Stop-ServiceProcess([string]$Key, $Service) {
         Write-Output "[$Key] not running"
         return
     }
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId"
+    if ($process.ExecutablePath -ine $ServerExe) {
+        throw "Refusing to stop unexpected process on port $($Service.Port): $processId ($($process.ExecutablePath))"
+    }
+    $launcherInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $($process.ParentProcessId)"
+    $launcher = $null
+    if ($launcherInfo.Name -ieq 'cmd.exe' -and $launcherInfo.CommandLine.Contains($ServerExe)) {
+        $launcher = Get-Process -Id $launcherInfo.ProcessId -ErrorAction SilentlyContinue
+    }
     Stop-Process -Id $processId -Force
+    # cmd owns the redirected log handles. A restart racing its exit can fail
+    # before llama-server even starts, without adding anything to llm.err.log.
+    if ($launcher) {
+        try {
+            if (-not $launcher.WaitForExit(5000)) { throw 'Old LLM launcher has not released its log handles yet; retry start-llm shortly.' }
+        } finally { $launcher.Dispose() }
+    }
     Write-Output "[$Key] stopped PID $processId"
 }
 
@@ -126,6 +155,19 @@ switch ($Action) {
     }
     'start-llm' { Start-ServiceProcess 'llm' $Services.llm }
     'start-embed' { Start-ServiceProcess 'embed' $Services.embed }
+    'restart-llm' {
+        $processId = Get-PortPid $Services.llm.Port
+        if ($processId) {
+            $slots = Invoke-RestMethod 'http://127.0.0.1:8080/slots' -TimeoutSec 5
+            if ($slots.Count -eq 0 -or @($slots | Where-Object { $_.is_processing }).Count -gt 0) {
+                throw 'LLM has active requests or no verifiable idle slots; retry after the conversation finishes.'
+            }
+        }
+        Stop-ServiceProcess 'llm' $Services.llm
+        Start-Sleep -Seconds 1
+        Start-ServiceProcess 'llm' $Services.llm
+        Show-Status
+    }
     'stop' {
         foreach ($entry in @($Services.GetEnumerator())[-1..-($Services.Count)]) {
             Stop-ServiceProcess $entry.Key $entry.Value

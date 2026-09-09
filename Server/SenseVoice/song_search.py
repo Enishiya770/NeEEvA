@@ -637,7 +637,7 @@ class SongSearchEngine:
         mode: str = "memory",
         query_contour: Optional[List[float]] = None,
         query_lyrics: str = "",
-        max_seconds: float = 60.0,
+        max_seconds: float = 0.0,
         seed: int = 1234,
         segment_lyrics: str = "",
     ) -> Dict:

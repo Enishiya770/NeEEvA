@@ -2995,11 +2995,12 @@ MonoBehaviour:
   api_key: 
   m_EnableThinking: 0
   m_KeepRecentImages: 2
-  m_LowLatencyHistoryLimit: 48
-  m_MaxPromptTokens: 20000
+  m_LowLatencyHistoryLimit: 128
+  m_MaxPromptTokens: 42000
   m_LogRequestStats: 1
   m_EphemeralMaxTokens: 128
   m_EphemeralHistoryMessages: 0
+  m_UtilityMaxTokens: 512
   m_PrewarmPrefixOnStart: 1
 --- !u!1 &785927902
 GameObject:
@@ -4381,9 +4382,9 @@ MonoBehaviour:
   m_LogLanguageChanges: 1
   m_WarmUpAllTargetLanguages: 1
   m_WarmUpLatencyFillerVariants: 1
-  m_StreamingPrebufferSeconds: 0.5
-  m_StreamingResumeBufferSeconds: 0.65
-  m_MaxAdaptivePrebufferSeconds: 1.25
+  m_StreamingPrebufferSeconds: 0.65
+  m_StreamingResumeBufferSeconds: 0.85
+  m_MaxAdaptivePrebufferSeconds: 1.5
   m_StreamingMode: 3
   m_MinStreamingChunkLength: 12
   m_MaxStreamingClipSeconds: 120
@@ -5089,7 +5090,15 @@ MonoBehaviour:
   m_ChatPanel: {fileID: 952192933}
   m_InputWord: {fileID: 2036658115}
   m_TextBack: {fileID: 1684937520}
+  m_SubtitleDisplayMode: 1
+  m_SubtitleTargetLanguage: 0
+  m_SystemNoticeMode: 1
+  m_EnableSubtitleTranslation: 1
+  m_PersistSubtitleSettings: 1
+  m_ShowSystemNoticeCodes: 0
+  m_SubtitleOverlay: {fileID: 0}
   m_AudioSource: {fileID: 489438415}
+  m_TextEchoEvidenceWindowSeconds: 8
   m_CommitMsgBtn: {fileID: 1936675600}
   m_Animator: {fileID: 0}
   m_IsVoiceMode: 1
@@ -5114,6 +5123,10 @@ MonoBehaviour:
   m_SpeechBridgeMinConfidence: 0.7
   m_SpeculativeSpeechVetoConfidence: 0.82
   m_SpeculativeSingingSupportConfidence: 0.7
+  m_ModeReviewSingingConfidence: 0.6
+  m_ModeReviewMelodicIslandSeconds: 4
+  m_ModeReviewPitchStability: 0.6
+  m_ModeReviewMelodicIslandRatio: 0.8
   m_EnableFinalModeCheck: 1
   m_VoiceInputBotton: {fileID: 985290567}
   m_VoiceBottonText: {fileID: 1871013867}

@@ -21,6 +21,9 @@ Run `install_seedvc.ps1` once. Unity now probes `http://127.0.0.1:9882/health`
 when the scene starts and launches `start_seedvc_server.ps1` in a hidden Windows
 process when the bridge is absent. It verifies health again immediately before
 every hum-back request, so a service stopped during play is restarted on demand.
+When the on-demand `singing` Skill is loaded, Unity also sends a background
+`POST /warmup`. This loads the dedicated RVC worker while the LLM is still
+deciding what to say; it does not submit fake audio and does not block dialogue.
 Manual startup remains available by running `start_seedvc_server.ps1` directly.
 Automatic-start output is written to `runtime/seedvc_server.log`.
 
@@ -36,9 +39,12 @@ The first Seed-VC fallback conversion can still download the official singing
 checkpoint and take several minutes; the preferred dedicated RVC path reuses its
 local trained model.
 
-The service uses port `9882`.  On a 6 GB GPU it chooses CUDA only when at least
-3400 MiB is free; otherwise it uses CPU so it cannot crash GPT-SoVITS.  Each request
-runs in an isolated process and releases its model/VRAM at completion.
+The service uses port `9882`. The dedicated RVC path uses the configured free-VRAM
+gate (1000 MiB by default), safely falls back to CPU after recoverable CUDA errors,
+and keeps one worker alive for 90 idle seconds so streamed blocks do not repeatedly
+pay model-import cost. A warmed worker's existing device is reused even though its
+own allocation lowers the later free-VRAM reading. The Seed-VC fallback remains an
+isolated process and releases its model/VRAM after completion.
 
 Only the isolated model process uses `https://hf-mirror.com`, because direct access
 to Hugging Face times out on the target machine.  Downloaded weights stay under

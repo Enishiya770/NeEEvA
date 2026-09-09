@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -16,7 +17,7 @@ using UnityEngine.Networking;
 ///
 /// 服务端脚本: Server/SenseVoice/sensevoice_server.py
 /// </summary>
-public class SenseVoiceSpeechToText : STT
+public partial class SenseVoiceSpeechToText : STT
 {
     #region 参数定义
 
@@ -92,12 +93,39 @@ public class SenseVoiceSpeechToText : STT
     public string LastKnownSpeakerName { get; private set; } = "";
     public string LastSpeakerStatus { get; private set; } = "";
     public float LastSpeakerConfidence { get; private set; } = 0f;
+    /// <summary>服务端认为本轮音频属于角色自身外放声纹的置信度。</summary>
+    public float LastSpeakerSelfConfidence { get; private set; } = 0f;
     public float LastSpeakerEnrollmentProgress { get; private set; } = 0f;
     public bool LastSpeakerIsNew { get; private set; } = false;
     public bool LastSpeakerPersistent { get; private set; } = false;
     public bool LastIsSinging { get; private set; } = false;
     public float LastSingingProbability { get; private set; } = 0f;
     public float LastPitchStability { get; private set; } = 0f;
+    public bool LastSingingAnalysisAvailable { get; private set; } = false;
+    public float LastSingingIslandSeconds { get; private set; } = 0f;
+    public float LastSingingContentSeconds { get; private set; } = 0f;
+    public float LastSingingIslandRatio { get; private set; } = 0f;
+    /// <summary>
+    /// 声学这里只报告证据质量：0.52≤p&lt;0.58 是 uncertain，不等于说话，
+    /// 也不等于已经确认歌唱。
+    /// </summary>
+    public bool LastAcousticModeUncertain
+    {
+        get
+        {
+            return LastSingingAnalysisAvailable && !LastNoSpeech &&
+                IsAcousticProbabilityUncertain(LastSingingProbability);
+        }
+    }
+    public string LastAcousticMode
+    {
+        get
+        {
+            if (!LastSingingAnalysisAvailable || LastNoSpeech) return "unavailable";
+            if (LastAcousticModeUncertain) return "uncertain";
+            return LastIsSinging ? "singing" : "speech";
+        }
+    }
     public string LastPitchLowNote { get; private set; } = "";
     public string LastPitchHighNote { get; private set; } = "";
     public string LastNoteSequence { get; private set; } = "";
@@ -113,6 +141,7 @@ public class SenseVoiceSpeechToText : STT
         m_SpeechRecognizeURL = m_ServerSetting.TrimEnd('/') + "/asr";
         m_VadRecognizeURL = m_ServerSetting.TrimEnd('/') + "/vad";
         m_SongSearchURL = m_ServerSetting.TrimEnd('/') + "/songs/search";
+        m_SongCatalogURL = m_ServerSetting.TrimEnd('/') + "/songs/catalog";
         m_SongRememberURL = m_ServerSetting.TrimEnd('/') + "/songs/catalog/remember";
         m_SongRenameURL = m_ServerSetting.TrimEnd('/') + "/songs/catalog/rename";
         m_SongForgetURL = m_ServerSetting.TrimEnd('/') + "/songs/catalog/forget";
@@ -121,25 +150,35 @@ public class SenseVoiceSpeechToText : STT
 
     private string m_VadRecognizeURL;
     private string m_SongSearchURL;
+    private string m_SongCatalogURL;
     private string m_SongRememberURL;
     private string m_SongRenameURL;
     private string m_SongForgetURL;
     private string m_SongSingURL;
     private byte[] m_LastSingingAudioBytes;
-    //置信度分带的暂定边界。**目前只用于打日志，不参与任何判定。**
-    //来自 8/8~8/9 两场共 26 次离线判定的分布：
-    //   0.13/0.23/0.35 判说话，0.62~0.77 共 14 次全判唱歌，两端各自干净；
-    //   [0.40,0.58] 是唯一重叠区(0.40唱 0.45唱 0.57说 0.58说)，占 15%。
-    //攒够 60~80 个样本后再决定要不要把「模糊带交给 LLM 定」变成真实行为。
+    //默认缓存保持“干净边界”；这一份是同一轮的可恢复扩展边界。它只在角色明确
+    //选择 capture="expanded" 时使用，避免为了防漏唱而默认把唱前/唱后的说话变声。
+    private byte[] m_LastSingingRecoveryAudioBytes;
+    private float[] m_LastSingingRecoveryPerformanceMidi = new float[0];
+    //置信度分带的正式证据边界。0.52~0.58 不再被二值化成 speech，而是报告 uncertain，
+    //触发完整转写语义复核；它本身不触发自动回唱或机械追问。
+    //0.52 来自 8/30 实测漏判：真唱 p=0.54、stab=0.69、岛占 93%。更低的历史样本
+    //仍有较多普通说话，先不扩大复核范围。
     // 岛比流式起唱点晚多少之内仍然信岛。见下方 onsetsAgree 处的推导。
     private const float k_IslandLaterToleranceSeconds = 1.75f;
-    private const float k_SingingBandLow = 0.40f;
+    private const float k_SingingBandLow = 0.52f;
     private const float k_SingingBandHigh = 0.58f;
+
+    public static bool IsAcousticProbabilityUncertain(float probability)
+    {
+        return probability >= k_SingingBandLow &&
+            probability < k_SingingBandHigh;
+    }
 
     private static string DescribeSingingBand(float probability)
     {
         if (probability < k_SingingBandLow) return "低区";
-        if (probability > k_SingingBandHigh) return "高区";
+        if (probability >= k_SingingBandHigh) return "高区";
         return "模糊带";
     }
 
@@ -147,6 +186,14 @@ public class SenseVoiceSpeechToText : STT
     //服务端对裁出来那段单独识别得到的歌词。整轮转写含唱前唱后的说话，
     //拿它当歌词会被 SVS 硬塞进几秒的旋律里，唱出来听不清。
     private string m_LastResponseSingingText = "";
+    private TurnTranscriptSegment[] m_LastTurnSegments;
+    private readonly List<string> m_EarlierCaptureTranscripts = new List<string>();
+    private string m_CurrentCaptureTranscript = "";
+    private float m_CurrentCaptureTranscriptSeconds;
+    private string m_LastWholeTurnText = "";
+    private string m_LastSegmentedPrimaryText = "";
+    public bool HasTimeOrderedTranscript => m_LastTurnSegments != null &&
+        m_LastTurnSegments.Length > 0 && LastText == m_LastSegmentedPrimaryText;
     //本轮响应给出的头部裁剪量。每份响应都会重写，所以不会串轮。
     private float m_LastResponseAudioCropSeconds = 0f;
     //岛结束之后被丢掉的那段音频有多长。快速回唱播的是**整条录音**，
@@ -154,6 +201,34 @@ public class SenseVoiceSpeechToText : STT
     //后面 10.8 秒的「歌词唱错了，歌词唱错了」被转成她的声线放了回来。
     private float m_LastResponseAudioTailDropSeconds = 0f;
     private string m_LastResponseSingingTailText = "";
+    //clean 之外、expanded 之内的边界证据。服务端只分析这两小段，保存时间戳、
+    //短 ASR 与声学类型；它们只提供给 LLM 判断，程序不会据此擅自选 clean/expanded。
+    private float m_LastHeadExtraSeconds = 0f;
+    private float m_LastTailExtraSeconds = 0f;
+    private string m_LastHeadExtraText = "";
+    private string m_LastTailExtraText = "";
+    private string m_LastHeadExtraType = "none";
+    private string m_LastTailExtraType = "none";
+    private float m_LastHeadExtraProbability = 0f;
+    private float m_LastTailExtraProbability = 0f;
+    private bool m_LastHeadExtraReviewRequired = false;
+    private bool m_LastTailExtraReviewRequired = false;
+    private float m_LastHeadExtraMelodicSeconds = 0f;
+    private float m_LastTailExtraMelodicSeconds = 0f;
+    private float m_LastHeadExtraMelodicRatio = 0f;
+    private float m_LastTailExtraMelodicRatio = 0f;
+    private float m_LastHeadExtraLongestMelodicRunSeconds = 0f;
+    private float m_LastTailExtraLongestMelodicRunSeconds = 0f;
+    private SingingBoundarySubsegment[] m_LastHeadExtraSegments =
+        new SingingBoundarySubsegment[0];
+    private SingingBoundarySubsegment[] m_LastTailExtraSegments =
+        new SingingBoundarySubsegment[0];
+    //流式起唱保护可能把 acoustic clean 起点之前的一小段保留进 clean。
+    //它不再属于 head_extra，却仍可能包含口语，必须作为独立事实交给 LLM。
+    private float m_LastCleanLeadInUnverifiedSeconds = 0f;
+    private string m_LastCleanLeadInEvidenceText = "";
+    private string m_LastCleanLeadInEvidenceType = "none";
+    private float m_LastCleanLeadInEvidenceProbability = 0f;
     private SongRecall[] m_LastSongRecall = null;
     //最近一次被判为"说话"的转写。用户在唱之前往往会交代这一段是什么
     //（「换一首歌吧」「刚才唱错了，重来一遍」），而那句话正是清单里唯一缺的东西：
@@ -248,50 +323,143 @@ public class SenseVoiceSpeechToText : STT
     private int m_LastCompletedAsrSerial = 0;
     private int m_LastSingingCacheSerial = -1;
     private byte[] m_RollbackSingingAudioBytes;
+    private byte[] m_RollbackSingingRecoveryAudioBytes;
     private string m_RollbackSingingLyrics = "";
     private float m_RollbackSingingAudioTime = -999f;
     private float m_RollbackSingingPerformanceTime = -999f;
     private float[] m_RollbackSingingPerformanceMidi = new float[0];
+    private float[] m_RollbackSingingRecoveryPerformanceMidi = new float[0];
     private float m_RollbackSingingPerformanceFrameSeconds = 0.10f;
     private string m_RollbackSingingPerformanceLanguage = "";
     private SingingScore m_RollbackSingingPerformanceScore = null;
+    private SingingEvidenceSnapshot m_RollbackSingingCacheEvidence;
+    private int m_RollbackSingingCacheCaptureSessionSerial = 0;
+    private SingingEvidenceSnapshot m_LastSingingCacheEvidence;
+    private int m_LastSingingCacheCaptureSessionSerial = 0;
     // A practice session is intentionally separate from the persistent song catalogue.
     // It keeps only final-ASR-confirmed performances, in the order the user sang them,
     // so ChatSample can later render the practiced phrases as one continuous take.
+    [Serializable]
+    public sealed class SingingBoundarySubsegment
+    {
+        public float start_seconds;
+        public float end_seconds;
+        public float expanded_start_seconds;
+        public float expanded_end_seconds;
+        public string type;
+        public float voiced_ratio;
+        public float pitch_smooth_ratio;
+    }
+
     private sealed class PracticePhrase
     {
+        // One identity from quarantine through confirmation/revision. Never derived
+        // from list position, candidate number, or the latest-audio cache.
+        public string ClipRef = "clip:" + Guid.NewGuid().ToString("N");
+        public SingingEvidenceSnapshot RecordingEvidence;
+        public SingingEvidenceSnapshot LatestRecordingEvidence;
+        public int RecordingSequence;
+        public PracticePhrase CopyForRevision() => (PracticePhrase)MemberwiseClone();
+        //会话内稳定身份。清单段号会在删除旧段后前移，不能拿段号给跨轮音高状态做键。
+        public int StableId;
         public byte[] WavBytes;
+        public byte[] RecoveryWavBytes;
         public float[] MidiTimeline;
+        public float[] RecoveryMidiTimeline;
+        //不可变的录音源。WavBytes/MidiTimeline 是当前可播放版本，修边后会更新；
+        //下面四项始终保留首次提交的 clean/expanded，因此“重新处理”永远可撤销，
+        //也不会像 practice_drop 那样把唯一的原录音永久删掉。
+        public byte[] SourceCleanWavBytes;
+        public byte[] SourceExpandedWavBytes;
+        public float[] SourceCleanMidiTimeline;
+        public float[] SourceExpandedMidiTimeline;
+        public int Revision;
+        public string ActiveCapture = "clean";
+        public float ActiveTrimHeadSeconds;
+        public float ActiveTrimTailSeconds;
         public float FrameSeconds;
         public string Language;
         public int Signature;
+        //同一次真实麦克风录音的稳定身份。preview/final、clean/expanded/raw
+        //都属于同一编号，不能因裁剪后的字节不同被当成另一段录音。
+        public int CaptureSessionSerial;
         //身份：用户是按内容指段的(「先唱沉默着走了那段」)，不是按序号。
         //没有这些字段时感知帧只能报歌词片段，她分不清哪几段属于同一首、哪段是最近唱的
         //——8/16 实测练唱会话累到 7 段、跨两首歌，她连着三次选错段(order=1,2 / 3,5,6,1 / 7)。
         public string Lyrics;
         public float Seconds;
+        public float RecoverySeconds;
+        //原始源各自使用独立的 0 秒坐标。当前 Seconds 可能已经是修订后的版本，
+        //不能再拿它解释最初的 head_extra / tail_extra。
+        public float OriginalCleanSeconds;
+        public float OriginalExpandedSeconds;
         public string SongId;      //本轮曲库回忆的首选，作为"这段属于哪首歌"的线索
         public string SongName;
         public float AtRealtime;   //唱下这一段的时刻，供"最近唱的是哪段"判断
+        public float ConfirmedAtRealtime;
         //唱这一段之前用户说的最后一句话。换歌/重唱的意图就在这句里。
         public string PrecedingSpeech;
         //软降级(声学判唱、文字判说话)写进来的段落带着这一位。
         //它**不拦任何用途**——段落照样能被 order 点到、照样能唱。它只是个警示：
-        //这一段有可能根本不是歌声，用户说不是就用 practice_drop 去掉。
+        //这一段有可能根本不是歌声；用户确认不是歌声，或明确要求无视/丢弃这次录音时，
+        //都由角色结合完整语境调用 practice_drop，程序不靠关键词擅自删除。
         //原来软降级是整个不写，代价是文字判错时那段永远连不起来(8/24 实测四轮说不清)。
         public bool PendingConfirmation;
+        //若这一段曾处于来源隔离区，保留其原始 candidate 身份。candidate id 是按
+        //真实录音创建且不会因 practice 删除/重排而改变的；角色因此能把“候选 2”
+        //与确认后得到的“练唱清单第 4 段”对应起来，而不是把两套编号混为一谈。
+        public int OriginCandidateId;
+        public float HeadExtraSeconds;
+        public float TailExtraSeconds;
+        public string HeadExtraText;
+        public string TailExtraText;
+        public string HeadExtraType;
+        public string TailExtraType;
+        public float HeadExtraProbability;
+        public float TailExtraProbability;
+        public bool HeadExtraReviewRequired;
+        public bool TailExtraReviewRequired;
+        public float HeadExtraMelodicSeconds;
+        public float TailExtraMelodicSeconds;
+        public float HeadExtraMelodicRatio;
+        public float TailExtraMelodicRatio;
+        public float HeadExtraLongestMelodicRunSeconds;
+        public float TailExtraLongestMelodicRunSeconds;
+        public SingingBoundarySubsegment[] HeadExtraSegments;
+        public SingingBoundarySubsegment[] TailExtraSegments;
+        public float CleanLeadInUnverifiedSeconds;
+        public string CleanLeadInEvidenceText;
+        public string CleanLeadInEvidenceType;
+        public float CleanLeadInEvidenceProbability;
     }
 
     /// <summary>练唱会话里每一段的身份，供感知帧展示与顺序指定。</summary>
     public sealed class PracticePhraseInfo
     {
+        public string ClipRef;
+        public int RecordingSequence;
+        public string RecordingTranscript;
+        public float RawSeconds, CleanStartSeconds, CleanEndSeconds, ExpandedStartSeconds, ExpandedEndSeconds;
         public int Index;          //1 起，就是 order 里要写的数字
+        public int StableId;       //会话内稳定，不随清单删除/前移改变
+        public int Revision;       //0=原始可播放版本；>0=已非破坏性修边
+        public string ActiveCapture;
+        public float ActiveTrimHeadSeconds;
+        public float ActiveTrimTailSeconds;
         public string Lyrics;
         public float Seconds;
+        public float RecoverySeconds;
+        //原始 clean / expanded 各自的完整长度。Seconds 是当前可播放版本，
+        //修订后不能再拿它解释最初的边界证据。
+        public float OriginalCleanSeconds;
+        public float OriginalExpandedSeconds;
         public string Language;
         public string SongId;
         public string SongName;
         public float AgoSeconds;   //距现在多久唱的
+        public float ConfirmedAgoSeconds;
+        public int CaptureOrder;   //录音先后，绝不是 order 参数的清单编号
+        public bool HasExpandedCapture;
         //同一句被教了好几遍时的分组：TakeGroup 相同 = 同一句，TakeIndex 是第几遍。
         //没有这两个字段时清单里两段歌词一模一样，用户说"第二次教你的那段"她对不上段号
         //——8/17 实测她因此把「紧闭双眼」连着唱了两遍。
@@ -300,18 +468,96 @@ public class SenseVoiceSpeechToText : STT
         public int TakeTotal;
         //唱这一段之前用户说的最后一句话——「换一首歌」「刚才唱错了」都在这里。
         public string PrecedingSpeech;
-        //这一段的音高中位(MIDI)，以及它比"各段的共同基准"高/低多少个半音。
+        //这一段所有有声帧的中心音高（中位数，MIDI）。它是稳健的调音参照，
+        //不是旋律第一个音，也不是歌曲的调性/key。
+        public float PitchCenterMidi;
+        public string PitchCenterNote;
+        //开头第一个连续稳定的有声音高，以及去掉两端异常值后的主要音域。
+        public float FirstStablePitchMidi;
+        public string FirstStablePitchNote;
+        public float PitchRangeLowMidi;
+        public float PitchRangeHighMidi;
+        public string PitchRangeNote;
+        //旧字段保留给场景/扩展兼容；语义等同 PitchCenter*，不再称作“起调”。
         //用户说的「让第三段和前两段调一致」需要这个数才能落地——8/20 实测
         //段1/段2 中位 60，段3 中位 57，实际只差 3 个半音；而她当时猜的是升八度(+12)，
         //既超出 key 的取值范围被截回默认档，也远大于真实差值，于是三轮都听不出变化。
         public float PitchMedianMidi;
-        //绝对起调的音名(C#4 这样)。不写「比别段低几个半音」：那需要先认定
-        //某几段是共同基调，而用户唱两首歌、或者每段起调都不同时，这个认定
-        //就是凭空造出来的。摆绝对值，让用户自己指定以哪段为准。
+        //兼容旧名；内容是中心音高，不是绝对起调。
         public string PitchBaseNote;
         //见 PracticePhrase.PendingConfirmation：清单里要显出来，否则她无从知道
         //哪一段是存疑的，也就不会在用户否认时去 drop 它。
         public bool PendingConfirmation;
+        public int OriginCandidateId;
+        public float HeadExtraSeconds;
+        public float TailExtraSeconds;
+        public string HeadExtraText;
+        public string TailExtraText;
+        public string HeadExtraType;
+        public string TailExtraType;
+        public float HeadExtraProbability;
+        public float TailExtraProbability;
+        public bool HeadExtraReviewRequired;
+        public bool TailExtraReviewRequired;
+        public float HeadExtraMelodicSeconds;
+        public float TailExtraMelodicSeconds;
+        public float HeadExtraMelodicRatio;
+        public float TailExtraMelodicRatio;
+        public float HeadExtraLongestMelodicRunSeconds;
+        public float TailExtraLongestMelodicRunSeconds;
+        public SingingBoundarySubsegment[] HeadExtraSegments;
+        public SingingBoundarySubsegment[] TailExtraSegments;
+        public float CleanLeadInUnverifiedSeconds;
+        public string CleanLeadInEvidenceText;
+        public string CleanLeadInEvidenceType;
+        public float CleanLeadInEvidenceProbability;
+    }
+
+    /// <summary>来源与播放资格独立的录音候选；只有明确选中才进入执行清单。</summary>
+    public sealed class QuarantinedSingingCandidateInfo
+    {
+        public string ClipRef;
+        public int RecordingSequence;
+        public string CurrentCapture;
+        public float CurrentStartSeconds, CurrentEndSeconds;
+        public float RawSeconds, CleanStartSeconds, CleanEndSeconds, ExpandedStartSeconds, ExpandedEndSeconds;
+        public float CleanSeconds;
+        public float ExpandedSeconds;
+        public bool HasRecoveryEvidence;
+        public int CandidateId;    //会话内稳定，不因确认顺序或 practice 重排而改变
+        public string Lyrics;
+        public string PrecedingSpeech;
+        public string WholeTurnText;
+        public string SingingSegmentText;
+        public float Seconds;
+        public float AgoSeconds;
+        public int CaptureOrder;   //按真实录音时间排序，1=本会话最早
+        public string SourceStatus;   //pending / confirmed_user
+        public string PlaybackStatus; //ready / evidence_only / unavailable
+        public float SingingProbability;
+        public float PitchStability;
+        public float MelodicIslandSeconds;
+        public float ContentSeconds;
+        public float HeadExtraSeconds;
+        public float TailExtraSeconds;
+        public string HeadExtraText;
+        public string TailExtraText;
+        public string HeadExtraType;
+        public string TailExtraType;
+        public bool HeadExtraReviewRequired;
+        public bool TailExtraReviewRequired;
+        public float HeadExtraMelodicSeconds;
+        public float TailExtraMelodicSeconds;
+        public float HeadExtraMelodicRatio;
+        public float TailExtraMelodicRatio;
+        public float HeadExtraLongestMelodicRunSeconds;
+        public float TailExtraLongestMelodicRunSeconds;
+        public SingingBoundarySubsegment[] HeadExtraSegments;
+        public SingingBoundarySubsegment[] TailExtraSegments;
+        public float CleanLeadInUnverifiedSeconds;
+        public string CleanLeadInEvidenceText;
+        public string CleanLeadInEvidenceType;
+        public float CleanLeadInEvidenceProbability;
     }
 
     public sealed class PracticeComposition
@@ -331,7 +577,7 @@ public class SenseVoiceSpeechToText : STT
         //Gaps[i] 是第 i 段之前的静音长度(第 0 段为 0)，照着填才能和整条转的听感一致。
         public List<byte[]> SegmentWavs;
         public List<float> Gaps;
-        //各段自己的起调(MIDI)。移调后的结果 = 这个数 + 实际发出的半音数，
+        //各段自己的中心音高(MIDI)。移调后的结果 = 这个数 + 实际发出的半音数，
         //回报给她之后她才能看出还差多少，而不是一次加一个半音地试。
         public List<float> SegmentMedians;
         //每一段来自练唱清单的第几段(1 起)。用户永远用清单段号说话("把第四段调高")，
@@ -344,6 +590,33 @@ public class SenseVoiceSpeechToText : STT
     }
 
     private readonly List<PracticePhrase> m_PracticePhrases = new List<PracticePhrase>();
+    private int m_NextPracticePhraseStableId = 0;
+    private sealed class QuarantinedSingingCandidate
+    {
+        public SingingEvidenceSnapshot Evidence;
+        public int CandidateId;
+        public PracticePhrase Phrase;
+        public bool SourceConfirmed;
+        public string PlaybackStatus = "ready";
+        public string WholeTurnText = "";
+        public string SingingSegmentText = "";
+        public byte[] RawWavBytes;
+        public float SingingProbability;
+        public float PitchStability;
+        public float MelodicIslandSeconds;
+        public float ContentSeconds;
+    }
+    //来源仍不确定的旋律进入会话级隔离集合，不能直接成为可点唱的 practice 段。
+    //旧实现只有一个槽，candidate 2 会覆盖 candidate 1，用户之后说“前两段”时音频
+    //已经不可恢复。现在所有候选都保留稳定 ID，直到确认/否认、显式开始新会话，或
+    //练唱会话跨重启时按同一陈旧期限清理。
+    private readonly List<QuarantinedSingingCandidate> m_QuarantinedSingingCandidates =
+        new List<QuarantinedSingingCandidate>();
+    //用户已经明确否认的同一份原始录音不能因迟到分析再次变成 pending。
+    //这里只保存轻量签名；开始新的练唱会话时一并清空。
+    private readonly HashSet<int> m_RejectedQuarantineSignatures = new HashSet<int>();
+    private readonly HashSet<int> m_RejectedQuarantineSessionSerials = new HashSet<int>();
+    private int m_NextQuarantinedSingingCandidateId = 0;
     //order 里有一部分没认出来、但还有认出来的：照常唱，但要如实说漏了哪些。
     private string m_LastPracticeOrderProblem = "";
     public string ConsumeLastPracticeOrderProblem()
@@ -373,6 +646,222 @@ public class SenseVoiceSpeechToText : STT
     private float m_LastPlayableCandidateAudioEndSeconds = 0f;
     private float m_LastPlayableCandidateTimelineEndSeconds = 0f;
     private float m_LastPlayableCandidateScoreEndSeconds = 0f;
+    private float m_LastPlayableCandidateRecoveryAudioCropSeconds = 0f;
+    private float m_LastPlayableCandidateRecoveryTimelineCropSeconds = 0f;
+    private float m_LastPlayableCandidateRecoveryAudioEndSeconds = 0f;
+    private float m_LastPlayableCandidateRecoveryTimelineEndSeconds = 0f;
+    private float[] m_LastPlayableCandidatePitchTimelineMidi = new float[0];
+    private float m_LastPlayableCandidatePitchFrameSeconds = 0.10f;
+    private SingingScore m_LastPlayableCandidateScore;
+    private string m_LastPlayableCandidateText = "";
+    private string m_LastPlayableCandidateLanguage = "";
+    private string m_LastPlayableCandidateSingingText = "";
+    private string m_LastPlayableCandidateSingingLanguage = "";
+    private string m_LastPlayableCandidateSingingReading = "";
+    private string m_LastPlayableCandidateSingingReadingSource = "";
+    private bool m_LastPlayableCandidateSingingReadingComplete = false;
+    private string[] m_LastPlayableCandidateSingingMora;
+    private float m_LastPlayableCandidatePerformanceSeconds = 0f;
+    private float m_LastPlayableCandidateProbability = 0f;
+    private float m_LastPlayableCandidatePitchStability = 0f;
+    private float m_LastPlayableCandidateIslandSeconds = 0f;
+    private float m_LastPlayableCandidateContentSeconds = 0f;
+    private SingingEvidenceSnapshot m_LastPlayableCandidateEvidence;
+    //来源证据不能受“能不能播放”支配。每份最终分析都保存这一份原始快照；
+    //即使旋律岛不足 3 秒或离线标签为 speech，语义/声学冲突仍能进入 quarantine。
+    private sealed class SingingEvidenceSnapshot
+    {
+        public float TimelineOriginSeconds;
+        public int CaptureSessionSerial;
+        public byte[] RawWavBytes;
+        public float[] PitchTimelineMidi;
+        public float FrameSeconds;
+        public float AtRealtime;
+        public string Text;
+        public string SingingText;
+        public string Language;
+        public float RawSeconds;
+        public float CleanStartSeconds;
+        public float CleanEndSeconds;
+        public float RecoveryStartSeconds;
+        public float RecoveryEndSeconds;
+        public float SingingProbability;
+        public float PitchStability;
+        public float MelodicIslandSeconds;
+        public float ContentSeconds;
+        public float HeadExtraSeconds;
+        public float TailExtraSeconds;
+        public string HeadExtraText;
+        public string TailExtraText;
+        public string HeadExtraType;
+        public string TailExtraType;
+        public float HeadExtraProbability;
+        public float TailExtraProbability;
+        public bool HeadExtraReviewRequired;
+        public bool TailExtraReviewRequired;
+        public float HeadExtraMelodicSeconds;
+        public float TailExtraMelodicSeconds;
+        public float HeadExtraMelodicRatio;
+        public float TailExtraMelodicRatio;
+        public float HeadExtraLongestMelodicRunSeconds;
+        public float TailExtraLongestMelodicRunSeconds;
+        public SingingBoundarySubsegment[] HeadExtraSegments;
+        public SingingBoundarySubsegment[] TailExtraSegments;
+        public float CleanLeadInUnverifiedSeconds;
+        public string CleanLeadInEvidenceText;
+        public string CleanLeadInEvidenceType;
+        public float CleanLeadInEvidenceProbability;
+    }
+
+    private static SingingEvidenceSnapshot CloneSingingEvidence(
+        SingingEvidenceSnapshot source)
+    {
+        if (source == null) return null;
+        return new SingingEvidenceSnapshot
+        {
+            CaptureSessionSerial = source.CaptureSessionSerial,
+            TimelineOriginSeconds = source.TimelineOriginSeconds,
+            RawWavBytes = source.RawWavBytes == null
+                ? null : (byte[])source.RawWavBytes.Clone(),
+            PitchTimelineMidi = source.PitchTimelineMidi == null
+                ? null : (float[])source.PitchTimelineMidi.Clone(),
+            FrameSeconds = source.FrameSeconds,
+            AtRealtime = source.AtRealtime,
+            Text = source.Text,
+            SingingText = source.SingingText,
+            Language = source.Language,
+            RawSeconds = source.RawSeconds,
+            CleanStartSeconds = source.CleanStartSeconds,
+            CleanEndSeconds = source.CleanEndSeconds,
+            RecoveryStartSeconds = source.RecoveryStartSeconds,
+            RecoveryEndSeconds = source.RecoveryEndSeconds,
+            SingingProbability = source.SingingProbability,
+            PitchStability = source.PitchStability,
+            MelodicIslandSeconds = source.MelodicIslandSeconds,
+            ContentSeconds = source.ContentSeconds,
+            HeadExtraSeconds = source.HeadExtraSeconds,
+            TailExtraSeconds = source.TailExtraSeconds,
+            HeadExtraText = source.HeadExtraText,
+            TailExtraText = source.TailExtraText,
+            HeadExtraType = source.HeadExtraType,
+            TailExtraType = source.TailExtraType,
+            HeadExtraProbability = source.HeadExtraProbability,
+            TailExtraProbability = source.TailExtraProbability,
+            HeadExtraReviewRequired = source.HeadExtraReviewRequired,
+            TailExtraReviewRequired = source.TailExtraReviewRequired,
+            HeadExtraMelodicSeconds = source.HeadExtraMelodicSeconds,
+            TailExtraMelodicSeconds = source.TailExtraMelodicSeconds,
+            HeadExtraMelodicRatio = source.HeadExtraMelodicRatio,
+            TailExtraMelodicRatio = source.TailExtraMelodicRatio,
+            HeadExtraLongestMelodicRunSeconds =
+                source.HeadExtraLongestMelodicRunSeconds,
+            TailExtraLongestMelodicRunSeconds =
+                source.TailExtraLongestMelodicRunSeconds,
+            HeadExtraSegments = CloneBoundarySegments(source.HeadExtraSegments),
+            TailExtraSegments = CloneBoundarySegments(source.TailExtraSegments),
+            CleanLeadInUnverifiedSeconds = source.CleanLeadInUnverifiedSeconds,
+            CleanLeadInEvidenceText = source.CleanLeadInEvidenceText,
+            CleanLeadInEvidenceType = source.CleanLeadInEvidenceType,
+            CleanLeadInEvidenceProbability = source.CleanLeadInEvidenceProbability,
+        };
+    }
+
+    private static SingingBoundarySubsegment[] CloneBoundarySegments(
+        SingingBoundarySubsegment[] source)
+    {
+        if (source == null || source.Length == 0)
+            return new SingingBoundarySubsegment[0];
+        var clone = new SingingBoundarySubsegment[source.Length];
+        for (int i = 0; i < source.Length; i++)
+        {
+            SingingBoundarySubsegment value = source[i];
+            if (value == null) continue;
+            clone[i] = new SingingBoundarySubsegment
+            {
+                start_seconds = value.start_seconds,
+                end_seconds = value.end_seconds,
+                expanded_start_seconds = value.expanded_start_seconds,
+                expanded_end_seconds = value.expanded_end_seconds,
+                type = value.type ?? "unknown",
+                voiced_ratio = value.voiced_ratio,
+                pitch_smooth_ratio = value.pitch_smooth_ratio,
+            };
+        }
+        return clone;
+    }
+    private SingingEvidenceSnapshot m_LastSingingEvidence;
+    //RTSpeechHandler 在每次真实录音开始时清空。录音结束后的最终 ASR 仍属于该会话，
+    //所以不能再用“最近 5 秒”判断候选是否过期；否则长歌后的一句口语会把前面的歌声丢掉。
+    private bool m_LiveRecordingCandidateSessionActive = false;
+    private float m_InputCaptureAt = -1f;
+    private float m_LastAnalyzedCaptureAt = -1f;
+    private sealed class AnalysisTicket
+    {
+        public string Id = Guid.NewGuid().ToString("N");
+        public bool Cancelled;
+        public bool CompletedCapture;
+        public bool Detached;
+        public UnityWebRequest Request;
+    }
+    private readonly string m_AnalysisChannel = Guid.NewGuid().ToString("N");
+    private readonly List<AnalysisTicket> m_AnalysisTickets = new List<AnalysisTicket>();
+    private AnalysisTicket m_PreviewAnalysis;
+
+    public void CancelPreviewAnalysis()
+    {
+        AnalysisTicket old = m_PreviewAnalysis;
+        m_PreviewAnalysis = null;
+        CancelAnalysis(old);
+    }
+
+    public void CancelInputAnalyses()
+    {
+        foreach (AnalysisTicket ticket in new List<AnalysisTicket>(m_AnalysisTickets))
+        {
+            // New speech cancels the old reply, not a recording already handed
+            // over for final analysis. Its eventual result enters quarantine.
+            if (ticket.CompletedCapture && !ticket.Cancelled) ticket.Detached = true;
+            else CancelAnalysis(ticket);
+        }
+        m_PreviewAnalysis = null;
+    }
+
+    public int PendingCompletedCaptureAnalysisCount
+    {
+        get { return m_AnalysisTickets.Count(t => t.CompletedCapture && t.Detached && !t.Cancelled); }
+    }
+
+    private void CancelAnalysis(AnalysisTicket ticket)
+    {
+        if (ticket == null || ticket.Cancelled) return;
+        ticket.Cancelled = true;
+        StartCoroutine(ControlAnalysis("cancel", ticket.Id));
+        if (ticket.Request != null && !ticket.Request.isDone) ticket.Request.Abort();
+    }
+
+    public void PromotePreviewAnalysis()
+    {
+        if (m_PreviewAnalysis != null && !m_PreviewAnalysis.Cancelled)
+        {
+            m_PreviewAnalysis.CompletedCapture = true;
+            StartCoroutine(ControlAnalysis("promote", m_PreviewAnalysis.Id));
+            m_PreviewAnalysis = null;
+        }
+    }
+
+    private IEnumerator ControlAnalysis(string operation, string id)
+    {
+        var form = new WWWForm();
+        form.AddField("request_id", id);
+        using (var request = UnityWebRequest.Post(m_ServerSetting.TrimEnd('/') + "/asr/" + operation, form))
+        {
+            request.timeout = 3;
+            yield return request.SendWebRequest();
+            if (request.result != UnityWebRequest.Result.Success)
+                Debug.LogWarning("[ASR/Dispatch] 后端任务控制未生效，请确认已重启 SenseVoice；客户端仍拒绝过期结果。");
+        }
+    }
+    private int m_LiveRecordingCandidateSessionSerial = 0;
 
     // WebSocket 的收发在后台线程；Unity UI/MonoBehaviour 回调统一排回主线程。
     private readonly ConcurrentQueue<Action> m_StreamMainThreadActions =
@@ -389,6 +878,245 @@ public class SenseVoiceSpeechToText : STT
     public bool StreamingPreviewEnabled
     {
         get { return m_EnableStreamingPreview; }
+    }
+
+    /// <summary>
+    /// 一次真实麦克风录音的候选边界。预览 ASR、流式复核和最终 ASR 都可更新同一候选；
+    /// 下一次真实录音开始才清空，因而长歌不会因为最终口语晚到几秒而失去前面的最佳歌声。
+    /// </summary>
+    public void BeginLiveRecordingCandidateSession()
+    {
+        m_CurrentRecordingEvidencePublished = false;
+        m_EarlierCaptureTranscripts.Clear();
+        m_CurrentCaptureTranscript = "";
+        m_InputCaptureAt = Time.realtimeSinceStartup;
+        m_LiveRecordingCandidateSessionSerial++;
+        ReserveRecordingSequence(m_LiveRecordingCandidateSessionSerial);
+        m_LiveRecordingCandidateSessionActive = true;
+        m_LastPlayableCandidateAudioBytes = null;
+        m_LastPlayableCandidateTime = -999f;
+        m_LastPlayableCandidatePitchTimelineMidi = new float[0];
+        m_LastPlayableCandidateScore = null;
+        m_LastPlayableCandidateSingingMora = null;
+        m_LastPlayableCandidatePerformanceSeconds = 0f;
+        m_LastPlayableCandidateProbability = 0f;
+        m_LastPlayableCandidatePitchStability = 0f;
+        m_LastPlayableCandidateIslandSeconds = 0f;
+        m_LastPlayableCandidateContentSeconds = 0f;
+        m_LastPlayableCandidateRecoveryAudioCropSeconds = 0f;
+        m_LastPlayableCandidateRecoveryTimelineCropSeconds = 0f;
+        m_LastPlayableCandidateRecoveryAudioEndSeconds = 0f;
+        m_LastPlayableCandidateRecoveryTimelineEndSeconds = 0f;
+        m_LastPlayableCandidateEvidence = null;
+        m_LastSingingEvidence = null;
+    }
+
+    public void SetInputCaptureTime(float capturedAt)
+    {
+        m_InputCaptureAt = capturedAt;
+    }
+
+    public bool TryGetCurrentRecordingSingingCandidateFacts(
+        out float performanceSeconds,
+        out float singingProbability,
+        out float pitchStability,
+        out float ageSeconds)
+    {
+        performanceSeconds = m_LastPlayableCandidatePerformanceSeconds;
+        singingProbability = m_LastPlayableCandidateProbability;
+        pitchStability = m_LastPlayableCandidatePitchStability;
+        ageSeconds = Mathf.Max(0f, Time.realtimeSinceStartup - m_LastPlayableCandidateTime);
+        bool withinLegacyCallbackWindow = ageSeconds <= 5f;
+        return (m_LiveRecordingCandidateSessionActive || withinLegacyCallbackWindow) &&
+            m_LastPlayableCandidateAudioBytes != null &&
+            m_LastPlayableCandidateAudioBytes.Length > 44 &&
+            HasPlayablePitchTimeline(m_LastPlayableCandidatePitchTimelineMidi) &&
+            performanceSeconds >= k_MinSingablePerformanceSeconds;
+    }
+
+    private static bool IsCrediblePlayableCandidate(
+        bool classifiedSinging,
+        float singingProbability,
+        float pitchStability,
+        float islandSeconds,
+        float contentSeconds)
+    {
+        if (classifiedSinging || singingProbability >= k_SingingBandLow) return true;
+        float islandRatio = contentSeconds > 0.01f ? islandSeconds / contentSeconds : 0f;
+        return islandSeconds >= 4f && pitchStability >= 0.60f && islandRatio >= 0.70f;
+    }
+
+    private static bool ShouldReplacePlayableCandidate(
+        float existingSeconds,
+        float existingQuality,
+        float candidateSeconds,
+        float candidateQuality)
+    {
+        if (existingSeconds < k_MinSingablePerformanceSeconds) return true;
+        if (candidateSeconds > existingSeconds + 0.35f) return true;
+        return Mathf.Abs(candidateSeconds - existingSeconds) <= 0.35f &&
+            candidateQuality > existingQuality + 0.02f;
+    }
+
+    private void TryStorePlayableCandidate(
+        byte[] audioBytes,
+        float audioCropSeconds,
+        float timelineCropSeconds,
+        float scoreCropSeconds,
+        float audioEndSeconds,
+        float timelineEndSeconds,
+        float scoreEndSeconds,
+        float recoveryAudioCropSeconds,
+        float recoveryTimelineCropSeconds,
+        float recoveryAudioEndSeconds,
+        float recoveryTimelineEndSeconds)
+    {
+        if (audioBytes == null || audioBytes.Length <= 44 ||
+            !HasPlayablePitchTimeline(LastPitchTimelineMidi)) return;
+        float candidateSeconds = MeasurePerformanceSeconds(
+            timelineCropSeconds,
+            timelineEndSeconds);
+        if (candidateSeconds < k_MinSingablePerformanceSeconds ||
+            !IsCrediblePlayableCandidate(
+                LastIsSinging,
+                LastSingingProbability,
+                LastPitchStability,
+                LastSingingIslandSeconds,
+                LastSingingContentSeconds)) return;
+
+        float islandRatio = LastSingingContentSeconds > 0.01f
+            ? Mathf.Clamp01(LastSingingIslandSeconds / LastSingingContentSeconds)
+            : 0f;
+        float quality = Mathf.Clamp01(LastSingingProbability) +
+            Mathf.Clamp01(LastPitchStability) + islandRatio;
+        float existingRatio = m_LastPlayableCandidateContentSeconds > 0.01f
+            ? Mathf.Clamp01(m_LastPlayableCandidateIslandSeconds /
+                            m_LastPlayableCandidateContentSeconds)
+            : 0f;
+        float existingQuality = Mathf.Clamp01(m_LastPlayableCandidateProbability) +
+            Mathf.Clamp01(m_LastPlayableCandidatePitchStability) + existingRatio;
+        if (!ShouldReplacePlayableCandidate(
+                m_LastPlayableCandidatePerformanceSeconds,
+                existingQuality,
+                candidateSeconds,
+                quality)) return;
+
+        m_LastPlayableCandidateAudioBytes = new byte[audioBytes.Length];
+        Array.Copy(audioBytes, m_LastPlayableCandidateAudioBytes, audioBytes.Length);
+        m_LastPlayableCandidateTime = Time.realtimeSinceStartup;
+        m_LastPlayableCandidateAudioCropSeconds = audioCropSeconds;
+        m_LastPlayableCandidateTimelineCropSeconds = timelineCropSeconds;
+        m_LastPlayableCandidateScoreCropSeconds = scoreCropSeconds;
+        m_LastPlayableCandidateAudioEndSeconds = audioEndSeconds;
+        m_LastPlayableCandidateTimelineEndSeconds = timelineEndSeconds;
+        m_LastPlayableCandidateScoreEndSeconds = scoreEndSeconds;
+        m_LastPlayableCandidateRecoveryAudioCropSeconds = recoveryAudioCropSeconds;
+        m_LastPlayableCandidateRecoveryTimelineCropSeconds = recoveryTimelineCropSeconds;
+        m_LastPlayableCandidateRecoveryAudioEndSeconds = recoveryAudioEndSeconds;
+        m_LastPlayableCandidateRecoveryTimelineEndSeconds = recoveryTimelineEndSeconds;
+        m_LastPlayableCandidatePitchTimelineMidi =
+            (float[])LastPitchTimelineMidi.Clone();
+        m_LastPlayableCandidatePitchFrameSeconds = LastPitchTimelineFrameSeconds;
+        m_LastPlayableCandidateScore = LastSingingScore == null
+            ? null
+            : JsonUtility.FromJson<SingingScore>(JsonUtility.ToJson(LastSingingScore));
+        m_LastPlayableCandidateText = LastText ?? "";
+        m_LastPlayableCandidateLanguage = LastLanguage ?? "";
+        m_LastPlayableCandidateSingingText = m_LastResponseSingingText ?? "";
+        m_LastPlayableCandidateSingingLanguage = m_LastResponseSingingLanguage ?? "";
+        m_LastPlayableCandidateSingingReading = m_LastResponseSingingReading ?? "";
+        m_LastPlayableCandidateSingingReadingSource =
+            m_LastResponseSingingReadingSource ?? "";
+        m_LastPlayableCandidateSingingReadingComplete =
+            m_LastResponseSingingReadingComplete;
+        m_LastPlayableCandidateSingingMora = m_LastResponseSingingMora == null
+            ? null
+            : (string[])m_LastResponseSingingMora.Clone();
+        m_LastPlayableCandidatePerformanceSeconds = candidateSeconds;
+        m_LastPlayableCandidateProbability = LastSingingProbability;
+        m_LastPlayableCandidatePitchStability = LastPitchStability;
+        m_LastPlayableCandidateIslandSeconds = LastSingingIslandSeconds;
+        m_LastPlayableCandidateContentSeconds = LastSingingContentSeconds;
+        //音频、旋律、歌词与边界必须作为一个不可拆的候选一起替换。
+        //否则 preview 的最佳音频会错误配上 final 的 head/tail 证据。
+        m_LastPlayableCandidateEvidence = CloneSingingEvidence(m_LastSingingEvidence);
+        Debug.Log($"[SenseVoice/Singing] 本次录音最佳候选更新 " +
+                  $"session={m_LiveRecordingCandidateSessionSerial} " +
+                  $"duration={candidateSeconds:F2}s p={LastSingingProbability:F2} " +
+                  $"stability={LastPitchStability:F2}");
+    }
+
+    private void CaptureLatestSingingEvidence(
+        byte[] audioBytes,
+        float rawSeconds,
+        float cleanStartSeconds,
+        float cleanEndSeconds,
+        float recoveryStartSeconds,
+        float recoveryEndSeconds,
+        float capturedAt, float timelineOriginSeconds)
+    {
+        if (audioBytes == null || audioBytes.Length <= 44 ||
+            !LastSingingAnalysisAvailable)
+            return;
+        var snapshot = new SingingEvidenceSnapshot
+        {
+            CaptureSessionSerial = m_LiveRecordingCandidateSessionSerial,
+            TimelineOriginSeconds = timelineOriginSeconds,
+            RawWavBytes = (byte[])audioBytes.Clone(),
+            PitchTimelineMidi = LastPitchTimelineMidi == null
+                ? new float[0] : (float[])LastPitchTimelineMidi.Clone(),
+            FrameSeconds = Mathf.Clamp(LastPitchTimelineFrameSeconds, 0.02f, 0.25f),
+            AtRealtime = capturedAt >= 0f ? capturedAt : Time.realtimeSinceStartup,
+            Text = LastText ?? "",
+            SingingText = m_LastResponseSingingText ?? "",
+            Language = !string.IsNullOrWhiteSpace(m_LastResponseSingingLanguage)
+                ? m_LastResponseSingingLanguage : (LastLanguage ?? ""),
+            RawSeconds = rawSeconds > 0f ? rawSeconds : GetWavDurationSeconds(audioBytes),
+            CleanStartSeconds = Mathf.Max(0f, cleanStartSeconds),
+            CleanEndSeconds = Mathf.Max(0f, cleanEndSeconds),
+            RecoveryStartSeconds = Mathf.Max(0f, recoveryStartSeconds),
+            RecoveryEndSeconds = Mathf.Max(0f, recoveryEndSeconds),
+            SingingProbability = LastSingingProbability,
+            PitchStability = LastPitchStability,
+            MelodicIslandSeconds = LastSingingIslandSeconds,
+            ContentSeconds = LastSingingContentSeconds,
+            HeadExtraSeconds = m_LastHeadExtraSeconds,
+            TailExtraSeconds = m_LastTailExtraSeconds,
+            HeadExtraText = m_LastHeadExtraText ?? "",
+            TailExtraText = m_LastTailExtraText ?? "",
+            HeadExtraType = m_LastHeadExtraType ?? "none",
+            TailExtraType = m_LastTailExtraType ?? "none",
+            HeadExtraProbability = m_LastHeadExtraProbability,
+            TailExtraProbability = m_LastTailExtraProbability,
+            HeadExtraReviewRequired = m_LastHeadExtraReviewRequired,
+            TailExtraReviewRequired = m_LastTailExtraReviewRequired,
+            HeadExtraMelodicSeconds = m_LastHeadExtraMelodicSeconds,
+            TailExtraMelodicSeconds = m_LastTailExtraMelodicSeconds,
+            HeadExtraMelodicRatio = m_LastHeadExtraMelodicRatio,
+            TailExtraMelodicRatio = m_LastTailExtraMelodicRatio,
+            HeadExtraLongestMelodicRunSeconds =
+                m_LastHeadExtraLongestMelodicRunSeconds,
+            TailExtraLongestMelodicRunSeconds =
+                m_LastTailExtraLongestMelodicRunSeconds,
+            HeadExtraSegments = CloneBoundarySegments(m_LastHeadExtraSegments),
+            TailExtraSegments = CloneBoundarySegments(m_LastTailExtraSegments),
+            CleanLeadInUnverifiedSeconds = m_LastCleanLeadInUnverifiedSeconds,
+            CleanLeadInEvidenceText = m_LastCleanLeadInEvidenceText ?? "",
+            CleanLeadInEvidenceType = m_LastCleanLeadInEvidenceType ?? "none",
+            CleanLeadInEvidenceProbability = m_LastCleanLeadInEvidenceProbability,
+        };
+        m_LastSingingEvidence = snapshot;
+        UpdateRetainedRecordingEvidence(snapshot);
+        Debug.Log($"[SenseVoice/Evidence] 原始歌唱证据已保存 raw={snapshot.RawSeconds:F2}s " +
+                   $"clean={snapshot.CleanStartSeconds:F2}~{snapshot.CleanEndSeconds:F2}s " +
+                   $"expanded={snapshot.RecoveryStartSeconds:F2}~{snapshot.RecoveryEndSeconds:F2}s " +
+                   $"head_extra={snapshot.HeadExtraSeconds:F2}s/{snapshot.HeadExtraType} " +
+                   $"tail_extra={snapshot.TailExtraSeconds:F2}s/{snapshot.TailExtraType} " +
+                   $"head_windows={(snapshot.HeadExtraSegments == null ? 0 : snapshot.HeadExtraSegments.Length)} " +
+                   $"tail_windows={(snapshot.TailExtraSegments == null ? 0 : snapshot.TailExtraSegments.Length)}；" +
+                  $"clean_lead_in_unverified={snapshot.CleanLeadInUnverifiedSeconds:F2}s/" +
+                  $"{snapshot.CleanLeadInEvidenceType}；" +
+                  "播放资格将在来源确认之外单独判断");
     }
 
     private void Update()
@@ -619,7 +1347,7 @@ public class SenseVoiceSpeechToText : STT
                 return;
             }
             if (response.@event != "partial") continue;
-            if (string.IsNullOrWhiteSpace(response.text) && !response.is_singing) continue;
+            // Empty hypotheses still prove that ASR processed new audio.
 
             StreamingTranscript transcript = new StreamingTranscript
             {
@@ -629,10 +1357,19 @@ public class SenseVoiceSpeechToText : STT
                 Language = response.language ?? "",
                 Revision = response.revision,
                 AudioMs = response.audio_ms,
+                WindowStartMs = response.window_start_ms,
                 Elapsed = response.elapsed,
                 IsSinging = response.is_singing,
                 SingingProbability = response.singing_probability,
                 PitchStability = response.pitch_stability,
+                ActivityAvailable = response.activity_schema >= 1,
+                ActivityWindowMs = response.activity_window_ms,
+                ActivityRms = response.activity_rms,
+                ActivityVadAvailable = response.activity_vad_available,
+                ActivitySpeechMs = response.activity_speech_ms,
+                ActivitySpeechEndAgeMs = response.activity_speech_end_age_ms,
+                ActivityPeriodicity = response.activity_periodicity,
+                ActivityVoicedRatio = response.activity_voiced_ratio,
             };
             QueueStreamMainThread(() =>
             {
@@ -713,10 +1450,19 @@ public class SenseVoiceSpeechToText : STT
         public string Language;
         public bool Revision;
         public int AudioMs;
+        public int WindowStartMs;
         public float Elapsed;
         public bool IsSinging;
         public float SingingProbability;
         public float PitchStability;
+        public bool ActivityAvailable;
+        public int ActivityWindowMs;
+        public float ActivityRms;
+        public bool ActivityVadAvailable;
+        public int ActivitySpeechMs;
+        public int ActivitySpeechEndAgeMs = -1;
+        public float ActivityPeriodicity;
+        public float ActivityVoicedRatio;
     }
 
     [Serializable]
@@ -729,6 +1475,15 @@ public class SenseVoiceSpeechToText : STT
         public string language = "";
         public bool revision = false;
         public int audio_ms = 0;
+        public int window_start_ms = 0;
+        public int activity_schema;
+        public int activity_window_ms;
+        public float activity_rms;
+        public bool activity_vad_available;
+        public int activity_speech_ms;
+        public int activity_speech_end_age_ms = -1;
+        public float activity_periodicity;
+        public float activity_voiced_ratio;
         public float elapsed = 0f;
         public bool is_singing = false;
         public float singing_probability = 0f;
@@ -738,13 +1493,39 @@ public class SenseVoiceSpeechToText : STT
 
     public override void SpeechToText(AudioClip _clip, Action<string> _callback)
     {
+        if (!HasUsableAudioClip(_clip))
+        {
+            if (_callback != null) _callback("");
+            return;
+        }
+        BeginLiveRecordingCandidateSession();
         byte[] _audioData = WavUtility.FromAudioClip(_clip);
-        StartCoroutine(SendAudioData(_audioData, _callback, true, false, -1f, -1f, false));
+        StartCoroutine(SendAudioData(
+            _audioData, _callback, true, false, -1f, -1f, false, false));
     }
 
     public override void SpeechToText(byte[] _audioData, Action<string> _callback)
     {
-        StartCoroutine(SendAudioData(_audioData, _callback, true, false, -1f, -1f, false));
+        if (!HasUsableWavPayload(_audioData))
+        {
+            if (_callback != null) _callback("");
+            return;
+        }
+        BeginLiveRecordingCandidateSession();
+        StartCoroutine(SendAudioData(
+            _audioData, _callback, true, false, -1f, -1f, false, false));
+    }
+
+    private static bool HasUsableAudioClip(AudioClip clip)
+    {
+        return clip != null && clip.samples > 0 && clip.channels > 0 &&
+               clip.frequency > 0 && clip.length > 0.005f;
+    }
+
+    private static bool HasUsableWavPayload(byte[] audioData)
+    {
+        //标准 PCM WAV 头通常为 44 字节；只有头、没有任何采样时不能送进 FunASR。
+        return audioData != null && audioData.Length > 44;
     }
 
     public void SpeechToText(AudioClip clip, Action<string> callback, bool learnSpeaker)
@@ -759,9 +1540,11 @@ public class SenseVoiceSpeechToText : STT
         bool expectSinging,
         float streamingSingingOnsetSeconds = -1f,
         float streamingObservedSeconds = -1f,
-        bool streamingSpokenExitDetected = false)
+        bool streamingSpokenExitDetected = false,
+        bool semanticSpokenLeadIn = false,
+        bool speculative = false)
     {
-        if (clip == null)
+        if (!HasUsableAudioClip(clip))
         {
             if (callback != null) callback("");
             return;
@@ -773,7 +1556,24 @@ public class SenseVoiceSpeechToText : STT
             expectSinging,
             streamingSingingOnsetSeconds,
             streamingObservedSeconds,
-            streamingSpokenExitDetected));
+            streamingSpokenExitDetected,
+            semanticSpokenLeadIn, speculative));
+    }
+
+    /// <summary>
+    /// 流式锚点与最终声学岛相差很大时，通常应保住更早的旋律，不能机械追随岛。
+    /// 唯一可核查的反向证据是：角色的流式语义已把那段前缀判为普通说话，而且最终
+    /// 分析也至少落入可复核歌唱带。1.5 秒过滤两套边界的正常抖动。
+    /// </summary>
+    private static bool ShouldPreferAcousticIslandForSpokenLeadIn(
+        bool semanticSpokenLeadIn,
+        bool credibleFinalMelody,
+        float acousticCropSeconds,
+        float protectedStreamingCropSeconds)
+    {
+        return semanticSpokenLeadIn && credibleFinalMelody &&
+            acousticCropSeconds > 0f && protectedStreamingCropSeconds >= 0f &&
+            acousticCropSeconds - protectedStreamingCropSeconds >= 1.5f;
     }
 
     /// <summary>
@@ -805,7 +1605,7 @@ public class SenseVoiceSpeechToText : STT
         bool speakerCheck,
         Action<VoiceActivityResult> callback)
     {
-        if (audioBytes == null || audioBytes.Length == 0)
+        if (!HasUsableWavPayload(audioBytes))
         {
             if (callback != null) callback(new VoiceActivityResult());
             return;
@@ -870,9 +1670,22 @@ public class SenseVoiceSpeechToText : STT
         bool expectSinging,
         float streamingSingingOnsetSeconds,
         float streamingObservedSeconds,
-        bool streamingSpokenExitDetected)
+        bool streamingSpokenExitDetected,
+        bool semanticSpokenLeadIn,
+        bool speculative = false)
     {
+        if (!HasUsableWavPayload(audioBytes))
+        {
+            if (_callback != null) _callback("");
+            yield break;
+        }
         int requestSerial = ++m_AsrRequestSerial;
+        var ticket = new AnalysisTicket { CompletedCapture = !speculative };
+        int captureSessionSerial = m_LiveRecordingCandidateSessionSerial;
+        if (speculative) CancelPreviewAnalysis();
+        m_AnalysisTickets.Add(ticket);
+        if (speculative) m_PreviewAnalysis = ticket;
+        float capturedAt = m_InputCaptureAt >= 0f ? m_InputCaptureAt : Time.realtimeSinceStartup;
         stopwatch.Restart();
 
         WWWForm form = new WWWForm();
@@ -881,12 +1694,28 @@ public class SenseVoiceSpeechToText : STT
         form.AddField("learn_speaker", learnSpeaker ? "true" : "false");
         form.AddField("expect_singing", expectSinging ? "true" : "false");
 
+        form.AddField("request_id", ticket.Id);
+        // Supersession is per recording, not per MonoBehaviour. A new capture
+        // must not cancel a sealed upload even if /promote arrives out of order.
+        form.AddField("channel_id", m_AnalysisChannel + ":" + captureSessionSerial);
+        form.AddField("speculative", speculative ? "true" : "false");
         using (UnityWebRequest www = UnityWebRequest.Post(m_SpeechRecognizeURL, form))
         {
+            ticket.Request = www;
+            float requestStarted = Time.realtimeSinceStartup;
             www.SetRequestHeader("accept", "application/json");
 
             yield return www.SendWebRequest();
 
+            m_AnalysisTickets.Remove(ticket);
+            if (ReferenceEquals(m_PreviewAnalysis, ticket)) m_PreviewAnalysis = null;
+            if (ticket.Cancelled || (www.result == UnityWebRequest.Result.Success &&
+                JsonUtility.FromJson<Response>(www.downloadHandler.text)?.cancelled == true))
+            {
+                Debug.Log($"[ASR/Dispatch] 过期分析已取消 request={requestSerial}；不修改本轮感知/记忆");
+                _callback?.Invoke("");
+                yield break;
+            }
             if (www.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError("[SenseVoice] 请求失败: " + www.error + " / " + www.downloadHandler.text);
@@ -904,8 +1733,37 @@ public class SenseVoiceSpeechToText : STT
                 }
                 else
                 {
+                    if (ticket.Detached)
+                    {
+                        ArchiveCompletedCapture(_response, audioBytes, capturedAt, captureSessionSerial);
+                        // Never publish the old transcript or awaken its cancelled reply.
+                        _callback?.Invoke("");
+                        yield break;
+                    }
+                    if (_response.timing_schema >= 1 && _response.timings != null)
+                    {
+                        AsrTiming t = _response.timings;
+                        Debug.Log($"[ASR/Timing] request={requestSerial} " +
+                            $"client={Time.realtimeSinceStartup - requestStarted:F2}s server={t.total:F2}s queue={t.queue_wait:F2}s " +
+                            $"decode={t.decode:F2}s vad={t.vad:F2}s quickPitch={t.quick_pitch:F2}s speaker={t.speaker:F2}s " +
+                            $"recognizer={t.recognizer:F2}s fullPitch={t.full_pitch:F2}s recovery={t.recovery:F2}s " +
+                            $"segment={t.segment_asr:F2}s tail={t.tail_asr:F2}s recall={t.song_recall:F2}s " +
+                            $"dump={t.dump:F2}s other={t.other:F2}s");
+                    }
                     m_LastCompletedAsrSerial = requestSerial;
+                    m_LastAnalyzedCaptureAt = capturedAt;
+                    PreserveEarlierCaptureTranscript(_response.text, GetWavDurationSeconds(audioBytes));
                     LastText = _response.text ?? "";
+                    m_LastTurnSegments = _response.turn_segments_schema == 1
+                        ? _response.turn_segments : null;
+                    m_LastWholeTurnText = _response.whole_text ?? "";
+                    m_LastSegmentedPrimaryText = LastText;
+                    if (HasTimeOrderedTranscript)
+                        Debug.Log($"[ASR/Segments] source={_response.transcript_source} " +
+                            $"count={m_LastTurnSegments.Length} complete={_response.turn_segments_complete} " +
+                            $"review={_response.turn_segments_review_required} " +
+                            $"whole=\"{m_LastWholeTurnText}\" primary=\"{LastText}\" " +
+                            BuildTimeOrderedTranscriptEvidence(m_LastTurnSegments, m_LastWholeTurnText));
                     LastLanguage = _response.language ?? "";
                     LastEmotion = _response.emotion ?? "";
                     LastEvent = _response.audio_event ?? "";
@@ -928,6 +1786,7 @@ public class SenseVoiceSpeechToText : STT
                         LastKnownSpeakerName = LastSpeakerName;
                     }
                     LastSpeakerConfidence = _response.speaker_confidence;
+                    LastSpeakerSelfConfidence = _response.speaker_self_confidence;
                     LastSpeakerEnrollmentProgress = _response.speaker_enrollment_progress;
                     LastSpeakerIsNew = _response.speaker_is_new;
                     LastSpeakerPersistent = _response.speaker_persistent;
@@ -939,8 +1798,28 @@ public class SenseVoiceSpeechToText : STT
                     LastNoteSequence = _response.note_sequence ?? "";
                     LastSingingSummary = _response.singing_summary ?? "";
                     LastSingingScore = _response.singing_score;
-                    //分带观测：只记录，不改判定。看两端是否真的干净、模糊带多大比例，
-                    //以及模糊带里若要问 LLM，手里的文本长什么样。
+                    LastSingingAnalysisAvailable = m_EnableSingingAnalysis &&
+                        _response.singing_analysis_available;
+                    int acousticTimelineFrames = _response.pitch_timeline_midi != null
+                        ? _response.pitch_timeline_midi.Length : 0;
+                    LastSingingContentSeconds = LastSingingAnalysisAvailable
+                        ? Mathf.Max(0f, _response.pitch_timeline_start_seconds +
+                            acousticTimelineFrames * Mathf.Max(
+                                0.02f, _response.pitch_timeline_frame_seconds))
+                        : 0f;
+                    float acousticIslandEnd = _response.singing_end_seconds > 0f
+                        ? _response.singing_end_seconds
+                        : LastSingingContentSeconds;
+                    LastSingingIslandSeconds = LastSingingAnalysisAvailable
+                        ? Mathf.Max(0f, acousticIslandEnd - _response.singing_start_seconds)
+                        : 0f;
+                    LastSingingIslandRatio = LastSingingContentSeconds > 0.01f
+                        ? Mathf.Clamp01(
+                            LastSingingIslandSeconds / LastSingingContentSeconds)
+                        : 0f;
+
+                    //分带现在是感知证据状态：模糊带会交给完整转写 LLM 复核，
+                    //但这里仍只记录声学事实，不改服务端 LastIsSinging 原始结论。
                     if (m_EnableSingingAnalysis && !_response.no_speech &&
                         _response.singing_analysis_available)
                     {
@@ -952,35 +1831,79 @@ public class SenseVoiceSpeechToText : STT
                         //但"该放行却被判说"的正样本只有 1 例，撑不起一个具体阈值。
                         //所以先把它打出来攒样本，别重蹈 _ISLAND_PROB_FLOOR 那次一路改阈值的覆辙。
                         //整段概率之外单独看它，是因为混合轮的均值天然会被说话拉低。
-                        int timelineFrames = _response.pitch_timeline_midi != null
-                            ? _response.pitch_timeline_midi.Length : 0;
-                        float contentSecondsProbe = _response.pitch_timeline_start_seconds +
-                            timelineFrames * Mathf.Max(0.02f, _response.pitch_timeline_frame_seconds);
-                        float islandEndProbe = _response.singing_end_seconds > 0f
-                            ? _response.singing_end_seconds : contentSecondsProbe;
-                        float islandSecondsProbe = Mathf.Max(
-                            0f, islandEndProbe - _response.singing_start_seconds);
-                        Debug.Log($"[Singing/Band] 离线 prob={_response.singing_probability:F2} " +
+                        Debug.Log($"[Singing/Band] 离线 prob={_response.singing_probability:F3} " +
                                   $"stab={_response.pitch_stability:F2} → {band} " +
-                                  $"(阈值 0.58 判为{(_response.is_singing ? "唱" : "说")}) " +
-                                  $"岛={islandSecondsProbe:F2}s/内容{contentSecondsProbe:F2}s " +
+                                  $"(声学证据={LastAcousticMode}; 服务端原判=" +
+                                  $"{(_response.is_singing ? "唱" : "说")}) " +
+                                  $"岛={LastSingingIslandSeconds:F2}s/" +
+                                  $"内容{LastSingingContentSeconds:F2}s " +
                                   $"文本=\"{(LastText ?? "").Trim()}\"");
                     }
                     //说话轮的原话留一份，下一段歌声提交时作为"唱这段之前用户说了什么"。
                     if (!_response.is_singing)
                     {
                         string spoken = (LastText ?? "").Trim();
+                        string segmentText = (_response.singing_text ?? "").Trim();
+                        if (segmentText.Length > 0)
+                        {
+                            //整轮文本可能是“说话+歌词”，而 singing_text 是声学岛
+                            //的独立转写。只做可验证的字面拆分；对不上时留空，
+                            //不把整轮歌词冒充成“唱前说话”。
+                            spoken = ExtractPrecedingSpeechFromMixedTranscript(
+                                spoken, segmentText);
+                            m_LastSpokenTranscript = spoken.Length >= 4 ? spoken : "";
+                        }
                         //太短的应答（「嗯」「好」）说明不了任何事，留着反而占地方。
-                        if (spoken.Length >= 4) m_LastSpokenTranscript = spoken;
+                        else if (spoken.Length >= 4)
+                        {
+                            m_LastSpokenTranscript = spoken;
+                        }
                     }
                     //每一份响应都要重置：调用方问的是「刚刚这一轮裁了多少头」，
                     //沿用上一轮的值会让没有演唱的轮次继承一个大裁剪量。
                     m_LastResponseAudioCropSeconds = 0f;
                     m_LastResponseAudioTailDropSeconds = 0f;
+                    m_LastCropLeadInSeconds = 0f;
+                    m_LastCleanLeadInUnverifiedSeconds = 0f;
+                    m_LastCleanLeadInEvidenceText = "";
+                    m_LastCleanLeadInEvidenceType = "none";
+                    m_LastCleanLeadInEvidenceProbability = 0f;
                     m_LastResponseSingingTailText = _response.singing_tail_text ?? "";
                     //每轮必赋值：沿用上一轮会让这一次的歌声配上别的歌的回忆
                     m_LastSongRecall = _response.song_recall;
                     m_LastResponseSingingText = _response.singing_text ?? "";
+                    m_LastHeadExtraText = _response.singing_head_extra_text ?? "";
+                    m_LastTailExtraText = _response.singing_tail_extra_text ?? "";
+                    m_LastHeadExtraType = string.IsNullOrWhiteSpace(
+                            _response.singing_head_extra_type)
+                        ? "none" : _response.singing_head_extra_type.Trim().ToLowerInvariant();
+                    m_LastTailExtraType = string.IsNullOrWhiteSpace(
+                            _response.singing_tail_extra_type)
+                        ? "none" : _response.singing_tail_extra_type.Trim().ToLowerInvariant();
+                    m_LastHeadExtraProbability =
+                        Mathf.Clamp01(_response.singing_head_extra_probability);
+                    m_LastTailExtraProbability =
+                        Mathf.Clamp01(_response.singing_tail_extra_probability);
+                    m_LastHeadExtraReviewRequired =
+                        _response.singing_head_extra_review_required;
+                    m_LastTailExtraReviewRequired =
+                        _response.singing_tail_extra_review_required;
+                    m_LastHeadExtraMelodicSeconds = Mathf.Max(
+                        0f, _response.singing_head_extra_melodic_seconds);
+                    m_LastTailExtraMelodicSeconds = Mathf.Max(
+                        0f, _response.singing_tail_extra_melodic_seconds);
+                    m_LastHeadExtraMelodicRatio = Mathf.Clamp01(
+                        _response.singing_head_extra_melodic_ratio);
+                    m_LastTailExtraMelodicRatio = Mathf.Clamp01(
+                        _response.singing_tail_extra_melodic_ratio);
+                    m_LastHeadExtraLongestMelodicRunSeconds = Mathf.Max(
+                        0f, _response.singing_head_extra_longest_melodic_run_seconds);
+                    m_LastTailExtraLongestMelodicRunSeconds = Mathf.Max(
+                        0f, _response.singing_tail_extra_longest_melodic_run_seconds);
+                    m_LastHeadExtraSegments = CloneBoundarySegments(
+                        _response.singing_head_extra_segments);
+                    m_LastTailExtraSegments = CloneBoundarySegments(
+                        _response.singing_tail_extra_segments);
                     m_LastResponseSingingLanguage = _response.singing_language ?? "";
                     m_LastResponseSingingReading = _response.singing_lyrics_reading ?? "";
                     m_LastResponseSingingReadingSource =
@@ -1004,6 +1927,7 @@ public class SenseVoiceSpeechToText : STT
                     float rawAudioSeconds = GetWavDurationSeconds(audioBytes);
                     float protectedStreamingCropSeconds = -1f;
                     bool onsetsAgree = false;
+                    bool semanticLeadInIslandOverride = false;
                     bool hasUsableStreamingOnset = streamingSingingOnsetSeconds >= 0f &&
                         streamingObservedSeconds > 0f &&
                         streamingSingingOnsetSeconds <= streamingObservedSeconds + 0.5f &&
@@ -1043,6 +1967,19 @@ public class SenseVoiceSpeechToText : STT
                             : Mathf.Min(
                                 acousticAudioCropSeconds, protectedStreamingCropSeconds);
                     }
+                    bool credibleFinalMelody = LastIsSinging ||
+                        LastSingingProbability >= k_SingingBandLow;
+                    if (ShouldPreferAcousticIslandForSpokenLeadIn(
+                            semanticSpokenLeadIn,
+                            credibleFinalMelody,
+                            acousticAudioCropSeconds,
+                            protectedStreamingCropSeconds))
+                    {
+                        //最终声学岛前只留 0.20s 呼吸余量。下面会以同一个绝对时刻
+                        //同步裁剪音高时间线，避免把说话音频配到后面的歌词/旋律上。
+                        audioCropSeconds = Mathf.Max(0f, acousticAudioCropSeconds - 0.20f);
+                        semanticLeadInIslandOverride = true;
+                    }
                     bool conservativeHeadKeep = false;
                     if (!hasUsableStreamingOnset && expectSinging && LastIsSinging)
                     {
@@ -1063,7 +2000,7 @@ public class SenseVoiceSpeechToText : STT
                     // 岛跳到了后半句，保护本已拦住，被这行推翻后切掉了 3.25s 真歌声。
                     // 两次失效方向相反(岛太早 vs 岛太晚)，占比 45% 与 33% 分不开，
                     // 暂无可靠判据，先退回已知状态：窗口由流式保护决定。
-                    bool alignCropToIsland = false;
+                    bool alignCropToIsland = semanticLeadInIslandOverride;
 
                     // 音频与音高时间线必须描述同一段。时间线只从 pitch_timeline_start_seconds
                     // 开始（服务端只为歌声那部分建时间线），如果音频裁得比它还靠前，多出来的
@@ -1074,6 +2011,22 @@ public class SenseVoiceSpeechToText : STT
                         _response.pitch_timeline_start_seconds;
                     bool clampedToTimeline = audioCropSeconds < timelineStartAbsolute - 0.05f;
                     if (clampedToTimeline) audioCropSeconds = timelineStartAbsolute;
+
+                    //两者都是原始 WAV 的绝对坐标。旧代码拿 content-relative 的
+                    //singing_start_seconds 去减 absolute audioCrop，在 post-VAD 有偏移时
+                    //会凭空放大/缩小这段。该差值表示 acoustic clean 之前有多少音频
+                    //被流式保护纳入了实际 clean；它可能是呼吸，也可能是口语。
+                    m_LastCropLeadInSeconds = Mathf.Max(
+                        0f, acousticAudioCropSeconds - audioCropSeconds);
+                    m_LastCleanLeadInUnverifiedSeconds = m_LastCropLeadInSeconds;
+                    if (m_LastCleanLeadInUnverifiedSeconds > 0.10f)
+                    {
+                        m_LastCleanLeadInEvidenceText = m_LastHeadExtraText ?? "";
+                        //这里只知道该前缀邻接 head_extra，并没有独立分析这个精确子区间。
+                        //保留转写和概率作为线索，但不能把相邻区间的标签冒充硬事实。
+                        m_LastCleanLeadInEvidenceType = "uncertain";
+                        m_LastCleanLeadInEvidenceProbability = m_LastHeadExtraProbability;
+                    }
 
                     float croppedContentSeconds = Mathf.Max(
                         0f, audioCropSeconds - _response.audio_content_start_seconds);
@@ -1097,6 +2050,51 @@ public class SenseVoiceSpeechToText : STT
                         : 0f;
                     float timelineEndSeconds = contentEndSeconds > 0f
                         ? Mathf.Max(0f, contentEndSeconds - _response.pitch_timeline_start_seconds)
+                        : 0f;
+                    //扩展边界是另一份可恢复素材，不覆盖上面的干净边界。它由服务端把
+                    //锚点附近被换气/不稳定音切开的旋律岛重新连起来；只有角色明确选择
+                    //capture="expanded" 才会播放。
+                    float recoveryAudioCropSeconds = audioCropSeconds;
+                    float recoveryAudioEndSeconds = audioEndSeconds;
+                    if (_response.singing_recovery_start_seconds >= 0f)
+                    {
+                        float absoluteRecoveryStart = _response.audio_content_start_seconds +
+                            _response.singing_recovery_start_seconds;
+                        if (absoluteRecoveryStart < recoveryAudioCropSeconds)
+                            recoveryAudioCropSeconds = absoluteRecoveryStart;
+                    }
+                    if (_response.singing_recovery_end_seconds > 0f)
+                    {
+                        float absoluteRecoveryEnd = _response.audio_content_start_seconds +
+                            _response.singing_recovery_end_seconds;
+                        if (recoveryAudioEndSeconds <= 0f ||
+                            absoluteRecoveryEnd > recoveryAudioEndSeconds)
+                            recoveryAudioEndSeconds = absoluteRecoveryEnd;
+                    }
+                    //音高时间线之前没有可执行旋律，扩展音频也不能越过它。
+                    recoveryAudioCropSeconds = Mathf.Max(
+                        recoveryAudioCropSeconds, timelineStartAbsolute);
+                    if (rawAudioSeconds > 0f &&
+                        recoveryAudioEndSeconds >= rawAudioSeconds - 0.45f)
+                        recoveryAudioEndSeconds = 0f;
+                    float recoveryContentCropSeconds = Mathf.Max(
+                        0f, recoveryAudioCropSeconds - _response.audio_content_start_seconds);
+                    float recoveryTimelineCropSeconds = Mathf.Max(
+                        0f, recoveryContentCropSeconds - _response.pitch_timeline_start_seconds);
+                    float recoveryContentEndSeconds = recoveryAudioEndSeconds > 0f
+                        ? Mathf.Max(0f, recoveryAudioEndSeconds - _response.audio_content_start_seconds)
+                        : 0f;
+                    float recoveryTimelineEndSeconds = recoveryContentEndSeconds > 0f
+                        ? Mathf.Max(0f, recoveryContentEndSeconds - _response.pitch_timeline_start_seconds)
+                        : 0f;
+                    //服务端对长录音只在尾部 45 秒建立音高/乐谱数组，但边界时间戳已经
+                    //换算回整段坐标。音频照绝对坐标裁；乐谱必须扣掉分析窗口偏移。
+                    float scoreWindowOffset = Mathf.Max(
+                        0f, _response.singing_score_window_offset_seconds);
+                    float scoreCropSeconds = Mathf.Max(
+                        0f, croppedContentSeconds - scoreWindowOffset);
+                    float scoreEndSeconds = contentEndSeconds > 0f
+                        ? Mathf.Max(0f, contentEndSeconds - scoreWindowOffset)
                         : 0f;
                     // The tail text is authoritative even when no explicit sing-along request
                     // was armed. Otherwise a spontaneous sung phrase followed by "不会唱了"
@@ -1129,6 +2127,7 @@ public class SenseVoiceSpeechToText : STT
                                   $"streamObserved={streamingObservedSeconds:F2}s " +
                                   $"protected={protectedStreamingCropSeconds:F2}s " +
                                   $"applied={audioCropSeconds:F2}s " +
+                                  $"语义说话前缀改按岛={semanticLeadInIslandOverride} " +
                                   $"起点一致={onsetsAgree} " +
                                   $"timeline={timelineCropSeconds:F2}s " +
                                   $"对齐时间线={clampedToTimeline}" +
@@ -1137,6 +2136,17 @@ public class SenseVoiceSpeechToText : STT
                                   $"contentStart={_response.audio_content_start_seconds:F2}s " +
                                   $"applied={audioEndSeconds:F2}s " +
                                   $"timeline={timelineEndSeconds:F2}s");
+                        string recoveryTailLabel = recoveryAudioEndSeconds > 0f
+                            ? recoveryAudioEndSeconds.ToString("F2") + "s"
+                            : "raw-end";
+                        string recoveryTimelineEndLabel = recoveryTimelineEndSeconds > 0f
+                            ? recoveryTimelineEndSeconds.ToString("F2")
+                            : "end";
+                        Debug.Log($"[SenseVoice/Singing] recovery " +
+                                  $"head={recoveryAudioCropSeconds:F2}s " +
+                                  $"tail={recoveryTailLabel} " +
+                                  $"timeline={recoveryTimelineCropSeconds:F2}~" +
+                                  recoveryTimelineEndLabel);
                         // 岛占内容的比例。保守分支(流式没确认起唱点时放弃头部裁剪)防的是
                         // 「岛跳到第二句」——那种失效会表现为比例很小。但 8/9 实测里占比 44%、
                         // 岛起点完全正确的一轮也被它放弃了，所以先量分布再定阈值，别拍脑袋。
@@ -1154,10 +2164,8 @@ public class SenseVoiceSpeechToText : STT
                         //她完全无从察觉，最后归结成「それは仕方がないの」。
                         //先只观测不改判据——保守取早本身是对的(防止乐句开头被切)，
                         //要区分"多留半秒余量"和"多留三秒说话"需要样本。
-                        m_LastCropLeadInSeconds = Mathf.Max(
-                            0f, _response.singing_start_seconds - audioCropSeconds);
                         Debug.Log($"[Singing/LeadIn] 裁剪起点={audioCropSeconds:F2}s " +
-                                  $"岛起点={_response.singing_start_seconds:F2}s " +
+                                  $"声学岛绝对起点={acousticAudioCropSeconds:F2}s " +
                                   $"多留={m_LastCropLeadInSeconds:F2}s 起点一致={onsetsAgree} " +
                                   $"整轮{(LastText ?? "").Trim().Length}字 " +
                                   $"分段{(_response.singing_text ?? "").Trim().Length}字");
@@ -1175,34 +2183,106 @@ public class SenseVoiceSpeechToText : STT
                             ? rawAudioSeconds - audioEndSeconds
                             : 0f;
 
-                    bool hasPlayablePitch = HasPlayablePitchTimeline(LastPitchTimelineMidi);
-                    if (hasPlayablePitch && !endsWithSpokenSingingExit)
+                    float cleanAbsoluteEnd = audioEndSeconds > 0f
+                        ? audioEndSeconds : rawAudioSeconds;
+                    float recoveryAbsoluteEnd = recoveryAudioEndSeconds > 0f
+                        ? recoveryAudioEndSeconds : rawAudioSeconds;
+                    m_LastHeadExtraSeconds = Mathf.Max(
+                        0f, audioCropSeconds - recoveryAudioCropSeconds);
+                    m_LastTailExtraSeconds = Mathf.Max(
+                        0f, recoveryAbsoluteEnd - cleanAbsoluteEnd);
+                    float serverHeadStart = _response.audio_content_start_seconds +
+                        _response.singing_head_extra_start_seconds;
+                    float serverHeadEnd = _response.audio_content_start_seconds +
+                        _response.singing_head_extra_end_seconds;
+                    float serverTailStart = _response.audio_content_start_seconds +
+                        _response.singing_tail_extra_start_seconds;
+                    float serverTailEnd = _response.audio_content_start_seconds +
+                        _response.singing_tail_extra_end_seconds;
+                    bool headEvidenceAligned = m_LastHeadExtraSeconds <= 0.10f ||
+                        (Mathf.Abs(serverHeadStart - recoveryAudioCropSeconds) <= 0.15f &&
+                         Mathf.Abs(serverHeadEnd - audioCropSeconds) <= 0.15f);
+                    bool tailEvidenceAligned = m_LastTailExtraSeconds <= 0.10f ||
+                        (Mathf.Abs(serverTailStart - cleanAbsoluteEnd) <= 0.15f &&
+                         Mathf.Abs(serverTailEnd - recoveryAbsoluteEnd) <= 0.15f);
+                    if (!headEvidenceAligned)
                     {
-                        m_LastPlayableCandidateAudioBytes = audioBytes;
-                        m_LastPlayableCandidateTime = Time.realtimeSinceStartup;
-                        m_LastPlayableCandidateAudioCropSeconds = audioCropSeconds;
-                        m_LastPlayableCandidateTimelineCropSeconds = timelineCropSeconds;
-                        m_LastPlayableCandidateScoreCropSeconds = croppedContentSeconds;
-                        m_LastPlayableCandidateAudioEndSeconds = audioEndSeconds;
-                        m_LastPlayableCandidateTimelineEndSeconds = timelineEndSeconds;
-                        m_LastPlayableCandidateScoreEndSeconds = contentEndSeconds;
+                        Debug.LogWarning($"[Singing/Boundary] 服务端 head 证据区间 " +
+                                         $"{serverHeadStart:F2}~{serverHeadEnd:F2}s 与最终采用 " +
+                                         $"{recoveryAudioCropSeconds:F2}~{audioCropSeconds:F2}s 不同；" +
+                                         "类型降为 uncertain，不把相邻区间转写冒充为实际边界");
+                        m_LastHeadExtraType = "uncertain";
+                        m_LastHeadExtraText = "";
+                        m_LastHeadExtraProbability = 0f;
+                        m_LastHeadExtraReviewRequired = false;
+                        m_LastHeadExtraMelodicSeconds = 0f;
+                        m_LastHeadExtraMelodicRatio = 0f;
+                        m_LastHeadExtraLongestMelodicRunSeconds = 0f;
+                        m_LastHeadExtraSegments = new SingingBoundarySubsegment[0];
+                    }
+                    if (!tailEvidenceAligned)
+                    {
+                        Debug.LogWarning($"[Singing/Boundary] 服务端 tail 证据区间 " +
+                                         $"{serverTailStart:F2}~{serverTailEnd:F2}s 与最终采用 " +
+                                         $"{cleanAbsoluteEnd:F2}~{recoveryAbsoluteEnd:F2}s 不同；" +
+                                         "类型降为 uncertain，不把相邻区间转写冒充为实际边界");
+                        m_LastTailExtraType = "uncertain";
+                        m_LastTailExtraText = "";
+                        m_LastTailExtraProbability = 0f;
+                        m_LastTailExtraReviewRequired = false;
+                        m_LastTailExtraMelodicSeconds = 0f;
+                        m_LastTailExtraMelodicRatio = 0f;
+                        m_LastTailExtraLongestMelodicRunSeconds = 0f;
+                        m_LastTailExtraSegments = new SingingBoundarySubsegment[0];
+                    }
+                    CaptureLatestSingingEvidence(
+                        audioBytes,
+                        rawAudioSeconds,
+                        audioCropSeconds,
+                        cleanAbsoluteEnd,
+                        recoveryAudioCropSeconds,
+                        recoveryAbsoluteEnd,
+                        capturedAt, timelineStartAbsolute);
+
+                    bool hasPlayablePitch = HasPlayablePitchTimeline(LastPitchTimelineMidi);
+                    //说话出现在旋律之前或之后，只决定这一轮应先回应口语，不能抹掉
+                    //中间实际录到的歌声。始终保存服务端已经裁净的旋律岛候选；绝不
+                    //把未裁剪的整轮混合音频拿去回唱。
+                    if (hasPlayablePitch)
+                    {
+                        TryStorePlayableCandidate(
+                            audioBytes,
+                            audioCropSeconds,
+                            timelineCropSeconds,
+                            scoreCropSeconds,
+                            audioEndSeconds,
+                            timelineEndSeconds,
+                            scoreEndSeconds,
+                            recoveryAudioCropSeconds,
+                            recoveryTimelineCropSeconds,
+                            recoveryAudioEndSeconds,
+                            recoveryTimelineEndSeconds);
                     }
 
-                    if (LastIsSinging && !endsWithSpokenSingingExit)
+                    if (LastIsSinging)
                     {
                         CacheLastSingingPerformance(
                             audioBytes,
                             audioCropSeconds,
                             timelineCropSeconds,
-                            croppedContentSeconds,
+                            scoreCropSeconds,
                             audioEndSeconds,
                             timelineEndSeconds,
-                            contentEndSeconds);
+                            scoreEndSeconds,
+                            recoveryAudioCropSeconds,
+                            recoveryTimelineCropSeconds,
+                            recoveryAudioEndSeconds,
+                            recoveryTimelineEndSeconds);
                     }
-                    else if (LastIsSinging && endsWithSpokenSingingExit)
+                    if (LastIsSinging && endsWithSpokenSingingExit)
                     {
                         Debug.Log("[SenseVoice/Singing] 检出末尾口语退出语义；" +
-                                  "保留上一段有效歌声，不缓存本轮混合音频");
+                                  "本轮整段不自动回唱，但干净歌唱岛已缓存为最近素材");
                     }
 
                     if (LastNoSpeech || (string.IsNullOrWhiteSpace(LastText) && !LastIsSinging))
@@ -1336,13 +2416,299 @@ public class SenseVoiceSpeechToText : STT
     /// </summary>
     public string BuildLastPerceivedText()
     {
+        return BuildLastPerceivedText(true);
+    }
+
+    /// <summary>
+    /// uncertain/冲突帧可保留说话人、情绪和原始转写，同时不抢先附加
+    /// “已确认演唱”的前缀。
+    /// </summary>
+    public string BuildLastPerceivedText(bool includeSingingConclusion)
+    {
         string perceivedText = string.IsNullOrWhiteSpace(LastText)
             ? "（没有识别出歌词的哼唱片段）"
             : LastText;
         return (m_InjectSpeakerPrefix ? BuildSpeakerPrefix() : "")
             + (m_InjectMetaPrefix ? BuildMetaPrefix() : "")
-            + (LastIsSinging ? BuildSingingPrefix() : "")
-            + perceivedText;
+            + (includeSingingConclusion && LastIsSinging ? BuildSingingPrefix() : "")
+            + perceivedText
+            + (HasTimeOrderedTranscript ? " " + BuildLastMixedTurnEvidence() : "");
+    }
+
+    /// <summary>
+    /// 把同一录音里的整轮文字通道与歌唱岛独立文字通道并列交给角色。
+    /// 这里只报告通道、时间顺序与素材事实，不替角色判定用户是在唱、朗读还是说话。
+    /// </summary>
+    public string BuildLastMixedTurnEvidence()
+    {
+        string earlier = m_EarlierCaptureTranscripts.Count == 0 ? "" :
+            "\n[同一录音的较早 ASR 观测：不是额外发言，也不表示最终结果必然更准确。" +
+            "可用于补漏和判断冲突，不要重复拼接；有歧义时可以询问。\n" +
+            string.Join("\n", m_EarlierCaptureTranscripts) + "]";
+        if (HasTimeOrderedTranscript)
+            return BuildTimeOrderedTranscriptEvidence(m_LastTurnSegments, m_LastWholeTurnText) + earlier;
+        return BuildMixedTurnEvidence(
+            LastText,
+            LastSegmentLyrics,
+            string.IsNullOrWhiteSpace(m_LastResponseSingingLanguage)
+                ? LastLanguage
+                : m_LastResponseSingingLanguage,
+            LastResponseAudioCropSeconds,
+            LastSingingIslandSeconds,
+            LastResponseAudioTailDropSeconds,
+            LastSingingTailText) + earlier;
+    }
+
+    private void PreserveEarlierCaptureTranscript(string incoming, float seconds)
+    {
+        incoming = incoming ?? "";
+        if (!string.IsNullOrWhiteSpace(m_CurrentCaptureTranscript) && incoming != m_CurrentCaptureTranscript)
+        {
+            m_EarlierCaptureTranscripts.Add($"覆盖录音前 {m_CurrentCaptureTranscriptSeconds:F2}s：" + m_CurrentCaptureTranscript);
+            if (m_EarlierCaptureTranscripts.Count > 2) m_EarlierCaptureTranscripts.RemoveAt(0);
+        }
+        m_CurrentCaptureTranscript = incoming;
+        m_CurrentCaptureTranscriptSeconds = seconds;
+    }
+
+    /// <summary>
+    /// 仅当独立歌唱通道补充了整轮 ASR 没有的信息，才把分轨事实交给角色。
+    /// 这不是歌唱分类器：不读取 singing probability，也不要求角色必须追问。
+    /// </summary>
+    public string BuildLastInformativeMixedTurnEvidence(
+        bool allowTimelineOnlyEvidence,
+        out string reason)
+    {
+        if (HasTimeOrderedTranscript)
+        {
+            reason = "time_ordered_independent_asr";
+            return BuildLastMixedTurnEvidence();
+        }
+        reason = ClassifyInformativeMixedTurnEvidence(
+            LastText,
+            LastSegmentLyrics,
+            LastResponseAudioCropSeconds,
+            LastSingingIslandSeconds,
+            LastResponseAudioTailDropSeconds,
+            LastSingingTailText,
+            allowTimelineOnlyEvidence);
+        return string.IsNullOrEmpty(reason) ? "" : BuildLastMixedTurnEvidence();
+    }
+
+    private const float k_MixedEvidenceBoundarySeconds = 0.5f;
+
+    private static string BuildTimeOrderedTranscriptEvidence(
+        TurnTranscriptSegment[] segments, string wholeText)
+    {
+        if (segments == null || segments.Length == 0) return "";
+        var sb = new StringBuilder("[同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；" +
+            "这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；" +
+            "较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。" +
+            "type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。" +
+            "alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。" +
+            "confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n");
+        foreach (var segment in segments)
+            if (segment != null) sb.AppendLine(JsonUtility.ToJson(segment));
+        sb.Append("整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：");
+        sb.Append(JsonUtility.ToJson(new WholeTurnObservation { text = wholeText ?? "" }));
+        sb.Append(']');
+        return sb.ToString();
+    }
+
+    [Serializable]
+    private class WholeTurnObservation { public string text; }
+
+    [Serializable]
+    private class TurnTranscriptAlternative
+    {
+        public string source, text, language, audio_event, error;
+        public float start_seconds, end_seconds;
+    }
+
+    [Serializable]
+    private class TurnTranscriptSegment
+    {
+        public int id;
+        public float start_seconds, end_seconds;
+        public string region, type, type_source, text, language, status, error;
+        public bool confidence_available, review_required;
+        public TurnTranscriptAlternative[] alternatives;
+    }
+
+    /// <summary>
+    /// 返回非空原因表示分轨通道确实新增了可核查事实。0.5 秒只用于过滤 ASR/裁剪
+    /// 边界抖动，不参与“唱/说”判断，也不会改变任何音频缓存或动作权限。
+    /// </summary>
+    private static string ClassifyInformativeMixedTurnEvidence(
+        string wholeTranscript,
+        string singingTranscript,
+        float leadSeconds,
+        float singingSeconds,
+        float tailSeconds,
+        string tailTranscript,
+        bool allowTimelineOnlyEvidence)
+    {
+        string whole = NormalizeEvidenceComparisonText(wholeTranscript);
+        string singing = NormalizeEvidenceComparisonText(singingTranscript);
+        string tail = NormalizeEvidenceComparisonText(tailTranscript);
+        bool hasSingingText = singing.Length >= 2;
+        bool hasTailText = tail.Length >= 2;
+        bool singingAddsText = hasSingingText &&
+            (whole.Length == 0 || !whole.Contains(singing));
+        bool tailAddsText = hasTailText &&
+            (whole.Length == 0 || !whole.Contains(tail));
+        if (singingAddsText) return "singing_text_adds_information";
+        if (tailAddsText) return "tail_text_adds_information";
+
+        //纯时序差异本身不能证明发生过歌唱。普通说话的 VAD 边界和 pitch 探针也会
+        //稳定地产生几秒“旋律岛”；只有本轮另有歌唱复核依据时，才允许把 lead/island/tail
+        //时序作为补充事实。独立歌词/尾部文字在上面仍可直接放行，因为它们确实新增了内容。
+        if (!allowTimelineOnlyEvidence) return "";
+
+        bool meaningfulBoundary =
+            leadSeconds >= k_MixedEvidenceBoundarySeconds ||
+            tailSeconds >= k_MixedEvidenceBoundarySeconds;
+        bool channelsDiffer = hasSingingText && whole.Length >= 2 &&
+            !string.Equals(whole, singing, StringComparison.Ordinal);
+        if (meaningfulBoundary && channelsDiffer)
+            return "temporal_channel_split";
+        if (meaningfulBoundary && singingSeconds >= 3f &&
+            (whole.Length >= 2 || hasTailText))
+            return "timed_mixed_audio";
+        return "";
+    }
+
+    private static string NormalizeEvidenceComparisonText(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+        var normalized = new StringBuilder(raw.Length);
+        foreach (char ch in raw)
+        {
+            if (!char.IsLetterOrDigit(ch)) continue;
+            normalized.Append(char.ToLowerInvariant(ch));
+        }
+        return normalized.ToString();
+    }
+
+    private static string BuildMixedTurnEvidence(
+        string wholeTranscript,
+        string singingTranscript,
+        string singingLanguage,
+        float leadSeconds,
+        float singingSeconds,
+        float tailSeconds,
+        string tailTranscript)
+    {
+        string whole = CompactEvidenceText(wholeTranscript, 220);
+        string singing = CompactEvidenceText(singingTranscript, 220);
+        string tail = CompactEvidenceText(tailTranscript, 120);
+        leadSeconds = Mathf.Max(0f, leadSeconds);
+        singingSeconds = Mathf.Max(0f, singingSeconds);
+        tailSeconds = Mathf.Max(0f, tailSeconds);
+        if (singing.Length == 0 && singingSeconds <= 0.01f) return "";
+
+        var sb = new StringBuilder(
+            "[同轮分轨观测；各通道来自本轮同一份录音，按时间并列，不互相覆盖：");
+        sb.Append("时序=");
+        if (leadSeconds > 0.01f)
+            sb.Append($"前置音频约{leadSeconds:F1}秒 → ");
+        sb.Append(singingSeconds > 0.01f
+            ? $"可播放旋律岛约{singingSeconds:F1}秒"
+            : "检测到歌唱岛文字通道");
+        if (tailSeconds > 0.01f)
+            sb.Append($" → 尾部音频约{tailSeconds:F1}秒");
+        if (whole.Length > 0)
+            sb.Append($"；整轮ASR文字通道=\"{whole}\"");
+        if (singing.Length > 0)
+        {
+            string language = string.IsNullOrWhiteSpace(singingLanguage)
+                ? "未知语言"
+                : singingLanguage.Trim();
+            sb.Append($"；歌唱岛独立ASR文字通道（{language}，歌词仅为推测）=\"{singing}\"");
+        }
+        if (tail.Length > 0)
+            sb.Append($"；尾部独立ASR文字通道=\"{tail}\"");
+        sb.Append("。整轮ASR没有写出歌唱岛歌词，不等于这一轮没有发生歌声；" +
+                  "这些只是可核查的感知事实，不是程序替你作出的语义结论。]");
+        return sb.ToString();
+    }
+
+    private static string CompactEvidenceText(string raw, int maxCharacters)
+    {
+        string value = (raw ?? "")
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Trim();
+        while (value.Contains("  ")) value = value.Replace("  ", " ");
+        int max = Mathf.Max(16, maxCharacters);
+        return value.Length <= max ? value : value.Substring(0, max) + "…";
+    }
+
+    private bool CachePlayableCandidateForCurrentResult()
+    {
+        if (!TryGetCurrentRecordingSingingCandidateFacts(
+                out float _, out float _, out float _, out float _)) return false;
+
+        float[] savedTimeline = LastPitchTimelineMidi;
+        float savedFrameSeconds = LastPitchTimelineFrameSeconds;
+        SingingScore savedScore = LastSingingScore;
+        string savedText = LastText;
+        string savedLanguage = LastLanguage;
+        string savedSingingText = m_LastResponseSingingText;
+        string savedSingingLanguage = m_LastResponseSingingLanguage;
+        string savedReading = m_LastResponseSingingReading;
+        string savedReadingSource = m_LastResponseSingingReadingSource;
+        bool savedReadingComplete = m_LastResponseSingingReadingComplete;
+        string[] savedMora = m_LastResponseSingingMora;
+        SingingEvidenceSnapshot savedEvidence = m_LastSingingEvidence;
+        try
+        {
+            LastPitchTimelineMidi = m_LastPlayableCandidatePitchTimelineMidi;
+            LastPitchTimelineFrameSeconds = m_LastPlayableCandidatePitchFrameSeconds;
+            LastSingingScore = m_LastPlayableCandidateScore;
+            LastText = m_LastPlayableCandidateText;
+            LastLanguage = m_LastPlayableCandidateLanguage;
+            m_LastResponseSingingText = m_LastPlayableCandidateSingingText;
+            m_LastResponseSingingLanguage = m_LastPlayableCandidateSingingLanguage;
+            m_LastResponseSingingReading = m_LastPlayableCandidateSingingReading;
+            m_LastResponseSingingReadingSource =
+                m_LastPlayableCandidateSingingReadingSource;
+            m_LastResponseSingingReadingComplete =
+                m_LastPlayableCandidateSingingReadingComplete;
+            m_LastResponseSingingMora = m_LastPlayableCandidateSingingMora;
+            m_LastSingingEvidence = CloneSingingEvidence(
+                m_LastPlayableCandidateEvidence);
+            CacheLastSingingPerformance(
+                m_LastPlayableCandidateAudioBytes,
+                m_LastPlayableCandidateAudioCropSeconds,
+                m_LastPlayableCandidateTimelineCropSeconds,
+                m_LastPlayableCandidateScoreCropSeconds,
+                m_LastPlayableCandidateAudioEndSeconds,
+                m_LastPlayableCandidateTimelineEndSeconds,
+                m_LastPlayableCandidateScoreEndSeconds,
+                m_LastPlayableCandidateRecoveryAudioCropSeconds,
+                m_LastPlayableCandidateRecoveryTimelineCropSeconds,
+                m_LastPlayableCandidateRecoveryAudioEndSeconds,
+                m_LastPlayableCandidateRecoveryTimelineEndSeconds);
+        }
+        finally
+        {
+            LastPitchTimelineMidi = savedTimeline;
+            LastPitchTimelineFrameSeconds = savedFrameSeconds;
+            LastSingingScore = savedScore;
+            LastText = savedText;
+            LastLanguage = savedLanguage;
+            m_LastResponseSingingText = savedSingingText;
+            m_LastResponseSingingLanguage = savedSingingLanguage;
+            m_LastResponseSingingReading = savedReading;
+            m_LastResponseSingingReadingSource = savedReadingSource;
+            m_LastResponseSingingReadingComplete = savedReadingComplete;
+            m_LastResponseSingingMora = savedMora;
+            m_LastSingingEvidence = savedEvidence;
+        }
+        return m_LastSingingCacheSerial == m_LastCompletedAsrSerial &&
+            HasFreshSingingAudio() &&
+            HasPlayablePitchTimeline(m_LastSingingPerformanceMidi);
     }
 
     /// <summary>
@@ -1359,7 +2725,7 @@ public class SenseVoiceSpeechToText : STT
         //stab 曾在 8/12 被我从判据里拿掉(理由是它没有区分度、等于长期为真)，
         //当天下一场就证明那是个错误改动：新的误判走的是服务端 expect_singing
         //放宽那条路，与提升点无关——改动对故障零贡献，却关掉了"离线保守、
-        //流式 0.40~0.55 的真唱"这条救援通道，纯亏。而且当时日志里提升点总共
+        //流式 0.52~0.55 的真唱"这条救援通道，纯亏。而且当时日志里提升点总共
         //只触发过 1 次，等于拿 1 个样本改判据。已回退。
         //真正的修复在转换期否决(见 ChatSample 的 SVC 期间语义复核)：
         //声学侧继续宽松地抢时间，语义侧在音频落地前行使否决权。
@@ -1376,32 +2742,31 @@ public class SenseVoiceSpeechToText : STT
         //分带观测：这一步会用流式概率推翻离线结论，是 8/9 那次「你跟着我唱呀」和
         //8/12 那次「那我那我开始喽」被当成唱歌的实际放行口。stab 已经不参与判定，
         //但继续打出来——它当初被怀疑"长期为真"，留着看这个怀疑还成不成立。
-        Debug.Log($"[Singing/Band] 提升点 streamProb={streamingProbability:F2} " +
+        Debug.Log($"[Singing/Band] 提升点 streamProb={streamingProbability:F3} " +
                   $"→ {DescribeSingingBand(streamingProbability)}  " +
                   $"(判据 prob>=0.55: {streamingProbability >= 0.55f}) " +
                   $"streamStab={streamingPitchStability:F2}(仅观测, " +
                   $"旧判据下会={streamingPitchStability >= 0.52f}) " +
                   $"离线prob={LastSingingProbability:F2}(判说话) " +
                   $"文本=\"{(LastText ?? "").Trim()}\"");
-        bool freshCandidate = Time.realtimeSinceStartup - m_LastPlayableCandidateTime <= 5f &&
-            m_LastPlayableCandidateAudioBytes != null &&
-            m_LastPlayableCandidateAudioBytes.Length > 44;
+        bool freshCandidate = TryGetCurrentRecordingSingingCandidateFacts(
+            out float promotableSeconds,
+            out float _,
+            out float _,
+            out float _);
         if (!offlineAllowsPromotion)
         {
-            Debug.Log($"[Singing/Band] 提升被拒：离线 prob={LastSingingProbability:F2} " +
+            Debug.Log($"[Singing/Band] 提升被拒：离线 prob={LastSingingProbability:F3} " +
                       $"落在低区(<{k_SingingBandLow:F2})，不接受流式 {streamingProbability:F2} 的推翻");
             return false;
         }
         if (!strongStreamingEvidence || !freshCandidate ||
-            !HasPlayablePitchTimeline(LastPitchTimelineMidi))
+            !HasPlayablePitchTimeline(m_LastPlayableCandidatePitchTimelineMidi))
             return false;
         //提升是拿流式证据推翻离线的“判说”，素材再短就什么都撑不住了。8/11
         //「那你试着唱出来啊」正是从这里进去的：离线 0.42 判说，流式把它提成歌唱，
         //缓存下 1.4s / 9 字，随后她把这句问话本身回哼了出去。长度不达标就连
         //LastIsSinging 也不置真，否则这一轮会被当成“她唱过”而缓存里却是上一段。
-        float promotableSeconds = MeasurePerformanceSeconds(
-            m_LastPlayableCandidateTimelineCropSeconds,
-            m_LastPlayableCandidateTimelineEndSeconds);
         if (promotableSeconds < k_MinSingablePerformanceSeconds)
         {
             Debug.Log($"[Singing/Band] 提升被拒：可唱素材只有 {promotableSeconds:F2}s，" +
@@ -1412,18 +2777,103 @@ public class SenseVoiceSpeechToText : STT
         LastIsSinging = true;
         LastSingingProbability = Mathf.Max(LastSingingProbability, streamingProbability);
         LastPitchStability = Mathf.Max(LastPitchStability, streamingPitchStability);
-        CacheLastSingingPerformance(
-            m_LastPlayableCandidateAudioBytes,
-            m_LastPlayableCandidateAudioCropSeconds,
-            m_LastPlayableCandidateTimelineCropSeconds,
-            m_LastPlayableCandidateScoreCropSeconds,
-            m_LastPlayableCandidateAudioEndSeconds,
-            m_LastPlayableCandidateTimelineEndSeconds,
-            m_LastPlayableCandidateScoreEndSeconds);
+        if (!CachePlayableCandidateForCurrentResult()) return false;
         Debug.Log($"[SenseVoice/Singing] 最终判定由流式证据恢复为歌唱 " +
                   $"prob={LastSingingProbability:F2} stability={LastPitchStability:F2} " +
                   $"timeline={m_LastSingingPerformanceMidi.Length}");
         return true;
+    }
+
+    /// <summary>
+    /// 声学判为说话、而语义判断认为可能在唱时，只暂存这一轮已经由服务端产出的
+    /// 可播放候选，不把 LastIsSinging 改成 true。这样程序不会替角色下结论，
+    /// 但角色向用户确认后仍有真实录音和音高时间线可用。
+    /// </summary>
+    public bool PreserveLastPlayableCandidateForConfirmation(out float performanceSeconds)
+    {
+        performanceSeconds = 0f;
+        if (!m_EnableSingingAnalysis || LastNoSpeech || LastIsSinging ||
+            EndsWithSpokenSingingExit(LastText))
+            return false;
+
+        bool freshCandidate = TryGetCurrentRecordingSingingCandidateFacts(
+            out performanceSeconds,
+            out float _,
+            out float _,
+            out float _);
+        if (!freshCandidate ||
+            !HasPlayablePitchTimeline(m_LastPlayableCandidatePitchTimelineMidi))
+            return false;
+
+        if (performanceSeconds < k_MinSingablePerformanceSeconds)
+        {
+            Debug.Log($"[SenseVoice/Singing] 语义/声学冲突候选只有 {performanceSeconds:F2}s，" +
+                      $"短于 {k_MinSingablePerformanceSeconds:F1}s；只报告冲突，不保存为可回唱素材");
+            return false;
+        }
+
+        if (!CachePlayableCandidateForCurrentResult()) return false;
+        bool preserved = m_LastSingingCacheSerial == m_LastCompletedAsrSerial &&
+            HasFreshSingingAudio() &&
+            HasPlayablePitchTimeline(m_LastSingingPerformanceMidi);
+        if (preserved)
+        {
+            Debug.Log($"[SenseVoice/Singing] 已暂存语义/声学冲突候选 " +
+                      $"duration={performanceSeconds:F2}s；未改写最终模态");
+        }
+        return preserved;
+    }
+
+    /// <summary>
+    /// 保留混合录音中已经测量并裁净的歌唱岛。前置或尾部口语决定整轮对话如何回应，
+    /// 但不应删除两者之间真实录到的旋律。本方法不把整轮改判成歌唱，只建立
+    /// recent_turn 可播放素材。
+    /// </summary>
+    public bool PreserveLastPlayableSingingIslandFromMixedTurn(
+        out float performanceSeconds)
+    {
+        performanceSeconds = 0f;
+        if (!m_EnableSingingAnalysis || LastNoSpeech) return false;
+
+        if (HasCurrentSingingPerformanceCandidate())
+        {
+            performanceSeconds = m_LastSingingPerformanceMidi.Length *
+                Mathf.Max(0.02f, m_LastSingingPerformanceFrameSeconds);
+            return true;
+        }
+
+        bool freshCandidate = TryGetCurrentRecordingSingingCandidateFacts(
+            out performanceSeconds,
+            out float _,
+            out float _,
+            out float _);
+        if (!freshCandidate ||
+            !HasPlayablePitchTimeline(m_LastPlayableCandidatePitchTimelineMidi) ||
+            performanceSeconds < k_MinSingablePerformanceSeconds)
+            return false;
+
+        bool preserved = CachePlayableCandidateForCurrentResult() &&
+            HasCurrentSingingPerformanceCandidate();
+        if (preserved)
+        {
+            Debug.Log($"[SenseVoice/Singing] 混合轮干净歌唱岛已保留 " +
+                      $"duration={performanceSeconds:F2}s；整轮对话模态仍交给口语");
+        }
+        return preserved;
+    }
+
+    /// <summary>当前最终 ASR 这一轮是否确实留下了成对的录音与旋律。</summary>
+    public bool HasCurrentSingingPerformanceCandidate()
+    {
+        bool sameAnalysis = m_LastSingingCacheSerial == m_LastCompletedAsrSerial;
+        bool sameCapture = m_LastSingingCacheCaptureSessionSerial > 0 &&
+            m_LastSingingCacheCaptureSessionSerial ==
+                m_LiveRecordingCandidateSessionSerial;
+        return (sameAnalysis || sameCapture) &&
+            HasFreshSingingAudio() &&
+            HasPlayablePitchTimeline(m_LastSingingPerformanceMidi) &&
+            Time.realtimeSinceStartup - m_LastSingingPerformanceTime <=
+                m_SingingAudioRetentionSeconds;
     }
 
     /// <summary>
@@ -1542,23 +2992,8 @@ public class SenseVoiceSpeechToText : STT
     {
         if (!LastIsSinging) return;
         LastIsSinging = false;
-        if (m_LastSingingCacheSerial == m_LastCompletedAsrSerial)
-        {
-            m_LastSingingAudioBytes = m_RollbackSingingAudioBytes;
-            m_LastSingingLyrics = m_RollbackSingingLyrics;
-            m_LastSingingAudioTime = m_RollbackSingingAudioTime;
-            m_LastSingingPerformanceTime = m_RollbackSingingPerformanceTime;
-            m_LastSingingPerformanceMidi = m_RollbackSingingPerformanceMidi ??
-                new float[0];
-            m_LastSingingPerformanceFrameSeconds =
-                m_RollbackSingingPerformanceFrameSeconds;
-            m_LastSingingPerformanceLanguage =
-                m_RollbackSingingPerformanceLanguage ?? "";
-            m_LastSingingPerformanceScore =
-                m_RollbackSingingPerformanceScore;
-            m_LastSingingCacheSerial = -1;
-            Debug.Log("[SenseVoice/Singing] 已回滚本轮误写入的歌声缓存，恢复上一段有效演唱");
-        }
+        RevokeCurrentSingingPlaybackAlias(
+            "本轮歌唱分类降级为说话，恢复上一段有效演唱");
         LastSingingSummary = "singing classification rejected as speech: " +
             (reason ?? "speech evidence");
         Debug.Log("[SenseVoice/Singing] 本轮歌唱分类已降级为普通说话，不作为可回唱歌声: " +
@@ -1566,11 +3001,55 @@ public class SenseVoiceSpeechToText : STT
     }
 
     /// <summary>
+    /// 把当前 ASR 轮临时发布到 recent_turn 的可播放别名撤回，并恢复上一段素材。
+    /// quarantine 可以复制这份音频作为隔离证据，但来源确认前绝不能让普通回唱工具
+    /// 从 recent_turn 绕过隔离区直接播放它。
+    /// </summary>
+    private bool RevokeCurrentSingingPlaybackAlias(string reason)
+    {
+        bool sameAnalysis = m_LastSingingCacheSerial == m_LastCompletedAsrSerial;
+        bool sameCapture = m_LastSingingCacheCaptureSessionSerial > 0 &&
+            m_LastSingingCacheCaptureSessionSerial ==
+                m_LiveRecordingCandidateSessionSerial;
+        if (!sameAnalysis && !sameCapture) return false;
+        m_LastSingingAudioBytes = m_RollbackSingingAudioBytes;
+        m_LastSingingRecoveryAudioBytes = m_RollbackSingingRecoveryAudioBytes;
+        m_LastSingingLyrics = m_RollbackSingingLyrics;
+        m_LastSingingAudioTime = m_RollbackSingingAudioTime;
+        m_LastSingingPerformanceTime = m_RollbackSingingPerformanceTime;
+        m_LastSingingPerformanceMidi = m_RollbackSingingPerformanceMidi ??
+            new float[0];
+        m_LastSingingRecoveryPerformanceMidi =
+            m_RollbackSingingRecoveryPerformanceMidi ?? new float[0];
+        m_LastSingingPerformanceFrameSeconds =
+            m_RollbackSingingPerformanceFrameSeconds;
+        m_LastSingingPerformanceLanguage =
+            m_RollbackSingingPerformanceLanguage ?? "";
+        m_LastSingingPerformanceScore = m_RollbackSingingPerformanceScore;
+        m_LastSingingCacheEvidence = CloneSingingEvidence(
+            m_RollbackSingingCacheEvidence);
+        m_LastSingingCacheCaptureSessionSerial =
+            m_RollbackSingingCacheCaptureSessionSerial;
+        m_LastSingingCacheSerial = -1;
+        Debug.Log("[SenseVoice/Singing] 已撤回本轮 recent_turn 可播放别名：" +
+                  (reason ?? "来源仍待确认"));
+        return true;
+    }
+
+    /// <summary>
     /// Compatibility wrapper for the explicit “singing then spoken tail” safety path.
     /// </summary>
     public void DowngradeLastMixedSingingToSpeech(string reason)
     {
-        DowngradeLastSingingToSpeech("mixed singing-to-speech: " + (reason ?? "tail speech"));
+        //混合轮不是“歌唱误判”：对话终点是说话，独立裁出的歌唱岛也同时为真。
+        //这里若复用普通误判回滚，会让【说话→唱歌→说话】整段消失，并迫使下一轮
+        //“唱刚才那段”错误地退到长期曲库。
+        LastIsSinging = false;
+        LastSingingSummary = "mixed singing-to-speech; clean singing island preserved: " +
+            (reason ?? "tail speech");
+        Debug.Log("[SenseVoice/Singing] 混合轮按口语结束处理；" +
+                  "保留本轮干净歌唱岛作为最近素材: " +
+                  (reason ?? "tail speech"));
     }
 
     /// <summary>
@@ -1644,6 +3123,18 @@ public class SenseVoiceSpeechToText : STT
         return performance.Length * Mathf.Max(0.02f, LastPitchTimelineFrameSeconds);
     }
 
+    private static string ExtractPrecedingSpeechFromMixedTranscript(
+        string fullText,
+        string singingText)
+    {
+        string full = (fullText ?? "").Trim();
+        string singing = (singingText ?? "").Trim();
+        if (full.Length == 0 || singing.Length == 0) return "";
+        int index = full.LastIndexOf(singing, StringComparison.OrdinalIgnoreCase);
+        if (index <= 0) return "";
+        return full.Substring(0, index).Trim();
+    }
+
     private void CacheLastSingingPerformance(
         byte[] audioBytes,
         float audioCropSeconds = 0f,
@@ -1651,7 +3142,11 @@ public class SenseVoiceSpeechToText : STT
         float scoreCropSeconds = 0f,
         float audioEndSeconds = 0f,
         float timelineEndSeconds = 0f,
-        float scoreEndSeconds = 0f)
+        float scoreEndSeconds = 0f,
+        float recoveryAudioCropSeconds = 0f,
+        float recoveryTimelineCropSeconds = 0f,
+        float recoveryAudioEndSeconds = 0f,
+        float recoveryTimelineEndSeconds = 0f)
     {
         //长度检查必须赶在任何赋值之前：音频和旋律要么一起换，要么一起不换，
         //否则旧时间线会配上新音频。
@@ -1665,28 +3160,57 @@ public class SenseVoiceSpeechToText : STT
             out timelineEnd,
             out croppedWindowUnplayable);
         float frameSeconds = Mathf.Max(0.02f, LastPitchTimelineFrameSeconds);
+        int recoveryTimelineStart;
+        int recoveryTimelineEnd;
+        bool recoveryWindowUnplayable;
+        float[] recoveryPerformance = ResolvePerformanceTimeline(
+            recoveryTimelineCropSeconds,
+            recoveryTimelineEndSeconds,
+            out recoveryTimelineStart,
+            out recoveryTimelineEnd,
+            out recoveryWindowUnplayable);
         if (performance != null &&
             performance.Length * frameSeconds < k_MinSingablePerformanceSeconds)
         {
             Debug.Log("[SenseVoice/Singing] 本轮可唱素材只有 " +
                       $"{performance.Length * frameSeconds:F2}s（{performance.Length} 帧），" +
                       $"短于 {k_MinSingablePerformanceSeconds:F1}s，不作为可回唱歌声，" +
-                      "沿用上一段。");
+                      "保留旧素材，不将它认作本轮新歌；新证据交由候选确认/恢复。");
             return;
         }
 
-        m_RollbackSingingAudioBytes = m_LastSingingAudioBytes;
-        m_RollbackSingingLyrics = m_LastSingingLyrics;
-        m_RollbackSingingAudioTime = m_LastSingingAudioTime;
-        m_RollbackSingingPerformanceTime = m_LastSingingPerformanceTime;
-        m_RollbackSingingPerformanceMidi = m_LastSingingPerformanceMidi;
-        m_RollbackSingingPerformanceFrameSeconds =
-            m_LastSingingPerformanceFrameSeconds;
-        m_RollbackSingingPerformanceLanguage =
-            m_LastSingingPerformanceLanguage;
-        m_RollbackSingingPerformanceScore =
-            m_LastSingingPerformanceScore;
+        int captureSessionSerial = m_LastSingingEvidence != null &&
+            m_LastSingingEvidence.CaptureSessionSerial > 0
+                ? m_LastSingingEvidence.CaptureSessionSerial
+                : m_LiveRecordingCandidateSessionSerial;
+        bool replacesSameCapture = captureSessionSerial > 0 &&
+            captureSessionSerial == m_LastSingingCacheCaptureSessionSerial;
+        //preview 与 final 是同一录音的两个版本。后一个版本替换前一个时，
+        //回滚点仍须是本次录音之前的可信素材，不能被同轮 preview 覆盖。
+        if (!replacesSameCapture)
+        {
+            m_RollbackSingingAudioBytes = m_LastSingingAudioBytes;
+            m_RollbackSingingRecoveryAudioBytes = m_LastSingingRecoveryAudioBytes;
+            m_RollbackSingingLyrics = m_LastSingingLyrics;
+            m_RollbackSingingAudioTime = m_LastSingingAudioTime;
+            m_RollbackSingingPerformanceTime = m_LastSingingPerformanceTime;
+            m_RollbackSingingPerformanceMidi = m_LastSingingPerformanceMidi;
+            m_RollbackSingingRecoveryPerformanceMidi =
+                m_LastSingingRecoveryPerformanceMidi;
+            m_RollbackSingingPerformanceFrameSeconds =
+                m_LastSingingPerformanceFrameSeconds;
+            m_RollbackSingingPerformanceLanguage =
+                m_LastSingingPerformanceLanguage;
+            m_RollbackSingingPerformanceScore =
+                m_LastSingingPerformanceScore;
+            m_RollbackSingingCacheEvidence = CloneSingingEvidence(
+                m_LastSingingCacheEvidence);
+            m_RollbackSingingCacheCaptureSessionSerial =
+                m_LastSingingCacheCaptureSessionSerial;
+        }
         m_LastSingingCacheSerial = m_LastCompletedAsrSerial;
+        m_LastSingingCacheCaptureSessionSerial = captureSessionSerial;
+        m_LastSingingCacheEvidence = CloneSingingEvidence(m_LastSingingEvidence);
 
         float now = Time.realtimeSinceStartup;
         //歌词必须和裁过的旋律来自同一段音频，否则 SVS 会把整轮的字铺到几秒的旋律上。
@@ -1705,6 +3229,35 @@ public class SenseVoiceSpeechToText : STT
                 out actualAudioCrop,
                 out actualAudioEnd);
             m_LastSingingAudioTime = now;
+            float cleanSeconds = GetWavDurationSeconds(m_LastSingingAudioBytes);
+            float recoveryActualCrop;
+            float recoveryActualEnd;
+            byte[] recoveryAudio = TrimWavWindow(
+                audioBytes,
+                recoveryAudioCropSeconds,
+                recoveryAudioEndSeconds,
+                out recoveryActualCrop,
+                out recoveryActualEnd);
+            float recoverySeconds = GetWavDurationSeconds(recoveryAudio);
+            if (recoveryPerformance != null &&
+                recoveryPerformance.Length * frameSeconds >= k_MinSingablePerformanceSeconds &&
+                recoverySeconds > cleanSeconds + 0.20f)
+            {
+                m_LastSingingRecoveryAudioBytes = recoveryAudio;
+                m_LastSingingRecoveryPerformanceMidi = recoveryPerformance;
+                string recoveryTailLabel = recoveryActualEnd > 0f
+                    ? recoveryActualEnd.ToString("F2") + "s"
+                    : "raw-end";
+                Debug.Log($"[SenseVoice/Singing] 可恢复扩展素材 " +
+                          $"clean={cleanSeconds:F2}s expanded={recoverySeconds:F2}s " +
+                          $"head={recoveryActualCrop:F2}s " +
+                          $"tail={recoveryTailLabel}");
+            }
+            else
+            {
+                m_LastSingingRecoveryAudioBytes = null;
+                m_LastSingingRecoveryPerformanceMidi = new float[0];
+            }
         }
         if (performance == null) return;
 
@@ -2176,9 +3729,145 @@ public class SenseVoiceSpeechToText : STT
         }
     }
 
+    /// <summary>
+    /// 读取本机歌曲记忆的实时快照。服务端返回全部条目，筛选和分页留在 Unity 端，
+    /// 避免把 catalog_path/audio_dir 等内部路径暴露给角色，也不需要为只读查询改服务端。
+    /// </summary>
+    public void InspectSongCatalog(
+        string query,
+        int offset,
+        int limit,
+        bool includeUnnamed,
+        Action<SongCatalogInspectionResult> callback)
+    {
+        StartCoroutine(SendSongCatalogInspection(
+            query, offset, limit, includeUnnamed, callback));
+    }
+
+    private IEnumerator SendSongCatalogInspection(
+        string query,
+        int offset,
+        int limit,
+        bool includeUnnamed,
+        Action<SongCatalogInspectionResult> callback)
+    {
+        using (UnityWebRequest www = UnityWebRequest.Get(m_SongCatalogURL))
+        {
+            www.SetRequestHeader("accept", "application/json");
+            yield return www.SendWebRequest();
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                if (callback != null)
+                {
+                    callback(new SongCatalogInspectionResult
+                    {
+                        Ok = false,
+                        Error = www.error + " / " + www.downloadHandler.text,
+                    });
+                }
+                yield break;
+            }
+
+            SongCatalogResponse response = null;
+            try { response = JsonUtility.FromJson<SongCatalogResponse>(www.downloadHandler.text); }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[SongCatalog] JSON 解析失败: " + e.Message);
+            }
+            if (response == null || !response.ok)
+            {
+                if (callback != null)
+                {
+                    callback(new SongCatalogInspectionResult
+                    {
+                        Ok = false,
+                        Error = response == null ? "invalid response" : response.error,
+                    });
+                }
+                yield break;
+            }
+
+            SongCatalogEntry[] all = response.songs ?? new SongCatalogEntry[0];
+            int namedCount = 0;
+            int unnamedCount = 0;
+            var exactTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var filtered = new List<SongCatalogEntry>();
+            string cleanQuery = (query ?? "").Trim();
+            for (int i = 0; i < all.Length; i++)
+            {
+                SongCatalogEntry entry = all[i];
+                if (entry == null) continue;
+                bool named = entry.named && !string.IsNullOrWhiteSpace(entry.title);
+                if (named)
+                {
+                    namedCount++;
+                    exactTitles.Add(entry.title.Trim());
+                }
+                else unnamedCount++;
+
+                // 默认列表不展开未命名条目，但精确拿 song_id 查询时仍应能找到它。
+                // 否则工具虽然宣称支持按 ID 自查，实际上必须先猜到 include_unnamed=true。
+                bool queryMatchesId = cleanQuery.Length > 0 &&
+                    CatalogFieldContains(entry.song_id, cleanQuery);
+                if (!named && !includeUnnamed && !queryMatchesId) continue;
+                if (cleanQuery.Length > 0 &&
+                    !queryMatchesId &&
+                    !CatalogFieldContains(entry.title, cleanQuery) &&
+                    !CatalogFieldContains(entry.artist, cleanQuery) &&
+                    !CatalogFieldContains(entry.display_name, cleanQuery))
+                    continue;
+                filtered.Add(entry);
+            }
+
+            filtered.Sort((left, right) =>
+            {
+                string a = left != null ? left.display_name ?? left.title ?? "" : "";
+                string b = right != null ? right.display_name ?? right.title ?? "" : "";
+                int byName = string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+                if (byName != 0) return byName;
+                return string.Compare(
+                    left != null ? left.song_id ?? "" : "",
+                    right != null ? right.song_id ?? "" : "",
+                    StringComparison.OrdinalIgnoreCase);
+            });
+
+            int safeLimit = Mathf.Clamp(limit, 1, 50);
+            int safeOffset = Mathf.Clamp(offset, 0, filtered.Count);
+            int end = Mathf.Min(filtered.Count, safeOffset + safeLimit);
+            var page = new List<SongCatalogEntry>(end - safeOffset);
+            for (int i = safeOffset; i < end; i++) page.Add(filtered[i]);
+
+            if (callback != null)
+            {
+                callback(new SongCatalogInspectionResult
+                {
+                    Ok = true,
+                    Query = cleanQuery,
+                    IncludeUnnamed = includeUnnamed,
+                    TotalEntries = all.Length,
+                    NamedEntries = namedCount,
+                    UnnamedEntries = unnamedCount,
+                    UniqueExactTitleGroups = exactTitles.Count,
+                    MatchedEntries = filtered.Count,
+                    Offset = safeOffset,
+                    Limit = safeLimit,
+                    HasMore = end < filtered.Count,
+                    NextOffset = end,
+                    Entries = page.ToArray(),
+                });
+            }
+        }
+    }
+
+    private static bool CatalogFieldContains(string field, string query)
+    {
+        return !string.IsNullOrWhiteSpace(field) && !string.IsNullOrWhiteSpace(query) &&
+            field.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
     public bool HasFreshSingingAudio()
     {
-        return m_LastSingingAudioBytes != null &&
+        return string.IsNullOrEmpty(RecentSingingMaterialConflict) && m_LastSingingAudioBytes != null &&
             m_LastSingingAudioBytes.Length > 44 &&
             Time.realtimeSinceStartup - m_LastSingingAudioTime <= m_SingingAudioRetentionSeconds;
     }
@@ -2227,42 +3916,147 @@ public class SenseVoiceSpeechToText : STT
         {
             list.Add(new PracticePhraseInfo
             {
+                ClipRef = m_PracticePhrases[i].ClipRef,
+                RecordingSequence = EnsureRecordingSequence(m_PracticePhrases[i]),
+                RecordingTranscript = m_PracticePhrases[i].RecordingEvidence?.Text ?? "",
+                RawSeconds = m_PracticePhrases[i].RecordingEvidence?.RawSeconds ?? 0f,
+                CleanStartSeconds = m_PracticePhrases[i].RecordingEvidence?.CleanStartSeconds ?? 0f,
+                CleanEndSeconds = m_PracticePhrases[i].RecordingEvidence?.CleanEndSeconds ?? 0f,
+                ExpandedStartSeconds = m_PracticePhrases[i].RecordingEvidence?.RecoveryStartSeconds ?? 0f,
+                ExpandedEndSeconds = m_PracticePhrases[i].RecordingEvidence?.RecoveryEndSeconds ?? 0f,
                 Index = i + 1,
+                StableId = m_PracticePhrases[i].StableId,
+                Revision = m_PracticePhrases[i].Revision,
+                ActiveCapture = m_PracticePhrases[i].ActiveCapture ?? "clean",
+                ActiveTrimHeadSeconds = m_PracticePhrases[i].ActiveTrimHeadSeconds,
+                ActiveTrimTailSeconds = m_PracticePhrases[i].ActiveTrimTailSeconds,
                 Lyrics = m_PracticePhrases[i].Lyrics ?? "",
                 Seconds = m_PracticePhrases[i].Seconds,
+                RecoverySeconds = m_PracticePhrases[i].RecoveryWavBytes != null
+                    ? GetWavDurationSeconds(m_PracticePhrases[i].RecoveryWavBytes)
+                    : m_PracticePhrases[i].Seconds,
+                OriginalCleanSeconds = m_PracticePhrases[i].OriginalCleanSeconds > 0f
+                    ? m_PracticePhrases[i].OriginalCleanSeconds
+                    : GetWavDurationSeconds(m_PracticePhrases[i].SourceCleanWavBytes ??
+                                            m_PracticePhrases[i].WavBytes),
+                OriginalExpandedSeconds = m_PracticePhrases[i].OriginalExpandedSeconds > 0f
+                    ? m_PracticePhrases[i].OriginalExpandedSeconds
+                    : GetWavDurationSeconds(m_PracticePhrases[i].SourceExpandedWavBytes ??
+                                            m_PracticePhrases[i].RecoveryWavBytes ??
+                                            m_PracticePhrases[i].SourceCleanWavBytes ??
+                                            m_PracticePhrases[i].WavBytes),
                 Language = m_PracticePhrases[i].Language ?? "",
                 SongId = m_PracticePhrases[i].SongId ?? "",
                 SongName = m_PracticePhrases[i].SongName ?? "",
                 AgoSeconds = Mathf.Max(
                     0f, Time.realtimeSinceStartup - m_PracticePhrases[i].AtRealtime),
-                PitchMedianMidi = MedianVoicedPitch(m_PracticePhrases[i].MidiTimeline),
+                ConfirmedAgoSeconds = Mathf.Max(
+                    0f, Time.realtimeSinceStartup - m_PracticePhrases[i].ConfirmedAtRealtime),
+                HasExpandedCapture = m_PracticePhrases[i].RecoveryWavBytes != null &&
+                    m_PracticePhrases[i].RecoveryWavBytes.Length > 44 &&
+                    HasPlayablePitchTimeline(
+                        m_PracticePhrases[i].RecoveryMidiTimeline),
+                PitchCenterMidi = MedianVoicedPitch(m_PracticePhrases[i].MidiTimeline),
+                FirstStablePitchMidi = FirstStableVoicedPitch(
+                    m_PracticePhrases[i].MidiTimeline),
+                PitchRangeLowMidi = VoicedPitchPercentile(
+                    m_PracticePhrases[i].MidiTimeline, 0.10f),
+                PitchRangeHighMidi = VoicedPitchPercentile(
+                    m_PracticePhrases[i].MidiTimeline, 0.90f),
                 PrecedingSpeech = m_PracticePhrases[i].PrecedingSpeech ?? "",
                 PendingConfirmation = m_PracticePhrases[i].PendingConfirmation,
+                OriginCandidateId = m_PracticePhrases[i].OriginCandidateId,
+                HeadExtraSeconds = m_PracticePhrases[i].HeadExtraSeconds,
+                TailExtraSeconds = m_PracticePhrases[i].TailExtraSeconds,
+                HeadExtraText = m_PracticePhrases[i].HeadExtraText ?? "",
+                TailExtraText = m_PracticePhrases[i].TailExtraText ?? "",
+                HeadExtraType = m_PracticePhrases[i].HeadExtraType ?? "none",
+                TailExtraType = m_PracticePhrases[i].TailExtraType ?? "none",
+                HeadExtraProbability = m_PracticePhrases[i].HeadExtraProbability,
+                TailExtraProbability = m_PracticePhrases[i].TailExtraProbability,
+                HeadExtraReviewRequired = m_PracticePhrases[i].HeadExtraReviewRequired,
+                TailExtraReviewRequired = m_PracticePhrases[i].TailExtraReviewRequired,
+                HeadExtraMelodicSeconds = m_PracticePhrases[i].HeadExtraMelodicSeconds,
+                TailExtraMelodicSeconds = m_PracticePhrases[i].TailExtraMelodicSeconds,
+                HeadExtraMelodicRatio = m_PracticePhrases[i].HeadExtraMelodicRatio,
+                TailExtraMelodicRatio = m_PracticePhrases[i].TailExtraMelodicRatio,
+                HeadExtraLongestMelodicRunSeconds =
+                    m_PracticePhrases[i].HeadExtraLongestMelodicRunSeconds,
+                TailExtraLongestMelodicRunSeconds =
+                    m_PracticePhrases[i].TailExtraLongestMelodicRunSeconds,
+                HeadExtraSegments = CloneBoundarySegments(
+                    m_PracticePhrases[i].HeadExtraSegments),
+                TailExtraSegments = CloneBoundarySegments(
+                    m_PracticePhrases[i].TailExtraSegments),
+                CleanLeadInUnverifiedSeconds =
+                    m_PracticePhrases[i].CleanLeadInUnverifiedSeconds,
+                CleanLeadInEvidenceText =
+                    m_PracticePhrases[i].CleanLeadInEvidenceText ?? "",
+                CleanLeadInEvidenceType =
+                    m_PracticePhrases[i].CleanLeadInEvidenceType ?? "none",
+                CleanLeadInEvidenceProbability =
+                    m_PracticePhrases[i].CleanLeadInEvidenceProbability,
             });
         }
+        AnnotateCaptureOrder(list);
         AnnotateTakeGroups(list);
         AnnotatePitchBases(list);
         return list;
     }
 
+    public string RecentSingingMaterialConflict
+    {
+        get
+        {
+            var newer = m_QuarantinedSingingCandidates
+                .Where(c => c.Phrase != null && c.Phrase.CaptureSessionSerial > m_LastSingingCacheCaptureSessionSerial)
+                .OrderByDescending(c => c.Phrase.AtRealtime).FirstOrDefault();
+            if (newer == null)
+            {
+                var latest = m_PracticePhrases.Where(p => p.CaptureSessionSerial > m_LastSingingCacheCaptureSessionSerial)
+                    .OrderByDescending(p => p.AtRealtime).FirstOrDefault();
+                return latest == null ? "" : $"最新确认录音为 stable:{latest.StableId}；旧 recent_turn 不是它。请明确使用该 stable 引用。";
+            }
+            return $"最新歌唱证据是 candidate:{newer.CandidateId}，source=" +
+                (newer.SourceConfirmed ? "confirmed_user" : "pending") +
+                $"，playback={newer.PlaybackStatus}；旧 recent_turn 缓存不是这份录音，不能自动替代。" +
+                "可确认/恢复该候选，或明确选择旧 stable:N；不确定时可以询问。";
+        }
+    }
+
+    private static void AnnotateCaptureOrder(List<PracticePhraseInfo> list)
+    {
+        var captured = new List<PracticePhraseInfo>(list);
+        captured.Sort((a, b) => {
+            int time = b.AgoSeconds.CompareTo(a.AgoSeconds);
+            return time != 0 ? time : a.StableId.CompareTo(b.StableId);
+        });
+        for (int i = 0; i < captured.Count; i++) captured[i].CaptureOrder =
+            captured[i].RecordingSequence > 0 ? captured[i].RecordingSequence : i + 1;
+    }
+
     /// <summary>
-    /// 标出各段的音高中位，以及相对"共同基准"的偏移。
-    ///
-    /// 基准取各段中位数的中位数——多数段落定的调就是基准，个别偏低/偏高的那段
-    /// 会被显出来。8/20 实测段1/段2 都是 60、段3 是 57，基准 60，段3 报 −3。
-    /// 只做展示：要不要对齐、对齐到哪，仍然由用户和她决定。
+    /// 把数值音高标成人和 LLM 都能直接使用的标准音名。
+    /// 中心音高、首个稳定音和主要音域是三种不同事实，不再混叫“起调”。
     /// </summary>
     private static void AnnotatePitchBases(List<PracticePhraseInfo> list)
     {
         for (int i = 0; i < list.Count; i++)
         {
-            //音名后面带上 MIDI 数值。8/21 实测她照音名做减法连错三次：
-            //D#3→D3 她算成 4(实际 1)、G#3→D#3 算成 -4(实际 -5)，三段调完更不齐了。
-            //给出整数之后"差几个半音"就是两个数相减，不必在音名上数格子。
-            list[i].PitchBaseNote = list[i].PitchMedianMidi > 0f
-                ? $"{MidiToNoteName(list[i].PitchMedianMidi)}" +
-                  $"({Mathf.RoundToInt(list[i].PitchMedianMidi)})"
+            list[i].PitchCenterNote = list[i].PitchCenterMidi > 0f
+                ? $"{MidiToNoteName(list[i].PitchCenterMidi)}" +
+                  $"({Mathf.RoundToInt(list[i].PitchCenterMidi)})"
                 : "";
+            list[i].FirstStablePitchNote = list[i].FirstStablePitchMidi > 0f
+                ? MidiToNoteName(list[i].FirstStablePitchMidi)
+                : "";
+            list[i].PitchRangeNote = list[i].PitchRangeLowMidi > 0f &&
+                                     list[i].PitchRangeHighMidi > 0f
+                ? MidiToNoteName(list[i].PitchRangeLowMidi) + "～" +
+                  MidiToNoteName(list[i].PitchRangeHighMidi)
+                : "";
+            list[i].PitchMedianMidi = list[i].PitchCenterMidi;
+            list[i].PitchBaseNote = list[i].PitchCenterNote;
         }
     }
 
@@ -2295,6 +4089,51 @@ public class SenseVoiceSpeechToText : STT
     }
 
     /// <summary>
+    /// 第一个至少连续三帧、窗口跨度不超过两个半音的音高。它比“第一个非零帧”更不容易
+    /// 把吸气、起音毛刺或倍频错误当作旋律首音；找不到时回退到第一个有声帧。
+    /// </summary>
+    private static float FirstStableVoicedPitch(float[] timeline)
+    {
+        if (timeline == null || timeline.Length == 0) return 0f;
+        float fallback = 0f;
+        for (int i = 0; i < timeline.Length; i++)
+        {
+            float value = timeline[i];
+            if (value <= 1f || float.IsNaN(value) || float.IsInfinity(value)) continue;
+            if (fallback <= 0f) fallback = value;
+            if (i + 2 >= timeline.Length) continue;
+            float b = timeline[i + 1];
+            float c = timeline[i + 2];
+            if (b <= 1f || c <= 1f || float.IsNaN(b) || float.IsNaN(c) ||
+                float.IsInfinity(b) || float.IsInfinity(c))
+                continue;
+            float low = Mathf.Min(value, Mathf.Min(b, c));
+            float high = Mathf.Max(value, Mathf.Max(b, c));
+            if (high - low <= 2f) return value + b + c - low - high;
+        }
+        return fallback;
+    }
+
+    /// <summary>有声帧的稳健分位数；用于排除少量八度误检后展示主要音域。</summary>
+    private static float VoicedPitchPercentile(float[] timeline, float percentile)
+    {
+        if (timeline == null || timeline.Length == 0) return 0f;
+        var voiced = new List<float>(timeline.Length);
+        foreach (float value in timeline)
+        {
+            if (value > 1f && !float.IsNaN(value) && !float.IsInfinity(value))
+                voiced.Add(value);
+        }
+        if (voiced.Count == 0) return 0f;
+        voiced.Sort();
+        int index = Mathf.Clamp(
+            Mathf.RoundToInt(Mathf.Clamp01(percentile) * (voiced.Count - 1)),
+            0,
+            voiced.Count - 1);
+        return voiced[index];
+    }
+
+    /// <summary>
     /// 标出"同一句的第几遍"。判据用歌词——用户重唱同一句时歌词高度一致，
     /// 而不同段落的歌词差别很大。刻意不用旋律相似度：实测它连不同的歌都分不开
     /// (组内中位 0.701 / 跨组 0.675)，拿来分"同一句的两遍"更不可能。
@@ -2302,6 +4141,10 @@ public class SenseVoiceSpeechToText : STT
     /// </summary>
     private static void AnnotateTakeGroups(List<PracticePhraseInfo> list)
     {
+        // Group display follows actual capture order, while order="..." indices
+        // remain the original list's identifiers (confirmation may have arrived late).
+        list = new List<PracticePhraseInfo>(list);
+        list.Sort((a, b) => a.CaptureOrder.CompareTo(b.CaptureOrder));
         int nextGroup = 0;
         for (int i = 0; i < list.Count; i++)
         {
@@ -2402,6 +4245,38 @@ public class SenseVoiceSpeechToText : STT
         {
             string t = piece.Trim().Trim('"', '\'', '“', '”', '「', '」').Trim();
             if (t.Length == 0) continue;
+            var stableMatch = System.Text.RegularExpressions.Regex.Match(
+                t, @"^(?:stable|id)\s*:\s*(?<id>\d+)$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (stableMatch.Success &&
+                int.TryParse(stableMatch.Groups["id"].Value, out int stableId))
+            {
+                int stableIndex = FindPracticeIndexByStableId(stableId);
+                if (stableIndex < 0)
+                    problems.Add($"stable_id={stableId} 在当前练唱会话中不存在");
+                else
+                    picked.Add(stableIndex);
+                continue;
+            }
+            var candidateMatch = System.Text.RegularExpressions.Regex.Match(
+                t, @"^candidate\s*:\s*(?<id>\d+)$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (candidateMatch.Success &&
+                int.TryParse(candidateMatch.Groups["id"].Value, out int candidateId))
+            {
+                int candidateIndex = -1;
+                for (int i = 0; i < m_PracticePhrases.Count; i++)
+                    if (m_PracticePhrases[i].OriginCandidateId == candidateId)
+                    {
+                        candidateIndex = i;
+                        break;
+                    }
+                if (candidateIndex < 0)
+                    problems.Add($"candidate_id={candidateId} 尚未确认成可播放练唱素材");
+                else
+                    picked.Add(candidateIndex);
+                continue;
+            }
             if (int.TryParse(t, out int n))
             {
                 if (n < 1 || n > m_PracticePhrases.Count)
@@ -2516,6 +4391,9 @@ public class SenseVoiceSpeechToText : STT
     public void BeginSingingPracticeSession()
     {
         m_PracticePhrases.Clear();
+        m_QuarantinedSingingCandidates.Clear();
+        m_RejectedQuarantineSignatures.Clear();
+        m_RejectedQuarantineSessionSerials.Clear();
         m_LastCommittedPracticeSignature = 0;
         m_LastPracticeCommitTime = -999f;
         Debug.Log("[SenseVoice/Practice] 新练唱会话已开始；等待最终确认的歌唱片段");
@@ -2538,12 +4416,21 @@ public class SenseVoiceSpeechToText : STT
         float maxAgeSeconds, out int kept, out int dropped)
     {
         dropped = 0;
-        //按时间追加，陈旧的必然都在前面；从头丢到第一个还新鲜的为止。
-        while (m_PracticePhrases.Count > 0 &&
-               Time.realtimeSinceStartup - m_PracticePhrases[0].AtRealtime > maxAgeSeconds)
+        // Delayed confirmations can append older recordings after newer ones.
+        for (int i = m_PracticePhrases.Count - 1; i >= 0; i--)
         {
-            m_PracticePhrases.RemoveAt(0);
+            if (Time.realtimeSinceStartup - m_PracticePhrases[i].AtRealtime <= maxAgeSeconds) continue;
+            m_PracticePhrases.RemoveAt(i);
             dropped++;
+        }
+        int droppedCandidates = 0;
+        for (int i = m_QuarantinedSingingCandidates.Count - 1; i >= 0; i--)
+        {
+            PracticePhrase phrase = m_QuarantinedSingingCandidates[i].Phrase;
+            if (phrase != null &&
+                Time.realtimeSinceStartup - phrase.AtRealtime <= maxAgeSeconds) continue;
+            m_QuarantinedSingingCandidates.RemoveAt(i);
+            droppedCandidates++;
         }
         kept = m_PracticePhrases.Count;
         //丢过东西就得让签名失效：段号已经整体前移，旧签名对应的不再是同一段。
@@ -2556,7 +4443,10 @@ public class SenseVoiceSpeechToText : STT
             Debug.Log("[SenseVoice/Practice] 新练唱会话已开始；等待最终确认的歌唱片段");
         else
             Debug.Log($"[SenseVoice/Practice] 练唱会话已延续：留下 {kept} 段" +
-                      (dropped > 0 ? $"，丢掉 {dropped} 段陈旧片段（超过 {maxAgeSeconds:F0} 秒）" : ""));
+                      (dropped > 0 ? $"，丢掉 {dropped} 段陈旧片段（超过 {maxAgeSeconds:F0} 秒）" : "") +
+                      (droppedCandidates > 0
+                          ? $"；另清理 {droppedCandidates} 个陈旧来源候选"
+                          : $"；保留 {m_QuarantinedSingingCandidates.Count} 个来源待确认候选"));
     }
 
     /// <summary>
@@ -2613,34 +4503,868 @@ public class SenseVoiceSpeechToText : STT
             }
         }
 
-        if (m_PracticePhrases.Count >= MaxPracticePhraseCount)
-            m_PracticePhrases.RemoveAt(0);
-        m_PracticePhrases.Add(new PracticePhrase
+        SingingEvidenceSnapshot cachedEvidence = m_LastSingingCacheEvidence;
+        var phrase = new PracticePhrase
         {
+            RecordingEvidence = CloneSingingEvidence(cachedEvidence),
             WavBytes = wavBytes,
+            RecoveryWavBytes = m_LastSingingRecoveryAudioBytes != null
+                ? (byte[])m_LastSingingRecoveryAudioBytes.Clone()
+                : null,
             MidiTimeline = timeline,
+            RecoveryMidiTimeline = HasPlayablePitchTimeline(
+                    m_LastSingingRecoveryPerformanceMidi)
+                ? (float[])m_LastSingingRecoveryPerformanceMidi.Clone()
+                : null,
             FrameSeconds = Mathf.Clamp(frameSeconds, 0.02f, 0.25f),
             Language = language ?? "",
             Signature = signature,
+            CaptureSessionSerial = cachedEvidence != null
+                ? cachedEvidence.CaptureSessionSerial
+                : m_LastSingingCacheCaptureSessionSerial,
             //分段歌词比整轮文本更贴近真正唱的那一段
             Lyrics = !string.IsNullOrWhiteSpace(m_LastSingingLyrics)
                 ? m_LastSingingLyrics.Trim()
                 : (LastText ?? "").Trim(),
             Seconds = GetWavDurationSeconds(wavBytes),
+            RecoverySeconds = m_LastSingingRecoveryAudioBytes != null
+                ? GetWavDurationSeconds(m_LastSingingRecoveryAudioBytes)
+                : GetWavDurationSeconds(wavBytes),
             //本轮曲库回忆的首选就是现成的身份线索，不额外算
             SongId = topRecallId,
             SongName = topRecallName,
-            AtRealtime = Time.realtimeSinceStartup,
+            AtRealtime = cachedEvidence != null
+                ? cachedEvidence.AtRealtime
+                : (m_LastAnalyzedCaptureAt >= 0f
+                    ? m_LastAnalyzedCaptureAt : Time.realtimeSinceStartup),
+            ConfirmedAtRealtime = Time.realtimeSinceStartup,
             PrecedingSpeech = m_LastSpokenTranscript ?? "",
             PendingConfirmation = pendingConfirmation,
-        });
+            HeadExtraSeconds = cachedEvidence != null
+                ? cachedEvidence.HeadExtraSeconds : m_LastHeadExtraSeconds,
+            TailExtraSeconds = cachedEvidence != null
+                ? cachedEvidence.TailExtraSeconds : m_LastTailExtraSeconds,
+            HeadExtraText = cachedEvidence != null
+                ? cachedEvidence.HeadExtraText : (m_LastHeadExtraText ?? ""),
+            TailExtraText = cachedEvidence != null
+                ? cachedEvidence.TailExtraText : (m_LastTailExtraText ?? ""),
+            HeadExtraType = cachedEvidence != null
+                ? cachedEvidence.HeadExtraType : (m_LastHeadExtraType ?? "none"),
+            TailExtraType = cachedEvidence != null
+                ? cachedEvidence.TailExtraType : (m_LastTailExtraType ?? "none"),
+            HeadExtraProbability = cachedEvidence != null
+                ? cachedEvidence.HeadExtraProbability : m_LastHeadExtraProbability,
+            TailExtraProbability = cachedEvidence != null
+                ? cachedEvidence.TailExtraProbability : m_LastTailExtraProbability,
+            HeadExtraReviewRequired = cachedEvidence != null
+                ? cachedEvidence.HeadExtraReviewRequired : m_LastHeadExtraReviewRequired,
+            TailExtraReviewRequired = cachedEvidence != null
+                ? cachedEvidence.TailExtraReviewRequired : m_LastTailExtraReviewRequired,
+            HeadExtraMelodicSeconds = cachedEvidence != null
+                ? cachedEvidence.HeadExtraMelodicSeconds : m_LastHeadExtraMelodicSeconds,
+            TailExtraMelodicSeconds = cachedEvidence != null
+                ? cachedEvidence.TailExtraMelodicSeconds : m_LastTailExtraMelodicSeconds,
+            HeadExtraMelodicRatio = cachedEvidence != null
+                ? cachedEvidence.HeadExtraMelodicRatio : m_LastHeadExtraMelodicRatio,
+            TailExtraMelodicRatio = cachedEvidence != null
+                ? cachedEvidence.TailExtraMelodicRatio : m_LastTailExtraMelodicRatio,
+            HeadExtraLongestMelodicRunSeconds = cachedEvidence != null
+                ? cachedEvidence.HeadExtraLongestMelodicRunSeconds
+                : m_LastHeadExtraLongestMelodicRunSeconds,
+            TailExtraLongestMelodicRunSeconds = cachedEvidence != null
+                ? cachedEvidence.TailExtraLongestMelodicRunSeconds
+                : m_LastTailExtraLongestMelodicRunSeconds,
+            HeadExtraSegments = CloneBoundarySegments(cachedEvidence != null
+                ? cachedEvidence.HeadExtraSegments : m_LastHeadExtraSegments),
+            TailExtraSegments = CloneBoundarySegments(cachedEvidence != null
+                ? cachedEvidence.TailExtraSegments : m_LastTailExtraSegments),
+            CleanLeadInUnverifiedSeconds = cachedEvidence != null
+                ? cachedEvidence.CleanLeadInUnverifiedSeconds
+                : m_LastCleanLeadInUnverifiedSeconds,
+            CleanLeadInEvidenceText = cachedEvidence != null
+                ? cachedEvidence.CleanLeadInEvidenceText
+                : (m_LastCleanLeadInEvidenceText ?? ""),
+            CleanLeadInEvidenceType = cachedEvidence != null
+                ? cachedEvidence.CleanLeadInEvidenceType
+                : (m_LastCleanLeadInEvidenceType ?? "none"),
+            CleanLeadInEvidenceProbability = cachedEvidence != null
+                ? cachedEvidence.CleanLeadInEvidenceProbability
+                : m_LastCleanLeadInEvidenceProbability,
+        };
+        var priorCandidate = m_QuarantinedSingingCandidates.Find(c =>
+            (phrase.CaptureSessionSerial > 0 && c.Phrase.CaptureSessionSerial == phrase.CaptureSessionSerial) ||
+            (phrase.AtRealtime > 0f && c.Phrase.AtRealtime == phrase.AtRealtime));
+        if (priorCandidate != null)
+        {
+            phrase.ClipRef = priorCandidate.Phrase.ClipRef;
+            phrase.RecordingSequence = EnsureRecordingSequence(priorCandidate.Phrase);
+            RetainRecordingEvidence(phrase, priorCandidate.Phrase.LatestRecordingEvidence);
+        }
+        phraseCount = StorePracticeCapture(phrase);
+        RemoveQuarantinedCandidateCapturedAt(phrase.AtRealtime);
         m_LastCommittedPracticeSignature = signature;
         m_LastPracticeCommitTime = Time.realtimeSinceStartup;
-        phraseCount = m_PracticePhrases.Count;
+        float recoverySeconds = m_LastSingingRecoveryAudioBytes != null
+            ? GetWavDurationSeconds(m_LastSingingRecoveryAudioBytes)
+            : GetWavDurationSeconds(wavBytes);
         Debug.Log($"[SenseVoice/Practice] 最终歌声已提交 sequence={phraseCount} " +
                   $"audio={GetWavDurationSeconds(wavBytes):F2}s frames={timeline.Length}" +
+                  (recoverySeconds > GetWavDurationSeconds(wavBytes) + 0.20f
+                      ? $" expanded={recoverySeconds:F2}s"
+                      : "") +
                   (pendingConfirmation ? " (待确认)" : ""));
         return true;
+    }
+
+    private int StorePracticeCapture(PracticePhrase phrase)
+    {
+        InitializePracticeSource(phrase);
+        EnsureRecordingSequence(phrase);
+        RetainRecordingEvidence(phrase, phrase.RecordingEvidence);
+        RetainRecordingEvidence(phrase, m_LastSingingEvidence);
+        // A resumed, unheard capture is the same recording with more samples,
+        // not a second performance. Keep its identity if an early result was stored.
+        for (int i = 0; i < m_PracticePhrases.Count; i++)
+        {
+            if (phrase.AtRealtime <= 0f || m_PracticePhrases[i].AtRealtime != phrase.AtRealtime) continue;
+            phrase.StableId = m_PracticePhrases[i].StableId;
+            phrase.ClipRef = m_PracticePhrases[i].ClipRef;
+            phrase.RecordingSequence = EnsureRecordingSequence(m_PracticePhrases[i]);
+            RetainRecordingEvidence(phrase, m_PracticePhrases[i].LatestRecordingEvidence);
+            m_PracticePhrases[i] = phrase;
+            Debug.Log($"[SenseVoice/Practice] 续音更新同一录音 practice={i + 1} stable_id={phrase.StableId}");
+            return i + 1;
+        }
+        if (m_PracticePhrases.Count >= MaxPracticePhraseCount)
+            m_PracticePhrases.RemoveAt(0);
+        phrase.StableId = ++m_NextPracticePhraseStableId;
+        m_PracticePhrases.Add(phrase);
+        return m_PracticePhrases.Count;
+    }
+
+    private static void InitializePracticeSource(PracticePhrase phrase)
+    {
+        if (phrase == null) return;
+        if (phrase.SourceCleanWavBytes == null && phrase.WavBytes != null)
+            phrase.SourceCleanWavBytes = (byte[])phrase.WavBytes.Clone();
+        if (phrase.SourceCleanMidiTimeline == null && phrase.MidiTimeline != null)
+            phrase.SourceCleanMidiTimeline = (float[])phrase.MidiTimeline.Clone();
+        if (phrase.SourceExpandedWavBytes == null && phrase.RecoveryWavBytes != null)
+            phrase.SourceExpandedWavBytes = (byte[])phrase.RecoveryWavBytes.Clone();
+        if (phrase.SourceExpandedMidiTimeline == null && phrase.RecoveryMidiTimeline != null)
+            phrase.SourceExpandedMidiTimeline = (float[])phrase.RecoveryMidiTimeline.Clone();
+        // No separate recovery buffer is needed when both measured windows are
+        // exactly the same. Never alias merely because their durations match.
+        var evidence = phrase.RecordingEvidence;
+        if (evidence != null &&
+            Mathf.Abs(evidence.CleanStartSeconds - evidence.RecoveryStartSeconds) < .00001f &&
+            Mathf.Abs(evidence.CleanEndSeconds - evidence.RecoveryEndSeconds) < .00001f)
+        {
+            if (phrase.SourceExpandedWavBytes == null && phrase.SourceCleanWavBytes != null)
+                phrase.SourceExpandedWavBytes = (byte[])phrase.SourceCleanWavBytes.Clone();
+            if (phrase.SourceExpandedMidiTimeline == null && phrase.SourceCleanMidiTimeline != null)
+                phrase.SourceExpandedMidiTimeline = (float[])phrase.SourceCleanMidiTimeline.Clone();
+        }
+        if (phrase.OriginalCleanSeconds <= 0f)
+            phrase.OriginalCleanSeconds = GetWavDurationSeconds(
+                phrase.SourceCleanWavBytes ?? phrase.WavBytes);
+        if (phrase.OriginalExpandedSeconds <= 0f)
+            phrase.OriginalExpandedSeconds = GetWavDurationSeconds(
+                phrase.SourceExpandedWavBytes ?? phrase.RecoveryWavBytes ??
+                phrase.SourceCleanWavBytes ?? phrase.WavBytes);
+        if (string.IsNullOrWhiteSpace(phrase.ActiveCapture)) phrase.ActiveCapture = "clean";
+    }
+
+    /// <summary>
+    /// 暂存一份“可能是用户歌声，也可能是外放/背景音乐”的真实音频证据。
+    /// 候选不会自动进入 practice 清单；角色可选择已有音频，来源判断独立保留。
+    /// </summary>
+    private bool m_CurrentRecordingEvidencePublished;
+
+    /// <summary>
+    /// Publish unrepresented recording evidence before the role sees the final turn.
+    /// Playback eligibility and an early speech verdict must not erase its identity.
+    /// Never use the recent playable cache here: it may belong to an older recording.
+    /// </summary>
+    public bool RetainCurrentSingingEvidenceClip(bool semanticSingingEvidence)
+    {
+        var evidence = m_LastSingingEvidence;
+        UpdateRetainedRecordingEvidence(evidence);
+        if (m_CurrentRecordingEvidencePublished || evidence == null || !HasUsableWavPayload(evidence.RawWavBytes) ||
+            evidence.CaptureSessionSerial != m_LiveRecordingCandidateSessionSerial)
+            return false;
+        // This is evidence retention, not a singing/source verdict. Keep existing
+        // uncertain-band policy; semantic evidence can retain lower acoustic scores.
+        if (!semanticSingingEvidence && evidence.SingingProbability < 0.52f)
+            return false;
+        // Follow-up text/ticks cannot resurrect an explicitly dropped clip from
+        // the still-current raw snapshot. Only a new recording resets publication.
+        m_CurrentRecordingEvidencePublished = true;
+        bool SameCapture(PracticePhrase p) => p != null &&
+            (evidence.CaptureSessionSerial > 0
+                ? p.CaptureSessionSerial == evidence.CaptureSessionSerial
+                : Mathf.Abs(p.AtRealtime - evidence.AtRealtime) < .001f);
+        if (m_PracticePhrases.Any(SameCapture) ||
+            m_QuarantinedSingingCandidates.Any(c => SameCapture(c.Phrase)))
+            return false;
+
+        // No automatic clean/expanded choice, provenance confirmation or playback.
+        // The snapshot supplies ALL audio and pitch for subsequent explicit selection.
+        bool retained = QuarantineSingingEvidence(evidence, null,
+            evidence.PitchTimelineMidi, evidence.FrameSeconds, evidence.Language,
+            false, false, null, null, "", out int candidateId, out _);
+        if (retained)
+        {
+            var candidate = m_QuarantinedSingingCandidates.Find(c => c.CandidateId == candidateId);
+            Debug.Log($"[SenseVoice/Clip] retained={candidate.Phrase.ClipRef} " +
+                $"session={evidence.CaptureSessionSerial} raw={evidence.RawSeconds:F2}s " +
+                $"clean={evidence.CleanEndSeconds - evidence.CleanStartSeconds:F2}s " +
+                $"expanded={evidence.RecoveryEndSeconds - evidence.RecoveryStartSeconds:F2}s " +
+                $"source=pending playback={candidate.PlaybackStatus} played=false；" +
+                "可引用证据独立于自动播放门槛，是否歌唱与范围交给角色判断");
+        }
+        return retained;
+    }
+
+    public bool QuarantineRecentSingingCandidate(
+        out int candidateId, out float seconds)
+    {
+        candidateId = 0;
+        seconds = 0f;
+        byte[] wavBytes = null;
+        float[] timeline = null;
+        float frameSeconds = 0.10f;
+        string language = "";
+        bool ownsCurrentPlaybackAlias = HasCurrentSingingPerformanceCandidate();
+        bool playbackReady = ownsCurrentPlaybackAlias &&
+            TryGetRecentSingingAudio(out wavBytes) &&
+            TryGetRecentSingingPerformance(out timeline, out frameSeconds,
+                out language);
+        SingingEvidenceSnapshot evidence = playbackReady &&
+            m_LastSingingCacheEvidence != null
+                ? m_LastSingingCacheEvidence : m_LastSingingEvidence;
+        if (!playbackReady && (evidence == null || evidence.RawWavBytes == null ||
+            evidence.RawWavBytes.Length <= 44))
+        {
+            if (ownsCurrentPlaybackAlias)
+                RevokeCurrentSingingPlaybackAlias(
+                    "隔离取证不完整；宁可不可播放也不泄漏待确认素材");
+            return false;
+        }
+
+        if (!playbackReady)
+        {
+            wavBytes = null;
+            timeline = evidence.PitchTimelineMidi == null
+                ? new float[0] : (float[])evidence.PitchTimelineMidi.Clone();
+            frameSeconds = evidence.FrameSeconds;
+            language = evidence.Language ?? "";
+        }
+
+        return QuarantineSingingEvidence(evidence, wavBytes, timeline, frameSeconds,
+            language, playbackReady, ownsCurrentPlaybackAlias,
+            m_LastSingingRecoveryAudioBytes, m_LastSingingRecoveryPerformanceMidi,
+            m_LastSpokenTranscript, out candidateId, out seconds);
+    }
+
+    private bool QuarantineSingingEvidence(SingingEvidenceSnapshot evidence,
+        byte[] wavBytes, float[] timeline, float frameSeconds, string language,
+        bool playbackReady, bool ownsCurrentPlaybackAlias, byte[] recoveryWav,
+        float[] recoveryTimeline, string precedingSpeech,
+        out int candidateId, out float seconds)
+    {
+        candidateId = 0;
+        seconds = 0f;
+
+        byte[] signatureAudio = evidence != null &&
+            evidence.RawWavBytes != null && evidence.RawWavBytes.Length > 44
+                ? evidence.RawWavBytes : wavBytes;
+        //来源身份锚定原始 WAV，而不是一次分析产出的 timeline 长度。迟到复核可能
+        //让同一录音的音高帧数略变；若把帧数混进签名，用户刚否认的录音会换个签名
+        //再次变成 pending。
+        int signature = ComputePracticeSignature(signatureAudio, null);
+        int captureSessionSerial = evidence != null
+            ? evidence.CaptureSessionSerial : m_LastSingingCacheCaptureSessionSerial;
+        bool rejectedRecording = captureSessionSerial > 0
+            ? m_RejectedQuarantineSessionSerials.Contains(captureSessionSerial)
+            : m_RejectedQuarantineSignatures.Contains(signature);
+        if (rejectedRecording)
+        {
+            if (ownsCurrentPlaybackAlias)
+                RevokeCurrentSingingPlaybackAlias(
+                    "同一录音的来源已被用户否认，禁止再次发布");
+            Debug.Log($"[SenseVoice/Quarantine] 同一录音 session={captureSessionSerial} " +
+                      $"signature={signature} 已被用户否认；" +
+                      "忽略迟到/重复分析，不重新创建 pending");
+            return false;
+        }
+        UpdateRetainedRecordingEvidence(evidence);
+        if (captureSessionSerial > 0 && m_PracticePhrases.Any(
+            p => p.CaptureSessionSerial == captureSessionSerial))
+            return false; // Retain new evidence without replacing the current playable version.
+        for (int i = 0; i < m_QuarantinedSingingCandidates.Count; i++)
+        {
+            QuarantinedSingingCandidate existing = m_QuarantinedSingingCandidates[i];
+            if (existing.Phrase == null) continue;
+            bool sameRecording = captureSessionSerial > 0 &&
+                existing.Phrase.CaptureSessionSerial == captureSessionSerial;
+            if (!sameRecording && (captureSessionSerial > 0 || existing.Phrase.Signature != signature)) continue;
+            candidateId = existing.CandidateId;
+            seconds = existing.Phrase.Seconds;
+            if (ownsCurrentPlaybackAlias)
+                RevokeCurrentSingingPlaybackAlias(
+                    $"候选 {candidateId} 已在隔离区，禁止经 recent_turn 播放");
+            return true;
+        }
+        if (captureSessionSerial <= 0 && signature == m_LastCommittedPracticeSignature &&
+            Time.realtimeSinceStartup - m_LastPracticeCommitTime < 8f)
+        {
+            if (ownsCurrentPlaybackAlias)
+                RevokeCurrentSingingPlaybackAlias(
+                    "本轮证据与刚提交素材重复，不保留临时 recent_turn 别名");
+            return false;
+        }
+
+        var phrase = new PracticePhrase
+        {
+            RecordingEvidence = CloneSingingEvidence(evidence),
+            WavBytes = wavBytes,
+            RecoveryWavBytes = playbackReady && recoveryWav != null
+                ? (byte[])recoveryWav.Clone()
+                : null,
+            MidiTimeline = timeline,
+            RecoveryMidiTimeline = playbackReady && HasPlayablePitchTimeline(
+                    recoveryTimeline)
+                ? (float[])recoveryTimeline.Clone()
+                : null,
+            FrameSeconds = Mathf.Clamp(frameSeconds, 0.02f, 0.25f),
+            Language = language ?? "",
+            Signature = signature,
+            CaptureSessionSerial = captureSessionSerial,
+            //歌唱岛没有独立转写时保持未知；不能把含前后口语的整轮 ASR 冒充歌词。
+            Lyrics = evidence != null ? (evidence.SingingText ?? "").Trim()
+                : playbackReady && !string.IsNullOrWhiteSpace(m_LastResponseSingingText)
+                ? m_LastResponseSingingText.Trim()
+                : (evidence?.SingingText ?? "").Trim(),
+            Seconds = playbackReady
+                ? GetWavDurationSeconds(wavBytes) : evidence.RawSeconds,
+            RecoverySeconds = playbackReady && recoveryWav != null
+                ? GetWavDurationSeconds(recoveryWav)
+                : (playbackReady ? GetWavDurationSeconds(wavBytes) : evidence.RawSeconds),
+            //来源尚未确认时，曲库相似候选也不能被误当作身份事实。
+            SongId = "",
+            SongName = "",
+            AtRealtime = evidence != null
+                ? evidence.AtRealtime
+                : (m_LastAnalyzedCaptureAt >= 0f
+                    ? m_LastAnalyzedCaptureAt : Time.realtimeSinceStartup),
+            ConfirmedAtRealtime = -1f,
+            PrecedingSpeech = precedingSpeech ?? "",
+            PendingConfirmation = true,
+            HeadExtraSeconds = evidence != null
+                ? evidence.HeadExtraSeconds : m_LastHeadExtraSeconds,
+            TailExtraSeconds = evidence != null
+                ? evidence.TailExtraSeconds : m_LastTailExtraSeconds,
+            HeadExtraText = evidence != null
+                ? evidence.HeadExtraText : (m_LastHeadExtraText ?? ""),
+            TailExtraText = evidence != null
+                ? evidence.TailExtraText : (m_LastTailExtraText ?? ""),
+            HeadExtraType = evidence != null
+                ? evidence.HeadExtraType : (m_LastHeadExtraType ?? "none"),
+            TailExtraType = evidence != null
+                ? evidence.TailExtraType : (m_LastTailExtraType ?? "none"),
+            HeadExtraProbability = evidence != null
+                ? evidence.HeadExtraProbability : m_LastHeadExtraProbability,
+            TailExtraProbability = evidence != null
+                ? evidence.TailExtraProbability : m_LastTailExtraProbability,
+            HeadExtraReviewRequired = evidence != null
+                ? evidence.HeadExtraReviewRequired : m_LastHeadExtraReviewRequired,
+            TailExtraReviewRequired = evidence != null
+                ? evidence.TailExtraReviewRequired : m_LastTailExtraReviewRequired,
+            HeadExtraMelodicSeconds = evidence != null
+                ? evidence.HeadExtraMelodicSeconds : m_LastHeadExtraMelodicSeconds,
+            TailExtraMelodicSeconds = evidence != null
+                ? evidence.TailExtraMelodicSeconds : m_LastTailExtraMelodicSeconds,
+            HeadExtraMelodicRatio = evidence != null
+                ? evidence.HeadExtraMelodicRatio : m_LastHeadExtraMelodicRatio,
+            TailExtraMelodicRatio = evidence != null
+                ? evidence.TailExtraMelodicRatio : m_LastTailExtraMelodicRatio,
+            HeadExtraLongestMelodicRunSeconds = evidence != null
+                ? evidence.HeadExtraLongestMelodicRunSeconds
+                : m_LastHeadExtraLongestMelodicRunSeconds,
+            TailExtraLongestMelodicRunSeconds = evidence != null
+                ? evidence.TailExtraLongestMelodicRunSeconds
+                : m_LastTailExtraLongestMelodicRunSeconds,
+            HeadExtraSegments = CloneBoundarySegments(evidence != null
+                ? evidence.HeadExtraSegments : m_LastHeadExtraSegments),
+            TailExtraSegments = CloneBoundarySegments(evidence != null
+                ? evidence.TailExtraSegments : m_LastTailExtraSegments),
+            CleanLeadInUnverifiedSeconds = evidence != null
+                ? evidence.CleanLeadInUnverifiedSeconds
+                : m_LastCleanLeadInUnverifiedSeconds,
+            CleanLeadInEvidenceText = evidence != null
+                ? evidence.CleanLeadInEvidenceText
+                : (m_LastCleanLeadInEvidenceText ?? ""),
+            CleanLeadInEvidenceType = evidence != null
+                ? evidence.CleanLeadInEvidenceType
+                : (m_LastCleanLeadInEvidenceType ?? "none"),
+            CleanLeadInEvidenceProbability = evidence != null
+                ? evidence.CleanLeadInEvidenceProbability
+                : m_LastCleanLeadInEvidenceProbability,
+        };
+        EnsureRecordingSequence(phrase);
+        RetainRecordingEvidence(phrase, phrase.RecordingEvidence);
+        RetainRecordingEvidence(phrase, m_LastSingingEvidence);
+        candidateId = ++m_NextQuarantinedSingingCandidateId;
+        phrase.OriginCandidateId = candidateId;
+        if (m_QuarantinedSingingCandidates.Count >= MaxPracticePhraseCount)
+        {
+            QuarantinedSingingCandidate oldest = m_QuarantinedSingingCandidates[0];
+            for (int i = 1; i < m_QuarantinedSingingCandidates.Count; i++)
+            {
+                if (m_QuarantinedSingingCandidates[i].Phrase.AtRealtime < oldest.Phrase.AtRealtime)
+                    oldest = m_QuarantinedSingingCandidates[i];
+            }
+            m_QuarantinedSingingCandidates.Remove(oldest);
+            Debug.LogWarning($"[SenseVoice/Quarantine] 会话候选达到 {MaxPracticePhraseCount} 个；" +
+                             $"为限制内存仅清理最老 candidate={oldest.CandidateId}");
+        }
+        m_QuarantinedSingingCandidates.Add(new QuarantinedSingingCandidate
+        {
+            Evidence = phrase.RecordingEvidence,
+            CandidateId = candidateId,
+            Phrase = phrase,
+            SourceConfirmed = false,
+            PlaybackStatus = playbackReady
+                ? "ready"
+                : (timeline != null && timeline.Length > 0
+                    ? "evidence_only" : "unavailable"),
+            WholeTurnText = (evidence?.Text ?? LastText ?? "").Trim(),
+            SingingSegmentText = (evidence?.SingingText ?? "").Trim(),
+            RawWavBytes = evidence != null && evidence.RawWavBytes != null
+                ? (byte[])evidence.RawWavBytes.Clone()
+                : (playbackReady ? (byte[])wavBytes.Clone() : null),
+            SingingProbability = evidence != null
+                ? evidence.SingingProbability : LastSingingProbability,
+            PitchStability = evidence != null
+                ? evidence.PitchStability : LastPitchStability,
+            MelodicIslandSeconds = evidence != null
+                ? evidence.MelodicIslandSeconds : LastSingingIslandSeconds,
+            ContentSeconds = evidence != null
+                ? evidence.ContentSeconds : LastSingingContentSeconds,
+        });
+        seconds = phrase.Seconds;
+        string playbackStatus = playbackReady
+            ? "ready" : (timeline != null && timeline.Length > 0
+                ? "evidence_only" : "unavailable");
+        Debug.Log($"[SenseVoice/Quarantine] 来源不确定证据已隔离 candidate={candidateId} " +
+                  $"audio={seconds:F2}s frames={(timeline == null ? 0 : timeline.Length)} " +
+                  $"source=pending playback={playbackStatus}；会话现有 " +
+                  $"{m_QuarantinedSingingCandidates.Count} 个待确认候选，均未进入练唱清单");
+        if (ownsCurrentPlaybackAlias)
+            RevokeCurrentSingingPlaybackAlias(
+                $"candidate={candidateId} 来源待确认，只允许隔离区持有");
+        return true;
+    }
+
+    // A detached final response must not touch LastText, current pitch, speaker,
+    // recent_turn, or the active recording's evidence. Build an independent item.
+    private void ArchiveCompletedCapture(Response response, byte[] raw, float capturedAt, int session)
+    {
+        if (response == null || !HasUsableWavPayload(raw)) return;
+        float duration = GetWavDurationSeconds(raw);
+        float frame = Mathf.Clamp(response.pitch_timeline_frame_seconds, .02f, .25f);
+        float origin = response.audio_content_start_seconds + response.pitch_timeline_start_seconds;
+        float start = Mathf.Clamp(response.audio_content_start_seconds + response.singing_start_seconds, 0f, duration);
+        float end = response.singing_end_seconds > 0f
+            ? Mathf.Clamp(response.audio_content_start_seconds + response.singing_end_seconds, start, duration)
+            : duration;
+        float recoveryStart = Mathf.Clamp(response.audio_content_start_seconds + response.singing_recovery_start_seconds, 0f, start);
+        float recoveryEnd = response.singing_recovery_end_seconds > 0f
+            ? Mathf.Clamp(response.audio_content_start_seconds + response.singing_recovery_end_seconds, end, duration)
+            : end;
+        var evidence = new SingingEvidenceSnapshot
+        {
+            CaptureSessionSerial = session, RawWavBytes = raw,
+            TimelineOriginSeconds = origin,
+            PitchTimelineMidi = response.pitch_timeline_midi ?? new float[0],
+            FrameSeconds = frame, AtRealtime = capturedAt,
+            Text = response.text ?? "", SingingText = response.singing_text ?? "",
+            Language = string.IsNullOrWhiteSpace(response.singing_language) ? response.language : response.singing_language,
+            RawSeconds = duration, CleanStartSeconds = start, CleanEndSeconds = end,
+            RecoveryStartSeconds = recoveryStart, RecoveryEndSeconds = recoveryEnd,
+            SingingProbability = response.singing_probability, PitchStability = response.pitch_stability,
+            MelodicIslandSeconds = end - start, ContentSeconds = duration - response.audio_content_start_seconds,
+            HeadExtraSeconds = Mathf.Max(0f, response.singing_head_extra_end_seconds - response.singing_head_extra_start_seconds),
+            TailExtraSeconds = Mathf.Max(0f, response.singing_tail_extra_end_seconds - response.singing_tail_extra_start_seconds),
+            HeadExtraText = response.singing_head_extra_text, TailExtraText = response.singing_tail_extra_text,
+            HeadExtraType = response.singing_head_extra_type, TailExtraType = response.singing_tail_extra_type,
+            HeadExtraProbability = response.singing_head_extra_probability, TailExtraProbability = response.singing_tail_extra_probability,
+            HeadExtraReviewRequired = response.singing_head_extra_review_required, TailExtraReviewRequired = response.singing_tail_extra_review_required,
+            HeadExtraMelodicSeconds = response.singing_head_extra_melodic_seconds, TailExtraMelodicSeconds = response.singing_tail_extra_melodic_seconds,
+            HeadExtraMelodicRatio = response.singing_head_extra_melodic_ratio, TailExtraMelodicRatio = response.singing_tail_extra_melodic_ratio,
+            HeadExtraLongestMelodicRunSeconds = response.singing_head_extra_longest_melodic_run_seconds,
+            TailExtraLongestMelodicRunSeconds = response.singing_tail_extra_longest_melodic_run_seconds,
+            HeadExtraSegments = CloneBoundarySegments(response.singing_head_extra_segments),
+            TailExtraSegments = CloneBoundarySegments(response.singing_tail_extra_segments),
+        };
+        float[] timeline = SliceFloatArray(evidence.PitchTimelineMidi,
+            Mathf.FloorToInt(Mathf.Max(0f, start - origin) / frame),
+            Mathf.CeilToInt(Mathf.Max(0f, end - origin) / frame));
+        float[] recoveryTimeline = SliceFloatArray(evidence.PitchTimelineMidi,
+            Mathf.FloorToInt(Mathf.Max(0f, recoveryStart - origin) / frame),
+            Mathf.CeilToInt(Mathf.Max(0f, recoveryEnd - origin) / frame));
+        byte[] clean = TrimWavWindow(raw, start, end, out _, out _);
+        byte[] expanded = TrimWavWindow(raw, recoveryStart, recoveryEnd, out _, out _);
+        bool ready = response.singing_analysis_available && start >= origin - .05f &&
+            end - start >= k_MinSingablePerformanceSeconds &&
+            HasPlayablePitchTimeline(timeline) && HasUsableWavPayload(clean);
+        QuarantineSingingEvidence(evidence, ready ? clean : null, timeline, frame,
+            evidence.Language, ready, false, expanded, recoveryTimeline, "",
+            out int candidateId, out float seconds);
+        Debug.Log($"[ASR/Archive] 已录完音频迟到归档 session={session} candidate={candidateId} " +
+            $"raw={duration:F2}s clean={end - start:F2}s；来源/是否歌唱待角色判断，不覆盖新轮感知，不启动旧回复");
+    }
+
+    /// <summary>按真实录音顺序返回本练唱会话的全部来源待确认候选。</summary>
+    public List<QuarantinedSingingCandidateInfo> DescribeQuarantinedSingingCandidates()
+    {
+        var list = new List<QuarantinedSingingCandidateInfo>(
+            m_QuarantinedSingingCandidates.Count);
+        for (int i = 0; i < m_QuarantinedSingingCandidates.Count; i++)
+        {
+            QuarantinedSingingCandidate item = m_QuarantinedSingingCandidates[i];
+            if (item == null || item.Phrase == null) continue;
+            list.Add(new QuarantinedSingingCandidateInfo
+            {
+                ClipRef = item.Phrase.ClipRef,
+                RecordingSequence = EnsureRecordingSequence(item.Phrase),
+                CurrentCapture = item.PlaybackStatus == "ready" ? item.Phrase.ActiveCapture : "unselected",
+                CurrentStartSeconds = (item.Phrase.ActiveCapture == "expanded"
+                    ? item.Evidence?.RecoveryStartSeconds ?? 0f : item.Evidence?.CleanStartSeconds ?? 0f) + item.Phrase.ActiveTrimHeadSeconds,
+                CurrentEndSeconds = (item.Phrase.ActiveCapture == "expanded"
+                    ? item.Evidence?.RecoveryEndSeconds ?? 0f : item.Evidence?.CleanEndSeconds ?? 0f) - item.Phrase.ActiveTrimTailSeconds,
+                RawSeconds = item.Evidence?.RawSeconds ?? 0f,
+                CleanStartSeconds = item.Evidence?.CleanStartSeconds ?? 0f,
+                CleanEndSeconds = item.Evidence?.CleanEndSeconds ?? 0f,
+                ExpandedStartSeconds = item.Evidence?.RecoveryStartSeconds ?? 0f,
+                ExpandedEndSeconds = item.Evidence?.RecoveryEndSeconds ?? 0f,
+                CandidateId = item.CandidateId,
+                HasRecoveryEvidence = item.Evidence != null,
+                CleanSeconds = item.Evidence == null ? 0f : item.Evidence.CleanEndSeconds - item.Evidence.CleanStartSeconds,
+                ExpandedSeconds = item.Evidence == null ? 0f : item.Evidence.RecoveryEndSeconds - item.Evidence.RecoveryStartSeconds,
+                Lyrics = item.Phrase.Lyrics ?? "",
+                PrecedingSpeech = item.Phrase.PrecedingSpeech ?? "",
+                WholeTurnText = item.WholeTurnText ?? "",
+                SingingSegmentText = item.SingingSegmentText ?? "",
+                Seconds = item.Phrase.Seconds,
+                AgoSeconds = Mathf.Max(
+                    0f, Time.realtimeSinceStartup - item.Phrase.AtRealtime),
+                SourceStatus = item.SourceConfirmed ? "confirmed_user" : "pending",
+                PlaybackStatus = string.IsNullOrWhiteSpace(item.PlaybackStatus)
+                    ? "unavailable" : item.PlaybackStatus,
+                SingingProbability = item.SingingProbability,
+                PitchStability = item.PitchStability,
+                MelodicIslandSeconds = item.MelodicIslandSeconds,
+                ContentSeconds = item.ContentSeconds,
+                HeadExtraSeconds = item.Phrase.HeadExtraSeconds,
+                TailExtraSeconds = item.Phrase.TailExtraSeconds,
+                HeadExtraText = item.Phrase.HeadExtraText ?? "",
+                TailExtraText = item.Phrase.TailExtraText ?? "",
+                HeadExtraType = item.Phrase.HeadExtraType ?? "none",
+                TailExtraType = item.Phrase.TailExtraType ?? "none",
+                HeadExtraReviewRequired = item.Phrase.HeadExtraReviewRequired,
+                TailExtraReviewRequired = item.Phrase.TailExtraReviewRequired,
+                HeadExtraMelodicSeconds = item.Phrase.HeadExtraMelodicSeconds,
+                TailExtraMelodicSeconds = item.Phrase.TailExtraMelodicSeconds,
+                HeadExtraMelodicRatio = item.Phrase.HeadExtraMelodicRatio,
+                TailExtraMelodicRatio = item.Phrase.TailExtraMelodicRatio,
+                HeadExtraLongestMelodicRunSeconds =
+                    item.Phrase.HeadExtraLongestMelodicRunSeconds,
+                TailExtraLongestMelodicRunSeconds =
+                    item.Phrase.TailExtraLongestMelodicRunSeconds,
+                HeadExtraSegments = CloneBoundarySegments(item.Phrase.HeadExtraSegments),
+                TailExtraSegments = CloneBoundarySegments(item.Phrase.TailExtraSegments),
+                CleanLeadInUnverifiedSeconds =
+                    item.Phrase.CleanLeadInUnverifiedSeconds,
+                CleanLeadInEvidenceText =
+                    item.Phrase.CleanLeadInEvidenceText ?? "",
+                CleanLeadInEvidenceType =
+                    item.Phrase.CleanLeadInEvidenceType ?? "none",
+                CleanLeadInEvidenceProbability =
+                    item.Phrase.CleanLeadInEvidenceProbability,
+            });
+        }
+        list.Sort((a, b) =>
+        {
+            int time = b.AgoSeconds.CompareTo(a.AgoSeconds);
+            return time != 0 ? time : a.CandidateId.CompareTo(b.CandidateId);
+        });
+        list.Sort((a, b) => a.RecordingSequence.CompareTo(b.RecordingSequence));
+        for (int i = 0; i < list.Count; i++) list[i].CaptureOrder = list[i].RecordingSequence;
+        return list;
+    }
+
+    /// <summary>兼容旧调用：返回最近录到的一个候选；完整列表请用 Describe。</summary>
+    public bool TryGetQuarantinedSingingCandidateFacts(
+        out int candidateId,
+        out string lyrics,
+        out string precedingSpeech,
+        out float seconds)
+    {
+        candidateId = 0;
+        lyrics = "";
+        precedingSpeech = "";
+        seconds = 0f;
+        QuarantinedSingingCandidate latest = null;
+        for (int i = 0; i < m_QuarantinedSingingCandidates.Count; i++)
+        {
+            QuarantinedSingingCandidate item = m_QuarantinedSingingCandidates[i];
+            if (item == null || item.Phrase == null) continue;
+            if (latest == null || item.Phrase.AtRealtime > latest.Phrase.AtRealtime)
+                latest = item;
+        }
+        if (latest == null) return false;
+        candidateId = latest.CandidateId;
+        lyrics = latest.Phrase.Lyrics ?? "";
+        precedingSpeech = latest.Phrase.PrecedingSpeech ?? "";
+        seconds = latest.Phrase.Seconds;
+        return true;
+    }
+
+    /// <summary>按固定 clip 身份解析当前存储位置；不选择范围，不推断来源。</summary>
+    public bool TryResolveSingingClip(string clipRef, out int stableId, out int candidateId)
+    {
+        stableId = 0;
+        candidateId = 0;
+        if (string.IsNullOrWhiteSpace(clipRef)) return false;
+        clipRef = clipRef.Trim();
+        var phrase = m_PracticePhrases.Find(p => p.ClipRef == clipRef);
+        if (phrase != null) { stableId = phrase.StableId; return true; }
+        var candidate = m_QuarantinedSingingCandidates.Find(c => c.Phrase.ClipRef == clipRef);
+        if (candidate == null) return false;
+        candidateId = candidate.CandidateId;
+        return true;
+    }
+
+    // Called only after action authorization. Source assertions come from the
+    // model, not keywords in user text. A failed request never substitutes audio.
+    public bool TryPrepareSingingClip(string clipRef, bool confirmUser, string range,
+        out int stableId, out string failure)
+    {
+        failure = "";
+        if (!TryResolveSingingClip(clipRef, out stableId, out int candidateId))
+        { failure = $"{clipRef} 不存在或已移除；未选择其它素材。"; return false; }
+        range = string.IsNullOrWhiteSpace(range) ? "current" : range.Trim().ToLowerInvariant();
+        if (range != "current" && range != "clean" && range != "expanded")
+        { failure = "range 只能为 current、clean、expanded。"; return false; }
+        if (candidateId > 0)
+        {
+            var candidate = m_QuarantinedSingingCandidates.Find(c => c.CandidateId == candidateId);
+            if (candidate.PlaybackStatus != "ready" && range == "current")
+            { failure = $"{clipRef} 原始录音仍在，但当前没有可播放版本。请根据边界证据选择 range=\"clean\" 或 \"expanded\"，也可询问；来源确认不是播放成功。"; return false; }
+            if (range != "current" && !PrepareQuarantinedCaptureForConfirmation(
+                    candidateId, range, 0f, 0f, out failure)) return false;
+            if (!AdmitSelectedSingingCandidate(candidateId, confirmUser, out _, out _) ||
+                !TryResolveSingingClip(clipRef, out stableId, out _) || stableId <= 0)
+            { failure = $"{clipRef} 所选音频仍不可播放；未选择其它素材。"; return false; }
+        }
+        else if (range != "current")
+        {
+            if (!TryRevisePracticePhrase(stableId, range, 0f, 0f, false, out _, out failure, 1f))
+                return false;
+        }
+        if (confirmUser) ConfirmSingingClipSource(clipRef, out _);
+        return true;
+    }
+
+    public bool TrySelectSingingClipWindow(string clipRef, bool confirmUser,
+        float startSeconds, float endSeconds, bool excludeSpeech, out int stableId, out string failure)
+    {
+        failure = "";
+        if (!TryResolveSingingClip(clipRef, out stableId, out int candidateId))
+        { failure = "指定 clip 不存在。"; return false; }
+        var record = m_QuarantinedSingingCandidates.Find(c => c.CandidateId == candidateId);
+        int selectedStableId = stableId;
+        var phrase = record != null ? record.Phrase : m_PracticePhrases.Find(p => p.StableId == selectedStableId);
+        var evidence = phrase?.LatestRecordingEvidence ?? phrase?.RecordingEvidence;
+        if (evidence == null || float.IsNaN(startSeconds) || float.IsNaN(endSeconds) ||
+            float.IsInfinity(startSeconds) || float.IsInfinity(endSeconds) ||
+            startSeconds < evidence.RecoveryStartSeconds || endSeconds > evidence.RecoveryEndSeconds ||
+            endSeconds - startSeconds < 1f)
+        { failure = "原录音坐标范围无效、少于1秒或超出可恢复音频范围；原始录音与当前版本未改动。"; return false; }
+        float head = startSeconds - evidence.RecoveryStartSeconds;
+        float tail = evidence.RecoveryEndSeconds - endSeconds;
+        if (record != null)
+        {
+            if (!PrepareQuarantinedCaptureForConfirmation(candidateId, "expanded", head, tail, out failure)) return false;
+            if (!AdmitSelectedSingingCandidate(candidateId, confirmUser, out _, out _) ||
+                !TryResolveSingingClip(clipRef, out stableId, out _) || stableId <= 0)
+            { failure = "范围准备后仍不可播放。"; return false; }
+            // The regular execution validator still checks speech-boundary conflicts.
+            return true;
+        }
+        bool revised = TryRevisePracticePhrase(stableId, "expanded", head, tail, excludeSpeech,
+            out _, out failure, 1f);
+        if (revised && confirmUser) ConfirmSingingClipSource(clipRef, out _);
+        return revised;
+    }
+
+    public bool PrepareQuarantinedCaptureForConfirmation(int candidateId, string capture,
+        float trimHead, float trimTail, out string error)
+    {
+        int index = FindQuarantinedCandidateIndex(candidateId);
+        if (index < 0) { error = "候选不存在；没有改用同号 stable 或旧缓存。"; return false; }
+        var record = m_QuarantinedSingingCandidates[index];
+        var evidence = record.Phrase.LatestRecordingEvidence ?? record.Evidence;
+        if (!TryPrepareEvidenceRange(record.Phrase, evidence, capture, trimHead, trimTail,
+                out var prepared, out error)) return false;
+        record.Phrase = prepared;
+        record.Evidence = prepared.RecordingEvidence;
+        record.PlaybackStatus = "ready";
+        // Preparing or playing audio is not a provenance decision.
+        Debug.Log($"[SenseVoice/Recovery] candidate={candidateId} selected={capture} " +
+            $"audio={prepared.Seconds:F2}s；角色选定范围，尚未播放，来源状态未改变");
+        return true;
+    }
+
+    public bool ConfirmQuarantinedSingingCandidate(
+        int candidateId, out int phraseIndex)
+    {
+        return ConfirmQuarantinedSingingCandidateWithPlaybackStatus(
+            candidateId, out phraseIndex, out string _);
+    }
+
+    /// <summary>
+    /// 来源确认和播放资格是两条状态轴。确认不足 3 秒或边界仍不可靠的原始证据时，
+    /// 保留 candidate 并标为 confirmed_user；绝不为了“确认成功”把它硬塞进可播放清单。
+    /// </summary>
+    public bool ConfirmQuarantinedSingingCandidateWithPlaybackStatus(
+        int candidateId, out int phraseIndex, out string playbackStatus)
+    {
+        return AdmitSelectedSingingCandidate(candidateId, true, out phraseIndex, out playbackStatus);
+    }
+
+    // Explicit audio selection and source attribution are independent decisions.
+    public bool ConfirmSingingClipSource(string clipRef, out string playbackStatus)
+    {
+        playbackStatus = "unavailable";
+        if (!TryResolveSingingClip(clipRef, out int stableId, out int candidateId)) return false;
+        if (candidateId > 0)
+            return AdmitSelectedSingingCandidate(candidateId, true, out _, out playbackStatus);
+        var phrase = m_PracticePhrases.Find(p => p.StableId == stableId);
+        if (phrase == null) return false;
+        if (phrase.PendingConfirmation) phrase.ConfirmedAtRealtime = Time.realtimeSinceStartup;
+        phrase.PendingConfirmation = false;
+        playbackStatus = "ready";
+        return true;
+    }
+
+    private bool AdmitSelectedSingingCandidate(int candidateId, bool confirmSource,
+        out int phraseIndex, out string playbackStatus)
+    {
+        phraseIndex = 0;
+        playbackStatus = "unavailable";
+        //ready 候选确认后会离开 quarantine、进入 practice。再次确认同一来源是无害
+        //重试，不应被当作失败并连带阻止同轮 hum_back；稳定映射仍是唯一真相。
+        if (TryResolveAdmittedSingingCandidate(
+                candidateId, out int stableId, out phraseIndex))
+        {
+            var existing = m_PracticePhrases.Find(p => p.StableId == stableId);
+            if (confirmSource && existing.PendingConfirmation)
+            {
+                existing.PendingConfirmation = false;
+                existing.ConfirmedAtRealtime = Time.realtimeSinceStartup;
+            }
+            playbackStatus = "ready";
+            Debug.Log($"[SenseVoice/Quarantine] candidate={candidateId} 已有可播放映射；" +
+                      $"幂等返回 stable_id={stableId} practice={phraseIndex}");
+            return true;
+        }
+        int candidateIndex = FindQuarantinedCandidateIndex(candidateId);
+        if (candidateIndex < 0) return false;
+
+        QuarantinedSingingCandidate record = m_QuarantinedSingingCandidates[candidateIndex];
+        PracticePhrase candidate = record.Phrase;
+        if (confirmSource && !record.SourceConfirmed)
+        {
+            record.SourceConfirmed = true;
+            candidate.ConfirmedAtRealtime = Time.realtimeSinceStartup;
+        }
+        candidate.PendingConfirmation = !record.SourceConfirmed;
+        candidate.OriginCandidateId = record.CandidateId;
+        playbackStatus = string.IsNullOrWhiteSpace(record.PlaybackStatus)
+            ? "unavailable" : record.PlaybackStatus;
+        if (playbackStatus != "ready" || candidate.WavBytes == null ||
+            candidate.WavBytes.Length <= 44 ||
+            !HasPlayablePitchTimeline(candidate.MidiTimeline))
+        {
+            Debug.Log($"[SenseVoice/Quarantine] candidate={candidateId} " +
+                      $"source={(record.SourceConfirmed ? "confirmed_user" : "pending")} playback={playbackStatus}，" +
+                      "原始证据继续保留，未写入可播放练唱清单");
+            return true;
+        }
+
+        // Confirmation is not a new performance. Preserve the original recording time.
+        phraseIndex = StorePracticeCapture(candidate);
+        m_LastCommittedPracticeSignature = candidate.Signature;
+        m_LastPracticeCommitTime = Time.realtimeSinceStartup;
+        m_QuarantinedSingingCandidates.RemoveAt(candidateIndex);
+        Debug.Log($"[SenseVoice/Quarantine] LLM 选用 candidate={candidateId}，source={(record.SourceConfirmed ? "confirmed_user" : "pending")}；" +
+                  $"已提交 practice={phraseIndex}，剩余候选=" +
+                  m_QuarantinedSingingCandidates.Count);
+        return true;
+    }
+
+    public bool DiscardQuarantinedSingingCandidate(int candidateId)
+    {
+        int candidateIndex = FindQuarantinedCandidateIndex(candidateId);
+        if (candidateIndex < 0) return false;
+        PracticePhrase rejected = m_QuarantinedSingingCandidates[candidateIndex].Phrase;
+        if (rejected != null)
+        {
+            m_RejectedQuarantineSignatures.Add(rejected.Signature);
+            if (rejected.CaptureSessionSerial > 0)
+                m_RejectedQuarantineSessionSerials.Add(
+                    rejected.CaptureSessionSerial);
+            //兼容升级前或异常中断留下的状态：若通用 recent_turn 仍恰好指向
+            //被否认的同一录音，否认动作必须同时撤销该别名，不能只删列表项。
+            bool sameCurrentSession = rejected.CaptureSessionSerial > 0 &&
+                m_LastSingingCacheCaptureSessionSerial ==
+                    rejected.CaptureSessionSerial;
+            byte[] currentIdentityWav = m_LastSingingCacheEvidence != null &&
+                m_LastSingingCacheEvidence.RawWavBytes != null
+                    ? m_LastSingingCacheEvidence.RawWavBytes
+                    : m_LastSingingAudioBytes;
+            bool sameCurrentSignature = ComputePracticeSignature(
+                currentIdentityWav, null) == rejected.Signature;
+            if (HasCurrentSingingPerformanceCandidate() &&
+                (sameCurrentSession || sameCurrentSignature))
+                RevokeCurrentSingingPlaybackAlias(
+                    $"candidate={candidateId} 已被用户否认来源");
+        }
+        m_QuarantinedSingingCandidates.RemoveAt(candidateIndex);
+        Debug.Log($"[SenseVoice/Quarantine] 用户语义否认 candidate={candidateId} 为自己的歌声；" +
+                  $"已丢弃，剩余候选={m_QuarantinedSingingCandidates.Count}");
+        return true;
+    }
+
+    private int FindQuarantinedCandidateIndex(int candidateId)
+    {
+        if (candidateId <= 0) return -1;
+        for (int i = 0; i < m_QuarantinedSingingCandidates.Count; i++)
+            if (m_QuarantinedSingingCandidates[i].CandidateId == candidateId) return i;
+        return -1;
+    }
+
+    private void RemoveQuarantinedCandidateCapturedAt(float capturedAt)
+    {
+        for (int i = m_QuarantinedSingingCandidates.Count - 1; i >= 0; i--)
+        {
+            PracticePhrase phrase = m_QuarantinedSingingCandidates[i].Phrase;
+            if (phrase != null && phrase.AtRealtime == capturedAt)
+                m_QuarantinedSingingCandidates.RemoveAt(i);
+        }
     }
 
     /// <summary>练唱会话里还标着"待确认"的段号(1 起)。</summary>
@@ -2656,8 +5380,8 @@ public class SenseVoiceSpeechToText : STT
     /// 清掉这几段的"待确认"标。段号 1 起；传空表示清掉全部待确认。
     /// </summary>
     /// <remarks>
-    /// 确认的形式不是用户嘴上答"是"，而是**这一段真的被唱出去、用户没有异议**：
-    /// 那一刻他听到的是实际音频，比任何文字确认都硬。所以调用点在回哼/连唱播完之处。
+    /// 有两条可靠入口：辅助 LLM 结合提问语境判定用户明确口头确认；或者这一段真的
+    /// 被唱出去、用户听完没有异议。这里仅更新素材事实，不决定角色是否应当演唱。
     /// </remarks>
     public int ConfirmPracticePhrases(List<int> indices1Based)
     {
@@ -2715,6 +5439,236 @@ public class SenseVoiceSpeechToText : STT
     }
 
     /// <summary>
+    /// 稳定身份版删除。跨轮修正不得依赖会前移的清单段号；界面仍可显示 order，
+    /// 但真正的破坏性操作优先使用 stable_id。
+    /// </summary>
+    public bool DropPracticePhraseByStableId(
+        int stableId, out string dropped, out int remaining, out string failure)
+    {
+        int index = FindPracticeIndexByStableId(stableId);
+        if (index < 0)
+        {
+            dropped = "";
+            remaining = m_PracticePhrases.Count;
+            failure = $"没有 stable_id={stableId} 的练唱素材；清单可能已经变化";
+            return false;
+        }
+        return DropPracticePhrase(index + 1, out dropped, out remaining, out failure);
+    }
+
+    public bool HasQuarantinedSingingCandidate(int candidateId)
+    {
+        return FindQuarantinedCandidateIndex(candidateId) >= 0;
+    }
+
+    /// <summary>
+    /// 可确认身份包括当前隔离候选，以及已经确认并消费进 practice 的历史候选。
+    /// 后者用于把 LLM 的重复确认变成幂等 no-op；从未存在的编号仍必须失败。
+    /// </summary>
+    public bool HasKnownSingingCandidate(int candidateId)
+    {
+        return FindQuarantinedCandidateIndex(candidateId) >= 0 ||
+            TryResolveAdmittedSingingCandidate(candidateId, out _, out _);
+    }
+
+    public bool TryResolveConfirmedSingingCandidate(
+        int candidateId, out int stableId, out int phraseIndex)
+    {
+        if (TryResolveAdmittedSingingCandidate(candidateId, out stableId, out phraseIndex) &&
+            !m_PracticePhrases[phraseIndex - 1].PendingConfirmation) return true;
+        stableId = 0;
+        phraseIndex = 0;
+        return false;
+    }
+
+    private bool TryResolveAdmittedSingingCandidate(
+        int candidateId, out int stableId, out int phraseIndex)
+    {
+        stableId = 0;
+        phraseIndex = 0;
+        if (candidateId <= 0) return false;
+        for (int i = 0; i < m_PracticePhrases.Count; i++)
+        {
+            PracticePhrase phrase = m_PracticePhrases[i];
+            if (phrase == null || phrase.OriginCandidateId != candidateId) continue;
+            stableId = phrase.StableId;
+            phraseIndex = i + 1;
+            return stableId > 0;
+        }
+        return false;
+    }
+
+    /// <summary>Resolve a ready practice identity without confusing it with candidate_id.</summary>
+    public bool TryResolvePracticeStableId(int stableId, out int phraseIndex)
+    {
+        int index = FindPracticeIndexByStableId(stableId);
+        phraseIndex = index >= 0 ? index + 1 : 0;
+        return index >= 0;
+    }
+
+    private int FindPracticeIndexByStableId(int stableId)
+    {
+        if (stableId <= 0) return -1;
+        for (int i = 0; i < m_PracticePhrases.Count; i++)
+            if (m_PracticePhrases[i].StableId == stableId) return i;
+        return -1;
+    }
+
+    /// <summary>
+    /// 从不可变的 clean/expanded 源创建新的当前可播放版本。只有解码、裁剪和旋律
+    /// 时间线全部成功后才原子替换；原录音继续保留，可再次修边或恢复。
+    /// </summary>
+    public bool TryRevisePracticePhrase(
+        int stableId,
+        string capture,
+        float trimHeadSeconds,
+        float trimTailSeconds,
+        bool excludeSpeech,
+        out string result,
+        out string failure,
+        float minimumSeconds = k_MinSingablePerformanceSeconds)
+    {
+        result = "";
+        failure = "";
+        int index = FindPracticeIndexByStableId(stableId);
+        if (index < 0)
+        {
+            failure = $"没有 stable_id={stableId} 的练唱素材；没有修改任何内容";
+            return false;
+        }
+        PracticePhrase phrase = m_PracticePhrases[index];
+        InitializePracticeSource(phrase);
+        if (phrase.LatestRecordingEvidence != null &&
+            !ReferenceEquals(phrase.LatestRecordingEvidence, phrase.RecordingEvidence))
+        {
+            if (!TryPrepareEvidenceRange(phrase, phrase.LatestRecordingEvidence, capture,
+                    trimHeadSeconds, trimTailSeconds, out var prepared, out failure)) return false;
+            if (prepared.Seconds < minimumSeconds)
+            { failure = $"所选范围不足 {minimumSeconds:F1} 秒；当前版本保持不变。"; return false; }
+            if (!ValidatePreparedEvidenceRange(index, prepared, excludeSpeech, out failure)) return false;
+            m_PracticePhrases[index] = prepared;
+            result = $"stable_id={stableId} 已按完整录音证据准备 {prepared.ActiveCapture}，" +
+                $"audio={prepared.Seconds:F2}s revision={prepared.Revision}；尚未播放，来源状态未改变。";
+            return true;
+        }
+        capture = string.IsNullOrWhiteSpace(capture)
+            ? "clean" : capture.Trim().ToLowerInvariant();
+        if (capture != "clean" && capture != "expanded")
+        {
+            failure = $"capture=\"{capture}\" 不存在；只能选择 clean 或 expanded";
+            return false;
+        }
+        if (trimHeadSeconds < 0f || trimTailSeconds < 0f ||
+            float.IsNaN(trimHeadSeconds) || float.IsNaN(trimTailSeconds) ||
+            float.IsInfinity(trimHeadSeconds) || float.IsInfinity(trimTailSeconds))
+        {
+            failure = "trim_head_seconds / trim_tail_seconds 必须是非负有限秒数";
+            return false;
+        }
+        if (!TryValidatePracticeBoundarySelection(
+                "stable:" + stableId,
+                capture == "expanded",
+                trimHeadSeconds,
+                trimTailSeconds,
+                excludeSpeech,
+                out string boundaryConflict))
+        {
+            failure = boundaryConflict;
+            return false;
+        }
+
+        byte[] sourceWav = capture == "expanded"
+            ? phrase.SourceExpandedWavBytes : phrase.SourceCleanWavBytes;
+        float[] sourceTimeline = capture == "expanded"
+            ? phrase.SourceExpandedMidiTimeline : phrase.SourceCleanMidiTimeline;
+        if (sourceWav == null || sourceWav.Length <= 44 ||
+            !HasPlayablePitchTimeline(sourceTimeline))
+        {
+            failure = $"stable_id={stableId} 没有可用的 {capture} 原始音频与旋律；" +
+                      "没有修改当前版本";
+            return false;
+        }
+        if (!TryDecodePcmWav(sourceWav, out float[] samples, out int sampleRate))
+        {
+            failure = $"stable_id={stableId} 的 {capture} 原始音频不是可编辑的 PCM WAV";
+            return false;
+        }
+
+        float duration = samples.Length / (float)Mathf.Max(1, sampleRate);
+        float start = Mathf.Clamp(trimHeadSeconds, 0f, duration);
+        float end = Mathf.Clamp(duration - trimTailSeconds, start, duration);
+        if (end - start < minimumSeconds)
+        {
+            failure = $"指定裁剪后只剩 {end - start:F2}s，短于可播放下限 " +
+                      $"{minimumSeconds:F1}s；当前版本保持不变";
+            return false;
+        }
+        int sampleStart = Mathf.Clamp(
+            Mathf.RoundToInt(start * sampleRate), 0, samples.Length);
+        int sampleEnd = Mathf.Clamp(
+            Mathf.RoundToInt(end * sampleRate), sampleStart, samples.Length);
+        var croppedSamples = new float[sampleEnd - sampleStart];
+        Array.Copy(samples, sampleStart, croppedSamples, 0, croppedSamples.Length);
+
+        float frameSeconds = Mathf.Clamp(phrase.FrameSeconds, 0.02f, 0.25f);
+        int frameStart = Mathf.Clamp(
+            Mathf.FloorToInt(start / frameSeconds), 0, sourceTimeline.Length);
+        int frameEnd = Mathf.Clamp(
+            Mathf.CeilToInt(end / frameSeconds), frameStart, sourceTimeline.Length);
+        float[] croppedTimeline = SliceFloatArray(sourceTimeline, frameStart, frameEnd);
+        if (!HasPlayablePitchTimeline(croppedTimeline))
+        {
+            failure = "指定裁剪范围内没有可执行的旋律时间线；当前版本保持不变";
+            return false;
+        }
+        byte[] revisedWav = EncodeMonoPcm16Wav(croppedSamples, sampleRate);
+        if (revisedWav == null || revisedWav.Length <= 44)
+        {
+            failure = "修订版本编码失败；当前版本保持不变";
+            return false;
+        }
+
+        // Selecting the same audio/window is idempotent, including clean and
+        // expanded aliases. Keep revision and downstream measured pitch intact.
+        var original = phrase.RecordingEvidence;
+        float oldOrigin = original == null ? 0f : phrase.ActiveCapture == "expanded"
+            ? original.RecoveryStartSeconds : original.CleanStartSeconds;
+        float newOrigin = original == null ? 0f : capture == "expanded"
+            ? original.RecoveryStartSeconds : original.CleanStartSeconds;
+        bool sameCoordinates = (original != null || capture == phrase.ActiveCapture) &&
+            Mathf.Abs(oldOrigin + phrase.ActiveTrimHeadSeconds - (newOrigin + start)) < .00001f;
+        bool sameAudio = phrase.WavBytes != null && phrase.WavBytes.SequenceEqual(revisedWav);
+        // The original may have a different WAV header or not yet have passed
+        // through PCM16 re-encoding. Compare decoded samples before quantization
+        // too, without treating approximately similar recordings as identical.
+        if (sameCoordinates && !sameAudio && phrase.WavBytes != null &&
+            TryDecodePcmWav(phrase.WavBytes, out float[] currentSamples, out int currentRate))
+            sameAudio = currentRate == sampleRate && currentSamples.SequenceEqual(croppedSamples);
+        if (sameCoordinates && sameAudio && phrase.MidiTimeline != null &&
+            phrase.MidiTimeline.SequenceEqual(croppedTimeline))
+        {
+            result = $"stable_id={stableId} 所选范围与当前版本相同；revision={phrase.Revision} 保持，未重新修订或播放。";
+            return true;
+        }
+        //直到这里都只操作局部副本；以下赋值是唯一提交点。
+        phrase.WavBytes = revisedWav;
+        phrase.MidiTimeline = croppedTimeline;
+        phrase.Seconds = GetWavDurationSeconds(revisedWav);
+        phrase.ActiveCapture = capture;
+        phrase.ActiveTrimHeadSeconds = start;
+        phrase.ActiveTrimTailSeconds = Mathf.Max(0f, duration - end);
+        phrase.Revision++;
+        result = $"stable_id={stableId}（当前清单第 {index + 1} 段）已生成修订版本 v{phrase.Revision}：" +
+                 $"source={capture}, trim_head={phrase.ActiveTrimHeadSeconds:F2}s, " +
+                 $"trim_tail={phrase.ActiveTrimTailSeconds:F2}s, playable={phrase.Seconds:F2}s。" +
+                 "原始 clean/expanded 仍保留，可继续重切；这次没有删除素材。" +
+                 $"要试听这个修订版本，请使用 source=practice、order=\"stable:{stableId}\"；" +
+                 "source=recent_turn 仍指向录音当时的临时原始素材。";
+        Debug.Log("[SenseVoice/Practice] " + result);
+        return true;
+    }
+
+    /// <summary>
     /// Creates a private performance variant of the latest phrase. The melody is not
     /// rewritten: only sub-percent pacing and a slow dynamics contour change between takes.
     /// </summary>
@@ -2758,12 +5712,142 @@ public class SenseVoiceSpeechToText : STT
     /// 四次回哼全是同一个结果。顺序必须是可指定的——用户是按内容指段的
     /// (「先唱沉默着走了那段」)，由她照着感知帧里的段号翻译成这个参数。
     /// </param>
+    public bool TryValidatePracticeBoundarySelection(
+        string order,
+        bool useExpandedCapture,
+        float trimHeadSeconds,
+        float trimTailSeconds,
+        bool excludeSpeech,
+        out string conflict)
+    {
+        conflict = "";
+        List<int> sequence = ParsePracticeOrder(order, out string orderFailure);
+        if (sequence == null && string.IsNullOrWhiteSpace(order))
+        {
+            sequence = new List<int>(m_PracticePhrases.Count);
+            for (int i = 0; i < m_PracticePhrases.Count; i++) sequence.Add(i);
+        }
+        if (sequence == null || sequence.Count == 0)
+        {
+            conflict = string.IsNullOrWhiteSpace(orderFailure)
+                ? "没有解析出要检查边界的练唱段落" : orderFailure;
+            return false;
+        }
+
+        //clean 与 expanded 各自从 0 秒开始。head_extra / tail_extra 是 expanded
+        //相对 clean 多出来的外缘，已经不在 clean 内。若请求在 clean 上又恰好裁掉
+        //同样的时长，通常是把两套坐标混用；不擅自改写意图，只把冲突证据退给 LLM。
+        if (!useExpandedCapture &&
+            (trimHeadSeconds > 0.001f || trimTailSeconds > 0.001f))
+        {
+            var duplicatedMargins = new List<string>();
+            foreach (int index in sequence)
+            {
+                PracticePhrase phrase = m_PracticePhrases[index];
+                var parts = new List<string>();
+                if (LooksLikeExpandedMarginUsedAsCleanTrim(
+                        trimHeadSeconds, phrase.HeadExtraSeconds))
+                    parts.Add($"trim_head={trimHeadSeconds:F2}s 恰好等于 " +
+                              $"head_extra={phrase.HeadExtraSeconds:F2}s" +
+                              FormatBoundaryEvidence(
+                                  phrase.HeadExtraType, phrase.HeadExtraText));
+                if (LooksLikeExpandedMarginUsedAsCleanTrim(
+                        trimTailSeconds, phrase.TailExtraSeconds))
+                    parts.Add($"trim_tail={trimTailSeconds:F2}s 恰好等于 " +
+                              $"tail_extra={phrase.TailExtraSeconds:F2}s" +
+                              FormatBoundaryEvidence(
+                                  phrase.TailExtraType, phrase.TailExtraText));
+                if (parts.Count > 0)
+                    duplicatedMargins.Add(
+                        $"第 {index + 1} 段(stable_id={phrase.StableId}) " +
+                        string.Join("；", parts));
+            }
+            if (duplicatedMargins.Count > 0)
+            {
+                conflict = "疑似混用了 clean/expanded 的独立时间坐标：" +
+                           string.Join("；", duplicatedMargins) +
+                           "。head_extra/tail_extra 位于原始 clean 之外，原始 clean 已经排除它们；" +
+                           "trim_* 始终从所选 capture 自己的 0 秒边界向内裁剪。" +
+                           "程序没有修改或播放素材；若想把外缘纳入后再裁，请选 expanded；" +
+                           "若确实想继续裁 clean 内部，请根据 clean 本地坐标重新决定，也可以先询问用户。";
+                return false;
+            }
+        }
+
+        if (!excludeSpeech) return true;
+        if ((trimHeadSeconds > 0.001f || trimTailSeconds > 0.001f) &&
+            sequence.Count != 1)
+        {
+            conflict = "exclude_speech=true 且指定秒数裁剪时，目前必须只选择一个 order；" +
+                       "多段各自边界不同，程序不会把同一秒数机械套用。";
+            return false;
+        }
+
+        var collisions = new List<string>();
+        foreach (int index in sequence)
+        {
+            PracticePhrase phrase = m_PracticePhrases[index];
+            //聚合 probe 写着 speech、但连续旋律窗触发 review 时，标签已经不是“明确口语”。
+            //LLM 选择 expanded 正是在裁决这份冲突；程序不得再拿旧聚合标签否决它。
+            //没有冲突的 speech 边界仍保留原校验，防止口语被无意回唱。
+            bool selectedExpanded = useExpandedCapture || phrase.ActiveCapture == "expanded";
+            float selectedHeadTrim = trimHeadSeconds + (useExpandedCapture ? 0f : phrase.ActiveTrimHeadSeconds);
+            float selectedTailTrim = trimTailSeconds + (useExpandedCapture ? 0f : phrase.ActiveTrimTailSeconds);
+            bool headSpeech = selectedExpanded && string.Equals(
+                phrase.HeadExtraType, "speech", StringComparison.OrdinalIgnoreCase) &&
+                !phrase.HeadExtraReviewRequired &&
+                phrase.HeadExtraSeconds - selectedHeadTrim > 0.10f;
+            bool tailSpeech = selectedExpanded && string.Equals(
+                phrase.TailExtraType, "speech", StringComparison.OrdinalIgnoreCase) &&
+                !phrase.TailExtraReviewRequired &&
+                phrase.TailExtraSeconds - selectedTailTrim > 0.10f;
+            if (!headSpeech && !tailSpeech) continue;
+            var parts = new List<string>();
+            if (headSpeech)
+                parts.Add($"head_extra={phrase.HeadExtraSeconds:F2}s speech " +
+                          $"转写=\"{(phrase.HeadExtraText ?? "").Trim()}\"");
+            if (tailSpeech)
+                parts.Add($"tail_extra={phrase.TailExtraSeconds:F2}s speech " +
+                          $"转写=\"{(phrase.TailExtraText ?? "").Trim()}\"");
+            collisions.Add($"第 {index + 1} 段 " + string.Join("；", parts));
+        }
+        if (collisions.Count == 0) return true;
+        conflict = "本次 LLM 语义目标是排除口语(exclude_speech=true)，但选择的 " +
+                   (useExpandedCapture ? "expanded" : "clean") +
+                   " 范围仍与明确的口语证据重叠：" + string.Join("；", collisions) +
+                   "。程序尚未播放；请" +
+                   (useExpandedCapture ? "改用 clean、" : "") +
+                   "补足明确裁剪，或结合语境重新决定。";
+        return false;
+    }
+
+    private static bool LooksLikeExpandedMarginUsedAsCleanTrim(
+        float requestedTrimSeconds, float expandedMarginSeconds)
+    {
+        if (requestedTrimSeconds < 0.10f || expandedMarginSeconds < 0.10f)
+            return false;
+        float tolerance = Mathf.Max(0.08f, expandedMarginSeconds * 0.03f);
+        return Mathf.Abs(requestedTrimSeconds - expandedMarginSeconds) <= tolerance;
+    }
+
+    private static string FormatBoundaryEvidence(string type, string text)
+    {
+        string evidence = string.IsNullOrWhiteSpace(type) ? "" : $"/type={type.Trim()}";
+        string transcript = (text ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (transcript.Length > 48) transcript = transcript.Substring(0, 48) + "…";
+        if (transcript.Length > 0) evidence += $"/转写=\"{transcript}\"";
+        return evidence;
+    }
+
     public bool TryBuildSingingPracticeComposition(
         int performanceSeed,
         float maxSeconds,
         out PracticeComposition composition,
         out string failure,
-        string order = "")
+        string order = "",
+        bool useExpandedCapture = false,
+        float trimHeadSeconds = 0f,
+        float trimTailSeconds = 0f)
     {
         composition = null;
         failure = "";
@@ -2785,7 +5869,8 @@ public class SenseVoiceSpeechToText : STT
             failure = $"order=\"{order.Trim()}\" 没有解析出任何段落" +
                       (string.IsNullOrEmpty(orderFailure) ? "：" : "——" + orderFailure + "。") +
                       $"练唱会话现在有 {m_PracticePhrases.Count} 段" +
-                      $"(可以写段号 1~{m_PracticePhrases.Count}，也可以直接写那一段的歌词片段)";
+                      $"(可以写段号 1~{m_PracticePhrases.Count}、stable:稳定身份、" +
+                      "candidate:来源候选ID，也可以直接写那一段的歌词片段)";
             return false;
         }
         if (sequence == null)
@@ -2799,24 +5884,80 @@ public class SenseVoiceSpeechToText : STT
             failure = "这次请求没有解析出任何要唱的段落";
             return false;
         }
+        bool hasExplicitTrim = trimHeadSeconds > 0.001f || trimTailSeconds > 0.001f;
+        if (hasExplicitTrim && sequence.Count != 1)
+        {
+            failure = "明确边界裁剪目前只适用于单段；多段不能把同一组秒数机械套用到每段";
+            return false;
+        }
 
         var decoded = new List<float[]>(sequence.Count);
+        var selectedTimelines = new List<float[]>(sequence.Count);
         int outputRate = 0;
         for (int k = 0; k < sequence.Count; k++)
         {
             int i = sequence[k];
+            PracticePhrase stored = m_PracticePhrases[i];
+            bool expandedAvailable = useExpandedCapture &&
+                stored.RecoveryWavBytes != null && stored.RecoveryWavBytes.Length > 44 &&
+                HasPlayablePitchTimeline(stored.RecoveryMidiTimeline);
+            if (useExpandedCapture && !expandedAvailable)
+            {
+                failure = $"第 {i + 1} 段没有可用的 expanded 音频与旋律；" +
+                          "程序没有静默改用 clean，请由角色改选 clean 或询问用户";
+                return false;
+            }
+            byte[] selectedWav = expandedAvailable
+                ? stored.RecoveryWavBytes : stored.WavBytes;
+            float[] selectedTimeline = expandedAvailable
+                ? stored.RecoveryMidiTimeline : stored.MidiTimeline;
             if (!TryDecodePcmWav(
-                    m_PracticePhrases[i].WavBytes,
+                    selectedWav,
                     out float[] phraseSamples,
                     out int phraseRate))
             {
                 failure = $"第 {i + 1} 段不是可组合的 PCM WAV";
                 return false;
             }
+            if (hasExplicitTrim)
+            {
+                float selectedDuration = phraseSamples.Length / (float)Mathf.Max(1, phraseRate);
+                float start = Mathf.Clamp(trimHeadSeconds, 0f, selectedDuration);
+                float end = Mathf.Clamp(
+                    selectedDuration - trimTailSeconds, start, selectedDuration);
+                if (end - start < k_MinSingablePerformanceSeconds)
+                {
+                    failure = $"指定裁剪后只剩 {end - start:F2}s，短于可播放下限 " +
+                              $"{k_MinSingablePerformanceSeconds:F1}s；没有执行";
+                    return false;
+                }
+                int sampleStart = Mathf.Clamp(
+                    Mathf.RoundToInt(start * phraseRate), 0, phraseSamples.Length);
+                int sampleEnd = Mathf.Clamp(
+                    Mathf.RoundToInt(end * phraseRate), sampleStart, phraseSamples.Length);
+                var croppedSamples = new float[sampleEnd - sampleStart];
+                Array.Copy(phraseSamples, sampleStart, croppedSamples, 0, croppedSamples.Length);
+                phraseSamples = croppedSamples;
+
+                float sourceFrameSeconds = Mathf.Clamp(stored.FrameSeconds, 0.02f, 0.25f);
+                int frameStart = Mathf.Clamp(
+                    Mathf.FloorToInt(start / sourceFrameSeconds), 0,
+                    selectedTimeline == null ? 0 : selectedTimeline.Length);
+                int frameEnd = Mathf.Clamp(
+                    Mathf.CeilToInt(end / sourceFrameSeconds), frameStart,
+                    selectedTimeline == null ? 0 : selectedTimeline.Length);
+                selectedTimeline = SliceFloatArray(selectedTimeline, frameStart, frameEnd);
+                if (!HasPlayablePitchTimeline(selectedTimeline))
+                {
+                    failure = "指定裁剪范围内没有可执行的旋律时间线；没有执行";
+                    return false;
+                }
+            }
             if (outputRate <= 0) outputRate = phraseRate;
             if (phraseRate != outputRate)
                 phraseSamples = ResampleToRate(phraseSamples, phraseRate, outputRate);
             decoded.Add(phraseSamples);
+            selectedTimelines.Add(selectedTimeline);
         }
 
         System.Random random = new System.Random(performanceSeed);
@@ -2857,21 +5998,24 @@ public class SenseVoiceSpeechToText : STT
             }
             else gaps.Add(0f);
             segmentWavs.Add(EncodeMonoPcm16Wav(phrase, outputRate));
-            segmentMedians.Add(MedianVoicedPitch(m_PracticePhrases[sequence[i]].MidiTimeline));
+            segmentMedians.Add(MedianVoicedPitch(selectedTimelines[i]));
             segmentSources.Add(sequence[i] + 1);
 
             int src = sequence[i];
             output.AddRange(phrase);
             AppendResampledTimeline(
                 midi,
-                m_PracticePhrases[src].MidiTimeline,
+                selectedTimelines[i],
                 m_PracticePhrases[src].FrameSeconds,
                 outputFrameSeconds,
                 pace);
             if (string.IsNullOrEmpty(language) &&
                 !string.IsNullOrEmpty(m_PracticePhrases[src].Language))
                 language = m_PracticePhrases[src].Language;
-            variation.Append($" p{src + 1}={pace:F3}/{gainStart:F2}->{gainEnd:F2}");
+            variation.Append($" p{src + 1}={pace:F3}/{gainStart:F2}->{gainEnd:F2}" +
+                             (useExpandedCapture &&
+                              m_PracticePhrases[src].RecoveryWavBytes != null
+                                 ? "/expanded" : ""));
         }
 
         float duration = output.Count / (float)Mathf.Max(1, outputRate);
@@ -3280,7 +6424,8 @@ public class SenseVoiceSpeechToText : STT
         midiTimeline = null;
         frameSeconds = m_LastSingingPerformanceFrameSeconds;
         language = m_LastSingingPerformanceLanguage ?? "";
-        if (!HasPlayablePitchTimeline(m_LastSingingPerformanceMidi) ||
+        if (!string.IsNullOrEmpty(RecentSingingMaterialConflict) ||
+            !HasPlayablePitchTimeline(m_LastSingingPerformanceMidi) ||
             Time.realtimeSinceStartup - m_LastSingingPerformanceTime > m_SingingAudioRetentionSeconds)
             return false;
 
@@ -3317,15 +6462,18 @@ public class SenseVoiceSpeechToText : STT
         string lyrics,
         string aliases,
         string reason,
-        Action<SongMemoryResult> callback)
+        Action<SongMemoryResult> callback,
+        string sourceRef = "")
     {
-        if (!HasFreshSingingAudio())
+        byte[] selectedAudio = null;
+        string materialError = "";
+        if (!TryResolveSongSaveAudio(sourceRef, out selectedAudio, out materialError))
         {
             if (callback != null) callback(new SongMemoryResult
             {
                 Ok = false,
                 Action = "remember",
-                Error = "最近没有可保存的歌唱或哼唱音频；可以请用户再唱一小段。",
+                Error = materialError,
             });
             return;
         }
@@ -3336,7 +6484,9 @@ public class SenseVoiceSpeechToText : STT
         form.AddField("lyrics", lyrics ?? "");
         form.AddField("aliases", aliases ?? "");
         form.AddField("reason", reason ?? "");
-        form.AddBinaryData("audio_file", m_LastSingingAudioBytes, "remembered_singing.wav", "audio/wav");
+        form.AddBinaryData("audio_file", selectedAudio, "remembered_singing.wav", "audio/wav");
+        Debug.Log($"[SongMemory/Source] source_ref={sourceRef} " +
+            $"recent_capture={m_LastSingingCacheCaptureSessionSerial} selected_audio={GetWavDurationSeconds(selectedAudio):F2}s");
         StartCoroutine(SendSongMemoryRequest(m_SongRememberURL, form, "remember", callback));
     }
 
@@ -3434,6 +6584,9 @@ public class SenseVoiceSpeechToText : STT
                 {
                     Ok = false,
                     Mode = normalizedMode,
+                    ErrorCode = response != null && !string.IsNullOrWhiteSpace(response.error_code)
+                        ? response.error_code
+                        : "transport",
                     Error = detail,
                 });
                 yield break;
@@ -3447,6 +6600,7 @@ public class SenseVoiceSpeechToText : STT
                 {
                     Ok = false,
                     Mode = normalizedMode,
+                    ErrorCode = "invalid_audio",
                     Error = "本地曲库音频解码失败: " + e.Message,
                 });
                 yield break;
@@ -3458,6 +6612,7 @@ public class SenseVoiceSpeechToText : STT
                 {
                     Ok = false,
                     Mode = normalizedMode,
+                    ErrorCode = "no_playable_audio",
                     Error = "本地曲库没有返回可播放的歌声或旋律时间轴。",
                 });
                 yield break;
@@ -3541,6 +6696,127 @@ public class SenseVoiceSpeechToText : STT
                 result.Error = response.error ?? "";
             }
             if (callback != null) callback(result);
+        }
+    }
+
+    private bool TryResolveSongSaveAudio(string sourceRef, out byte[] audio, out string error)
+    {
+        if ((sourceRef ?? "").StartsWith("clip:", StringComparison.Ordinal))
+        {
+            if (!TryResolveSingingClip(sourceRef, out int clipStable, out _) || clipStable <= 0)
+            { audio = null; error = "所选 clip 未就绪或不存在；未改用最近录音。"; return false; }
+            sourceRef = "stable:" + clipStable;
+        }
+        audio = null;
+        error = "";
+        string reference = (sourceRef ?? "").Trim();
+        if (!string.IsNullOrEmpty(reference) && reference != "recent_turn")
+        {
+            if (!reference.StartsWith("stable:", StringComparison.OrdinalIgnoreCase) ||
+                !int.TryParse(reference.Substring(7), out int id) ||
+                !TryResolvePracticeStableId(id, out int index))
+            {
+                error = "保存失败：source_ref 必须是当前存在的 stable:N 或 recent_turn；没有改用其它录音。";
+                return false;
+            }
+            PracticePhrase phrase = m_PracticePhrases[index - 1];
+            if (phrase.PendingConfirmation || !HasUsableWavPayload(phrase.WavBytes))
+            {
+                error = $"保存失败：{reference} 尚未确认或没有可用音频。";
+                return false;
+            }
+            audio = (byte[])phrase.WavBytes.Clone();
+            return true;
+        }
+        if (TryGetRecentSingingAudio(out audio)) return true;
+        error = !string.IsNullOrEmpty(RecentSingingMaterialConflict)
+            ? RecentSingingMaterialConflict
+            : "最近没有可保存的歌唱音频；可用 source_ref=stable:N 明确选择已确认素材，或询问用户。";
+        return false;
+    }
+
+    /// <summary>
+    /// 对角色已经生成的歌声音频做无副作用 F0 回测。该请求不经过 ASR，也不会写入
+    /// 用户练唱片段或曲库；调用方可以在播放开始后异步使用它，不增加首音等待。
+    /// </summary>
+    public void AnalyzeRenderedSingingPitch(
+        byte[] wavBytes,
+        Action<RenderedPitchAnalysisResult> callback)
+    {
+        if (wavBytes == null || wavBytes.Length <= 44)
+        {
+            if (callback != null) callback(new RenderedPitchAnalysisResult
+            {
+                Ok = false,
+                Error = "rendered audio is empty",
+            });
+            return;
+        }
+        StartCoroutine(SendRenderedPitchAnalysis(wavBytes, callback));
+    }
+
+    private IEnumerator SendRenderedPitchAnalysis(
+        byte[] wavBytes,
+        Action<RenderedPitchAnalysisResult> callback)
+    {
+        WWWForm form = new WWWForm();
+        form.AddBinaryData(
+            "audio_file", wavBytes, "rendered_singing.wav", "audio/wav");
+        form.AddField("lyrics", "");
+        form.AddField("language", "");
+        form.AddField("pitch_only", "true");
+
+        string url = m_ServerSetting.TrimEnd('/') + "/singing/score";
+        using (UnityWebRequest www = UnityWebRequest.Post(url, form))
+        {
+            www.SetRequestHeader("accept", "application/json");
+            www.timeout = 120;
+            yield return www.SendWebRequest();
+
+            SingingPitchResponse response = null;
+            string responseText = www.downloadHandler != null
+                ? www.downloadHandler.text
+                : "";
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(responseText))
+                    response = JsonUtility.FromJson<SingingPitchResponse>(responseText);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[RenderedPitch] JSON 解析失败: " + e.Message);
+            }
+
+            if (www.result != UnityWebRequest.Result.Success || response == null ||
+                !response.ok || response.pitch_median_hz <= 0f)
+            {
+                string detail = response != null && !string.IsNullOrWhiteSpace(response.error)
+                    ? response.error
+                    : (www.error + (string.IsNullOrWhiteSpace(responseText)
+                        ? ""
+                        : " / " + responseText));
+                if (callback != null) callback(new RenderedPitchAnalysisResult
+                {
+                    Ok = false,
+                    Error = detail,
+                });
+                yield break;
+            }
+
+            float centerMidi = 69f + 12f * Mathf.Log(
+                response.pitch_median_hz / 440f, 2f);
+            if (callback != null) callback(new RenderedPitchAnalysisResult
+            {
+                Ok = true,
+                CenterMidi = centerMidi,
+                CenterNote = response.pitch_median_note ?? "",
+                LowNote = response.pitch_low_note ?? "",
+                HighNote = response.pitch_high_note ?? "",
+                Stability = Mathf.Clamp01(response.pitch_stability),
+                VoicedRatio = Mathf.Clamp01(response.voiced_ratio),
+                Backend = response.pitch_backend ?? "",
+                Error = response.error ?? "",
+            });
         }
     }
 
@@ -3641,9 +6917,52 @@ public class SenseVoiceSpeechToText : STT
         public SingingVibrato[] vibrato = null;
     }
 
+    public sealed class RenderedPitchAnalysisResult
+    {
+        public bool Ok = false;
+        public float CenterMidi = 0f;
+        public string CenterNote = "";
+        public string LowNote = "";
+        public string HighNote = "";
+        public float Stability = 0f;
+        public float VoicedRatio = 0f;
+        public string Backend = "";
+        public string Error = "";
+    }
+
+    [Serializable]
+    private class SingingPitchResponse
+    {
+        public bool ok = false;
+        public string error = "";
+        public string pitch_backend = "";
+        public float pitch_stability = 0f;
+        public float voiced_ratio = 0f;
+        public float pitch_median_hz = 0f;
+        public string pitch_median_note = "";
+        public string pitch_low_note = "";
+        public string pitch_high_note = "";
+        public SingingScore singing_score = null;
+    }
+
+    [Serializable]
+    private class AsrTiming
+    {
+        public float queue_wait;
+        public float total, decode, vad, quick_pitch, speaker, recognizer, full_pitch;
+        public float recovery, segment_asr, tail_asr, song_recall, dump, other;
+    }
+
     [Serializable]
     private class Response
     {
+        public int turn_segments_schema;
+        public TurnTranscriptSegment[] turn_segments;
+        public string whole_text, segmented_text, transcript_source;
+        public bool turn_segments_complete, turn_segments_review_required;
+        public bool cancelled;
+        public AsrTiming timings;
+        public int timing_schema;
         public string text = "";
         public string language = "";
         public string emotion = "";
@@ -3656,6 +6975,7 @@ public class SenseVoiceSpeechToText : STT
         public string speaker_voiceprint_id = "";
         public string speaker_voiceprint_status = "";
         public float speaker_confidence = 0f;
+        public float speaker_self_confidence = 0f;
         public float speaker_enrollment_progress = 0f;
         public bool speaker_is_new = false;
         public bool speaker_persistent = false;
@@ -3686,6 +7006,31 @@ public class SenseVoiceSpeechToText : STT
         //歌声岛的结束位置（内容坐标系，与 singing_start_seconds 同一原点）。
         //服务端找不到可信边界时会回填整段时长，等价于"不裁尾"。
         public float singing_end_seconds = 0f;
+        //围绕干净歌唱岛、合并相邻低置信旋律岛后的可恢复边界。默认不播放。
+        public float singing_recovery_start_seconds = 0f;
+        public float singing_recovery_end_seconds = 0f;
+        public float singing_head_extra_start_seconds = 0f;
+        public float singing_head_extra_end_seconds = 0f;
+        public string singing_head_extra_text = "";
+        public string singing_head_extra_type = "none";
+        public float singing_head_extra_probability = 0f;
+        public bool singing_head_extra_review_required = false;
+        public float singing_head_extra_melodic_seconds = 0f;
+        public float singing_head_extra_melodic_ratio = 0f;
+        public float singing_head_extra_longest_melodic_run_seconds = 0f;
+        public string singing_head_extra_review_reason = "";
+        public SingingBoundarySubsegment[] singing_head_extra_segments = null;
+        public float singing_tail_extra_start_seconds = 0f;
+        public float singing_tail_extra_end_seconds = 0f;
+        public string singing_tail_extra_text = "";
+        public string singing_tail_extra_type = "none";
+        public float singing_tail_extra_probability = 0f;
+        public bool singing_tail_extra_review_required = false;
+        public float singing_tail_extra_melodic_seconds = 0f;
+        public float singing_tail_extra_melodic_ratio = 0f;
+        public float singing_tail_extra_longest_melodic_run_seconds = 0f;
+        public string singing_tail_extra_review_reason = "";
+        public SingingBoundarySubsegment[] singing_tail_extra_segments = null;
         //只对裁出来那段单独再识别一次得到的歌词。没发生裁剪时为空。
         public string singing_text = "";
         //唱完之后那截说话的单独转写。整轮 ASR 在长混合录音上只转得出开头，
@@ -3699,6 +7044,8 @@ public class SenseVoiceSpeechToText : STT
         public bool singing_lyrics_reading_complete = false;
         public string[] singing_lyrics_mora = null;
         public float pitch_timeline_start_seconds = 0f;
+        public float singing_analysis_window_offset_seconds = 0f;
+        public float singing_score_window_offset_seconds = 0f;
         public float audio_content_start_seconds = 0f;
         public SingingScore singing_score = null;
         //曲库里旋律接近的几条，服务端每个唱歌轮自动算好。不是识别结果——
@@ -3785,6 +7132,15 @@ public class SenseVoiceSpeechToText : STT
     }
 
     [Serializable]
+    private class SongCatalogResponse
+    {
+        public bool ok = false;
+        public int local_song_catalog = 0;
+        public SongCatalogEntry[] songs = null;
+        public string error = "";
+    }
+
+    [Serializable]
     private class SongMemoryResponse
     {
         public bool ok = false;
@@ -3826,6 +7182,7 @@ public class SenseVoiceSpeechToText : STT
         public float lyrics_confidence = 0f;
         public bool continuation = false;
         public string continuation_basis = "";
+        public string error_code = "";
         public string error = "";
     }
 
@@ -3852,6 +7209,41 @@ public class SenseVoiceSpeechToText : STT
         public string Privacy = "";
         public string Error = "";
         public SongMatch[] Matches = new SongMatch[0];
+    }
+
+    [Serializable]
+    public class SongCatalogEntry
+    {
+        public string song_id = "";
+        public string title = "";
+        public string artist = "";
+        public string display_name = "";
+        public bool named = false;
+        public int reference_count = 0;
+        public int unique_segment_count = 0;
+        public int duplicate_variant_count = 0;
+        public bool can_continue = false;
+        public bool score_available = false;
+        public int updated_at = 0;
+    }
+
+    public class SongCatalogInspectionResult
+    {
+        public bool Ok = false;
+        public string Error = "";
+        public string Query = "";
+        public bool IncludeUnnamed = false;
+        public int TotalEntries = 0;
+        public int NamedEntries = 0;
+        public int UnnamedEntries = 0;
+        //只按标题大小写/首尾空白归并；同名条目仍可能是不同歌曲，结果会明确提醒角色。
+        public int UniqueExactTitleGroups = 0;
+        public int MatchedEntries = 0;
+        public int Offset = 0;
+        public int Limit = 0;
+        public bool HasMore = false;
+        public int NextOffset = 0;
+        public SongCatalogEntry[] Entries = new SongCatalogEntry[0];
     }
 
     public class SongMemoryResult
@@ -3894,6 +7286,7 @@ public class SenseVoiceSpeechToText : STT
         public float LyricsConfidence = 0f;
         public bool Continuation = false;
         public string ContinuationBasis = "";
+        public string ErrorCode = "";
         public string Error = "";
     }
 

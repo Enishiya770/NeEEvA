@@ -1,8 +1,8 @@
-"""On-demand local Seed-VC service used by Unity's character hum-back path.
+"""On-demand local voice-conversion service used by Unity's hum-back path.
 
-The neural model intentionally runs in a child process.  It is slower than keeping
-the model resident, but releases VRAM after every conversion so GPT-SoVITS can keep
-serving normal dialogue on a 6 GB GPU.
+The preferred character RVC runs in a short-lived persistent worker so Skill-load
+warm-up and streamed chunks can share model import cost. The Seed-VC fallback still
+uses an isolated process and releases VRAM after every conversion.
 """
 
 from __future__ import annotations
@@ -356,6 +356,35 @@ class _RvcWorker:
     def _alive(self) -> bool:
         return self._process is not None and self._process.poll() is None
 
+    def warm_up(self, force_cpu: bool) -> dict[str, object]:
+        """Load imports/model without consuming or fabricating an audio request."""
+        if RVC_WORKER_IDLE_SECONDS <= 0:
+            return {"ready": False, "reason": "persistent worker disabled"}
+        with self._lock:
+            if self._alive() and self._force_cpu != force_cpu:
+                self._shutdown_locked()
+            already_ready = self._alive()
+            if not already_ready and not self._spawn(force_cpu):
+                return {"ready": False, "reason": "worker failed to start"}
+            self._last_used = time.time()
+            self._schedule_idle_shutdown()
+            return {
+                "ready": True,
+                "already_ready": already_ready,
+                "device": self._device or ("cpu-low-vram" if force_cpu else "cuda"),
+                "idle_seconds": RVC_WORKER_IDLE_SECONDS,
+            }
+
+    def active_force_cpu(self) -> bool | None:
+        """Return the warmed worker device, waiting for an in-progress warm-up.
+
+        A CUDA warm-up itself reduces reported free VRAM.  Re-running the ordinary
+        free-memory gate afterwards would incorrectly kill that worker and respawn
+        it on CPU, so a live warmed worker is the more reliable source of truth.
+        """
+        with self._lock:
+            return self._force_cpu if self._alive() else None
+
     def _schedule_idle_shutdown(self) -> None:
         if self._timer is not None:
             self._timer.cancel()
@@ -483,7 +512,10 @@ def _run_rvc_conversion(
 ) -> tuple[bytes, dict[str, str]]:
     global _active_process, _active_request_id
     free_mib = _cuda_free_mib()
-    prefer_cuda = free_mib is None or free_mib >= RVC_GPU_MIN_FREE_MIB
+    warmed_force_cpu = _rvc_worker.active_force_cpu()
+    prefer_cuda = (not warmed_force_cpu) if warmed_force_cpu is not None else (
+        free_mib is None or free_mib >= RVC_GPU_MIN_FREE_MIB
+    )
     started = time.perf_counter()
 
     with tempfile.TemporaryDirectory(prefix="neeeva_rvc_") as temp_name:
@@ -830,6 +862,29 @@ def health() -> dict[str, object]:
         "cuda_free_mib": free_mib,
         "cuda_min_free_mib": threshold,
         "will_use": "cuda" if free_mib is None or free_mib >= threshold else "cpu-low-vram",
+    }
+
+
+@app.post("/warmup")
+async def warmup() -> dict[str, object]:
+    """Non-audio model warm-up used when Unity loads the singing Skill.
+
+    This request runs model startup on a worker thread.  Unity does not await it
+    before generating dialogue, and a concurrent conversion safely waits for and
+    reuses the same worker instead of starting another model process.
+    """
+    if not _rvc_ready():
+        raise HTTPException(503, "character RVC is not installed; warm-up unavailable")
+    free_mib = _cuda_free_mib()
+    force_cpu = free_mib is not None and free_mib < RVC_GPU_MIN_FREE_MIB
+    result = await asyncio.to_thread(_rvc_worker.warm_up, force_cpu)
+    if not result.get("ready"):
+        raise HTTPException(503, str(result.get("reason", "RVC warm-up failed")))
+    return {
+        "ok": True,
+        "backend": "rvc-character-v2",
+        "cuda_free_mib_before": free_mib,
+        **result,
     }
 
 

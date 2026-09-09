@@ -10,7 +10,7 @@ using WebGLSupport;
 using AIChat.Agent;
 using AIChat.Memory;
 
-public class ChatSample : MonoBehaviour
+public partial class ChatSample : MonoBehaviour
 {
     /// <summary>
     /// 聊天配置
@@ -29,6 +29,19 @@ public class ChatSample : MonoBehaviour
     /// 返回的信息
     /// </summary>
     [SerializeField] private Text m_TextBack;
+    [Header("字幕、翻译与系统通知")]
+    [SerializeField] private SubtitleDisplayMode m_SubtitleDisplayMode =
+        SubtitleDisplayMode.OriginalOnly;
+    [SerializeField] private SubtitleLanguage m_SubtitleTargetLanguage =
+        SubtitleLanguage.ChineseSimplified;
+    [SerializeField] private SystemNoticeMode m_SystemNoticeMode =
+        SystemNoticeMode.ErrorsOnly;
+    [Tooltip("只在 TranslationOnly/Bilingual 模式调用无历史翻译接口")]
+    [SerializeField] private bool m_EnableSubtitleTranslation = true;
+    [Tooltip("运行时切换会保存到 PlayerPrefs")]
+    [SerializeField] private bool m_PersistSubtitleSettings = true;
+    [SerializeField] private bool m_ShowSystemNoticeCodes = false;
+    [SerializeField] private SubtitleOverlay m_SubtitleOverlay;
     /// <summary>
     /// 播放声音
     /// </summary>
@@ -66,6 +79,26 @@ public class ChatSample : MonoBehaviour
     public System.Action OnAISpeakDone;
 
     /// <summary>
+    /// 流式声学与语义闸已经取得稳定歌唱证据时通知录音状态机。这里只传感知事实，
+    /// 不替角色决定是否回应、是否保存或是否回唱。
+    /// </summary>
+    public System.Action<float, float, int> OnStableUserSingingObserved;
+
+    /// <summary>
+    /// 流式角色 LLM 高置信度判断当前输入是普通说话时，通知录音状态机解除可逆的
+    /// “可能在唱”锁。它只修正输入模态与 EOU 策略，不决定角色怎样回应。
+    /// </summary>
+    public System.Action<float, int> OnStableUserSpeechObserved;
+
+    /// <summary>
+    /// 持续外放/背景声让物理静音无法出现时，角色 LLM 根据稳定文字、持续声学活动和
+    /// 环境基线给出的轮次边界判断。程序只校验这份判断仍对应当前文字，再决定是否收束录音。
+    /// status: complete | continue | ask_user。
+    /// </summary>
+    public System.Action<string, float, string, float, string, string, int>
+        OnStalledUserTurnDecision;
+
+    /// <summary>
     /// 角色是否正在出声(TTS播放中)。
     /// RTSpeechHandler用这个判断"现在RMS spike算barge-in还是新一轮发言"。
     /// </summary>
@@ -79,6 +112,9 @@ public class ChatSample : MonoBehaviour
 
     private float m_LastVoiceOutputEndedRealtime = -999f;
     private bool m_WasVoiceOutputPlaying = false;
+    [Header("最终转写中的外放回声证据")]
+    [Tooltip("角色刚出声后的这段时间内，若最终转写以角色近期原话开头，就把原文、重合前缀和用户剩余文本一起交给 LLM 判断；程序不直接删字。")]
+    [Range(1f, 15f)] [SerializeField] private float m_TextEchoEvidenceWindowSeconds = 8f;
 
     /// <summary>True when the actual TTS AudioSource is producing output.</summary>
     public bool IsVoiceOutputPlaying
@@ -143,6 +179,14 @@ public class ChatSample : MonoBehaviour
 
     private void Awake()
     {
+        EnsureSubtitleOverlay();
+        if (m_ChatSettings != null && m_ChatSettings.m_ChatModel != null)
+        {
+            m_ChatSettings.m_ChatModel.OnSystemNotice += HandleSystemNotice;
+            m_ChatSettings.m_ChatModel.OnRawResponse += HandleRawLLMResponse;
+            m_ChatSettings.m_ChatModel.OnOutputFormatError += HandleLLMOutputFormatError;
+            m_ChatSettings.m_ChatModel.OnRequestDiagnostic += HandleRequestDiagnostic;
+        }
         if (m_AudioSource != null)
         {
             EchoReferenceTap = m_AudioSource.GetComponent<PlaybackEchoReferenceTap>();
@@ -159,6 +203,12 @@ public class ChatSample : MonoBehaviour
         StepUrge();
 
         bool playing = IsVoiceOutputPlaying;
+        if (playing && !m_WasVoiceOutputPlaying)
+        {
+            VoiceOutputRevision++;
+            ReportPerceivedFirstAudio();
+        }
+        if (playing && m_HumBackPlaying) ReportPerceivedFormalAudio("singing");
         if (m_WasVoiceOutputPlaying && !playing)
             m_LastVoiceOutputEndedRealtime = Time.realtimeSinceStartup;
         m_WasVoiceOutputPlaying = playing;
@@ -173,6 +223,13 @@ public class ChatSample : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (m_ChatSettings != null && m_ChatSettings.m_ChatModel != null)
+        {
+            m_ChatSettings.m_ChatModel.OnSystemNotice -= HandleSystemNotice;
+            m_ChatSettings.m_ChatModel.OnRawResponse -= HandleRawLLMResponse;
+            m_ChatSettings.m_ChatModel.OnOutputFormatError -= HandleLLMOutputFormatError;
+            m_ChatSettings.m_ChatModel.OnRequestDiagnostic -= HandleRequestDiagnostic;
+        }
         if (m_ActiveSVSRequest != null) m_ActiveSVSRequest.Abort();
         if (m_ActiveHumSVCRequest != null) m_ActiveHumSVCRequest.Abort();
         if (m_HumBackPrefixSVCRequest != null) m_HumBackPrefixSVCRequest.Abort();
@@ -262,6 +319,69 @@ public class ChatSample : MonoBehaviour
         else CancelPendingHumBack("typed-user-turn", true);
         SendData(_text);
     }
+
+    private void EnsureSubtitleOverlay()
+    {
+        if (m_SubtitleOverlay == null)
+            m_SubtitleOverlay = GetComponent<SubtitleOverlay>();
+        if (m_SubtitleOverlay == null)
+            m_SubtitleOverlay = gameObject.AddComponent<SubtitleOverlay>();
+        m_SubtitleOverlay.Initialize(
+            m_TextBack,
+            m_ChatSettings != null ? m_ChatSettings.m_ChatModel : null,
+            m_SubtitleDisplayMode,
+            m_SubtitleTargetLanguage,
+            m_SystemNoticeMode,
+            m_EnableSubtitleTranslation,
+            m_PersistSubtitleSettings,
+            m_ShowSystemNoticeCodes);
+    }
+
+    private void HandleSystemNotice(SystemNotice notice)
+    {
+        EnsureSubtitleOverlay();
+        if (m_SubtitleOverlay != null) m_SubtitleOverlay.PublishSystemNotice(notice);
+    }
+
+    private void ReportTtsFailureOnce(string code, string message, string detail)
+    {
+        if (m_LastTtsFailureNoticeGeneration == m_FormalResponseGeneration) return;
+        m_LastTtsFailureNoticeGeneration = m_FormalResponseGeneration;
+        HandleSystemNotice(new SystemNotice(
+            code,
+            SystemNoticeSeverity.Error,
+            message,
+            detail,
+            "TTS",
+            true));
+    }
+
+    public void SetSubtitleDisplayMode(int mode)
+    {
+        EnsureSubtitleOverlay();
+        m_SubtitleOverlay.SetDisplayMode(
+            (SubtitleDisplayMode)Mathf.Clamp(mode, 0, 3));
+    }
+
+    public void SetSubtitleTargetLanguage(int language)
+    {
+        EnsureSubtitleOverlay();
+        m_SubtitleOverlay.SetTargetLanguage(
+            (SubtitleLanguage)Mathf.Clamp(language, 0, 7));
+    }
+
+    public void SetSystemNoticeMode(int mode)
+    {
+        EnsureSubtitleOverlay();
+        m_SubtitleOverlay.SetNoticeMode(
+            (SystemNoticeMode)Mathf.Clamp(mode, 0, 2));
+    }
+
+    public void SetSubtitlesVisible(bool visible)
+    {
+        EnsureSubtitleOverlay();
+        m_SubtitleOverlay.SetSubtitlesVisible(visible);
+    }
     /// <summary>
     /// 带文字发送
     /// </summary>
@@ -271,10 +391,14 @@ public class ChatSample : MonoBehaviour
         SendDataInternal(_postWord, null);
     }
 
-    private void SendDataInternal(string _postWord, string speculativeHint)
+    private void SendDataInternal(string _postWord, string speculativeHint, string rawUserText = null)
     {
         if (_postWord.Equals(""))
             return;
+
+        //来源确认现在由正式角色在看过完整转写、上下文与边界证据后，通过
+        //<practice_confirm/> 明确表达。同轮不再串行跑一个看不到正式角色想法的辅助
+        //分类器；旧实现会出现“后台已确认、角色嘴上仍在询问”的分裂状态。
 
         if (m_CreateVoiceMode)//合成输入为语音
         {
@@ -284,16 +408,15 @@ public class ChatSample : MonoBehaviour
         }
 
         //添加记录聊天 — 历史气泡里只显示用户原话(感知帧只去 LLM context，不进 UI)
-        m_ChatHistory.Add(_postWord);
+        string userUtterance = rawUserText ?? _postWord;
+        m_ChatHistory.Add(userUtterance);
+        SetCurrentUserInput(userUtterance, _postWord);
 
         //歌曲工具不能依赖 Agent Loop 才知道“用户刚说了什么”。直接对话模式也维护
         //当前用户轮次，供明确保存请求兜底、歌名提取和成功确认使用。
         if (!m_AgentRunning)
         {
             m_LastUserTurnTime = Time.realtimeSinceStartup;
-            m_LastUserMsg = _postWord ?? "";
-            m_ExplicitSongRememberHandled = false;
-            m_ExplicitHumBackHandled = false;
             m_AgentCurrentRoundIsTick = false;
             if (m_MemoryHub != null && m_EnableMemoryRecall)
                 m_MemoryHub.NotifyUserUtterance(m_LastUserMsg);
@@ -315,15 +438,16 @@ public class ChatSample : MonoBehaviour
         //(prob 0.68~0.76、岛占比 95%+)，只因当时 armed 恰好没开才没唱出来。
         BeginTurnSemanticCheck(_postWord);
 
+        //消费上一句留下的“下一轮会唱”预期，并根据这一轮真实用户文本决定是否
+        //为再下一轮续上。这里只改变听觉先验，不触发任何歌唱动作。
+        UpdateUpcomingUserSingingExpectation(userUtterance);
+
         //agent loop 启用时：把感知帧拼到用户文本前面，让 LLM 也能"感受"时间
         //(返回的字符串才是真正喂给 LLM 的——含 [感知帧 ...] + 用户原话)
         PrepareActiveSkillsForRound(_postWord, "user-spoke");
-        string llmInput = (m_AgentRunning) ? PrepareUserTurn(_postWord) : _postWord;
-        if (!string.IsNullOrWhiteSpace(speculativeHint))
-        {
-            //临时草稿不进入任何历史；只在最终转写与 partial 足够一致时，作为本轮一次性提示。
-            llmInput = speculativeHint + "\n" + llmInput;
-        }
+        CommitConfirmedSingingBeforePerception();
+        string llmInput = (m_AgentRunning) ? PrepareUserTurn(_postWord, userUtterance) : _postWord;
+        // Prepared thoughts belong to this request only, not persisted user history.
 
         // A previously armed sing-along is deterministic once final ASR confirms a
         // playable performance.  Do not spend another LLM round deciding whether to
@@ -342,22 +466,542 @@ public class ChatSample : MonoBehaviour
         if (m_UseStreaming && m_IsVoiceMode && m_ChatSettings.m_TextToSpeech != null)
         {
             bool singingTurn = _postWord.IndexOf("[演唱片段", StringComparison.Ordinal) >= 0;
-            bool waitForSongMemoryResult = ShouldHoldSpeechForExplicitSongRemember();
             bool waitForRealHumBack = ShouldHoldSpeechForExplicitHumBack();
             StartStreaming(
                 llmInput,
                 !singingTurn && string.IsNullOrWhiteSpace(speculativeHint),
                 _postWord,
-                waitForSongMemoryResult,
-                waitForRealHumBack);
+                false,
+                waitForRealHumBack,
+                transientSystemContext: speculativeHint);
         }
         else
         {
-            m_HoldSpeechForSongMemoryResult = ShouldHoldSpeechForExplicitSongRemember();
+            //Whether to save singing is an LLM decision expressed through
+            //<song_remember/>.  Do not infer it from the user's wording.
+            m_HoldSpeechForSongMemoryResult = false;
             m_HoldSpeechForHumBackResult = ShouldHoldSpeechForExplicitHumBack();
             PublishSpokenPrefixToLlm();
+            m_ChatSettings.m_ChatModel.RequestContext = speculativeHint ?? "";
             m_ChatSettings.m_ChatModel.PostMsg(llmInput, CallBack);
         }
+    }
+
+    private sealed class PendingPracticeResolutionTarget
+    {
+        //辅助分类器只输出这一轮快照里的 selector；真正执行仍使用稳定 candidate id
+        //或当时的 practice index，避免两套都叫“第 1 段”。
+        public int Selector;
+        public int PracticeIndex;
+        public int CandidateId;
+        public bool IsCandidate { get { return CandidateId > 0; } }
+    }
+
+    private bool TryBeginPracticeConfirmationProbe(
+        string userText,
+        string speculativeHint,
+        string rawUserText = null)
+    {
+        SenseVoiceSpeechToText sense = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+            : null;
+        ChatQW qw = m_ChatSettings != null
+            ? m_ChatSettings.m_ChatModel as ChatQW
+            : null;
+        if (sense == null || qw == null) return false;
+
+        List<PendingPracticeResolutionTarget> pending =
+            BuildPendingPracticeResolutionTargets(sense);
+        if (pending.Count == 0) return false;
+        string pendingSummary = BuildPendingPracticeSemanticSummary(sense, pending);
+        if (string.IsNullOrWhiteSpace(pendingSummary)) return false;
+
+        //当前用户消息尚未写入 m_ChatHistory，因此这里拿到的正是角色上一句。
+        string lastAssistant = GetLastAssistantSemanticContext(false);
+        int inputRevision = m_InputAudioRevision;
+        qw.ClassifyPracticeConfirmation(
+            rawUserText ?? userText,
+            lastAssistant,
+            pendingSummary,
+            decision =>
+            {
+                if (inputRevision != m_InputAudioRevision) return;
+                ApplyPracticeConfirmationDecision(sense, pending, decision);
+                SendDataInternal(userText, speculativeHint, rawUserText);
+            });
+        return true;
+    }
+
+    private static List<PendingPracticeResolutionTarget>
+        BuildPendingPracticeResolutionTargets(SenseVoiceSpeechToText sense)
+    {
+        var targets = new List<PendingPracticeResolutionTarget>();
+        if (sense == null) return targets;
+        int selector = 0;
+        //先列来源不确定候选，并保持真实录音顺序。用户说“最前两段/本次全部”时，
+        //LLM 能直接看到 candidate 的稳定身份，而不是被较晚生成的 practice 编号误导。
+        foreach (SenseVoiceSpeechToText.QuarantinedSingingCandidateInfo candidate in
+                 sense.DescribeQuarantinedSingingCandidates())
+        {
+            if (candidate == null || candidate.CandidateId <= 0 ||
+                !string.Equals(candidate.SourceStatus, "pending",
+                    StringComparison.OrdinalIgnoreCase))
+                continue;
+            targets.Add(new PendingPracticeResolutionTarget
+            {
+                Selector = ++selector,
+                CandidateId = candidate.CandidateId,
+            });
+        }
+        foreach (int practiceIndex in sense.PendingConfirmationPracticeIndices())
+        {
+            targets.Add(new PendingPracticeResolutionTarget
+            {
+                Selector = ++selector,
+                PracticeIndex = practiceIndex,
+            });
+        }
+        return targets;
+    }
+
+    private static string BuildPendingPracticeSemanticSummary(
+        SenseVoiceSpeechToText sense,
+        List<PendingPracticeResolutionTarget> pending)
+    {
+        if (sense == null || pending == null || pending.Count == 0) return "";
+        var sb = new System.Text.StringBuilder();
+        List<SenseVoiceSpeechToText.QuarantinedSingingCandidateInfo> candidates =
+            sense.DescribeQuarantinedSingingCandidates();
+        List<SenseVoiceSpeechToText.PracticePhraseInfo> phrases =
+            sense.DescribePracticePhrases();
+        for (int i = 0; i < pending.Count; i++)
+        {
+            PendingPracticeResolutionTarget target = pending[i];
+            if (target == null) continue;
+            if (sb.Length > 0) sb.Append('\n');
+            if (target.IsCandidate)
+            {
+                SenseVoiceSpeechToText.QuarantinedSingingCandidateInfo candidate =
+                    candidates.Find(value => value != null &&
+                        value.CandidateId == target.CandidateId);
+                if (candidate == null) continue;
+                string candidateLyric = (candidate.Lyrics ?? "").Trim();
+                if (candidateLyric.Length > 80)
+                    candidateLyric = candidateLyric.Substring(0, 80) + "…";
+                sb.Append(target.Selector)
+                  .Append(": kind=source_uncertain; candidate_id=")
+                  .Append(candidate.CandidateId)
+                  .Append("; capture_order=")
+                  .Append(candidate.CaptureOrder)
+                  .Append("; duration=")
+                  .Append(candidate.Seconds.ToString("F1"))
+                  .Append("s; lyrics=\"")
+                  .Append(candidateLyric)
+                  .Append('"');
+                if (!string.IsNullOrWhiteSpace(candidate.PrecedingSpeech))
+                {
+                    string before = candidate.PrecedingSpeech.Trim();
+                    if (before.Length > 80) before = before.Substring(0, 80) + "…";
+                    sb.Append("; preceding_speech=\"").Append(before).Append('"');
+                }
+                continue;
+            }
+            SenseVoiceSpeechToText.PracticePhraseInfo phrase =
+                phrases.Find(value => value != null &&
+                    value.Index == target.PracticeIndex);
+            if (phrase == null) continue;
+            string lyric = (phrase.Lyrics ?? "").Trim();
+            if (lyric.Length > 80) lyric = lyric.Substring(0, 80) + "…";
+            sb.Append(target.Selector)
+              .Append(": kind=practice_pending; practice_index=")
+              .Append(phrase.Index).Append("; lyrics=\"")
+              .Append(lyric).Append("\"");
+            if (!string.IsNullOrWhiteSpace(phrase.PrecedingSpeech))
+            {
+                string before = phrase.PrecedingSpeech.Trim();
+                if (before.Length > 80) before = before.Substring(0, 80) + "…";
+                sb.Append("; preceding_speech=\"").Append(before).Append('"');
+            }
+        }
+        return sb.ToString();
+    }
+
+    private void ApplyPracticeConfirmationDecision(
+        SenseVoiceSpeechToText sense,
+        List<PendingPracticeResolutionTarget> pendingSnapshot,
+        string decision)
+    {
+        if (sense == null || pendingSnapshot == null || pendingSnapshot.Count == 0)
+            return;
+        List<int> allowedSelectors = pendingSnapshot.ConvertAll(target => target.Selector);
+        List<int> confirmedSelectors = ParseIndexedClassifierDecision(
+            decision, "confirm:", allowedSelectors);
+        if (confirmedSelectors.Count > 0)
+        {
+            var candidateMappings = new List<string>();
+            var confirmedPractice = new List<int>();
+            for (int i = 0; i < pendingSnapshot.Count; i++)
+            {
+                PendingPracticeResolutionTarget target = pendingSnapshot[i];
+                if (!confirmedSelectors.Contains(target.Selector)) continue;
+                if (target.IsCandidate)
+                {
+                    if (sense.ConfirmQuarantinedSingingCandidateWithPlaybackStatus(
+                            target.CandidateId, out int phraseIndex,
+                            out string playbackStatus))
+                    {
+                        candidateMappings.Add(phraseIndex > 0
+                            ? $"候选 {target.CandidateId}→清单第 {phraseIndex} 段"
+                            : $"候选 {target.CandidateId} 已确认属于用户，" +
+                              $"但 playback={playbackStatus}，尚不能播放");
+                    }
+                }
+                else if (target.PracticeIndex > 0)
+                    confirmedPractice.Add(target.PracticeIndex);
+            }
+            int cleared = confirmedPractice.Count > 0
+                ? sense.ConfirmPracticePhrases(confirmedPractice)
+                : 0;
+            if (candidateMappings.Count > 0 || cleared > 0)
+            {
+                var confirmedFacts = new System.Text.StringBuilder(
+                    "\n练唱片段语义确认事实: ");
+                if (candidateMappings.Count > 0)
+                    confirmedFacts.Append("LLM结合用户本轮完整原话确认了来源待确认候选属于" +
+                        "用户自己的歌唱/哼唱：" + string.Join("、", candidateMappings) + "。 ");
+                if (cleared > 0)
+                    confirmedFacts.Append("用户明确确认原练唱清单第 " +
+                        string.Join("、", confirmedPractice) +
+                        " 段属于歌唱/哼唱，待确认标已经解除。 ");
+                confirmedFacts.Append(
+                    "这只更新素材事实，不代表用户一定要求你现在回唱；是否行动、直接判断或自然询问" +
+                    "仍由你结合当前原话决定。");
+                m_PracticeSemanticResolutionNote = confirmedFacts.ToString();
+                if (m_LogHumBack)
+                    Debug.Log("[SenseVoice/Practice] 用户语义确认完成：" +
+                              (candidateMappings.Count > 0
+                                  ? string.Join("、", candidateMappings) + " "
+                                  : "") +
+                              (cleared > 0
+                                  ? "原段=" + string.Join("、", confirmedPractice)
+                                  : ""));
+            }
+            return;
+        }
+
+        List<int> rejectedSelectors = ParseIndexedClassifierDecision(
+            decision, "reject:", allowedSelectors);
+        if (rejectedSelectors.Count > 0)
+        {
+            var discardedCandidates = new List<int>();
+            var rejectedPractice = new List<int>();
+            for (int i = 0; i < pendingSnapshot.Count; i++)
+            {
+                PendingPracticeResolutionTarget target = pendingSnapshot[i];
+                if (!rejectedSelectors.Contains(target.Selector)) continue;
+                if (target.IsCandidate)
+                {
+                    if (sense.DiscardQuarantinedSingingCandidate(target.CandidateId))
+                        discardedCandidates.Add(target.CandidateId);
+                }
+                else if (target.PracticeIndex > 0)
+                    rejectedPractice.Add(target.PracticeIndex);
+            }
+            var rejectedFacts = new System.Text.StringBuilder(
+                "\n练唱片段语义否认事实: ");
+            if (discardedCandidates.Count > 0)
+                rejectedFacts.Append("LLM结合用户本轮完整原话确认来源候选 " +
+                    string.Join("、", discardedCandidates) +
+                    " 不是用户自己的歌唱/哼唱；它们从未进入练唱清单，现已安全丢弃。 ");
+            if (rejectedPractice.Count > 0)
+                rejectedFacts.Append("用户刚刚明确表示原练唱清单第 " +
+                    string.Join("、", rejectedPractice) +
+                    " 段不是歌唱/哼唱。程序没有自动删除已有素材；请由你结合语境决定是否使用 " +
+                    "<practice_drop order=\"段号\" reason=\"用户明确否认该段是歌声\"/>。");
+            m_PracticeSemanticResolutionNote = rejectedFacts.ToString();
+            if (m_LogHumBack)
+                Debug.Log("[SenseVoice/Practice] 用户语义否认完成：" +
+                          (discardedCandidates.Count > 0
+                              ? "隔离候选=" + string.Join("、", discardedCandidates) + " 已丢弃 "
+                              : "") +
+                          (rejectedPractice.Count > 0
+                              ? "原段=" + string.Join("、", rejectedPractice) +
+                                " 保留并交给角色决定"
+                              : ""));
+        }
+    }
+
+    private static List<int> ParseIndexedClassifierDecision(
+        string decision,
+        string prefix,
+        List<int> allowedIndices)
+    {
+        var result = new List<int>();
+        if (string.IsNullOrWhiteSpace(decision) || string.IsNullOrWhiteSpace(prefix) ||
+            allowedIndices == null || allowedIndices.Count == 0)
+            return result;
+        string text = decision.Trim();
+        if (!text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return result;
+        string payload = text.Substring(prefix.Length).Trim();
+        if (string.Equals(payload, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            result.AddRange(allowedIndices);
+            return result;
+        }
+        foreach (System.Text.RegularExpressions.Match match in
+                 System.Text.RegularExpressions.Regex.Matches(payload, @"\d+"))
+        {
+            if (!int.TryParse(match.Value, out int index) ||
+                !allowedIndices.Contains(index) || result.Contains(index))
+                continue;
+            result.Add(index);
+        }
+        return result;
+    }
+
+    private void ApplyMemoryOpsWithGrounding(List<MemoryTagParser.MemoryOp> ops)
+    {
+        if (ops == null || ops.Count == 0 || m_MemoryHub == null) return;
+
+        var factualOrdinals = new List<int>();
+        int factOrdinal = 0;
+        var proposals = new System.Text.StringBuilder();
+        for (int i = 0; i < ops.Count; i++)
+        {
+            MemoryTagParser.MemoryOp op = ops[i];
+            if (op.isLink || op.isNote) continue;
+            factOrdinal++;
+            factualOrdinals.Add(factOrdinal);
+            proposals.Append(factOrdinal)
+              .Append(": action=")
+              .Append(op.isUpdate ? "update" : "add")
+              .Append("; name=\"").Append(op.name ?? "")
+              .Append("\"; desc=\"").Append(op.desc ?? "")
+              .Append("\"\n");
+        }
+
+        //短期 note 和主观联想 link 不把猜测固化成事实节点，沿用角色原本的自主决定。
+        if (factualOrdinals.Count == 0)
+        {
+            m_MemoryHub.ApplyMemoryOps(ops);
+            return;
+        }
+
+        ChatQW qw = m_ChatSettings != null
+            ? m_ChatSettings.m_ChatModel as ChatQW
+            : null;
+        if (qw == null)
+        {
+            ApplyGroundedMemorySubset(ops, new List<int>(), false);
+            return;
+        }
+
+        string evidence = BuildMemoryGroundingEvidenceContext();
+        qw.DecomposeMemoryClaims(proposals.ToString(), atoms =>
+        {
+            if (atoms == null || atoms.Length == 0)
+            {
+                ApplyGroundedMemorySubset(ops, new List<int>(), false);
+                return;
+            }
+
+            var atomicOrdinals = new List<int>();
+            var atomToFact = new Dictionary<int, int>();
+            var atomicProposals = new System.Text.StringBuilder();
+            int atomicOrdinal = 0;
+            for (int i = 0; i < atoms.Length; i++)
+            {
+                ChatQW.MemoryAtomicClaim atom = atoms[i];
+                if (atom == null || !factualOrdinals.Contains(atom.original_index) ||
+                    string.IsNullOrWhiteSpace(atom.claim))
+                    continue;
+                string claim = atom.claim.Replace('\r', ' ').Replace('\n', ' ').Trim();
+                if (claim.Length > 600) claim = claim.Substring(0, 600);
+                atomicOrdinal++;
+                atomicOrdinals.Add(atomicOrdinal);
+                atomToFact[atomicOrdinal] = atom.original_index;
+                atomicProposals.Append(atomicOrdinal)
+                  .Append(": original=").Append(atom.original_index)
+                  .Append("; claim=\"").Append(claim).Append("\"\n");
+            }
+
+            if (atomicOrdinals.Count == 0)
+            {
+                ApplyGroundedMemorySubset(ops, new List<int>(), false);
+                return;
+            }
+
+            qw.ValidateMemoryGrounding(evidence, atomicProposals.ToString(), decision =>
+            {
+                bool validatorSucceeded = !string.IsNullOrWhiteSpace(decision);
+                List<int> acceptedAtoms = ParseIndexedClassifierDecision(
+                    decision, "accept:", atomicOrdinals);
+                List<int> acceptedFacts = SelectFullyGroundedFactOrdinals(
+                    factualOrdinals, atomToFact, acceptedAtoms);
+                ApplyGroundedMemorySubset(ops, acceptedFacts, validatorSucceeded);
+            });
+        });
+    }
+
+    private static List<int> SelectFullyGroundedFactOrdinals(
+        List<int> factualOrdinals,
+        Dictionary<int, int> atomToFact,
+        List<int> acceptedAtomOrdinals)
+    {
+        var result = new List<int>();
+        if (factualOrdinals == null || atomToFact == null ||
+            acceptedAtomOrdinals == null)
+            return result;
+        var accepted = new HashSet<int>(acceptedAtomOrdinals);
+        foreach (int factOrdinal in factualOrdinals)
+        {
+            bool foundAtom = false;
+            bool allAccepted = true;
+            foreach (KeyValuePair<int, int> pair in atomToFact)
+            {
+                if (pair.Value != factOrdinal) continue;
+                foundAtom = true;
+                if (!accepted.Contains(pair.Key)) allAccepted = false;
+            }
+            if (foundAtom && allAccepted) result.Add(factOrdinal);
+        }
+        return result;
+    }
+
+    private string BuildMemoryGroundingEvidenceContext()
+    {
+        var sb = new System.Text.StringBuilder();
+        string currentUser = StripPerceptionPrefixes(m_LastUserMsg ?? "").Trim();
+        if (!string.IsNullOrEmpty(currentUser))
+            sb.Append("当前用户原话：\n").Append(TruncateMemoryEvidence(currentUser, 3000));
+
+        //记忆标签在当前回复全文完成后才解析；m_DataList 的最后一条 assistant
+        //已经是正在审查的这份候选回复，必须跳过，不能让它给自己作证。
+        string lastAssistant = GetLastAssistantSemanticContext(true);
+        if (!string.IsNullOrWhiteSpace(lastAssistant))
+            sb.Append("\n前一角色发言（只能帮助解析用户的‘是/对/它’，不能单独作为事实依据）：\n")
+              .Append(TruncateMemoryEvidence(lastAssistant, 2000));
+
+        LLM model = m_ChatSettings != null ? m_ChatSettings.m_ChatModel : null;
+        if (model != null && model.m_DataList != null)
+        {
+            var recentUsers = new List<string>();
+            for (int i = model.m_DataList.Count - 1;
+                 i >= 0 && recentUsers.Count < 4;
+                 i--)
+            {
+                LLM.SendData message = model.m_DataList[i];
+                if (message == null ||
+                    !string.Equals(message.role, "user", StringComparison.OrdinalIgnoreCase) ||
+                    string.IsNullOrWhiteSpace(message.content))
+                    continue;
+                recentUsers.Add(TruncateMemoryEvidence(message.content, 3500));
+            }
+            recentUsers.Reverse();
+            if (recentUsers.Count > 0)
+            {
+                sb.Append("\n最近可见的用户轮与系统感知事实：");
+                for (int i = 0; i < recentUsers.Count; i++)
+                    sb.Append("\n--- user turn ").Append(i + 1).Append(" ---\n")
+                      .Append(recentUsers[i]);
+            }
+        }
+
+        if (model != null && !string.IsNullOrWhiteSpace(model.TrailingContext))
+            sb.Append("\n当前可见的本地记忆/短期事实：\n")
+              .Append(TruncateMemoryEvidence(model.TrailingContext, 6000));
+        return sb.ToString();
+    }
+
+    private string GetLastAssistantSemanticContext(bool skipLatestAssistant)
+    {
+        LLM model = m_ChatSettings != null ? m_ChatSettings.m_ChatModel : null;
+        if (model != null && model.m_DataList != null)
+        {
+            bool skipped = false;
+            for (int i = model.m_DataList.Count - 1; i >= 0; i--)
+            {
+                LLM.SendData message = model.m_DataList[i];
+                if (message == null ||
+                    !string.Equals(message.role, "assistant", StringComparison.OrdinalIgnoreCase) ||
+                    string.IsNullOrWhiteSpace(message.content))
+                    continue;
+                if (skipLatestAssistant && !skipped)
+                {
+                    skipped = true;
+                    continue;
+                }
+                return TruncateMemoryEvidence(message.content, 3000);
+            }
+        }
+        //旧 provider 没维护 m_DataList 时保留原来的聊天记录后备。
+        return GetLastAssistantMessage();
+    }
+
+    private static string TruncateMemoryEvidence(string text, int maxChars)
+    {
+        string clean = (text ?? "").Trim();
+        if (clean.Length <= maxChars) return clean;
+        //保留尾部：感知帧后面才是用户本人的当前原话。
+        return "…" + clean.Substring(clean.Length - maxChars);
+    }
+
+    private void ApplyGroundedMemorySubset(
+        List<MemoryTagParser.MemoryOp> ops,
+        List<int> acceptedFactOrdinals,
+        bool validatorSucceeded)
+    {
+        var accepted = acceptedFactOrdinals ?? new List<int>();
+        var safe = new List<MemoryTagParser.MemoryOp>();
+        var rejectedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rejectedDescriptions = new List<string>();
+        int factOrdinal = 0;
+
+        for (int i = 0; i < ops.Count; i++)
+        {
+            MemoryTagParser.MemoryOp op = ops[i];
+            if (op.isLink || op.isNote) continue;
+            factOrdinal++;
+            if (accepted.Contains(factOrdinal))
+            {
+                safe.Add(op);
+            }
+            else
+            {
+                if (!op.isUpdate && !string.IsNullOrWhiteSpace(op.name))
+                    rejectedNames.Add(op.name.Trim());
+                rejectedDescriptions.Add(string.IsNullOrWhiteSpace(op.name)
+                    ? "未命名候选"
+                    : op.name.Trim());
+            }
+        }
+
+        //note 保留；link 也保留，除非它正指向本批次被拒绝的新事实节点。
+        for (int i = 0; i < ops.Count; i++)
+        {
+            MemoryTagParser.MemoryOp op = ops[i];
+            if (op.isNote)
+            {
+                safe.Add(op);
+                continue;
+            }
+            if (op.isLink &&
+                !rejectedNames.Contains(op.from ?? "") &&
+                !rejectedNames.Contains(op.to ?? ""))
+                safe.Add(op);
+        }
+
+        if (safe.Count > 0) m_MemoryHub.ApplyMemoryOps(safe);
+        if (rejectedDescriptions.Count == 0) return;
+
+        string reason = validatorSucceeded
+            ? "当前可见证据不足以完整支持候选事实"
+            : "记忆依据审查没有得到可靠结果";
+        string detail = reason + "，未写入长期记忆：" +
+            string.Join("、", rejectedDescriptions) +
+            "。可以保留为短期线索，或等用户明确说明后再记。";
+        NoteToolFailure(detail);
+        Debug.LogWarning("[Memory/Grounding] " + detail);
     }
 
     /// <summary>
@@ -367,66 +1011,88 @@ public class ChatSample : MonoBehaviour
     private void CallBack(string _response)
     {
         _response = (_response ?? "").Trim();
+        // Markdown code spans quote protocol syntax for explanation; they are not
+        // actions. Remove quoted known tags before every non-streaming extractor so
+        // an example such as `<hum_back/>` cannot outrank the real tag that follows.
+        _response = RemoveQuotedAgentActionTags(_response);
+        int subtitleGeneration = ++m_FormalResponseGeneration;
+        EnsureSubtitleOverlay();
+        if (m_SubtitleOverlay != null) m_SubtitleOverlay.BeginUtterance(subtitleGeneration);
+        if (_response.Length == 0)
+        {
+            HandleSystemNotice(new SystemNotice(
+                "llm_response_failed",
+                SystemNoticeSeverity.Error,
+                "角色回复生成失败，请稍后再试。",
+                "non-streaming response was empty",
+                "ChatSample",
+                true));
+            m_TextBack.text = "";
+            return;
+        }
         //非流式路径同样处理标签:记忆标签提取应用,其余标签剥净——
         //system prompt 无条件教标签,任何模式下模型都可能输出,漏剥会被念出来
         string afterMem;
         var memOps = MemoryTagParser.Extract(_response, out afterMem);
-        if (memOps != null && m_MemoryHub != null) m_MemoryHub.ApplyMemoryOps(memOps);
+        ApplyMemoryOpsWithGrounding(memOps);
         AgentSkillRequest ignoredSkillRequest = ExtractSkillRequestTag(ref afterMem);
         if (ignoredSkillRequest != null && m_LogAgentLoop)
             Debug.LogWarning("[LLM技能] 非流式回复中的自主 Skill 申请已忽略；该握手只在 Agent 流式链中执行");
         AgentSkillControlRequest skillControl = ExtractSkillControlTag(ref afterMem);
-        AgentSingingIntentRequest singingIntent = ExtractSingingIntentTag(ref afterMem);
+        AgentSingingPolicyRequest singingPolicy = ExtractSingingPolicyTag(ref afterMem);
         bool selfRepeat = IsVerbatimSelfRepeat(
             StripAgentTagsForTTS(afterMem), out string selfRepeatReason);
-        bool singingIntentAccepted = false;
-        string singingIntentResult = "";
-        if (!selfRepeat && singingIntent != null)
+        bool singingPolicyAccepted = false;
+        string singingPolicyResult = "";
+        if (!selfRepeat && singingPolicy != null)
         {
-            singingIntentAccepted = TryApplySingingIntent(
-                singingIntent, out singingIntentResult);
-            if (!singingIntentAccepted)
-                NoteToolFailure("未执行 singing 结构化意图：" + singingIntentResult);
+            singingPolicyAccepted = TryApplySingingPolicy(
+                singingPolicy, out singingPolicyResult);
+            if (!singingPolicyAccepted)
+                NoteToolFailure("未执行 singing 权限变更：" + singingPolicyResult);
         }
         if (!selfRepeat && skillControl != null &&
             !TryApplySkillControl(skillControl, out string skillControlResult))
         {
             NoteToolFailure("未执行 Skill 权限变更：" + skillControlResult);
         }
-        bool hadSingingAction = s_PracticeDropTagRegex.IsMatch(afterMem) ||
+        bool hadSingingAction = s_PracticeConfirmTagRegex.IsMatch(afterMem) ||
+            s_PracticeReviseTagRegex.IsMatch(afterMem) ||
+            s_PracticeDropTagRegex.IsMatch(afterMem) ||
             s_SongMemoryTagRegex.IsMatch(afterMem) || s_SongSearchTagRegex.IsMatch(afterMem) ||
-            s_SongSingTagRegex.IsMatch(afterMem) || s_HumBackTagRegex.IsMatch(afterMem) ||
-            (singingIntent != null && singingIntent.Action != "none");
+            s_SongSingTagRegex.IsMatch(afterMem) || s_HumBackTagRegex.IsMatch(afterMem);
         bool singingActionAllowed = CanExecuteSkillAction("singing", out string singingBlockReason);
-        if (singingIntent != null && !singingIntentAccepted)
-        {
-            singingActionAllowed = false;
-            singingBlockReason = "singing_intent 校验失败：" + singingIntentResult;
-        }
         AgentSongMemoryRequest songMemory = ExtractSongMemoryTag(ref afterMem);
         AgentSongSearchRequest songSearch = ExtractSongSearchTag(ref afterMem);
+        AgentSongCatalogRequest songCatalog = ExtractSongCatalogTag(ref afterMem);
         AgentSongSingRequest songSing = ExtractSongSingTag(ref afterMem);
+        m_PracticeEditFailedThisResponse = false;
+        ExtractAndApplyPracticeConfirmTag(ref afterMem, !selfRepeat && singingActionAllowed);
+        ExtractAndApplyPracticeReviseTag(ref afterMem, !selfRepeat && singingActionAllowed);
         ExtractAndApplyPracticeDropTag(ref afterMem, !selfRepeat && singingActionAllowed);
         AgentHumBackRequest humBack = ExtractHumBackTag(ref afterMem);
-        if (!selfRepeat)
-            ApplySingingIntentAction(
-                singingIntent, singingIntentAccepted, ref songSing, ref humBack);
-        if (!selfRepeat && singingActionAllowed && !m_AgentCurrentRoundIsTick &&
-            !ValidateUserSingingActionAuthorization(
-                singingIntentAccepted && singingIntent != null ? singingIntent.Actor : "",
-                singingIntentAccepted && singingIntent != null ? singingIntent.Action : "",
-                songSing != null,
-                humBack != null ? humBack.Mode : "",
-                out string userSingingAuthorizationFailure))
+        AgentSingingStopRequest singingStop = ExtractSingingStopTag(ref afterMem);
+        if (!selfRepeat && singingStop != null)
         {
-            singingActionAllowed = false;
-            singingBlockReason = userSingingAuthorizationFailure;
+            bool continuesWithNewAction = songSing != null || humBack != null;
+            CancelSkillRuntimeActivity("singing", "singing-stop-tool");
+            if (continuesWithNewAction)
+            {
+                NoteSingingRoutingFact(
+                    "singing_stop",
+                    "old_activity_stopped_then_new_action_retained",
+                    "同一回复还包含新的歌唱动作；程序只停止旧活动，并继续处理新动作。" +
+                    "是否发起新动作仍来自角色本轮决定。");
+            }
+            if (m_LogAgentLoop)
+                Debug.Log("[LLM技能] singing_stop 已执行；reason=" + singingStop.Reason +
+                          (continuesWithNewAction ? "；同轮新歌唱动作保留" : ""));
         }
         string speakerName = ExtractSpeakerNameTag(ref afterMem);
         AgentSpeakerManageRequest speakerManage = ExtractSpeakerManageTag(ref afterMem);
         if (selfRepeat)
         {
-            songMemory = null; songSearch = null; songSing = null; humBack = null;
+            songMemory = null; songSearch = null; songCatalog = null; songSing = null; humBack = null;
             speakerName = null; speakerManage = null;
             m_SelfRepeatNote = "未执行：" + selfRepeatReason;
             NoteToolFailure(m_SelfRepeatNote);
@@ -442,31 +1108,45 @@ public class ChatSample : MonoBehaviour
             NoteToolFailure("未执行 singing Skill 动作：" + singingBlockReason);
             Debug.LogWarning("[LLM技能] 拦下未授权的 singing 动作：" + singingBlockReason);
         }
-        if (TryRerouteSongSingToPractice(ref songSing, ref humBack) && m_LogHumBack)
-            Debug.LogWarning("[SongSing→HumBack] 曲库标签指向本轮练唱片段，已保留顺序并改走 practice");
+        if (songCatalog != null &&
+            !CanInspectSkillData("singing", out string catalogInspectionBlockReason))
+        {
+            songCatalog = null;
+            NoteToolFailure("未执行曲库自查：" + catalogInspectionBlockReason);
+        }
+        RejectInvalidSongSingMaterialSource(ref songSing);
+        bool songSingRerouted = TryRerouteSongSingToPractice(ref songSing, ref humBack);
+        if (songSingRerouted)
+        {
+            NoteSingingRoutingFact(
+                "song_sing",
+                "routed_for_validation",
+                "current_material_source_corrected",
+                $"角色决定演唱的意图已保留；实际素材不在长期曲库，已改走 " +
+                $"hum_back mode={humBack.Mode}, order={humBack.Order ?? ""}。" +
+                "程序没有替角色决定是否演唱，只纠正了客观素材来源；" +
+                "这个改路请求仍需通过 order 等参数校验才会执行。");
+            if (m_LogHumBack)
+                Debug.LogWarning($"[SongSing→HumBack] 曲库标签指向当前歌声素材，已按来源改走 {humBack.Mode}");
+        }
         if (ShouldDiscardSongSingToolForCurrentTurn(songSing))
         {
+            ReportToolFailureForLlm(
+                "song_sing",
+                "wrong_material_source",
+                "当前用户原话指向跟唱约定、正在发生的演唱、失败反馈或最近录音，" +
+                "而 song_sing 只读取长期曲库；本次曲库演唱没有执行。",
+                "先根据真实可用素材判断来源：即时录音用 hum_back echo，" +
+                "练唱清单用 hum_back practice；只有用户确实指向长期曲库时才用 song_sing。" +
+                "是否仍要演唱、解释或询问用户由你决定。");
             if (m_LogHumBack)
                 Debug.LogWarning("[SongSing] 模型把跟唱约定、当前演唱或失败陈述误写成曲库演唱；已丢弃该标签并重新分流");
             songSing = null;
         }
-        if (humBack != null) m_ExplicitHumBackHandled = true;
-        if (songMemory != null)
+        if (songMemory != null &&
+            songMemory.Action == "remember" && string.IsNullOrWhiteSpace(songMemory.Title))
         {
-            if (songMemory.Action == "remember" && string.IsNullOrWhiteSpace(songMemory.Title))
-                songMemory.Title = ExtractExplicitSongTitle(m_LastUserMsg);
-            m_ExplicitSongRememberHandled = true;
-        }
-        if (songMemory == null && !selfRepeat && singingActionAllowed &&
-            ShouldFallbackToExplicitSongRemember())
-        {
-            songMemory = new AgentSongMemoryRequest
-            {
-                Action = "remember",
-                Title = ExtractExplicitSongTitle(m_LastUserMsg),
-                Reason = "用户明确要求记住最近歌声，但模型漏掉了 song_remember 标签",
-            };
-            m_ExplicitSongRememberHandled = true;
+            songMemory.Title = ExtractExplicitSongTitle(m_LastUserMsg);
         }
         bool heldForSongMemory = m_HoldSpeechForSongMemoryResult;
         bool heldForHumBack = m_HoldSpeechForHumBackResult;
@@ -477,6 +1157,7 @@ public class ChatSample : MonoBehaviour
             CompleteSongMemoryImmediately("没有找到可用于保存的最近歌声音频，本次未写入本机曲库。");
         }
         if (songSearch != null) BeginSongSearch(songSearch);
+        if (songCatalog != null) BeginSongCatalogInspection(songCatalog);
         if (speakerManage != null) BeginSpeakerManage(speakerManage);
         //曾经在这里做「模型漏调 <song_sing/> 就按正则兜底」。已删除：8/9 实测触发 5 次、
         //成功 0 次，而正则从普通说话里编出来的"歌名"是「了呀」(出自"我刚才已经唱了呀")、
@@ -485,26 +1166,19 @@ public class ChatSample : MonoBehaviour
         //更要命的是它会连带扣住她那一轮的正常回复(已扣留 7 次)，查不到歌之后整轮无声。
         //而那几轮模型自己**没有**调用 <song_sing/>——它判断"这不是点歌请求"，判断是对的，
         //是正则在第二次猜并且猜错。要不要从曲库唱，交给她自己决定。
+        if (m_PracticeEditFailedThisResponse && humBack != null)
+        {
+            humBack = null;
+            NoteToolFailure("同一回复中的来源确认/素材修订没有成功，后续 hum_back 未执行；" +
+                            "旧版本没有被冒充成修复结果。");
+        }
         if (songSing != null)
         {
             // 持久曲库与“刚才一句”是不同音源；同一轮只执行一种真实歌唱动作。
             humBack = null;
             BeginSongSing(songSing);
         }
-        if (songSing == null && humBack == null && !selfRepeat && singingActionAllowed &&
-            singingIntentAccepted && singingIntent != null &&
-            singingIntent.Actor == "character" && singingIntent.Action == "echo" &&
-            ShouldFallbackToExplicitHumBack())
-        {
-            humBack = new AgentHumBackRequest
-            {
-                Mode = "echo",
-                Reason = "用户明确要求回哼最近旋律，但模型漏掉了 hum_back 标签",
-            };
-            m_ExplicitHumBackHandled = true;
-            if (m_LogHumBack)
-                Debug.LogWarning("[HumBack] 检测到明确回哼请求，模型未调用 <hum_back/>，执行安全兜底");
-        }
+        m_HumBackTransactionRetainedThisRound = false;
         if (humBack != null) QueueHumBack(humBack);
         m_HoldSpeechForSongMemoryResult = false;
         m_HoldSpeechForHumBackResult = false;
@@ -522,6 +1196,10 @@ public class ChatSample : MonoBehaviour
 
         
         Debug.Log("收到AI回复："+ _response);
+
+        if (m_SubtitleOverlay != null)
+            m_SubtitleOverlay.QueueTranslationChunk(
+                subtitleGeneration, _response, true);
 
         //记录聊天
         m_ChatHistory.Add(_response);
@@ -603,6 +1281,14 @@ public class ChatSample : MonoBehaviour
     [Range(0.65f, 0.98f)] [SerializeField] private float m_SpeculativeSpeechVetoConfidence = 0.82f;
     [Tooltip("临时心里话判断为歌唱达到此置信度时，可与流式声学证据一起请求最终歌唱分析；仍不能绕过最终声学确认。")]
     [Range(0.55f, 0.95f)] [SerializeField] private float m_SpeculativeSingingSupportConfidence = 0.70f;
+    [Tooltip("达到此置信度的流式歌唱判断会作为复核证据交给正式角色 LLM；它不会单独触发动作。")]
+    [Range(0.5f, 0.9f)] [SerializeField] private float m_ModeReviewSingingConfidence = 0.60f;
+    [Tooltip("长旋律岛触发正式角色复核所需的最短秒数；只提供证据，不替角色判定。")]
+    [Range(2f, 12f)] [SerializeField] private float m_ModeReviewMelodicIslandSeconds = 4f;
+    [Tooltip("长旋律岛复核所需的最低音高稳定度。")]
+    [Range(0.4f, 0.95f)] [SerializeField] private float m_ModeReviewPitchStability = 0.60f;
+    [Tooltip("长旋律岛占有效内容的最低比例。")]
+    [Range(0.5f, 1f)] [SerializeField] private float m_ModeReviewMelodicIslandRatio = 0.80f;
 
     private string m_StreamingTranscript = "";
     //最近一次收到流式 partial 的时刻。自主发言的闸用它判断"用户还在说话"。
@@ -621,6 +1307,11 @@ public class ChatSample : MonoBehaviour
     private Coroutine m_SpeculativeDraftCoroutine;
     private SpeculativeDraft m_SpeculativeDraft;
     private bool m_SpeculativeRequestInFlight = false;
+    private bool m_TurnBoundaryRequestInFlight = false;
+    private int m_TurnBoundaryRequestVersion = 0;
+    private float m_TurnBoundaryRequestStarted = -1f;
+    private string m_LastBoundaryDecisionReason = "";
+    private string m_StalledTurnAction = "";
     private bool m_StreamingTurnIsSinging = false;
     private float m_StreamingSingingProbability = 0f;
     private float m_StreamingPitchStability = 0f;
@@ -637,32 +1328,49 @@ public class ChatSample : MonoBehaviour
     private string m_LastObservedMode = "";
     private float m_LastObservedModeConfidence = 0f;
     private string m_LastObservedModeTranscript = "";
+    private string m_LastSpeechVetoLogKey = "";
+    //本轮曾由流式角色判断为普通说话的前缀。后续歌词 partial 若改判 singing，
+    //也不能抹掉“开头确实先说过话”这一事实；只在真实轮次结束时重置。
+    private bool m_StreamingSemanticSpokenLeadInObserved = false;
+    //同一真实用户轮里，流式角色 LLM 只要曾以中等以上把某一段判断为 singing，
+    //后续“唱完又说话”也不能抹掉这份语义证据。它不直接确认来源，只确保进入融合/quarantine。
+    private bool m_StreamingSemanticSingingObservedThisTurn = false;
+    private float m_StreamingSemanticSingingConfidenceThisTurn = 0f;
+    private string m_StreamingSemanticSingingTranscriptThisTurn = "";
     private int m_StreamingSingingLowFrames = 0;
     private bool m_StreamingSingingExitDetected = false;
     private string m_StreamingSingingEvidence = "";
     private float m_LastSingingSpeculativeRequestTime = -999f;
     private bool m_EouCognitiveSpeechVeto = false;
-    [Tooltip("拿最终转写问一次 LLM「这是唱还是说」，判完再决定要不要回哼。" +
-             "实测不带上下文的轻量请求 0.41s，十个历史误判样本全对；关掉则完全依赖声学" +
-             "与流式判定，而流式只有约 25% 的轮次来得及回包。")]
+    private string m_StalledTurnDecisionNote = "";
+    [Tooltip("把声学、旋律岛和流式语义证据交给本次正式角色 LLM 复核。" +
+             "不会额外串行调用分类器，因此不增加角色回复的首音等待。")]
     [SerializeField] private bool m_EnableFinalModeCheck = true;
-    //本轮的最终模态结论："singing" / "speech" / "-"(判不出) / ""(还没问)。
-    //非空即表示已经问过，用来防止回调重入时再问一次。
+    //保留给旧场景/回归兼容；正式模态判断现在由收到证据帧的角色 LLM 在同一请求中完成，
+    //不再在 DealingTextCallback 前串行等待一个裸文本分类器。
     private string m_FinalModeVerdict = "";
-    //声学很确定在唱、而文字说不是时的软降级：仍按歌唱轮呈现给 LLM，但不自动回哼、
-    //不写进练唱会话。文字判错时最坏只是"她没主动唱回来"，而不是整段演唱被丢弃。
+    //声学 uncertain 或语义/声学冲突时的安全态：不自动回哼、不替用户定案，
+    //暂存可用素材并把证据交给角色。字段名沿用 soft downgrade，避免遗漏既有安全闸。
     private bool m_FinalModeSoftDowngrade = false;
-    //软降级这一轮要不要让她出声追问「刚才那段是在唱吗」。只在本轮内有效，
+    //强证据冲突或双方都 uncertain 时，要不要建议她自然确认。只在本轮内有效，
     //构造完 _msg 就清掉，不跨轮。
     private bool m_PendingSingingConfirmation = false;
-    //刚靠"唱出去且用户没异议"清掉待确认标的段号，回报给她一次。
-    private List<int> m_JustConfirmedPhraseIndices = null;
+    //待确认片段的口头确认由辅助 LLM 判定。回调会重新进入 SendDataInternal，
+    //这一位只跳过紧接着的那一次，避免同一句无限重复发起语义判定。
+    //语义确认/否认结果只随当前用户轮出现一次，作为事实给正式角色 LLM；
+    //它不替角色决定是否回唱，否认时也不自动删除素材。
+    private string m_PracticeSemanticResolutionNote = "";
     private bool m_EouCognitiveSingingSupport = false;
     private int m_SingingBridgeGeneration = 0;
     private bool m_SingingBridgeTtsInFlight = false;
     private AudioClip m_PreparedSingingBridgeClip;
     private AudioClip m_DeferredPreparedClipToDestroy;
     private string m_PreparedSingingBridgeText = "";
+    //预合成开场对应的 partial。最终 ASR 到达后必须用它做一致度提交，不能只看开场文本。
+    private string m_PreparedBridgeSourceTranscript = "";
+    //预合成时角色自己给出的模态判断。最终确认可以推翻它来生成正式回复，
+    //但不能让一条基于“用户还在说话/还没开始唱”的旧开场不可撤销地播出去。
+    private string m_PreparedBridgeObservedMode = "";
     //本轮真正出过声的那句开场，在播放时留存，只在轮次重置时清。
     private string m_SpokenBridgeTextThisTurn = "";
     private float m_PreparedSingingBridgeConfidence = 0f;
@@ -674,6 +1382,7 @@ public class ChatSample : MonoBehaviour
     private string m_PendingBridgeText = "";
     private float m_PendingBridgeConfidence = 0f;
     private bool m_PendingBridgeIsSinging = false;
+    private string m_PendingBridgeObservedMode = "";
     /// <summary>
     /// 语音输入的按钮
     /// </summary>
@@ -754,6 +1463,9 @@ public class ChatSample : MonoBehaviour
     /// <param name="_data"></param>
     public void AcceptClip(AudioClip _audioClip)
     {
+        // Button-recorded clips are independent inputs, not continuations of an
+        // earlier realtime microphone capture whose context is still cached.
+        (m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText)?.BeginLiveRecordingCandidateSession();
         AcceptClip(_audioClip, true);
     }
 
@@ -768,7 +1480,8 @@ public class ChatSample : MonoBehaviour
         m_EouCognitiveSpeechVeto = HasStrongSpeculativeSpeechVeto();
         m_EouCognitiveSingingSupport = !m_EouCognitiveSpeechVeto &&
             HasStrongSpeculativeSingingSupport();
-        bool expectObservedSinging = HasActiveSingAlongRequest() &&
+        bool expectedSingingContext = HasExpectedUserSingingAcousticContext();
+        bool expectObservedSinging = expectedSingingContext &&
             !m_EouCognitiveSpeechVeto &&
             (m_StreamingTurnIsSinging || m_EouCognitiveSingingSupport);
 
@@ -779,16 +1492,24 @@ public class ChatSample : MonoBehaviour
 
         m_FinalAsrRequestsInFlight++;
         bool streamingExitAtSubmission = m_StreamingSingingExitDetected;
+        int inputRevision = m_InputAudioRevision;
         bool completed = false;
         Action<string> onFinalAsr = text =>
         {
             if (completed) return;
             completed = true;
             m_FinalAsrRequestsInFlight = Mathf.Max(0, m_FinalAsrRequestsInFlight - 1);
+            if (inputRevision != m_InputAudioRevision) return;
             DealingTextCallback(text, streamingExitAtSubmission);
         };
         SenseVoiceSpeechToText senseVoice = m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText;
         if (senseVoice != null)
+        {
+            bool semanticSpokenLeadIn =
+                GetStreamingSingingOnsetSeconds() >= 0f &&
+                (m_StreamingSemanticSpokenLeadInObserved ||
+                 (NormalizeObservedMode(m_LastObservedMode) == "speech" &&
+                  Mathf.Clamp01(m_LastObservedModeConfidence) >= 0.70f));
             senseVoice.SpeechToText(
                 _audioClip,
                 onFinalAsr,
@@ -796,9 +1517,37 @@ public class ChatSample : MonoBehaviour
                 expectObservedSinging,
                 GetStreamingSingingOnsetSeconds(),
                 GetStreamingObservedSeconds(),
-                streamingExitAtSubmission);
+                streamingExitAtSubmission,
+                semanticSpokenLeadIn);
+        }
         else
             m_ChatSettings.m_SpeechToText.SpeechToText(_audioClip, onFinalAsr);
+    }
+
+    /// <summary>
+    /// RTSpeechHandler 已经有一份覆盖全部有效内容的预测 ASR 在飞时，先把它登记成
+    /// 正式工作，避免 Agent Loop 在等待期间误以为系统空闲。clip 只用于并行准备可撤销
+    /// 的快速回唱；预测失败后仍可回落到 AcceptClip。
+    /// </summary>
+    public bool BeginDeferredFinalAsr(AudioClip completeClip)
+    {
+        m_FinalAsrRequestsInFlight++;
+        TryStageFastHumBackAtEou(completeClip);
+        return m_StreamingSingingExitDetected;
+    }
+
+    public void AcceptDeferredFinalAsrText(string text, bool streamingExitAtSubmission)
+    {
+        m_FinalAsrRequestsInFlight = Mathf.Max(0, m_FinalAsrRequestsInFlight - 1);
+        DealingTextCallback(text, streamingExitAtSubmission);
+    }
+
+    public void FallbackDeferredFinalAsrToClip(
+        AudioClip completeClip,
+        bool allowSpeakerLearning)
+    {
+        m_FinalAsrRequestsInFlight = Mathf.Max(0, m_FinalAsrRequestsInFlight - 1);
+        AcceptClip(completeClip, allowSpeakerLearning);
     }
 
     /// <summary>
@@ -809,7 +1558,8 @@ public class ChatSample : MonoBehaviour
     public void PreviewASR(
         AudioClip _audioClip,
         System.Action<string> _callback,
-        bool allowSpeakerLearning = true)
+        bool allowSpeakerLearning = true,
+        System.Action<string> onRawTranscript = null)
     {
         if (m_ChatSettings == null || m_ChatSettings.m_SpeechToText == null)
         {
@@ -820,20 +1570,36 @@ public class ChatSample : MonoBehaviour
         if (senseVoice != null)
         {
             bool cognitiveSpeechVeto = HasStrongSpeculativeSpeechVeto();
-            bool expectObservedSinging = HasActiveSingAlongRequest() &&
+            bool expectObservedSinging = HasExpectedUserSingingAcousticContext() &&
                 !cognitiveSpeechVeto &&
                 (m_StreamingTurnIsSinging || HasStrongSpeculativeSingingSupport());
+            bool semanticSpokenLeadIn =
+                GetStreamingSingingOnsetSeconds() >= 0f &&
+                (m_StreamingSemanticSpokenLeadInObserved ||
+                 (NormalizeObservedMode(m_LastObservedMode) == "speech" &&
+                  Mathf.Clamp01(m_LastObservedModeConfidence) >= 0.70f));
             senseVoice.SpeechToText(
                 _audioClip,
-                _callback,
+                text =>
+                {
+                    // Capture from the exact provider/result before another analysis
+                    // can change LastText; callers bind it to their snapshot generation.
+                    onRawTranscript?.Invoke(senseVoice.LastText ?? "");
+                    _callback?.Invoke(text);
+                },
                 allowSpeakerLearning,
                 expectObservedSinging,
                 GetStreamingSingingOnsetSeconds(),
                 GetStreamingObservedSeconds(),
-                m_StreamingSingingExitDetected);
+                m_StreamingSingingExitDetected,
+                semanticSpokenLeadIn, true);
         }
         else
-            m_ChatSettings.m_SpeechToText.SpeechToText(_audioClip, _callback);
+            m_ChatSettings.m_SpeechToText.SpeechToText(_audioClip, text =>
+            {
+                onRawTranscript?.Invoke(text ?? "");
+                _callback?.Invoke(text);
+            });
     }
 
     /// <summary>
@@ -860,7 +1626,7 @@ public class ChatSample : MonoBehaviour
             // When the user explicitly armed continuous sing-along, accept a lower
             // probability only if pitch remains stable for several consecutive frames.
             // Normal conversation keeps the original thresholds above.
-            bool expectedMelodicFrame = HasActiveSingAlongRequest() &&
+            bool expectedMelodicFrame = HasExpectedUserSingingAcousticContext() &&
                 transcript.SingingProbability >= 0.32f &&
                 transcript.PitchStability >= 0.50f;
             bool strongFrame = normalStrongFrame || expectedMelodicFrame;
@@ -884,12 +1650,28 @@ public class ChatSample : MonoBehaviour
              (transcript.IsSinging || transcript.SingingProbability >= 0.54f)) ||
             (m_StreamingSingingEvidenceFrames >= 3 && averageSingingProbability >= 0.58f &&
              transcript.SingingProbability >= 0.48f && transcript.PitchStability >= 0.35f);
-        bool expectedStableSingingEvidence = HasActiveSingAlongRequest() &&
+        bool expectedStableSingingEvidence = HasExpectedUserSingingAcousticContext() &&
             m_StreamingSingingConsecutiveFrames >= 3 &&
             transcript.SingingProbability >= 0.32f &&
             transcript.PitchStability >= 0.50f;
         bool stableSingingEvidence = normalStableSingingEvidence ||
             expectedStableSingingEvidence;
+        bool repeatedSemanticSpeechVeto = ShouldSuppressRepeatedMelodicEntry(
+            m_LastObservedMode,
+            m_LastObservedModeConfidence,
+            m_SpeculativeSpeechVetoConfidence,
+            m_LastObservedModeTranscript,
+            transcript.Text);
+        if (stableSingingEvidence && repeatedSemanticSpeechVeto &&
+            !m_StreamingTurnIsSinging)
+        {
+            stableSingingEvidence = false;
+            string vetoKey = NormalizeTranscript(m_LastObservedModeTranscript);
+            if (m_LogSpeculativeListening && vetoKey != m_LastSpeechVetoLogKey)
+                Debug.Log("[歌唱流式倾听] 相同文字已由角色高置信度判为说话；" +
+                          "保持声学证据供持续背景复核，但不再逐帧重进歌唱状态");
+            m_LastSpeechVetoLogKey = vetoKey;
+        }
         if (stableSingingEvidence && m_StreamingSingingOnsetAudioMs < 0)
         {
             m_StreamingSingingOnsetAudioMs = m_StreamingSingingCandidateStartAudioMs >= 0
@@ -939,7 +1721,8 @@ public class ChatSample : MonoBehaviour
             //UpdateStreamingSingingReaction **内部**才置 true 的，而这段检查在调用它之前，
             //所以拦在"切进去之前"的那些命中会一条都打不出来(实测 0 次，只能靠
             //"起唱锚点打印了两次"反推出它其实生效了)。改成无条件打印，并区分两种情形。
-            if (m_LogSpeculativeListening)
+            string vetoKey = NormalizeTranscript(m_LastObservedModeTranscript);
+            if (m_LogSpeculativeListening && vetoKey != m_LastSpeechVetoLogKey)
             {
                 float sim = (!string.IsNullOrWhiteSpace(m_LastObservedModeTranscript) &&
                              !string.IsNullOrWhiteSpace(m_StreamingTranscript))
@@ -952,6 +1735,7 @@ public class ChatSample : MonoBehaviour
                           $"pitch={transcript.PitchStability:F2}; 转写相似度={sim:F2}; " +
                           $"判定源=\"{TruncateForFrame(m_LastObservedModeTranscript, 24)}\")");
             }
+            m_LastSpeechVetoLogKey = vetoKey;
             m_StreamingTurnIsSinging = false;
             m_StreamingSingingOnsetAudioMs = -1;
             m_StreamingSingingConsecutiveFrames = 0;
@@ -960,6 +1744,13 @@ public class ChatSample : MonoBehaviour
         }
         if (singing)
         {
+            if (stableSingingEvidence && OnStableUserSingingObserved != null)
+            {
+                OnStableUserSingingObserved(
+                    transcript.SingingProbability,
+                    transcript.PitchStability,
+                    transcript.AudioMs);
+            }
             UpdateStreamingSingingReaction(transcript);
             return;
         }
@@ -977,6 +1768,14 @@ public class ChatSample : MonoBehaviour
         if (m_ChatSettings == null || m_ChatSettings.m_ChatModel == null ||
             text.Length < Mathf.Max(2, m_SpeculativeMinTranscriptChars)) return;
 
+        if (m_TurnBoundaryRequestInFlight)
+        {
+            if (m_LogSpeculativeListening)
+                Debug.Log($"[流式倾听] v{m_StreamingTranscriptVersion} audio={transcript.AudioMs}ms " +
+                          "边界复核进行中；只更新文字证据，不启动低优先级草稿");
+            return;
+        }
+
         // 普通“末尾继续增长”不取消在飞请求，否则约 1 秒一次的 partial 会让草稿永远完不成。
         // 只有 ASR 明确回滚且新旧含义差异很大时才撤销；EOU 则始终立即撤销。
         if (m_SpeculativeRequestInFlight && transcript.Revision &&
@@ -993,6 +1792,240 @@ public class ChatSample : MonoBehaviour
 
         if (m_LogSpeculativeListening)
             Debug.Log($"[流式倾听] v{version} audio={transcript.AudioMs}ms revision={transcript.Revision}: \"{text}\"");
+    }
+
+    private static bool ShouldSuppressRepeatedMelodicEntry(
+        string observedMode,
+        float modeConfidence,
+        float speechThreshold,
+        string judgedTranscript,
+        string currentTranscript)
+    {
+        if (NormalizeObservedMode(observedMode) != "speech" ||
+            modeConfidence < speechThreshold)
+            return false;
+        string judged = NormalizeTranscript(judgedTranscript);
+        string current = NormalizeTranscript(currentTranscript);
+        if (judged.Length == 0 || current.Length == 0) return false;
+        if (string.Equals(judged, current, StringComparison.Ordinal)) return true;
+        int delta = Mathf.Abs(judged.Length - current.Length);
+        return delta <= 1 &&
+            (judged.StartsWith(current, StringComparison.Ordinal) ||
+             current.StartsWith(judged, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// 物理声音持续存在、但文字已经停止增长时使用独立的高优先级 LLM 通道判断轮次边界。
+    /// 这不是定时强切：continue / take_turn / ask_user / complete 由角色结合文字和声学事实选择。
+    /// </summary>
+    public bool SupportsRoleTurnBoundary => m_ChatSettings != null &&
+        m_ChatSettings.m_ChatModel != null && m_ChatSettings.m_ChatModel.SupportsTurnBoundaryMessages;
+
+    public bool RequestStalledTurnReview(
+        string transcript,
+        float unchangedSeconds,
+        int audioMs,
+        float currentRms,
+        float eouThreshold,
+        float ambientFloor,
+        bool ambientCalibrated,
+        float latestSingingProbability,
+        float peakSingingProbability,
+        float recentSingingProbability,
+        float singingProbabilityTrend,
+        float pitchStability,
+        int priorContinueDecisions,
+        string lastDecisionStatus,
+        float lastDecisionConfidence,
+        float dropDb,
+        float dropHeldSeconds,
+        float asrAgeSeconds,
+        int unchangedAudioMs,
+        string trigger,
+        int failedReviews,
+        string activityEvidence = null)
+    {
+        if (m_ChatSettings == null || m_ChatSettings.m_ChatModel == null ||
+            !m_ChatSettings.m_ChatModel.SupportsTurnBoundaryMessages ||
+            string.IsNullOrWhiteSpace(transcript))
+            return false;
+        //连 provider 没有回调的异常路径也能重试；这个计时器只管理请求，不截断用户音频。
+        if (m_TurnBoundaryRequestInFlight)
+        {
+            if (Time.realtimeSinceStartup - m_TurnBoundaryRequestStarted < 7f) return false;
+            CancelTurnBoundaryReview();
+        }
+
+        //边界复核优先于可撤销的说话/歌唱预反应。先撤销低优先级草稿，随后用独立
+        //request generation 发起；新流式帧只能更新证据，不能取消或占住这条请求。
+        CancelSpeculativeRequestOnly();
+        int requestVersion = ++m_TurnBoundaryRequestVersion;
+        m_TurnBoundaryRequestInFlight = true;
+        m_TurnBoundaryRequestStarted = Time.realtimeSinceStartup;
+        string sourceTranscript = transcript.Trim();
+        string trendDescription = singingProbabilityTrend > 0.015f
+            ? "上升"
+            : singingProbabilityTrend < -0.015f
+                ? "下降"
+                : "近似持平";
+        string decisionHistory = priorContinueDecisions > 0
+            ? $"此前已连续选择 continue={priorContinueDecisions} 次；最近一次=" +
+              $"{NormalizeTurnStatus(lastDecisionStatus)}/{Mathf.Clamp01(lastDecisionConfidence):F2}。"
+            : "此前没有对同一稳定内容选择过 continue。";
+        string prompt =
+            "[内部轮次边界判断；不要正式回复、不要调用工具、不要写入记忆]\n" +
+            "这是轮次时机复核，不是催你回应。麦克风可能仍有声音，也可能音量已经下降。" +
+            "持续声音可能是用户继续说话/哼唱，也可能是外放音乐或环境声。请由你结合语义与证据判断，" +
+            "程序不会用关键词替你决定。\n" +
+            $"本轮当前累计转写=\"{sourceTranscript}\"\n" +
+            $"当前互动证据：持续轮唱约定={HasActiveSingAlongRequest()}; 本轮曾识别歌唱={m_StreamingTurnIsSinging}。" +
+            "这是历史模态，不代表此刻仍在发声。旧对话里的确认或结束不能冒充本轮结束。\n" +
+            (activityEvidence ?? "近期活动字段暂不可用，不要从旧歌词推断当前仍有新发声。") + "\n" +
+            $"文字未变化={unchangedSeconds:F1}s; 已听音频={audioMs}ms; " +
+            $"当前RMS={currentRms:F4}; EOU阈值={eouThreshold:F4}; " +
+            $"环境基线={(ambientCalibrated ? ambientFloor.ToString("F4") : "未完成校准")}; " +
+            $"最新歌唱概率={latestSingingProbability:F2}; " +
+            $"最近短期均值={recentSingingProbability:F2}; 本轮峰值={peakSingingProbability:F2}; " +
+            $"最近趋势={trendDescription}({singingProbabilityTrend:+0.000;-0.000;0.000}/帧); " +
+            $"最新音高稳定度={pitchStability:F2}\n" +
+            $"触发={trigger}; 相对电平下降={dropDb:F1}dB; 低电平保持={dropHeldSeconds:F2}s; " +
+            $"最新ASR回包年龄={asrAgeSeconds:F2}s; 文字稳定后ASR已覆盖新增音频={unchangedAudioMs}ms; " +
+            $"此前无效复核={failedReviews}次。相对dB来自麦克风PCM，不是物理声压级。\n" +
+            GetTurnBoundaryThought(sourceTranscript) + "\n" +
+            decisionHistory + "\n" +
+            BuildTurnBoundaryGuidance() +
+            "turn_state 单独写你认为对方当前表达是 open(仍未完)、closed(已有交接点) 还是 uncertain。" +
+            "它必须与你选择的动作一致：open 时若故意接话用 interrupt_user，否则 continue；" +
+            "ask_user 用于已有交接点但内容/来源仍需确认，不可一边写 open 一边伪装成自然交接。" +
+            "只输出以下6字段JSON；reason一句简短理由，不要长篇分析、完整回答或工具标签：" +
+            "{\"action\":\"continue|take_turn|ask_user|complete|interrupt_user\",\"confidence\":0.0," +
+            "\"mode\":\"speech|singing|uncertain\",\"source\":\"user|background|uncertain\"," +
+            "\"turn_state\":\"open|closed|uncertain\",\"reason\":\"简短理由\"}";
+
+        m_ChatSettings.m_ChatModel.PostTurnBoundaryMsg(prompt, response =>
+        {
+            if (requestVersion != m_TurnBoundaryRequestVersion) return;
+            m_TurnBoundaryRequestInFlight = false;
+            if (!TurnBoundaryDecision.TryParse(response, out TurnBoundaryDecision parsed))
+            {
+                if (m_LogSpeculativeListening)
+                    Debug.LogWarning("[Semantic EOU] 边界协议无效；已释放请求并允许重试。raw=" +
+                                     TruncateForFrame(response ?? "<empty>", 700));
+                if (OnStalledUserTurnDecision != null)
+                    OnStalledUserTurnDecision(
+                        "", 0f, "uncertain", 0f, "uncertain",
+                        sourceTranscript, audioMs);
+                return;
+            }
+
+            //轮次选择不是“当前声源属于用户歌声”的确认，不再反向改写模态锁。
+            m_LastBoundaryDecisionReason = parsed.reason;
+
+            if (m_LogSpeculativeListening)
+                Debug.Log($"[Semantic EOU] LLM={parsed.action}/{parsed.confidence:F2} " +
+                          $"mode={parsed.mode} source={parsed.source} turn={parsed.turn_state} " +
+                          $"reason={parsed.reason} latest/mean/peak=" +
+                          $"{latestSingingProbability:F2}/{recentSingingProbability:F2}/" +
+                          $"{peakSingingProbability:F2} trend={singingProbabilityTrend:+0.000;-0.000;0.000} " +
+                          $"priorContinue={priorContinueDecisions} " +
+                          $"text=\"{TruncateForFrame(sourceTranscript, 48)}\"");
+            if (OnStalledUserTurnDecision != null)
+                OnStalledUserTurnDecision(
+                    parsed.action,
+                    parsed.confidence,
+                    parsed.mode,
+                    0f,
+                    parsed.source,
+                    sourceTranscript,
+                    audioMs);
+        });
+        return true;
+    }
+
+    public bool HasTurnBoundaryThought(string transcript)
+    {
+        return !string.IsNullOrWhiteSpace(m_DeferredAutonomyIntent) ||
+            (m_SpeculativeDraft != null && !string.IsNullOrWhiteSpace(m_SpeculativeDraft.draft) &&
+             TranscriptSimilarity(m_SpeculativeDraft.sourceTranscript, transcript) >= m_SpeculativeReuseSimilarity);
+    }
+
+    private static string BuildTurnBoundaryGuidance()
+    {
+        return "先区分‘有内容可回应’和‘现在适合接话’。识别出歌词、想安慰或已有草稿，本身都不是抢过话轮的理由。" +
+            "continue=我选择继续倾听，包括给未完句、思考、换气或乐句间停顿留空间；不需要证明对方此刻仍在发声。" +
+            "take_turn=我认为已有自然交接点；ask_user=我选择在交接点自然询问不确定处；" +
+            "interrupt_user=我知道对方可能仍在说/唱，但有具体理由主动打断（包括需要立即询问），不是误以为对方已结束；" +
+            "complete=我确信本轮表达结束。这些选择都有效，不确定时仍可询问、等待或采用自己的判断。\n" +
+            "一句歌词结束不等于整段演唱结束，词义像陈述/邀请也可能仍是歌词；轮唱约定不是每个换气点都回唱。" +
+            "例如话语停在‘不过…’或‘我那时候呢…’，即使已有回答也可以继续听；" +
+            "旋律仍在发展、歌词前后相接时可等下一乐句；多次新音频确认文字不再推进且声源不明时可询问；" +
+            "完整问题后出现自然交接时可接话。这是语境示例，不是关键词规则。\n" +
+            "文字未变可能只是下一次ASR尚未返回；新增音频覆盖=0尤其不能当作已停止。" +
+            "音量下降、旋律峰值、最新低概率都不是独立结论；结合近期证据，不要只引用旧轮‘用户已确认’。" +
+            "同样，整窗歌唱分数高也不能证明声音来自用户、或旋律还在继续；低信噪比时它可能只是周期性底噪。" +
+            "累计歌词没增长、近期有效声音也消退时，可以自然接话或询问；不能仅凭旧歌词写‘旋律仍在发展’。" +
+            "已有想法可保留到稍后，不必现在说。reason简短说明时机/为何等待，而不是只说明想答什么。" +
+            "程序会保存本轮录音并校验最终ASR后回应；你选择接话可能结束这一段采集，因此也要考虑对方是否在继续同一段表达。\n";
+    }
+
+    private string GetTurnBoundaryThought(string transcript)
+    {
+        string thought = "尚无与当前输入匹配的候选开场。";
+        if (m_SpeculativeDraft != null && !string.IsNullOrWhiteSpace(m_SpeculativeDraft.draft) &&
+            TranscriptSimilarity(m_SpeculativeDraft.sourceTranscript, transcript) >= m_SpeculativeReuseSimilarity)
+            thought = "你此前可撤销的想法=" + TruncateForFrame(m_SpeculativeDraft.inner_reaction, 80) +
+                "；候选开场=" + TruncateForFrame(m_SpeculativeDraft.draft, 120) +
+                $"；草稿置信度={m_SpeculativeDraft.confidence:F2}；语音已准备={m_PreparedSingingBridgeClip != null}。";
+        if (!string.IsNullOrWhiteSpace(m_DeferredAutonomyIntent))
+            thought += "你已形成的私人自主意图=" + TruncateForFrame(m_DeferredAutonomyIntent, 120) + "。";
+        return thought;
+    }
+
+    public void CommitStalledTurnDecisionNote(
+        string status,
+        float confidence,
+        string observedMode,
+        float modeConfidence,
+        string sourceLikelihood)
+    {
+        status = NormalizeTurnStatus(status);
+        if (!TurnBoundaryDecision.IsAction(status)) return;
+        m_StalledTurnAction = status;
+        if (status == "ask_user" || status == "continue")
+        {
+            //旧草稿不一定是问题；不能抢在角色选定的询问之前播出无关开场。
+            ReleasePreparedSingingBridge(true);
+            m_SpeculativeDraft = null;
+        }
+        m_StalledTurnDecisionNote =
+            "[持续声音下的轮次边界复核：角色内部判断=" + status +
+            "/" + Mathf.Clamp01(confidence).ToString("F2") +
+            "；输入模态=" + NormalizeObservedMode(observedMode) +
+            "/" + Mathf.Clamp01(modeConfidence).ToString("F2") +
+            "；持续声音来源倾向=" + NormalizeSourceLikelihood(sourceLikelihood) +
+            "；接话理由=" + TruncateForFrame(m_LastBoundaryDecisionReason, 120) +
+            "。这是角色的轮次选择，不是用户已经唱完整首歌或声源归属的确认。最终ASR具有最高优先级。" +
+            (status == "continue"
+                ? "你此前选择继续倾听。程序仅收束了缺少新增有效输入的一段录音，没有替你认定用户说完或要求你开口；" +
+                  "你仍可保持 <silent/>、等待，也可以根据最终完整证据改变主意、接话或自然询问。先行开场未被播放。"
+                : status == "ask_user"
+                ? "请在正式回复中以符合角色个性的方式自然询问你尚不确定的内容，例如用户是否仍在唱或持续声音的来源；依据最终ASR修正问题，不要暴露内部阈值。"
+                : status == "take_turn"
+                    ? "你选择了主动接话；结合完整用户输入采用、修改或放弃此前想法，不必重新等静音，也不要声称用户整首歌已唱完。"
+                : "请回应已经完成的文字内容；不要把疑似背景声擅自当作用户演唱。") + "]";
+    }
+
+    private static string NormalizeTurnStatus(string value)
+    {
+        string normalized = (value ?? "").Trim().ToLowerInvariant();
+        return TurnBoundaryDecision.IsAction(normalized) ? normalized : "";
+    }
+
+    private static string NormalizeSourceLikelihood(string value)
+    {
+        string normalized = (value ?? "").Trim().ToLowerInvariant();
+        return normalized == "user" || normalized == "background" ||
+               normalized == "uncertain" ? normalized : "uncertain";
     }
 
     private void UpdateStreamingSingingReaction(SenseVoiceSpeechToText.StreamingTranscript transcript)
@@ -1048,13 +2081,13 @@ public class ChatSample : MonoBehaviour
             // streaming SVC prefix is now based on a superseded intent and must not fire.
             m_StreamingSingingExitDetected = true;
             CancelSpeculativeRequestOnly();
-            ReleasePreparedSingingBridge(true);
+            ReleasePreparedSingingOnly();
             m_SpeculativeDraft = null;
             if (m_SpeculativeDraftCoroutine != null)
                 StopCoroutine(m_SpeculativeDraftCoroutine);
             m_SpeculativeDraftCoroutine = null;
 
-            if (m_EnableSpeculativeListening &&
+            if (!m_TurnBoundaryRequestInFlight && m_EnableSpeculativeListening &&
                 m_ChatSettings != null && m_ChatSettings.m_ChatModel != null &&
                 lyric.Length >= Mathf.Max(2, m_SpeculativeMinTranscriptChars))
             {
@@ -1072,18 +2105,32 @@ public class ChatSample : MonoBehaviour
             m_ChatSettings == null || m_ChatSettings.m_ChatModel == null)
             return;
 
+        if (m_TurnBoundaryRequestInFlight)
+        {
+            if (m_LogSpeculativeListening)
+                Debug.Log($"[歌唱流式倾听] v{m_StreamingTranscriptVersion} audio={transcript.AudioMs}ms " +
+                          "边界复核进行中；保留声学证据但暂停歌唱预反应");
+            return;
+        }
+
         if (m_SpeculativeRequestInFlight && transcript.Revision &&
             TranscriptContinuity(previousLyric, lyric) < 0.42f)
             CancelSpeculativeRequestOnly();
 
-        if (m_SpeculativeDraftCoroutine != null)
-            StopCoroutine(m_SpeculativeDraftCoroutine);
-        int version = m_StreamingTranscriptVersion;
-        m_SpeculativeDraftCoroutine = StartCoroutine(
-            RequestSingingDraftAfterDelay(version, evidence));
+        //不要每帧重启 debounce。流式帧约 0.9s 一次、这里的 debounce 也是 0.9s，
+        //旧做法会在协程醒来的前一刻永远取消它，使 LLM 模态复核一次都发不出去。
+        //已有协程会在醒来后读取最新 evidence；在飞请求则由回调安排下一次刷新。
+        if (ShouldScheduleSingingReview(
+                m_SpeculativeDraftCoroutine != null,
+                m_SpeculativeRequestInFlight || m_TurnBoundaryRequestInFlight))
+        {
+            int version = m_StreamingTranscriptVersion;
+            m_SpeculativeDraftCoroutine = StartCoroutine(
+                RequestSingingDraftAfterDelay(version, evidence));
+        }
 
         if (m_LogSpeculativeListening)
-            Debug.Log($"[歌唱流式倾听] v{version} audio={transcript.AudioMs}ms " +
+            Debug.Log($"[歌唱流式倾听] v{m_StreamingTranscriptVersion} audio={transcript.AudioMs}ms " +
                       $"singing={transcript.SingingProbability:F2} pitch={transcript.PitchStability:F2}: \"{lyric}\"");
     }
 
@@ -1099,7 +2146,7 @@ public class ChatSample : MonoBehaviour
         if (transcriptVersion != m_StreamingTranscriptVersion || transcript != m_StreamingTranscript)
             yield break;
         if (transcript == m_LastDraftTranscript) yield break;
-        if (m_SpeculativeRequestInFlight) yield break;
+        if (m_SpeculativeRequestInFlight || m_TurnBoundaryRequestInFlight) yield break;
 
         m_LastDraftTranscript = transcript;
         m_LastSpeculativeRequestTime = Time.realtimeSinceStartup;
@@ -1128,27 +2175,57 @@ public class ChatSample : MonoBehaviour
                 return;
             }
             SpeculativeDraft parsed = ParseSpeculativeDraft(response);
-            if (parsed != null && !string.IsNullOrWhiteSpace(parsed.draft))
+            if (parsed != null)
             {
-                parsed.observed_mode = NormalizeObservedMode(parsed.observed_mode);
                 parsed.sourceTranscript = transcript;
-                parsed.draft = StripAgentTagsForTTS(parsed.draft).Trim();
-                m_SpeculativeDraft = parsed;
-                //mode 判定单独留一份：切进歌唱模式时 m_SpeculativeDraft 会被清掉
-                //(UpdateStreamingSingingReaction 开头的 CancelSpeculativeRequestOnly)，
-                //而正是那之后才需要靠它把误判的歌唱模式退出来。
-                m_LastObservedMode = parsed.observed_mode;
-                m_LastObservedModeConfidence = Mathf.Clamp01(parsed.mode_confidence);
-                m_LastObservedModeTranscript = transcript;
-                if (m_LogSpeculativeListening)
-                    Debug.Log($"[流式倾听] 临时草稿就绪 confidence={parsed.confidence:F2} " +
-                              $"mode={parsed.observed_mode}/{parsed.mode_confidence:F2}: \"{parsed.draft}\"");
-                //草稿本来就在用户说话期间生成好了，顺手把开场静默预合成，
-                //EOU 时就能说一句切题的话，而不是通用的"なるほど……"。
-                if (!m_StreamingTurnIsSinging) PrepareSingingBridge(parsed);
+                StoreStreamingObservedMode(parsed, transcript);
+                if (IsStrongSpeculativeSpeechVeto(parsed) &&
+                    OnStableUserSpeechObserved != null)
+                    OnStableUserSpeechObserved(
+                        m_LastObservedModeConfidence,
+                        m_StreamingLatestAudioMs);
+                if (!string.IsNullOrWhiteSpace(parsed.draft))
+                {
+                    parsed.draft = StripAgentTagsForTTS(parsed.draft).Trim();
+                    m_SpeculativeDraft = parsed;
+                    if (m_LogSpeculativeListening)
+                        Debug.Log($"[流式倾听] 临时草稿就绪 confidence={parsed.confidence:F2} " +
+                                  $"mode={parsed.observed_mode}/{parsed.mode_confidence:F2}: \"{parsed.draft}\"");
+                    //草稿本来就在用户说话期间生成好了，顺手把开场静默预合成，
+                    //EOU 时就能说一句切题的话，而不是通用的"なるほど……"。
+                    if (!m_StreamingTurnIsSinging) PrepareSingingBridge(parsed);
+                }
             }
             ScheduleSpeculativeRefreshIfNeeded();
         });
+    }
+
+    /// <summary>
+    /// observed_mode 是独立的听觉判断，即使角色此刻选择沉默、draft 为空也必须保留。
+    /// 否则“LLM 已听出歌唱但暂不插话”会在 final 阶段被误当作从未有过语义证据。
+    /// </summary>
+    private void StoreStreamingObservedMode(
+        SpeculativeDraft parsed, string observedTranscript)
+    {
+        if (parsed == null) return;
+        parsed.observed_mode = NormalizeObservedMode(parsed.observed_mode);
+        m_LastObservedMode = parsed.observed_mode;
+        m_LastObservedModeConfidence = Mathf.Clamp01(parsed.mode_confidence);
+        m_LastObservedModeTranscript = observedTranscript ?? "";
+        if (parsed.observed_mode == "speech" &&
+            m_LastObservedModeConfidence >= 0.70f)
+            m_StreamingSemanticSpokenLeadInObserved = true;
+        if (parsed.observed_mode != "singing" ||
+            m_LastObservedModeConfidence < m_ModeReviewSingingConfidence)
+            return;
+
+        m_StreamingSemanticSingingObservedThisTurn = true;
+        if (m_LastObservedModeConfidence <
+            m_StreamingSemanticSingingConfidenceThisTurn)
+            return;
+        m_StreamingSemanticSingingConfidenceThisTurn =
+            m_LastObservedModeConfidence;
+        m_StreamingSemanticSingingTranscriptThisTurn = observedTranscript ?? "";
     }
 
     private IEnumerator RequestSingingDraftAfterDelay(int transcriptVersion, string evidence)
@@ -1167,10 +2244,12 @@ public class ChatSample : MonoBehaviour
         //  实测后果：一段 14 秒的哼唱里歌唱草稿发出 **0 次**，唯一那次 mode 判定
         //  来自切进歌唱之前的说话草稿。而模式判定正是靠它刷新的，退出机制因此完全没有输入。
         //  改成醒来后用当下最新的 evidence 重新取值。
-        if (!m_StreamingTurnIsSinging || m_SpeculativeRequestInFlight) yield break;
+        if (!m_StreamingTurnIsSinging || m_SpeculativeRequestInFlight ||
+            m_TurnBoundaryRequestInFlight) yield break;
         evidence = m_StreamingSingingEvidence;
         if (string.IsNullOrEmpty(evidence)) yield break;
         if (evidence == m_LastDraftTranscript) yield break;
+        string sourceTranscript = m_StreamingTranscript;
 
         m_LastDraftTranscript = evidence;
         m_LastSingingSpeculativeRequestTime = Time.realtimeSinceStartup;
@@ -1195,32 +2274,42 @@ public class ChatSample : MonoBehaviour
         {
             if (requestVersion != m_SpeculativeRequestVersion) return;
             m_SpeculativeRequestInFlight = false;
-            if (!m_StreamingTurnIsSinging || evidence != m_StreamingSingingEvidence)
+            if (!ShouldAcceptSingingReviewResult(
+                    m_StreamingTurnIsSinging,
+                    sourceTranscript,
+                    m_StreamingTranscript))
             {
                 ScheduleSingingRefreshIfNeeded();
                 return;
             }
 
             SpeculativeDraft parsed = ParseSpeculativeDraft(response);
-            if (parsed != null && !string.IsNullOrWhiteSpace(parsed.draft))
+            if (parsed != null)
             {
-                parsed.observed_mode = NormalizeObservedMode(parsed.observed_mode);
-                parsed.sourceTranscript = m_StreamingTranscript;
+                parsed.sourceTranscript = sourceTranscript;
                 //歌唱草稿也要刷新这份判定，否则切进歌唱模式之后就没有新判定了——
                 //退出将只能依赖切换之前的旧值，那等于只有一次机会。
-                m_LastObservedMode = parsed.observed_mode;
-                m_LastObservedModeConfidence = Mathf.Clamp01(parsed.mode_confidence);
-                m_LastObservedModeTranscript = m_StreamingTranscript;
+                StoreStreamingObservedMode(parsed, m_StreamingTranscript);
                 parsed.sourceEvidence = evidence;
                 parsed.sourceSingingProbability = m_StreamingSingingProbability;
                 parsed.sourcePitchStability = m_StreamingPitchStability;
                 bool speechVeto = IsStrongSpeculativeSpeechVeto(parsed);
+                if (speechVeto && OnStableUserSpeechObserved != null)
+                    OnStableUserSpeechObserved(
+                        m_LastObservedModeConfidence,
+                        m_StreamingLatestAudioMs);
                 parsed.isSinging = !speechVeto;
-                parsed.draft = speechVeto
-                    ? StripAgentTagsForTTS(parsed.draft).Trim()
-                    : SanitizeSingingBridge(parsed.draft);
-                if (!string.IsNullOrEmpty(parsed.draft))
+                if (speechVeto)
                 {
+                    ReleasePreparedSingingBridge(true);
+                    ResetStreamingHumBackPrefix(
+                        "speculative-cognition-speech-veto", true);
+                }
+                if (!string.IsNullOrWhiteSpace(parsed.draft))
+                {
+                    parsed.draft = speechVeto
+                        ? StripAgentTagsForTTS(parsed.draft).Trim()
+                        : SanitizeSingingBridge(parsed.draft);
                     m_SpeculativeDraft = parsed;
                     if (m_LogSpeculativeListening)
                     {
@@ -1229,12 +2318,7 @@ public class ChatSample : MonoBehaviour
                                   $"speechVeto={speechVeto}；候选开场 confidence={parsed.confidence:F2}: " +
                                   $"\"{parsed.draft}\"");
                     }
-                    if (speechVeto)
-                    {
-                        ReleasePreparedSingingBridge(true);
-                        ResetStreamingHumBackPrefix("speculative-cognition-speech-veto", true);
-                    }
-                    else
+                    if (!speechVeto)
                     {
                         PrepareSingingBridge(parsed);
                     }
@@ -1244,11 +2328,33 @@ public class ChatSample : MonoBehaviour
         });
     }
 
+    private static bool ShouldScheduleSingingReview(
+        bool coroutinePending,
+        bool requestInFlight)
+    {
+        return !coroutinePending && !requestInFlight;
+    }
+
+    private static bool ShouldAcceptSingingReviewResult(
+        bool stillInSingingReview,
+        string sourceTranscript,
+        string currentTranscript)
+    {
+        if (!stillInSingingReview) return false;
+        if (string.IsNullOrWhiteSpace(sourceTranscript) ||
+            string.IsNullOrWhiteSpace(currentTranscript))
+            return true;
+        //数值证据和 audio_ms 每帧都会变化，不能用整段 evidence 相等作为回包门槛；
+        //只在文字语义发生大回滚时丢弃旧判断。
+        return TranscriptContinuity(sourceTranscript, currentTranscript) >= 0.55f;
+    }
+
     private void ScheduleSingingRefreshIfNeeded()
     {
         if (!m_StreamingTurnIsSinging || string.IsNullOrWhiteSpace(m_StreamingSingingEvidence) ||
             m_StreamingSingingEvidence == m_LastDraftTranscript ||
-            m_SpeculativeDraftCoroutine != null || m_SpeculativeRequestInFlight)
+            m_SpeculativeDraftCoroutine != null || m_SpeculativeRequestInFlight ||
+            m_TurnBoundaryRequestInFlight)
             return;
         int version = m_StreamingTranscriptVersion;
         string evidence = m_StreamingSingingEvidence;
@@ -1273,7 +2379,8 @@ public class ChatSample : MonoBehaviour
     {
         if (m_StreamingTurnIsSinging || string.IsNullOrWhiteSpace(m_StreamingTranscript) ||
             m_StreamingTranscript == m_LastDraftTranscript ||
-            m_SpeculativeDraftCoroutine != null || m_SpeculativeRequestInFlight)
+            m_SpeculativeDraftCoroutine != null || m_SpeculativeRequestInFlight ||
+            m_TurnBoundaryRequestInFlight)
             return;
         int version = m_StreamingTranscriptVersion;
         string text = m_StreamingTranscript;
@@ -1311,6 +2418,71 @@ public class ChatSample : MonoBehaviour
         return "uncertain";
     }
 
+    private string DescribeStreamingSemanticModeEvidence()
+    {
+        if (m_StreamingSemanticSingingObservedThisTurn)
+        {
+            string transcript = TruncateForFrame(
+                m_StreamingSemanticSingingTranscriptThisTurn, 48);
+            return "singing/" +
+                Mathf.Clamp01(m_StreamingSemanticSingingConfidenceThisTurn).ToString("F2") +
+                (string.IsNullOrWhiteSpace(transcript)
+                    ? "（本轮较早片段）"
+                    : "（本轮较早片段=\"" + transcript + "\"）");
+        }
+        return NormalizeObservedMode(m_LastObservedMode) + "/" +
+            Mathf.Clamp01(m_LastObservedModeConfidence).ToString("F2");
+    }
+
+    private enum SingingModeFusion
+    {
+        AcousticSinging,
+        AcousticSpeech,
+        AcousticUncertainSemanticSinging,
+        AcousticUncertainSemanticSpeech,
+        AcousticUncertain,
+        ConflictSemanticSinging,
+        ConflictSemanticSpeech,
+    }
+
+    /// <summary>
+    /// 融合这里只负责识别“证据是否冲突”，不负责替角色猜最终事实。
+    /// 完整转写判断优先于较早的流式判断；完整判断无结论时才沿用流式判断。
+    /// </summary>
+    private static SingingModeFusion FuseSingingModeEvidence(
+        bool acousticSaysSinging,
+        bool acousticIsUncertain,
+        string finalSemanticVerdict,
+        bool streamingSemanticSinging,
+        bool streamingSemanticSpeech)
+    {
+        string rawFinalMode = (finalSemanticVerdict ?? "").Trim().ToLowerInvariant();
+        bool finalModeWasExplicit = rawFinalMode == "singing" ||
+            rawFinalMode == "speech" || rawFinalMode == "uncertain";
+        string semanticMode = finalModeWasExplicit
+            ? rawFinalMode
+            : streamingSemanticSinging != streamingSemanticSpeech
+                ? (streamingSemanticSinging ? "singing" : "speech")
+                : "uncertain";
+
+        if (acousticIsUncertain)
+        {
+            if (semanticMode == "singing")
+                return SingingModeFusion.AcousticUncertainSemanticSinging;
+            if (semanticMode == "speech")
+                return SingingModeFusion.AcousticUncertainSemanticSpeech;
+            return SingingModeFusion.AcousticUncertain;
+        }
+
+        if (semanticMode == "singing" && !acousticSaysSinging)
+            return SingingModeFusion.ConflictSemanticSinging;
+        if (semanticMode == "speech" && acousticSaysSinging)
+            return SingingModeFusion.ConflictSemanticSpeech;
+        return acousticSaysSinging
+            ? SingingModeFusion.AcousticSinging
+            : SingingModeFusion.AcousticSpeech;
+    }
+
     private bool IsStrongSpeculativeSpeechVeto(SpeculativeDraft draft)
     {
         return draft != null &&
@@ -1340,7 +2512,10 @@ public class ChatSample : MonoBehaviour
         SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
             ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
             : null;
-        return senseVoice != null && senseVoice.LastSingingProbability >= 0.58f;
+        //0.52~0.58 的声学仍是不确定证据，不足以确认歌唱；但完整转写 LLM 已判
+        //singing 时，足以推翻更早、信息更少的流式 speech 草稿。自动回唱仍由
+        //m_FinalModeSoftDowngrade 在 uncertain 状态下拦住。
+        return senseVoice != null && senseVoice.LastSingingProbability >= 0.52f;
     }
 
     private bool HasStrongSpeculativeSpeechVeto()
@@ -1461,6 +2636,9 @@ public class ChatSample : MonoBehaviour
         m_PendingBridgeText = bridgeText;
         m_PendingBridgeConfidence = draft.confidence;
         m_PendingBridgeIsSinging = singing;
+        m_PendingBridgeObservedMode = NormalizeObservedMode(draft.observed_mode);
+        string bridgeSourceTranscript = draft.sourceTranscript ?? "";
+        string bridgeObservedMode = m_PendingBridgeObservedMode;
         string label = singing ? "歌唱预反应" : "说话预反应";
 
         if (m_LogSpeculativeListening)
@@ -1489,6 +2667,8 @@ public class ChatSample : MonoBehaviour
             AudioClip previous = m_PreparedSingingBridgeClip;
             m_PreparedSingingBridgeClip = clip;
             m_PreparedSingingBridgeText = text;
+            m_PreparedBridgeSourceTranscript = bridgeSourceTranscript;
+            m_PreparedBridgeObservedMode = bridgeObservedMode;
             m_PreparedSingingBridgeConfidence = m_PendingBridgeConfidence;
             m_PreparedBridgeIsSinging = m_PendingBridgeIsSinging;
             if (previous != null)
@@ -1556,6 +2736,133 @@ public class ChatSample : MonoBehaviour
         return true;
     }
 
+    private static bool ShouldCommitPreparedBridgeAfterFinal(
+        bool finalModeConfirmed,
+        bool singingBridge,
+        bool sourceModeCompatible,
+        float transcriptSimilarity,
+        float requiredSimilarity)
+    {
+        if (!finalModeConfirmed) return false;
+        //歌词的流式/最终 ASR 本来就可能差异很大，歌唱开场不比歌词相似度；
+        //但其生成依据不能明确判为 speech。那种开场通常仍在说“等你开始唱”，
+        //放到已经唱完的最终事实后会成为不可撤销的时序错误。
+        return singingBridge
+            ? sourceModeCompatible
+            : transcriptSimilarity >= requiredSimilarity;
+    }
+
+    /// <summary>
+    /// 预生成与预合成可以发生在用户说话期间，但实际出声属于不可撤销提交：必须等最终
+    /// ASR/模态证据到达。普通说话还要核对“这段音频对应的 partial”而不只是最新草稿，
+    /// 防止旧音频在新草稿尚未合成完成时被错误沿用。
+    /// </summary>
+    private bool TryCommitPreparedBridgeAfterFinal(
+        string finalTranscript,
+        bool wantSinging,
+        bool finalModeConfirmed,
+        out float sourceSimilarity)
+    {
+        if (m_StalledTurnAction == "ask_user" || m_StalledTurnAction == "continue")
+        {
+            sourceSimilarity = 0f;
+            return false;
+        }
+        sourceSimilarity = wantSinging
+            ? 1f
+            : TranscriptSimilarity(m_PreparedBridgeSourceTranscript, finalTranscript);
+        bool sourceModeCompatible = !wantSinging ||
+            NormalizeObservedMode(m_PreparedBridgeObservedMode) != "speech";
+        m_EouFillerGeneration++;
+        m_EouFillerScheduled = false;
+
+        bool decision = ShouldCommitPreparedBridgeAfterFinal(
+            finalModeConfirmed,
+            wantSinging,
+            sourceModeCompatible,
+            sourceSimilarity,
+            m_SpeculativeReuseSimilarity);
+        if (!decision || m_PreparedSingingBridgeClip == null ||
+            m_PreparedBridgeIsSinging != wantSinging ||
+            m_AudioSource == null || m_AudioSource.isPlaying || m_LatencyFillerPlayed)
+        {
+            if (!decision && m_LogSpeculativeListening)
+                Debug.Log($"[{(wantSinging ? "歌唱预反应" : "说话预反应")}] " +
+                          $"最终证据未通过提交，预合成只保留为可撤销准备 " +
+                          $"(mode={finalModeConfirmed}, source_mode=" +
+                          $"{NormalizeObservedMode(m_PreparedBridgeObservedMode)}, " +
+                          $"source_compatible={sourceModeCompatible}, " +
+                          $"similarity={sourceSimilarity:F2})");
+            return false;
+        }
+
+        if (!TryPlayPreparedSingingBridge(
+                wantSinging, m_AudioSource, out string fillerText, out float fillerDuration))
+            return false;
+
+        m_LatencyFillerPlayed = true;
+        m_LatencyFillerFromEou = true;
+        m_LatencyFillerText = fillerText;
+        m_LatencyFillerStartedAt = Time.realtimeSinceStartup;
+        m_LatencyFillerDuration = Mathf.Max(0.1f, fillerDuration);
+        m_CurrentlyPlayingText = fillerText;
+        m_TextBack.text = fillerText;
+        SetAnimator("state", 2);
+        IsAISpeaking = true;
+
+        if (m_LogStreamTimings)
+        {
+            float eouToFiller = m_EouTime > 0f
+                ? Time.realtimeSinceStartup - m_EouTime
+                : 0f;
+            Debug.Log($"[Timing] ★ EOU→最终确认后首音: {eouToFiller:F2}s");
+            Debug.Log($"[{(wantSinging ? "歌唱预反应" : "说话预反应")}] " +
+                      $"最终证据通过后播放预合成开场: \"{fillerText}\" " +
+                      $"(source_similarity={sourceSimilarity:F2})");
+        }
+        return true;
+    }
+
+    private void AbandonPreparedBridgeAfterFinal(string reason)
+    {
+        m_EouFillerGeneration++;
+        m_EouFillerScheduled = false;
+        CancelPendingBridgeSynthesis(true);
+        if (m_LogSpeculativeListening)
+            Debug.Log($"[说话预反应] 不自动提交开场；已就绪音频仅供正式LLM重新选择 ({reason})");
+    }
+
+    private string PreparedReplyChoiceHint()
+    {
+        if (m_PreparedSingingBridgeClip == null || string.IsNullOrWhiteSpace(m_PreparedSingingBridgeText))
+            return "";
+        return "\n[本轮未说出口的候选开场：" + m_PreparedSingingBridgeText +
+            "\n它基于较早的片段，尚未经最终语义确认，也没有播放或写入已说历史。" +
+            "请先完整理解本轮最终输入和声学证据。若这句仍符合你的意思，可原样作为正式回复开头；" +
+            "也可自由改写、不用、询问或保持沉默。不要为了复用而忽略否定、后半句或不确定性。]";
+    }
+
+    // The final model has already selected these exact spoken words. This is an
+    // audio-cache lookup, never an ASR similarity test or a program-chosen answer.
+    private AudioClip TakePreparedFormalReply(string selectedText)
+    {
+        if (m_PreparedSingingBridgeClip == null ||
+            !string.Equals(selectedText.Trim(), m_PreparedSingingBridgeText.Trim(), StringComparison.Ordinal))
+            return null;
+        AudioClip clip = m_PreparedSingingBridgeClip;
+        m_PreparedSingingBridgeClip = null; // transfer ownership to the formal player
+        ClearPreparedBridgeClip();
+        Debug.Log("[说话预反应] 正式LLM选择了候选原句，复用音频作为正式回复（非先行开场）");
+        return clip;
+    }
+
+    private static int PreparedReplyBoundary(string generated, string prepared, bool complete)
+    {
+        if (string.IsNullOrEmpty(prepared) || string.IsNullOrEmpty(generated)) return -1;
+        if (generated.StartsWith(prepared, StringComparison.Ordinal)) return prepared.Length - 1;
+        return !complete && prepared.StartsWith(generated, StringComparison.Ordinal) ? -2 : -1;
+    }
+
     private void ReleasePreparedSingingBridge(bool cancelSynthesis)
     {
         //已经合成好、却还没播就被丢掉的素材，是白付掉的一次 LLM+TTS。和
@@ -1569,11 +2876,34 @@ public class ChatSample : MonoBehaviour
                       $"conf={m_PreparedSingingBridgeConfidence:F2}): " +
                       $"\"{m_PreparedSingingBridgeText}\"");
         }
-        if (cancelSynthesis && m_ChatSettings != null && m_ChatSettings.m_TextToSpeech != null)
+        CancelPendingBridgeSynthesis(cancelSynthesis);
+        ClearPreparedBridgeClip();
+    }
+
+    // Speech confirmation cancels singing preparation, not a speech opener whose
+    // own source transcript still needs the normal final-consistency check.
+    private void ReleasePreparedSingingOnly()
+    {
+        if (m_SingingBridgeTtsInFlight && m_PendingBridgeIsSinging)
+            CancelPendingBridgeSynthesis(true);
+        if (m_PreparedBridgeIsSinging)
+            ClearPreparedBridgeClip();
+    }
+
+    private void CancelPendingBridgeSynthesis(bool cancelRequest)
+    {
+        if (cancelRequest && m_ChatSettings != null && m_ChatSettings.m_TextToSpeech != null)
             m_ChatSettings.m_TextToSpeech.CancelPreparedSpeech();
         m_SingingBridgeGeneration++;
         m_SingingBridgeTtsInFlight = false;
+        m_PendingBridgeText = "";
+        m_PendingBridgeConfidence = 0f;
+        m_PendingBridgeIsSinging = false;
+        m_PendingBridgeObservedMode = "";
+    }
 
+    private void ClearPreparedBridgeClip()
+    {
         if (m_PreparedSingingBridgeClip != null)
         {
             if (m_AudioSource != null && m_AudioSource.isPlaying &&
@@ -1591,11 +2921,10 @@ public class ChatSample : MonoBehaviour
         }
         m_PreparedSingingBridgeClip = null;
         m_PreparedSingingBridgeText = "";
+        m_PreparedBridgeSourceTranscript = "";
+        m_PreparedBridgeObservedMode = "";
         m_PreparedSingingBridgeConfidence = 0f;
         m_PreparedBridgeIsSinging = false;
-        m_PendingBridgeText = "";
-        m_PendingBridgeConfidence = 0f;
-        m_PendingBridgeIsSinging = false;
     }
 
     /// <summary>
@@ -1605,6 +2934,7 @@ public class ChatSample : MonoBehaviour
     private string FinalizeSpeculativeTurn(string finalTranscript)
     {
         CancelSpeculativeRequestOnly();
+        CancelTurnBoundaryReview();
 
         SpeculativeDraft draft = m_SpeculativeDraft;
         float similarity = draft != null
@@ -1614,7 +2944,8 @@ public class ChatSample : MonoBehaviour
         if (draft != null && !string.IsNullOrWhiteSpace(draft.draft) &&
             similarity >= m_SpeculativeReuseSimilarity)
         {
-            //已经出声(或即将出声)的那句开场不再写进这里。它由 PublishSpokenPrefixToLlm
+            float preparedSourceSimilarity = TranscriptSimilarity(m_PreparedBridgeSourceTranscript, finalTranscript);
+            //最终证据通过后已经出声的那句开场不再写进这里。它由 PublishSpokenPrefixToLlm
             //作为一条 assistant 消息挂在用户消息之后，正式回复相当于接着它往下写——
             //散文形态的"不要重复它"实测挡不住(8/11 那轮明写了，她照样又说了一遍；
             //离线复现同样是 1/5 重说、2/5 重新打招呼，换成 assistant 消息后归零)。
@@ -1625,8 +2956,7 @@ public class ChatSample : MonoBehaviour
                 (!m_PendingBridgeIsSinging && m_SingingBridgeTtsInFlight &&
                  m_PendingBridgeConfidence >= m_SpeechBridgeMinConfidence);
             bool bridgeSpoken = m_PreparedSingingBridgePlayedThisTurn && !m_PreparedBridgeIsSinging;
-            bool bridgeHandledAsPrefix =
-                bridgeSpoken || (speechBridgeReady && m_EouFillerScheduled);
+            bool bridgeHandledAsPrefix = bridgeSpoken;
 
             hint =
                 "[本轮可撤销倾听状态；最终用户转写具有最高优先级。不要提及这段内部状态。\n" +
@@ -1641,36 +2971,53 @@ public class ChatSample : MonoBehaviour
                       "若最终文本改变了含义，必须修改或放弃候选回答。]");
             if (m_LogSpeculativeListening)
                 Debug.Log($"[流式倾听] 最终一致度 {similarity:F2}，复用临时准备作为本轮提示" +
-                          $"(开场走前缀={bridgeHandledAsPrefix})");
+                          $"(音频源一致度={preparedSourceSimilarity:F2}, " +
+                          $"开场走前缀={bridgeHandledAsPrefix})");
         }
         else if (draft != null && m_LogSpeculativeListening)
         {
             Debug.Log($"[流式倾听] 最终一致度 {similarity:F2}，放弃临时草稿并重新理解");
+            AbandonPreparedBridgeAfterFinal($"transcript-similarity={similarity:F2}");
+        }
+        else
+        {
+            AbandonPreparedBridgeAfterFinal("no-reusable-final-draft");
         }
 
         m_SpeculativeDraft = null;
         m_StreamingTranscript = "";
         m_LastDraftTranscript = "";
         ResetStreamingSingingEvidence();
-        return hint;
+        return (hint ?? "") + PreparedReplyChoiceHint();
     }
 
     private string FinalizeSingingTurn(SenseVoiceSpeechToText senseVoice)
     {
         CancelSpeculativeRequestOnly();
+        CancelTurnBoundaryReview();
         bool confirmedSinging = senseVoice != null && senseVoice.LastIsSinging;
         m_EouSingingRejectedByFinal = !confirmedSinging;
 
         SpeculativeDraft draft = m_SpeculativeDraft;
+        bool draftModeCompatible = draft != null &&
+            NormalizeObservedMode(draft.observed_mode) != "speech";
         bool reusable = confirmedSinging && draft != null && draft.isSinging &&
+            draftModeCompatible &&
             !string.IsNullOrWhiteSpace(draft.draft) &&
             draft.confidence >= m_SingingBridgeMinConfidence;
-        string hint = null;
+        string finalGrounding = m_StalledTurnAction == "take_turn" || m_StalledTurnAction == "ask_user"
+            ? "[本轮录音由角色主动接话/询问收束；这不证明用户已经唱完整首歌。请结合完整ASR和你自己的接话意图回应。]"
+            : confirmedSinging
+            ? "[本轮最终听觉事实：用户这一轮已经唱完，最终歌唱分析也确认了歌声。" +
+              "请基于已经听到的内容自然回应；不要再说仍在等待用户开始唱，" +
+              "也不要把流式阶段未完成的理解当成最终事实。]"
+            : "";
+        string hint = string.IsNullOrEmpty(finalGrounding) ? null : finalGrounding;
         if (reusable)
         {
             //与说话那条一致：已经出声的短开场交给 assistant 前缀，这里不再复述。
             bool alreadySpoken = m_PreparedSingingBridgePlayedThisTurn;
-            hint =
+            hint = finalGrounding + "\n" +
                 "[本轮可撤销听歌状态；最终歌唱分析具有最高优先级，不要提及内部状态。\n" +
                 "听歌期间的理解：" + (draft.understanding ?? "") + "\n" +
                 "仍不确定：" + (draft.uncertainty ?? "") + "\n" +
@@ -1679,16 +3026,20 @@ public class ChatSample : MonoBehaviour
                 "（置信度 " + Mathf.Clamp01(draft.mode_confidence).ToString("F2") + "）\n" +
                 (alreadySpoken
                     ? "]"
-                    : "安全短开场：" + draft.draft + "\n" +
-                      "若稍后由快速回应播放这句，正式回答请从它之后自然接续，" +
-                      "不要重复它的意思；否则可自行改写。]");
+                    : "已准备但未提交的安全短开场：" + draft.draft + "\n" +
+                      "它没有对用户播放；可自行采用、改写或放弃。]");
             if (m_LogSpeculativeListening)
                 Debug.Log($"[歌唱流式倾听] 最终确认为歌唱，复用内部感受；" +
                           $"开场已播放={alreadySpoken}");
         }
         else
         {
-            if (!confirmedSinging) ReleasePreparedSingingBridge(true);
+            AbandonPreparedBridgeAfterFinal(
+                !confirmedSinging
+                    ? "final-mode-not-singing"
+                    : !draftModeCompatible
+                        ? "draft-source-mode-was-speech"
+                        : "draft-confidence-insufficient");
             if (m_LogSpeculativeListening)
                 Debug.Log($"[歌唱流式倾听] 最终门控未通过 " +
                           $"(singing={confirmedSinging}, confidence={(draft != null ? draft.confidence : 0f):F2})，" +
@@ -1700,7 +3051,7 @@ public class ChatSample : MonoBehaviour
         m_LastDraftTranscript = "";
         m_StreamingSingingEvidence = "";
         ResetStreamingSingingEvidence();
-        return hint;
+        return (hint ?? "") + PreparedReplyChoiceHint();
     }
 
     private void ResetStreamingSingingEvidence()
@@ -1718,6 +3069,8 @@ public class ChatSample : MonoBehaviour
         m_LastObservedMode = "";
         m_LastObservedModeConfidence = 0f;
         m_LastObservedModeTranscript = "";
+        m_LastSpeechVetoLogKey = "";
+        m_StreamingSemanticSpokenLeadInObserved = false;
         m_StreamingSingingLowFrames = 0;
         m_StreamingSingingExitDetected = false;
     }
@@ -1739,6 +3092,7 @@ public class ChatSample : MonoBehaviour
     private void ResetSpeculativeTurn()
     {
         CancelSpeculativeRequestOnly();
+        CancelTurnBoundaryReview();
         ReleasePreparedSingingBridge(true);
         m_StreamingTranscript = "";
         m_LastDraftTranscript = "";
@@ -1748,6 +3102,21 @@ public class ChatSample : MonoBehaviour
         m_PreparedSingingBridgePlayedThisTurn = false;
         m_SpokenBridgeTextThisTurn = "";
         m_StreamingTranscriptVersion++;
+    }
+
+    private void ResetStreamingSemanticSingingLatch()
+    {
+        m_StreamingSemanticSingingObservedThisTurn = false;
+        m_StreamingSemanticSingingConfidenceThisTurn = 0f;
+        m_StreamingSemanticSingingTranscriptThisTurn = "";
+    }
+
+    public void CancelTurnBoundaryReview()
+    {
+        m_TurnBoundaryRequestVersion++;
+        m_TurnBoundaryRequestInFlight = false;
+        if (m_ChatSettings != null && m_ChatSettings.m_ChatModel != null)
+            m_ChatSettings.m_ChatModel.CancelTurnBoundaryMsg();
     }
 
     private static float TranscriptSimilarity(string a, string b)
@@ -1774,6 +3143,40 @@ public class ChatSample : MonoBehaviour
         int lengthGrowth = Mathf.Abs(left.Length - right.Length);
         int substantiveEdits = Mathf.Max(0, distance - lengthGrowth);
         return Mathf.Clamp01(1f - substantiveEdits / (float)Mathf.Min(left.Length, right.Length));
+    }
+
+    /// <summary>
+    /// 最终整段 ASR 在“说→唱→说”中偶尔只留下开头短句，而稳定流式文本已经完整覆盖
+    /// 用户尾部请求。只有后者是前者的高连续度扩展时才采用更完整文本；两路真正冲突
+    /// 仍保留 final，交给感知证据说明，不以“谁更长”粗暴裁决。
+    /// </summary>
+    private static string ResolveAuthoritativeUserSemanticText(
+        string finalText,
+        string stableStreamingText,
+        bool mixedTurnEvidence,
+        out string basis)
+    {
+        string finalValue = (finalText ?? "").Trim();
+        string streamingValue = (stableStreamingText ?? "").Trim();
+        basis = "final-asr";
+        if (streamingValue.Length == 0) return finalValue;
+        if (finalValue.Length == 0)
+        {
+            basis = "stable-stream-only";
+            return streamingValue;
+        }
+        string finalNormalized = NormalizeTranscript(finalValue);
+        string streamingNormalized = NormalizeTranscript(streamingValue);
+        if (streamingNormalized.Length <= finalNormalized.Length) return finalValue;
+        int minimumGrowth = mixedTurnEvidence ? 3 : 6;
+        if (streamingNormalized.Length - finalNormalized.Length < minimumGrowth)
+            return finalValue;
+        float continuity = TranscriptContinuity(finalValue, streamingValue);
+        if (continuity < 0.88f) return finalValue;
+        basis = mixedTurnEvidence
+            ? $"stable-stream-mixed-extension/{continuity:F2}"
+            : $"stable-stream-extension/{continuity:F2}";
+        return streamingValue;
     }
 
     private static int TranscriptEditDistance(string left, string right)
@@ -1819,6 +3222,71 @@ public class ChatSample : MonoBehaviour
         return builder.ToString();
     }
 
+    private static int FindNormalizedPrefixEnd(string raw, string normalizedPrefix)
+    {
+        if (string.IsNullOrEmpty(raw) || string.IsNullOrEmpty(normalizedPrefix)) return -1;
+        int matched = 0;
+        for (int i = 0; i < raw.Length; i++)
+        {
+            char c = char.ToLowerInvariant(raw[i]);
+            if (char.IsWhiteSpace(c) || char.IsPunctuation(c) || char.IsSymbol(c)) continue;
+            if (matched >= normalizedPrefix.Length || c != normalizedPrefix[matched]) return -1;
+            matched++;
+            if (matched == normalizedPrefix.Length) return i + 1;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// 最终 ASR 偶尔会把角色刚从扬声器说出的句子和真人接下来的话拼在一起。
+    /// 这里只构造证据，不直接改写转写：用户也可能真的复述了角色原话。
+    /// </summary>
+    private string BuildPossibleSelfEchoEvidence(
+        string finalTranscript, SenseVoiceSpeechToText senseVoice)
+    {
+        if (string.IsNullOrWhiteSpace(finalTranscript) ||
+            string.IsNullOrWhiteSpace(m_LastAIMsgPlain))
+            return "";
+        float sincePlayback = Time.realtimeSinceStartup - m_LastVoiceOutputEndedRealtime;
+        if (!IsAISpeaking && !IsVoiceOutputPlaying &&
+            sincePlayback > Mathf.Max(1f, m_TextEchoEvidenceWindowSeconds))
+            return "";
+
+        string normalizedUser = NormalizeTranscript(finalTranscript);
+        if (normalizedUser.Length < 6) return "";
+        string[] spokenSentences = m_LastAIMsgPlain.Split(
+            new[] { '\r', '\n', '。', '！', '？', '!', '?' },
+            StringSplitOptions.RemoveEmptyEntries);
+        string best = "";
+        string bestNormalized = "";
+        for (int i = 0; i < spokenSentences.Length; i++)
+        {
+            string candidate = spokenSentences[i].Trim();
+            string normalized = NormalizeTranscript(candidate);
+            if (normalized.Length < 6 ||
+                !normalizedUser.StartsWith(normalized, StringComparison.Ordinal) ||
+                normalized.Length <= bestNormalized.Length)
+                continue;
+            best = candidate;
+            bestNormalized = normalized;
+        }
+        if (bestNormalized.Length == 0) return "";
+
+        int rawEnd = FindNormalizedPrefixEnd(finalTranscript, bestNormalized);
+        string remainder = rawEnd >= 0 && rawEnd < finalTranscript.Length
+            ? finalTranscript.Substring(rawEnd).Trim()
+            : "";
+        string speakerKind = senseVoice != null ? senseVoice.LastSpeakerKind : "unknown";
+        float ownerScore = senseVoice != null ? senseVoice.LastSpeakerConfidence : 0f;
+        float selfScore = senseVoice != null ? senseVoice.LastSpeakerSelfConfidence : 0f;
+        return "[疑似角色外放回声与真人语音重叠；程序未删除原始转写。" +
+               "与最近实际发声重合的前缀=\"" + TruncateForFrame(best, 100) + "\"；" +
+               "去除该前缀后的用户文本候选=\"" + TruncateForFrame(remainder, 180) + "\"；" +
+               $"声纹证据=kind:{speakerKind}, speaker:{ownerScore:F2}, ai_self:{selfScore:F2}。" +
+               "请结合原始转写和上下文自行判断；证据不足时可以自然确认，" +
+               "不要把疑似角色回声当成用户的新观点。]";
+    }
+
     [Serializable]
     private class SpeculativeDraft
     {
@@ -1829,6 +3297,9 @@ public class ChatSample : MonoBehaviour
         public float confidence = 0f;
         public string observed_mode = "uncertain";
         public float mode_confidence = 0f;
+        public string turn_status = "";
+        public float turn_confidence = 0f;
+        public string source_likelihood = "uncertain";
         [NonSerialized] public string sourceTranscript = "";
         [NonSerialized] public string sourceEvidence = "";
         [NonSerialized] public bool isSinging = false;
@@ -1860,13 +3331,39 @@ public class ChatSample : MonoBehaviour
         // 否则一次碰桌子也可能触发一整轮无意义回复。
         if (string.IsNullOrWhiteSpace(_msg))
         {
+            SenseVoiceSpeechToText emptySense = m_ChatSettings != null
+                ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+                : null;
+            bool streamingHeardSinging = m_EouTurnWasSinging ||
+                m_StreamingTurnIsSinging || m_EouCognitiveSingingSupport ||
+                HasStrongSpeculativeSingingSupport() ||
+                HasModerateSingingModeJudgment() ||
+                m_StreamingSemanticSingingObservedThisTurn ||
+                streamingExitAtSubmission || m_StreamingSingingExitDetected;
+            if (streamingHeardSinging && emptySense != null &&
+                emptySense.QuarantineRecentSingingCandidate(
+                    out int emptyCandidateId, out float emptyCandidateSeconds))
+            {
+                Debug.LogWarning($"[SenseVoice/Quarantine] 最终 ASR 无文字，但实时 LLM 曾判为 " +
+                                 $"singing；原始证据已隔离 candidate={emptyCandidateId} " +
+                                 $"raw={emptyCandidateSeconds:F2}s。没有把空文字伪装成用户发言；" +
+                                 "候选将在后续感知帧中交给角色判断/询问");
+            }
+            m_ListeningLatencyArmed = false;
+            m_ListeningFormalLatencyArmed = false;
             RejectFastHumBackAfterFinal("final-asr-empty");
             ResetSpeculativeTurn();
+            ResetStreamingSemanticSingingLatch();
             CancelPendingEouLatencyFiller("asr-empty", true);
             if (m_LogStreamTimings) Debug.Log("[ASR] 未检测到有效人声，本轮丢弃");
             if (m_RecordTips != null) m_RecordTips.text = "";
+            ResumePendingReplyAfterEmptyInput();
             return;
         }
+
+        m_InterruptedUserQuestion = null; // valid input also supersedes recovery when AutoSend is off
+        //每次最终 ASR 回调代表一条新的真实用户话语。同轮新建的来源候选会在
+        //SendDataInternal 前交给辅助 LLM 结合这条完整语义一起判断，不再机械延后一轮。
 
         //ASR延迟：从用户结束发言(MarkEOU)到拿到识别文本。
         //m_EouTime为0表示这一轮没有外部EOU标记(走的是按住按钮路径)，跳过。
@@ -1879,48 +3376,75 @@ public class ChatSample : MonoBehaviour
         // SenseVoice 给 LLM 的消息包含 [说话人:...] 元数据；界面仍只显示纯转写。
         string displayMsg = _msg;
         SenseVoiceSpeechToText senseVoice = m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText;
+        string rawUserText = senseVoice != null ? (senseVoice.LastText ?? "") : _msg;
+        //FinalizeSpeculativeTurn 会清空这一字段，先保存同轮最后一份稳定流式语义。
+        //它不是天然更权威；只在后面确认是 final-ASR 的高连续度扩展时采用。
+        string stableStreamingUserText = m_StreamingTranscript ?? "";
 
-        // 最终模态判定：拿完整转写问一次 LLM，判完再往下走。
-        //
-        // 为什么放在这里、为什么阻塞：流式期间的判定只有 25% 的轮次回得来
-        // (debounce 0.55~0.9s + 节流 2.4~4.0s + 往返 2.6s，而一轮常常只有 2~4 秒)，
-        // 于是「说话被当成唱歌」反复发生——0.54/0.56/0.61/0.62/0.65 都出现过，
-        // 其中几次还经 armed-sing-along 快速路径直接唱了回去(那条路不问 LLM)。
-        // 不带上下文的轻量请求实测 **0.41s**、十个历史误判样本全对，代价是快速首音
-        // 从 0.36s 变约 0.77s，仍远在 1.5s 目标之内。而且这里用的是**最终**转写，
-        // 比流式 partial 可靠得多。
-        if (m_EnableFinalModeCheck && string.IsNullOrEmpty(m_FinalModeVerdict) &&
-            senseVoice != null && senseVoice.LastIsSinging &&
-            !string.IsNullOrWhiteSpace(senseVoice.LastText))
-        {
-            ChatQW qw = m_ChatSettings.m_ChatModel as ChatQW;
-            if (qw != null)
-            {
-                string pendingMsg = _msg;
-                bool pendingExit = streamingExitAtSubmission;
-                qw.ClassifyUtteranceMode(senseVoice.LastText, verdict =>
-                {
-                    //空结论时用 "-" 占位，避免判不出来时无限重入
-                    m_FinalModeVerdict = string.IsNullOrEmpty(verdict) ? "-" : verdict;
-                    DealingTextCallback(pendingMsg, pendingExit);
-                }, senseVoice.LastSegmentLyrics);
-                return;
-            }
-        }
+        //StartRecording 通常已经取消上一轮歌唱；但外放歌声偶尔会先把录音状态
+        //占住，真人随后插话时不会再触发第二次 StartRecording。最终 ASR 已经给出
+        //非空、非 AI_SELF 的真实用户轮次，是不会漏掉的确定边界。当前这一轮自己
+        //预转换的快速回唱带有 Fast 标志，不能在这里误杀。
+        CancelSupersededSingingForAcceptedUserTurn(senseVoice);
 
-        // 文字与声学取交集，而不是让文字一票否决。
-        //
-        // 转写里"引用歌词"和"唱歌词"长得一模一样——「我刚才唱了…就是那个雪下的那么的深
-        // 那个」和真的在唱，文字上分不开(实测这一句被判成 singing)。而声学恰好知道
-        // 差别：真唱时音高稳、有持续音。所以：
-        //   声学模糊带(<0.58，多半是待唱宽松闸强行判成的唱) → 文字有完全否决权，
-        //     那正是 0.54/0.56 那两次「不对呀你漏了一些话」被唱回去的场合；
-        //   声学高区(>=0.58) → 文字说不是也只做软降级，不自动回哼但保留演唱，
-        //     因为混合轮(说话开头+后面唱)文字仍有 2/5 会答错，误杀代价太大。
+        // 不再为了模态判定串行等待一个额外的裸文本 LLM 请求。这里把声学、旋律结构
+        // 与已经返回的流式语义整理成证据，和完整转写一起交给本轮正式角色 LLM。
+        // 因而角色仍负责语境判断，同时不会为“复核”额外增加首音前网络往返。
+        bool strongStreamingSingingJudgment =
+            m_EouCognitiveSingingSupport || HasStrongSpeculativeSingingSupport() ||
+            HasStrongSingingModeJudgment();
+        bool moderateStreamingSingingJudgment = m_EnableFinalModeCheck &&
+            (HasModerateSingingModeJudgment() ||
+             m_StreamingSemanticSingingObservedThisTurn);
+        bool acousticModeUncertain = senseVoice != null &&
+            senseVoice.LastAcousticModeUncertain;
+        bool strongMelodicReviewEvidence = m_EnableFinalModeCheck &&
+            HasStrongMelodicReviewEvidence(senseVoice);
+        float recordingCandidateSeconds = 0f;
+        float recordingCandidateProbability = 0f;
+        float recordingCandidatePitchStability = 0f;
+        float recordingCandidateAgeSeconds = 0f;
+        bool recordingCandidateObserved = senseVoice != null &&
+            senseVoice.TryGetCurrentRecordingSingingCandidateFacts(
+                out recordingCandidateSeconds,
+                out recordingCandidateProbability,
+                out recordingCandidatePitchStability,
+                out recordingCandidateAgeSeconds);
+        bool recordingCandidateRequiresReview = recordingCandidateObserved &&
+            !senseVoice.LastIsSinging &&
+            !SenseVoiceSpeechToText.EndsWithSpokenSingingExit(senseVoice.LastText);
+
+        //程序只陈列证据，不在两种感知冲突时替角色裁决。这里的“语义方向”仅来自
+        //用户说话期间已经返回的流式判断；最终完整转写由接下来同一个正式角色请求判断。
+        bool acousticSaysSinging = senseVoice != null && senseVoice.LastIsSinging;
+        bool strongStreamingSpeechJudgment =
+            m_EouCognitiveSpeechVeto || HasStrongSpeculativeSpeechVeto() ||
+            HasStrongSpeechModeJudgment();
+        SingingModeFusion modeFusion = FuseSingingModeEvidence(
+            acousticSaysSinging,
+            acousticModeUncertain,
+            "",
+            strongStreamingSingingJudgment || moderateStreamingSingingJudgment,
+            strongStreamingSpeechJudgment);
+        bool semanticSingingAcousticSpeechConflict =
+            modeFusion == SingingModeFusion.ConflictSemanticSinging;
+        bool semanticSpeechAcousticSingingConflict =
+            modeFusion == SingingModeFusion.ConflictSemanticSpeech;
+        bool modeConflictRequiresConfirmation =
+            semanticSingingAcousticSpeechConflict ||
+            semanticSpeechAcousticSingingConflict;
+        bool roleModeReviewRequested = acousticModeUncertain ||
+            modeConflictRequiresConfirmation ||
+            (!acousticSaysSinging && strongMelodicReviewEvidence) ||
+            recordingCandidateRequiresReview;
+        bool confirmationRecommended = roleModeReviewRequested;
+
         bool textSaysSpeech = m_FinalModeVerdict == "speech";
         bool acousticIsConfident = senseVoice != null &&
             senseVoice.LastSingingProbability >= 0.58f;
-        m_FinalModeSoftDowngrade = textSaysSpeech && acousticIsConfident;
+        //声学 uncertain 时只关掉程序自动回唱；正式 LLM 仍可结合全部证据自行判断。
+        m_FinalModeSoftDowngrade = roleModeReviewRequested;
+        m_PendingSingingConfirmation = confirmationRecommended;
 
         bool finalEvidenceOverridesSpeculation = FinalEvidenceOverridesSpeculation();
         bool speculationSaysSpeech =
@@ -1931,24 +3455,51 @@ public class ChatSample : MonoBehaviour
             m_LogStreamTimings)
         {
             Debug.Log("[模态判定] 心里话判说话，但声学 " +
-                      $"prob={senseVoice.LastSingingProbability:F2} 与最终文字都判唱" +
+                      $"prob={senseVoice.LastSingingProbability:F3} 与最终文字都判唱" +
                       "——以信息更全的最终判定为准，不否决");
         }
-        bool cognitiveSpeechVeto = speculativeVeto ||
-            (textSaysSpeech && !acousticIsConfident);
-        if (m_FinalModeSoftDowngrade)
+        bool cognitiveSpeechVeto = !roleModeReviewRequested &&
+            (speculativeVeto || (textSaysSpeech && !acousticIsConfident));
+        if (modeConflictRequiresConfirmation && m_LogStreamTimings)
         {
-            if (m_LogStreamTimings)
-                Debug.Log($"[模态判定] 软降级：声学 prob={senseVoice.LastSingingProbability:F2} " +
-                          "仍判唱，但文字判为说话——保留演唱，改为出声追问");
-            // 软降级以前是**静默**跳过自动回哼：素材留着，但用户不知道，于是重唱、
-            // 解释、再重唱——8/10 实测一次误判换来五轮返工。
-            //
-            // 提示词那一侧已经到顶：拿 28 段真值 + 29 条真说话量过五种写法，漏判
-            // 死死卡在 6/28，而且漏的清一色是「评价+宣布+唱」这种形态(其中三条唱的
-            // 是《演员》，歌词字面就是「说话的方式」，文字侧对它没有信息量)。
-            // 判据推不动，就改代价：把静默丢弃换成一句追问，五轮返工变一轮确认。
-            m_PendingSingingConfirmation = true;
+            string semanticDirection = semanticSingingAcousticSpeechConflict
+                ? "语义=singing / 声学=speech"
+                : "语义=speech / 声学=singing";
+            Debug.Log($"[模态判定] 证据冲突：{semanticDirection}，" +
+                      $"final={m_FinalModeVerdict} stream={m_LastObservedMode}/" +
+                      $"{m_LastObservedModeConfidence:F2} acousticProb=" +
+                      $"{senseVoice.LastSingingProbability:F3} stability=" +
+                      $"{senseVoice.LastPitchStability:F2}；暂存素材并交给角色确认");
+        }
+        else if (acousticModeUncertain && m_LogStreamTimings)
+        {
+            Debug.Log($"[模态判定] 声学 uncertain：prob=" +
+                      $"{senseVoice.LastSingingProbability:F3} stability=" +
+                      $"{senseVoice.LastPitchStability:F2} island=" +
+                      $"{senseVoice.LastSingingIslandSeconds:F2}s/" +
+                      $"{senseVoice.LastSingingContentSeconds:F2}s final=" +
+                      $"{m_FinalModeVerdict} stream={m_LastObservedMode}/" +
+                      $"{m_LastObservedModeConfidence:F2}；交给角色结合语境判断");
+        }
+        else if (roleModeReviewRequested && strongMelodicReviewEvidence &&
+                 m_LogStreamTimings)
+        {
+            Debug.Log($"[模态判定] 声学标签为 speech，但旋律结构需要角色复核：" +
+                      $"prob={senseVoice.LastSingingProbability:F3} stability=" +
+                      $"{senseVoice.LastPitchStability:F2} island=" +
+                      $"{senseVoice.LastSingingIslandSeconds:F2}s/" +
+                      $"{senseVoice.LastSingingContentSeconds:F2}s stream=" +
+                      $"{m_LastObservedMode}/{m_LastObservedModeConfidence:F2}；" +
+                      "不另发分类请求，证据随正式回复提交");
+        }
+        else if (recordingCandidateRequiresReview && m_LogStreamTimings)
+        {
+            Debug.Log($"[模态判定] 本次录音较早阶段保留了歌唱候选：" +
+                      $"duration={recordingCandidateSeconds:F2}s " +
+                      $"prob={recordingCandidateProbability:F3} " +
+                      $"stability={recordingCandidatePitchStability:F2} " +
+                      $"age={recordingCandidateAgeSeconds:F1}s；" +
+                      "最终末段声学标签不同，交给角色理解整轮语义");
         }
         if (cognitiveSpeechVeto)
         {
@@ -1956,7 +3507,7 @@ public class ChatSample : MonoBehaviour
             // 不确定音频确认成歌唱。即使后台已经做了预转换，也必须在这里撤销，
             // 并把最终文字交还给普通对话 LLM。
             RejectFastHumBackAfterFinal("speculative-cognition-classified-speech");
-            ReleasePreparedSingingBridge(true);
+            ReleasePreparedSingingOnly();
             if (senseVoice != null)
             {
                 if (senseVoice.LastIsSinging)
@@ -1977,7 +3528,11 @@ public class ChatSample : MonoBehaviour
         }
         bool hadSingingEvidence = senseVoice != null &&
             (senseVoice.LastIsSinging || m_EouTurnWasSinging ||
-             m_StreamingTurnIsSinging || m_StreamingSingingExitDetected);
+             m_StreamingTurnIsSinging || m_StreamingSingingExitDetected ||
+             m_StreamingSemanticSingingObservedThisTurn ||
+             acousticModeUncertain || strongStreamingSingingJudgment ||
+             moderateStreamingSingingJudgment || strongMelodicReviewEvidence ||
+             m_FinalModeVerdict == "singing");
         bool finalTextHasSingingExit = hadSingingEvidence &&
             SenseVoiceSpeechToText.EndsWithSpokenSingingExit(senseVoice.LastText);
         // Streaming ASR can preserve the spoken tail better than the final whole-clip
@@ -1988,14 +3543,48 @@ public class ChatSample : MonoBehaviour
         bool spokenSingingExit = streamingExitAtSubmission ||
             m_StreamingSingingExitDetected || finalTextHasSingingExit;
         bool streamingConfirmedSinging = !spokenSingingExit && !cognitiveSpeechVeto &&
+            !m_FinalModeSoftDowngrade &&
             (m_EouTurnWasSinging || m_StreamingTurnIsSinging);
         if (spokenSingingExit)
         {
             RejectFastHumBackAfterFinal("singing-ended-with-spoken-exit");
-            ReleasePreparedSingingBridge(true);
+            ReleasePreparedSingingOnly();
+            float mixedIslandSeconds = 0f;
+            bool mixedIslandPreserved = senseVoice != null &&
+                senseVoice.PreserveLastPlayableSingingIslandFromMixedTurn(
+                    out mixedIslandSeconds);
+            bool mixedSourceNeedsReview = senseVoice != null &&
+                !senseVoice.LastIsSinging &&
+                (semanticSingingAcousticSpeechConflict ||
+                 strongStreamingSingingJudgment || moderateStreamingSingingJudgment ||
+                 m_EouTurnWasSinging || m_StreamingTurnIsSinging ||
+                 m_StreamingSemanticSingingObservedThisTurn);
+            int mixedCandidateId = 0;
+            float mixedCandidateSeconds = 0f;
+            bool mixedCandidateQuarantined = mixedSourceNeedsReview &&
+                senseVoice.QuarantineRecentSingingCandidate(
+                    out mixedCandidateId, out mixedCandidateSeconds);
+            int mixedPracticeCount = senseVoice != null
+                ? senseVoice.PracticePhraseCount
+                : 0;
+            bool mixedPracticeCommitted = mixedIslandPreserved &&
+                !mixedCandidateQuarantined && senseVoice != null &&
+                senseVoice.CommitRecentSingingToPracticeSession(
+                    out mixedPracticeCount);
             senseVoice.DowngradeLastMixedSingingToSpeech("recognized tail: " + senseVoice.LastText);
-            _msg = "[混合歌唱转说话; 用户在末尾表示不会继续、忘词或停止，" +
-                "必须优先回应末尾口语；本轮不得自动跟唱或写入练唱片段] " +
+            string mixedMaterialFact = mixedCandidateQuarantined
+                ? $"原始录音与边界证据已隔离为来源待确认候选 {mixedCandidateId}" +
+                  $"（约{mixedCandidateSeconds:F1}秒）；未因唱后口语而跳过 LLM 来源判断"
+                : mixedIslandPreserved
+                ? $"干净歌唱岛约{mixedIslandSeconds:F1}秒已保留为 source=recent_turn" +
+                  (mixedPracticeCommitted
+                      ? $"，并写入当前练唱会话第{mixedPracticeCount}段（source=practice）"
+                      : "；没有新增重复的练唱条目")
+                : "没有取得足够长且可播放的干净歌唱岛";
+            _msg = "[混合歌唱转说话; 本轮包含歌唱与口语，必须优先理解末尾口语；" +
+                "程序只停止未经角色决定的自动跟唱，不会因为口语边界删除真实歌声。" +
+                mixedMaterialFact + "。是否回应、回唱、保留或按用户语义丢弃该段，" +
+                "由你结合完整语境决定；不要用曲库候选替换 recent_turn/practice 素材] " +
                 senseVoice.BuildLastPerceivedText();
             m_EouSingingRejectedByFinal = true;
             if (m_LogSpeculativeListening)
@@ -2003,7 +3592,9 @@ public class ChatSample : MonoBehaviour
                           $"(requestLatch={streamingExitAtSubmission}, " +
                           $"liveLatch={m_StreamingSingingExitDetected}, " +
                           $"finalText={finalTextHasSingingExit})；" +
-                          "降级为普通对话并保留上一段有效歌声缓存");
+                          $"对话按口语收束；mixedIsland={mixedIslandPreserved} " +
+                          $"quarantined={mixedCandidateQuarantined} " +
+                          $"practiceCommitted={mixedPracticeCommitted}");
         }
         if (senseVoice != null && streamingConfirmedSinging && !senseVoice.LastIsSinging)
         {
@@ -2022,70 +3613,260 @@ public class ChatSample : MonoBehaviour
                 Debug.LogWarning("[歌唱流式倾听] 流式曾判定歌唱，但最终响应没有有效音高时间轴，无法安全回哼");
             }
         }
-        // 声学说在唱、文字说在说话——两边都不足以定案，那就别替用户决定，问一句。
-        // 素材保留 180s，他答"是"下一轮立刻能唱回来。
+        //语义与声学无论哪一个方向相反，都不要替用户决定。把双方的原始结论、
+        //概率和素材状态交给角色，让她结合语境自然确认。
         // 必须放在流式恢复之后：那一段会整个重建 _msg，写在前面会被它盖掉，
         // 结果既不回哼也不追问。
         if (m_PendingSingingConfirmation && !spokenSingingExit && !cognitiveSpeechVeto &&
             senseVoice != null)
         {
-            // 写入与确认必须分开。原来这里是"不确认就不写"，代价在 8/24 兑现了：
-            // 用户唱了 34 秒(声学 0.76、岛占 92%)，文字判说话 → 一个字都没写进练唱会话。
-            // 她照着这段指示问了、用户也答了「非常好」，可系统这边**没有任何路径消费
-            // 那个回答**——m_PendingSingingConfirmation 全文只有置位/注入/清空三处。
-            // 于是他接着说"把刚才这几段连起来唱"时，会话里根本没有那一段，来回四轮说不清。
-            //
-            // 改法是把两件事拆开：**照常写进去**，只是标一个"待确认"。
-            // 标记不拦任何用途(order 照样点得到、照样能唱)，它只是个警示；
-            // 用户否认时用 <practice_drop/> 去掉，比"漏写了再也补不回来"便宜得多。
+            //反方向过去没有 authoritative singing cache：服务端其实已经给了音频与音高，
+            //只因声学标签是 speech 就在五秒后丢失。这里仅暂存候选，不改 LastIsSinging。
+            float pendingPerformanceSeconds = 0f;
+            bool currentCandidateReady = senseVoice.HasCurrentSingingPerformanceCandidate();
+            if (!currentCandidateReady &&
+                (semanticSingingAcousticSpeechConflict || acousticModeUncertain ||
+                 strongMelodicReviewEvidence || recordingCandidateRequiresReview))
+            {
+                currentCandidateReady =
+                    senseVoice.PreserveLastPlayableCandidateForConfirmation(
+                        out pendingPerformanceSeconds);
+            }
+
             string confirmNote;
-            bool written = senseVoice.CommitRecentSingingToPracticeSession(
-                out int pendingIndex, true);
-            if (written)
+            int quarantineCandidateId = 0;
+            float quarantinedSeconds = 0f;
+            //来源取证不能受播放门槛支配。实时语义判为 singing、离线声学判为
+            //speech 时，即使旋律岛不足 3 秒，也要把同轮原始录音保存进 quarantine；
+            //3 秒门槛只继续约束 playback。
+            bool quarantined = senseVoice.QuarantineRecentSingingCandidate(
+                out quarantineCandidateId, out quarantinedSeconds);
+            string candidateDurationFact = Mathf.Max(
+                    pendingPerformanceSeconds, quarantinedSeconds) > 0f
+                ? $"，真实音频长度约 {Mathf.Max(pendingPerformanceSeconds, quarantinedSeconds):F1} 秒"
+                : "";
+            if (quarantined)
             {
                 confirmNote =
-                    $"这一段**已经作为第 {pendingIndex} 段记进练唱会话**了，标着「待确认」，" +
-                    $"现在就能用——要唱回来直接 <hum_back mode=\"echo\"/>，" +
-                    $"要和别的段连起来就把 {pendingIndex} 写进 order。" +
-                    $"如果他说那不是在唱歌，用 <practice_drop order=\"{pendingIndex}\" " +
-                    "reason=\"用户确认那不是唱歌\"/> 把它去掉。";
+                    $"素材状态：原始录音与边界证据已隔离保存为来源待确认候选 {quarantineCandidateId}" +
+                    candidateDurationFact +
+                    "；来源状态和播放状态分开记录；在本次感知融合时它尚未进入练唱清单。" +
+                    "若 playback 不是 ready 就不能点唱。辅助 LLM 会把" +
+                    "同轮完整原话与会话内全部候选一起判断；正式回复时以最新歌唱素材事实为准。";
             }
             else
             {
-                confirmNote = "**刚才那段录音还完整保留在手边**，" +
-                    "他只要说一句「是」，下一轮你立刻就能把它唱回来。";
+                confirmNote = currentCandidateReady
+                    ? "素材状态：本轮录音与旋律已经暂存，但没有新增重复的练唱片段。"
+                    : "素材状态：没有得到足够长且可播放的音高时间线；只能确认事实，" +
+                      "不要声称已经保存或可以唱回。";
             }
-            _msg = "[本轮存在不确定性：声学判定用户在唱歌，但转写读起来像普通说话，" +
-                "无法确定他刚才是在演唱还是在讲话。" + confirmNote +
-                "请在回应里自然地问一句「刚才那段是在唱吗／要我跟着唱一下吗」，由他确认。" +
-                "不要擅自当成演唱去复述或跟唱；也不要去查曲库找歌名——" +
-                "要唱的就是刚才那段录音本身，跟它叫什么歌无关；" +
-                "更不要在他回答之前自己说「还是算了吧」把话收回去] " +
-                senseVoice.BuildLastPerceivedText();
+            const string finalSemanticEvidence =
+                "由本次正式角色 LLM 结合完整转写与上下文判断（未串行调用额外分类器）";
+            string streamingSemanticEvidence =
+                DescribeStreamingSemanticModeEvidence();
+            string acousticEvidence =
+                senseVoice.LastAcousticMode +
+                ", singing_probability=" +
+                senseVoice.LastSingingProbability.ToString("F3") +
+                ", pitch_stability=" + senseVoice.LastPitchStability.ToString("F2") +
+                ", melodic_island=" +
+                senseVoice.LastSingingIslandSeconds.ToString("F2") + "s/" +
+                senseVoice.LastSingingContentSeconds.ToString("F2") + "s";
+            string earlierCandidateEvidence = recordingCandidateObserved
+                ? $"本次录音较早阶段曾取得约 {recordingCandidateSeconds:F1} 秒的可播放旋律候选" +
+                  $"（当时 singing_probability={recordingCandidateProbability:F3}, " +
+                  $"pitch_stability={recordingCandidatePitchStability:F2}）；" +
+                  "这是同一录音内的真实观测，不代表程序已经认定用户在唱。"
+                : "";
+            string spokenBridgeEvidence =
+                m_PreparedSingingBridgePlayedThisTurn &&
+                !string.IsNullOrWhiteSpace(m_SpokenBridgeTextThisTurn)
+                    ? "已经说出口的快速开场=\"" +
+                      m_SpokenBridgeTextThisTurn.Trim() +
+                      "\"；它来自未完成转写，不是可靠结论。"
+                    : "";
+
+            string uncertaintySituation = modeConflictRequiresConfirmation
+                ? "本轮歌唱模态证据冲突"
+                : acousticModeUncertain
+                    ? "本轮声学歌唱证据处于 uncertain 区间"
+                    : recordingCandidateRequiresReview
+                        ? "本次录音较早阶段的旋律候选与最终末段标签不一致"
+                        : "本轮声学标签与长旋律结构不一致";
+            _msg = "[" + uncertaintySituation + "；程序没有替用户下结论。" +
+                "完整转写语义复核=" + finalSemanticEvidence + "；" +
+                "实时语义判断=" + streamingSemanticEvidence + "；" +
+                "声学分析=" + acousticEvidence + "。" + earlierCandidateEvidence + confirmNote +
+                spokenBridgeEvidence +
+                "若末尾附有同轮分轨观测，请把整轮文字与歌唱岛独立文字作为同一轮内容分别理解；" +
+                "再结合当前对话自行判断用户刚才是在演唱、朗读还是讲话；" +
+                "表达自己没有听准即可，不要向用户暴露模型名、阈值或概率。" +
+                "如果你仍无法判断，再以符合角色个性的方式自然向用户确认；不要机械追问。" +
+                "确认前不要把它当成已经确定的演唱去复述或跟唱，也不要为了猜歌名查询曲库。] " +
+                senseVoice.BuildLastPerceivedText(false);
             if (m_LogHumBack)
-                Debug.Log("[HumBack] 软降级：" +
-                          (written ? $"已作为第 {pendingIndex} 段写进练唱会话(待确认)"
-                                   : "写入练唱会话失败，素材仍在最近演唱缓存里") +
-                          "，并让她出声追问是否在唱");
+                Debug.Log("[HumBack] 模态冲突：" +
+                          (quarantined ? $"已隔离为来源待确认候选 {quarantineCandidateId}"
+                                   : currentCandidateReady
+                                       ? "素材已暂存，本轮未新增重复隔离候选"
+                                       : "没有足够的可播放候选") +
+                          "；已把双方证据交给角色确认");
+        }
+        else if (acousticModeUncertain && !spokenSingingExit &&
+                 !cognitiveSpeechVeto && senseVoice != null)
+        {
+            //只有声学不确定、而完整语义已经给出方向时，不机械要求角色追问。
+            //保留原始证据，由正式角色 LLM 结合上下文决定是否已经足够。
+            bool semanticSupportsSinging =
+                modeFusion == SingingModeFusion.AcousticUncertainSemanticSinging;
+            float candidateSeconds = 0f;
+            bool candidateReady = senseVoice.HasCurrentSingingPerformanceCandidate();
+            if (semanticSupportsSinging && !candidateReady)
+            {
+                candidateReady = senseVoice.PreserveLastPlayableCandidateForConfirmation(
+                    out candidateSeconds);
+            }
+
+            const string finalSemanticEvidence =
+                "由本次正式角色 LLM 结合完整转写与上下文判断（未串行调用额外分类器）";
+            string candidateEvidence = candidateReady
+                ? "可播放候选已临时保留" +
+                  (candidateSeconds > 0f ? $"（约 {candidateSeconds:F1} 秒）" : "")
+                : "没有保存可播放候选";
+            string spokenBridgeEvidence =
+                m_PreparedSingingBridgePlayedThisTurn &&
+                !string.IsNullOrWhiteSpace(m_SpokenBridgeTextThisTurn)
+                    ? "已经说出口的快速开场=\"" +
+                      m_SpokenBridgeTextThisTurn.Trim() +
+                      "\"；它来自未完成转写，可能需要自然更正。"
+                    : "";
+            _msg = "[本轮声学歌唱证据为 uncertain；程序只提供信息，不替用户下结论。" +
+                "完整转写语义复核=" + finalSemanticEvidence + "；" +
+                "实时语义判断=" + DescribeStreamingSemanticModeEvidence() + "；" +
+                "声学分析=uncertain, singing_probability=" +
+                senseVoice.LastSingingProbability.ToString("F3") +
+                ", pitch_stability=" + senseVoice.LastPitchStability.ToString("F2") +
+                ", melodic_island=" + senseVoice.LastSingingIslandSeconds.ToString("F2") +
+                "s/" + senseVoice.LastSingingContentSeconds.ToString("F2") + "s。" +
+                "素材状态：" + candidateEvidence + "。" +
+                spokenBridgeEvidence +
+                "若末尾附有同轮分轨观测，请把整轮文字与歌唱岛独立文字作为同一轮内容分别理解；" +
+                "再结合当前对话和角色自身判断自然回应；不必机械追问，" +
+                "只有你自己仍无法判断时才向用户确认。不要向用户暴露内部模型名、阈值或概率。" +
+                "如果已经说出口的快速开场与这些最终证据不一致，那是未完成转写造成的临时误听，" +
+                "不要顺着错误话题继续编造，必要时自然更正。] " +
+                senseVoice.BuildLastPerceivedText(false);
+            if (m_LogHumBack)
+                Debug.Log("[HumBack] 声学 uncertain：停止程序自动复唱；" +
+                          candidateEvidence + "，判断交给正式角色 LLM");
+        }
+        //放在所有最终融合/降级/恢复分支之后统一追加，避免某个分支重建 _msg 时覆盖，
+        //也避免 uncertain 与通用路径各附一次。这里只补充同一录音的分轨事实；
+        //不改变模态结论、不触发动作，也不要求角色必须询问。
+        if (senseVoice != null)
+        {
+            //纯时序“旋律岛”不能靠同一条流式误判给自己背书。只有最终声学结果、
+            //uncertain 带、长而稳定的独立旋律证据或本录音已保存的可信候选，
+            //才允许附 timed_mixed_audio；独立歌词/尾部文字仍由分类器直接放行。
+            bool allowTimelineOnlyMixedEvidence = !cognitiveSpeechVeto &&
+                (senseVoice.LastIsSinging || acousticModeUncertain ||
+                 strongMelodicReviewEvidence || recordingCandidateRequiresReview);
+            string mixedEvidence =
+                senseVoice.BuildLastInformativeMixedTurnEvidence(
+                    allowTimelineOnlyMixedEvidence,
+                    out string mixedEvidenceReason);
+            if (!string.IsNullOrWhiteSpace(mixedEvidence) &&
+                (_msg ?? "").IndexOf("[同轮分轨观测", StringComparison.Ordinal) < 0)
+            {
+                _msg = (_msg ?? "").TrimEnd() + " " + mixedEvidence;
+                if (m_LogStreamTimings || m_LogHumBack)
+                {
+                    Debug.Log($"[MixedTurn/Evidence] attached reason={mixedEvidenceReason} " +
+                              $"lead={senseVoice.LastResponseAudioCropSeconds:F2}s " +
+                              $"island={senseVoice.LastSingingIslandSeconds:F2}s " +
+                              $"tail={senseVoice.LastResponseAudioTailDropSeconds:F2}s " +
+                              $"wholeChars={(senseVoice.LastText ?? "").Length} " +
+                              $"singingChars={(senseVoice.LastSegmentLyrics ?? "").Length}");
+                }
+            }
+        }
+
+        bool hasMixedTurnSemanticEvidence = senseVoice != null &&
+            (spokenSingingExit || modeConflictRequiresConfirmation ||
+             senseVoice.LastSingingIslandSeconds >= 2f ||
+             (_msg ?? "").IndexOf("[同轮分轨观测", StringComparison.Ordinal) >= 0);
+        string authoritativeUserText = ResolveAuthoritativeUserSemanticText(
+            rawUserText,
+            // Independent final windows cover the whole mixed recording. A
+            // rolling draft may miss the song or tail and must not replace them.
+            senseVoice != null && senseVoice.HasTimeOrderedTranscript ? "" : stableStreamingUserText,
+            hasMixedTurnSemanticEvidence,
+            out string authoritativeBasis);
+        bool authoritativeTextPromoted = false;
+        if (!string.IsNullOrWhiteSpace(authoritativeUserText) &&
+            !string.Equals(authoritativeUserText.Trim(), (rawUserText ?? "").Trim(),
+                StringComparison.Ordinal))
+        {
+            //LLM输入、持久用户历史与后续工具来源校验必须读取同一份权威语义。
+            //final ASR 仍保留在原感知文本中作为证据，不被伪装成从未出现过。
+            _msg = (_msg ?? "").TrimEnd() +
+                " [同轮权威语义文本；稳定流式转写完整覆盖了最终整段ASR的残缺前缀；" +
+                "下面这段同时用于本轮LLM理解、用户历史和程序来源校验] " +
+                authoritativeUserText;
+            rawUserText = authoritativeUserText;
+            displayMsg = authoritativeUserText;
+            authoritativeTextPromoted = true;
+            if (m_LogStreamTimings || m_LogHumBack)
+                Debug.Log($"[ASR/Authoritative] basis={authoritativeBasis} " +
+                          $"final=\"{senseVoice?.LastText}\" authoritative=\"{authoritativeUserText}\"");
+        }
+
+        //Internal reasoning is transient LLM context, never part of a user's utterance.
+        string boundaryHint = m_StalledTurnDecisionNote;
+        m_StalledTurnDecisionNote = "";
+
+        string possibleSelfEchoEvidence = BuildPossibleSelfEchoEvidence(
+            senseVoice != null && !string.IsNullOrWhiteSpace(senseVoice.LastText)
+                ? senseVoice.LastText
+                : displayMsg,
+            senseVoice);
+        if (!string.IsNullOrEmpty(possibleSelfEchoEvidence))
+        {
+            _msg = possibleSelfEchoEvidence + " " + _msg;
+            if (m_LogStreamTimings)
+                Debug.Log("[ASR/回声证据] 最终转写含角色近期原话前缀；" +
+                          "保留原文并把候选用户剩余文本交给 LLM");
         }
         m_PendingSingingConfirmation = false;
-        if (senseVoice != null && senseVoice.LastIsSinging)
+        if (!authoritativeTextPromoted &&
+            (modeConflictRequiresConfirmation || acousticModeUncertain) &&
+            senseVoice != null &&
+            !string.IsNullOrWhiteSpace(senseVoice.LastText))
+        {
+            //问号态不在 UI 上抢先画成“♪ 已确认演唱”。
+            displayMsg = senseVoice.LastText;
+        }
+        else if (!authoritativeTextPromoted && senseVoice != null && senseVoice.LastIsSinging)
         {
             displayMsg = string.IsNullOrWhiteSpace(senseVoice.LastText)
                 ? "♪（哼唱片段）"
                 : "♪ " + senseVoice.LastText;
         }
-        else if (senseVoice != null && !string.IsNullOrWhiteSpace(senseVoice.LastText))
+        else if (!authoritativeTextPromoted && senseVoice != null &&
+                 !string.IsNullOrWhiteSpace(senseVoice.LastText))
         {
             displayMsg = senseVoice.LastText;
         }
         string speculativeHint;
-        if (spokenSingingExit || cognitiveSpeechVeto)
+        if (spokenSingingExit || cognitiveSpeechVeto ||
+            modeConflictRequiresConfirmation || acousticModeUncertain)
         {
             // UpdateStreamingSingingReaction already replaced the listening-only singing
             // draft with an ordinary conversational draft as soon as the spoken exit was
             // heard. Preserve that work here; the singing finalizer would discard it just
-            // because it is intentionally marked as non-singing.
+            // because it is intentionally marked as non-singing. 模态冲突也走普通收尾：
+            //此时角色需要理解证据并提问，而不是复用“已经听完歌”的预测开场。
             m_StreamingSingingEvidence = "";
             speculativeHint = FinalizeSpeculativeTurn(displayMsg);
         }
@@ -2103,10 +3884,13 @@ public class ChatSample : MonoBehaviour
         //自动发送
         if (m_AutoSend)
         {
-            SendDataInternal(_msg, speculativeHint);
+            string internalHint = string.Join("\n", new[] { boundaryHint ?? "", speculativeHint ?? "" }).Trim();
+            ResetStreamingSemanticSingingLatch();
+            SendDataInternal(_msg, internalHint, rawUserText);
             return;
         }
 
+        ResetStreamingSemanticSingingLatch();
         m_InputWord.text = _msg;
     }
 
@@ -2116,6 +3900,56 @@ public class ChatSample : MonoBehaviour
     /// 0 = 当前这轮没有外部EOU标记(例如push-to-talk路径不调用)。
     /// </summary>
     private float m_EouTime = 0f;
+    private bool m_ListeningLatencyArmed;
+    private bool m_ListeningFormalLatencyArmed;
+    private float m_ListeningEndEstimate = -1f;
+    private float m_ListeningLastText = -1f;
+    private float m_ListeningFirstCandidate = -1f;
+    private float m_ListeningClosedAt = -1f;
+    private string m_ListeningEstimateSource = "unknown";
+    private string m_ListeningCloseReason = "";
+
+    public void RecordListeningEndEvidence(float endEstimate, string estimateSource,
+        float lastTextAt, float firstCandidateAt, string closeReason)
+    {
+        m_ListeningEndEstimate = endEstimate;
+        m_ListeningEstimateSource = estimateSource;
+        m_ListeningLastText = lastTextAt;
+        m_ListeningFirstCandidate = firstCandidateAt;
+        m_ListeningCloseReason = closeReason;
+        m_ListeningLatencyArmed = true;
+        m_ListeningFormalLatencyArmed = true;
+    }
+
+    private void ReportPerceivedFirstAudio()
+    {
+        if (!m_ListeningLatencyArmed || m_ListeningClosedAt < 0f) return;
+        m_ListeningLatencyArmed = false;
+        if (!m_LogStreamTimings) return;
+        float now = Time.realtimeSinceStartup;
+        //最后发声无法由RMS或ASR精确标注；始终报告估计来源，不冒充人工标注的实际停说点。
+        Debug.Log($"[Timing/Perceived] first-audio={now:F2}s " +
+            $"kind={(m_LatencyFillerPlayed ? "opening" : m_HumBackPlaying ? "singing" : "reply")} " +
+            $"end-to-audio-estimate={(m_ListeningEndEstimate >= 0f ? now - m_ListeningEndEstimate : -1f):F2}s " +
+            $"source={m_ListeningEstimateSource} " +
+            $"capture-close-delay-estimate={(m_ListeningEndEstimate >= 0f ? m_ListeningClosedAt - m_ListeningEndEstimate : -1f):F2}s " +
+            $"EOU-to-audio={now - m_ListeningClosedAt:F2}s " +
+            $"text-stable-to-audio={(m_ListeningLastText >= 0f ? now - m_ListeningLastText : -1f):F2}s " +
+            $"candidate-to-audio={(m_ListeningFirstCandidate >= 0f ? now - m_ListeningFirstCandidate : -1f):F2}s " +
+            $"close={m_ListeningCloseReason}（均为采集侧估计，非人工停说标注）");
+    }
+
+    private void ReportPerceivedFormalAudio(string kind)
+    {
+        if (!m_ListeningFormalLatencyArmed || m_ListeningClosedAt < 0f) return;
+        m_ListeningFormalLatencyArmed = false;
+        if (!m_LogStreamTimings) return;
+        float now = Time.realtimeSinceStartup;
+        Debug.Log($"[Timing/Perceived] formal-first-audio={now:F2}s kind={kind} " +
+            $"end-to-formal-estimate={(m_ListeningEndEstimate >= 0f ? now - m_ListeningEndEstimate : -1f):F2}s " +
+            $"EOU-to-formal={now - m_ListeningClosedAt:F2}s source={m_ListeningEstimateSource} " +
+            "（不把先行开场计为正式内容；停说点仍为采集侧估计）");
+    }
     /// <summary>
     /// 本轮录音是不是"语音VAD本来拒绝了、靠哼唱豁免捞回来的"。
     /// 用来抑制快速应声——见 ScheduleEouLatencyFiller。
@@ -2128,7 +3962,16 @@ public class ChatSample : MonoBehaviour
     public void MarkEOU(bool rescuedByTonalOverride = false)
     {
         m_EouTime = Time.realtimeSinceStartup;
+        m_ListeningClosedAt = m_EouTime;
+        if (m_LogStreamTimings && m_ListeningLatencyArmed)
+            Debug.Log($"[Timing/Listening] capture-closed={m_EouTime:F2}s " +
+                $"delay-estimate={(m_ListeningEndEstimate >= 0f ? m_EouTime - m_ListeningEndEstimate : -1f):F2}s " +
+                $"source={m_ListeningEstimateSource} reason={m_ListeningCloseReason}");
         m_EouRescuedByTonalOverride = rescuedByTonalOverride;
+        //“我再唱一遍”描述的是下一次录音，不等于要求角色自动跟唱。这里只把它
+        //锁存为本轮声学先验，让模糊带获得服务端的细致复核；真正要不要回唱仍由
+        //角色结合语境选择业务工具。
+        m_EouExpectedUserSinging = HasUpcomingUserSingingExpectation();
         //上一轮的 formal-first 标志不能阻止本轮 EOU 快速回应。
         m_RealFirstAudioStarted = false;
         m_EouCognitiveSpeechVeto = HasStrongSpeculativeSpeechVeto();
@@ -2140,16 +3983,17 @@ public class ChatSample : MonoBehaviour
         //每轮必清：EOU 是一轮的确定起点，比依赖各种收尾路径可靠
         m_FinalModeVerdict = "";
         m_FinalModeSoftDowngrade = false;
+        m_PendingSingingConfirmation = false;
         if (m_StreamingSingingExitDetected)
         {
-            ReleasePreparedSingingBridge(true);
+            ReleasePreparedSingingOnly();
             ResetStreamingHumBackPrefix("singing-exit-at-eou", true);
         }
         m_EouFillerContext = DetermineLatencyFillerContext(
             m_StreamingTranscript, m_EouTurnWasSinging);
         ScheduleEouLatencyFiller(m_StreamingTranscript);
         if (m_LogStreamTimings)
-            Debug.Log($"[Timing] EOU @ {m_EouTime:F2}s — 用户停止说话 " +
+            Debug.Log($"[Timing] EOU @ {m_EouTime:F2}s — 程序收束采集（不等于真实停说时刻） " +
                       $"(context={m_EouFillerContext}, cognitiveMode=" +
                       $"{(m_EouCognitiveSpeechVeto ? "speech-veto" : m_EouCognitiveSingingSupport ? "singing-support" : "uncertain")})");
     }
@@ -2183,6 +4027,7 @@ public class ChatSample : MonoBehaviour
     /// </summary>
     private IEnumerator SpeakInChunks(string _response)
     {
+        int responseGeneration = m_FormalResponseGeneration;
         List<string> chunks = SplitResponseIntoChunks(_response);
         if (chunks.Count == 0)
         {
@@ -2211,6 +4056,10 @@ public class ChatSample : MonoBehaviour
                 if (Time.realtimeSinceStartup - waitStart > 25f)
                 {
                     Debug.LogError("TTS客户端无响应(>25s)，放弃后续段落");
+                    ReportTtsFailureOnce(
+                        "tts_timeout",
+                        "语音合成超时。",
+                        "non-streaming TTS callback exceeded 25 seconds");
                     SetAnimator("state", 0);
                     yield break;
                 }
@@ -2235,8 +4084,16 @@ public class ChatSample : MonoBehaviour
                 m_AudioSource.Play();
                 if (i == 0) SetAnimator("state", 2);
                 //打字速度按音频时长匹配，字幕和语音同步结束
-                yield return StartCoroutine(TypeSentence(currentText, currentClip.length));
+                yield return StartCoroutine(TypeSentence(
+                    currentText, currentClip.length, responseGeneration));
                 while (m_AudioSource.isPlaying) yield return null;
+            }
+            else
+            {
+                ReportTtsFailureOnce(
+                    "tts_failed",
+                    "部分语音未能播放。",
+                    "non-streaming TTS returned no audio clip");
             }
         }
 
@@ -2304,9 +4161,16 @@ public class ChatSample : MonoBehaviour
     /// <summary>
     /// 在当前文本后追加逐字显示一段，打字速度按给定音频时长匹配
     /// </summary>
-    private IEnumerator TypeSentence(string _sentence, float totalDuration, int responseGeneration = -1)
+    private IEnumerator TypeSentence(
+        string _sentence,
+        float totalDuration,
+        int responseGeneration = -1,
+        System.Action<int> onProgress = null)
     {
         if (string.IsNullOrEmpty(_sentence)) yield break;
+        int subtitleGeneration = responseGeneration >= 0
+            ? responseGeneration
+            : m_FormalResponseGeneration;
         string prefix = m_TextBack.text;
         int pos = 0;
         float waitPerChar = totalDuration > 0f && _sentence.Length > 0
@@ -2321,6 +4185,10 @@ public class ChatSample : MonoBehaviour
                 yield break;
             pos++;
             m_TextBack.text = prefix + _sentence.Substring(0, pos);
+            if (m_SubtitleOverlay != null)
+                m_SubtitleOverlay.ReportSourceCharacterRevealed(
+                    subtitleGeneration, _sentence[pos - 1]);
+            if (onProgress != null) onProgress(pos);
         }
     }
 
@@ -2356,14 +4224,37 @@ public class ChatSample : MonoBehaviour
     //GPT-SoVITS直播放流使用：用于中断时停止仍在逐字显示的字幕
     private Coroutine m_DirectStreamingSubtitleCoroutine;
     private string m_DirectStreamingSubtitlePrefix = "";
+    private int m_DirectStreamingSubtitleRevealedChars = 0;
+    private AudioClip m_FormalBufferedClip;
     //LLM流是否已结束
     private bool m_StreamComplete = true;
     //TTSSender是否已全部处理完
     private bool m_TTSSenderDone = true;
     //正式回复代次。用户重新开口时推进，所有旧 LLM/TTS 回调据此立即失效。
     private int m_FormalResponseGeneration = 0;
+    //本代正文已真实播放完毕。这是不依赖具体 TTS sender 实现的客观交接信号，
+    //用于防止直流式 TTS 漏写 m_TTSSenderDone 时把已缓冲的歌声永久卡住。
+    private int m_TextOutputDrainedGeneration = -1;
+    private int m_LastTtsFailureNoticeGeneration = -1;
     private bool m_FormalResponseInFlight = false;
     private int m_FinalAsrRequestsInFlight = 0;
+    public int VoiceOutputRevision { get; private set; }
+    private int m_InputAudioRevision;
+
+    public void CancelPreviewAnalysis()
+    {
+        (m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText)?.CancelPreviewAnalysis();
+    }
+
+    public void PromotePreviewAnalysis()
+    {
+        (m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText)?.PromotePreviewAnalysis();
+    }
+
+    public void AbandonDeferredFinalAsr()
+    {
+        m_FinalAsrRequestsInFlight = Mathf.Max(0, m_FinalAsrRequestsInFlight - 1);
+    }
     private bool m_HoldSpeechForSongMemoryResult = false;
     private bool m_HoldSpeechForHumBackResult = false;
     //首块是否已冲出。首块用更激进的切分，追求最快首音
@@ -2387,6 +4278,26 @@ public class ChatSample : MonoBehaviour
              "排查'标签没生成 vs 标签被吞'时才开：其余流式日志打的都是剥离之后的文本，" +
              "这两种情况在那些日志里无法区分")]
     [SerializeField] private bool m_LogRawLLMOutput = false;
+
+    private void HandleRawLLMResponse(string raw)
+    {
+        if (m_LogRawLLMOutput)
+            Debug.Log($"[LLM原文] {(raw ?? "").Replace("\n", "\\n")}");
+    }
+
+    private void HandleLLMOutputFormatError(string reason)
+    {
+        ReportToolFailureForLlm("output", "malformed_tool_syntax", reason,
+            "这是格式错误，不是业务执行失败。工具用标准 <工具名 属性=\"值\"/>；程序没有自动修正或执行。" +
+            "可重新选择动作、询问或暂不行动，不需要给普通台词添加 say。");
+    }
+
+    private void HandleRequestDiagnostic(string requestJson)
+    {
+        if (!m_LogRawLLMOutput) return;
+        Debug.Log("[LLM请求/歌唱事实] " + ChatQW.BuildRequestSingingSummary(requestJson));
+    }
+
     //本轮正文中间出现 <silent/> 时，其后被切出来的内心独白文本(不发声，只入历史)。
     //每轮用完即清；见 OnStreamComplete 的尾部处理。
     private string m_PendingMidRoundInner = null;
@@ -2394,7 +4305,7 @@ public class ChatSample : MonoBehaviour
     [Header("首音延迟快速回应")]
     [Tooltip("预计或实际等待较长时，先播放启动阶段缓存的短回应，不额外占用TTS推理队列")]
     [SerializeField] private bool m_EnableLatencyFiller = true;
-    [Tooltip("从系统确认用户停止说话(EOU)到缓存短回应开始播放的目标秒数。EOU自身已有停顿确认，因此默认0.35秒，明显低于1.5秒上限。")]
+    [Tooltip("最终 ASR 已确认完整用户语义后，正式回复仍未出声时播放缓存短回应的目标秒数。预合成可以更早完成，但不会在最终 ASR 前提交。")]
     [SerializeField, Range(0.1f, 1.45f)] private float m_UserFirstAudioTargetSec = 0.35f;
     [Tooltip("超过该预测延迟就启用快速回应（秒）")]
     [SerializeField, Range(0.8f, 4f)] private float m_LatencyFillerThresholdSec = 2.8f;
@@ -2423,6 +4334,7 @@ public class ChatSample : MonoBehaviour
     private int m_EouFillerGeneration = 0;
     private bool m_EouFillerScheduled = false;
     private bool m_EouTurnWasSinging = false;
+    private bool m_EouExpectedUserSinging = false;
     private bool m_EouSingingRejectedByFinal = false;
     private string m_EouFillerContext = "neutral";
 
@@ -2443,6 +4355,8 @@ public class ChatSample : MonoBehaviour
         if (m_ChatSettings != null && m_ChatSettings.m_ChatModel != null)
             m_ChatSettings.m_ChatModel.CancelActiveResponse();
         int responseGeneration = ++m_FormalResponseGeneration;
+        EnsureSubtitleOverlay();
+        if (m_SubtitleOverlay != null) m_SubtitleOverlay.BeginUtterance(responseGeneration);
 
         //真实对话优先于后台三语预热；缺失缓存会在本轮结束后利用空闲时间续补。
         if (m_ChatSettings != null && m_ChatSettings.m_TextToSpeech != null)
@@ -2469,8 +4383,8 @@ public class ChatSample : MonoBehaviour
         m_HoldSpeechForHumBackResult = holdSpeechForHumBackResult;
         m_StreamStartTime = Time.realtimeSinceStartup;
         m_RealFirstAudioStarted = false;
-        //MarkEOU 可能已在 ASR 阶段安排甚至播放了快速回应。正式管线接手时必须保留它，
-        //否则会把已经在约 0.35 秒响起的缓存音频状态清掉并重复安排第二次 filler。
+        //MarkEOU 只安排可撤销准备；最终 ASR 通过后 Finalize* 才可能提交并播放。
+        //正式管线接手时保留已提交音频，避免重复安排第二次 filler。
         bool hasEouFillerPlan = m_EouFillerScheduled ||
             (m_LatencyFillerFromEou && m_LatencyFillerPlayed);
         if (!hasEouFillerPlan)
@@ -2543,7 +4457,8 @@ public class ChatSample : MonoBehaviour
                 _postWord,
                 imageUrl,
                 responseGeneration,
-                !holdSpeechForSongMemoryResult);
+                !holdSpeechForSongMemoryResult,
+                transientSystemContext);
         }
     }
 
@@ -2563,20 +4478,29 @@ public class ChatSample : MonoBehaviour
         if (m_ChatSettings == null || m_ChatSettings.m_ChatModel == null) return;
         bool spoken = m_PreparedSingingBridgePlayedThisTurn &&
             !string.IsNullOrWhiteSpace(m_SpokenBridgeTextThisTurn);
+        bool prefixIsReliable = !m_FinalModeSoftDowngrade;
         m_ChatSettings.m_ChatModel.SpokenPrefix =
-            spoken ? m_SpokenBridgeTextThisTurn.Trim() : "";
+            spoken && prefixIsReliable ? m_SpokenBridgeTextThisTurn.Trim() : "";
         if (spoken && m_LogSpeculativeListening)
-            Debug.Log("[说话预反应] 已出声开场作为 assistant 前缀交给本轮回复: " +
-                      $"\"{m_ChatSettings.m_ChatModel.SpokenPrefix}\"");
+        {
+            if (prefixIsReliable)
+                Debug.Log("[说话预反应] 已出声开场作为 assistant 前缀交给本轮回复: " +
+                          $"\"{m_ChatSettings.m_ChatModel.SpokenPrefix}\"");
+            else
+                Debug.Log("[说话预反应] 已出声开场处于模态 uncertain/冲突，" +
+                          "不作为可靠 assistant 前缀；具体文本已作为可撤销事实交给正式 LLM");
+        }
     }
 
     private void DispatchFormalStream(
         string prompt,
         string imageUrl,
         int responseGeneration,
-        bool recordAssistantHistory = true)
+        bool recordAssistantHistory = true,
+        string transientSystemContext = null)
     {
         PublishSpokenPrefixToLlm();
+        m_ChatSettings.m_ChatModel.RequestContext = transientSystemContext ?? "";
         m_FormalResponseInFlight = true;
         m_ChatSettings.m_ChatModel.PostMsgStream(
             prompt,
@@ -2625,6 +4549,8 @@ public class ChatSample : MonoBehaviour
     private void InvalidateFormalResponse(string reason)
     {
         bool hadActiveRequest = m_FormalResponseInFlight;
+        if (m_SubtitleOverlay != null)
+            m_SubtitleOverlay.CancelUtterance(m_FormalResponseGeneration, true);
         m_FormalResponseGeneration++;
         m_FormalResponseInFlight = false;
         if (m_ChatSettings != null && m_ChatSettings.m_ChatModel != null)
@@ -2684,6 +4610,7 @@ public class ChatSample : MonoBehaviour
     private IEnumerator MaybePlayLatencyFiller(
         int generation, string languageHint, string contextHint)
     {
+        if (m_StalledTurnAction == "continue") yield break;
         float predicted = m_FirstAudioLatencyEstimateSec > 0f
             ? m_FirstAudioLatencyEstimateSec
             : m_InitialFirstAudioPredictionSec;
@@ -2713,7 +4640,7 @@ public class ChatSample : MonoBehaviour
             yield return null;
         }
 
-        if (m_AudioSource == null || m_AudioSource.isPlaying) yield break;
+        if (m_StalledTurnAction == "continue" || m_AudioSource == null || m_AudioSource.isPlaying) yield break;
 
         string fillerText;
         float fillerDuration;
@@ -2740,24 +4667,22 @@ public class ChatSample : MonoBehaviour
     }
 
     /// <summary>
-    /// 用户一停止说话就开始计时，不等待最终 ASR 或 LLM。缓存音频在 EOU+目标时间直接播放，
-    /// 因而正常语音和耗时较长的歌声分析都能把“有反应的首音”稳定压到1.5秒内。
+    /// 用户停止说话时只锁存“有可撤销准备”这一事实，不播放任何音频。最终 ASR 到达后，
+    /// Finalize* 只提供未说出口的候选；正式 LLM 选择原句后才复用音频。
+    /// 这保留流式计算收益，同时避免用户的后半句话尚未确认就先作答。
     /// </summary>
     private void ScheduleEouLatencyFiller(string languageHint)
     {
         m_EouFillerGeneration++;
         m_EouFillerScheduled = false;
+        if (m_StalledTurnAction == "continue") return;
         if (!m_EnableLatencyFiller || !m_AutoSend || !m_UseStreaming || !m_IsVoiceMode ||
             m_ChatSettings == null ||
             m_ChatSettings.m_TextToSpeech == null || m_AudioSource == null)
             return;
 
-        //本轮若是靠哼唱豁免捞回来的(语音VAD其实拒绝了)，不播快速应声。
-        //快速应声在 EOU+0.36s 就出声，远早于正式 ASR 的判定——实测一场里 5 次环境噪音
-        //全部被"回应"了一句缓存短句("ふふっ……" / "うん、ちゃんと聴いていたわ……")，
-        //随后才 CancelPendingEouLatencyFiller("asr-empty")。取消发生在声音已经出去之后，
-        //用户听到的就是"角色在对着杂音搭话"。
-        //真哼唱的代价是少了这句应声，等正式管线的回复——比对着风扇说话好。
+        //本轮若是靠哼唱豁免捞回来的(语音VAD其实拒绝了)，连计划也不锁存。
+        //旧实现会在最终 ASR 前对环境噪音出声；现在所有路径都必须等最终证据。
         if (m_EouRescuedByTonalOverride)
         {
             if (m_LogStreamTimings)
@@ -2766,9 +4691,8 @@ public class ChatSample : MonoBehaviour
         }
 
         m_EouFillerScheduled = true;
-        int generation = m_EouFillerGeneration;
-        StartCoroutine(PlayEouLatencyFillerAtTarget(
-            generation, m_EouTime, SelectLatencyFillerLanguageHint(languageHint)));
+        if (m_LogStreamTimings)
+            Debug.Log("[LatencyFiller] EOU 已锁存预合成计划；等待最终 ASR/模态证据后再提交播放");
     }
 
     /// <summary>
@@ -2810,66 +4734,6 @@ public class ChatSample : MonoBehaviour
         return "neutral";
     }
 
-    private IEnumerator PlayEouLatencyFillerAtTarget(
-        int generation, float eouTime, string languageHint)
-    {
-        float target = Mathf.Clamp(m_UserFirstAudioTargetSec, 0.1f, 1.45f);
-        while (Time.realtimeSinceStartup - eouTime < target)
-        {
-            if (generation != m_EouFillerGeneration || !m_EouFillerScheduled ||
-                m_RealFirstAudioStarted)
-                yield break;
-            yield return null;
-        }
-
-        if (generation != m_EouFillerGeneration || !m_EouFillerScheduled ||
-            m_RealFirstAudioStarted)
-            yield break;
-        m_EouFillerScheduled = false;
-
-        //用户在目标点前又开口、或仍有别的真实音频时，不叠音。
-        if (m_AudioSource == null || m_AudioSource.isPlaying || m_LatencyFillerPlayed)
-            yield break;
-
-        string fillerText = "";
-        float fillerDuration = 0f;
-        //唱歌与说话都先试预合成的草稿开场；它是针对本轮内容的，比通用缓存语切题得多。
-        bool singingTurn = m_EouTurnWasSinging && !m_EouSingingRejectedByFinal;
-        bool preparedSingingBridge =
-            TryPlayPreparedSingingBridge(singingTurn, m_AudioSource, out fillerText, out fillerDuration);
-        if (!preparedSingingBridge &&
-            !m_ChatSettings.m_TextToSpeech.TryPlayLatencyFiller(
-                languageHint,
-                m_EouSingingRejectedByFinal ? "neutral" : m_EouFillerContext,
-                m_AudioSource,
-                out fillerText,
-                out fillerDuration))
-        {
-            if (m_LogStreamTimings)
-                Debug.LogWarning("[LatencyFiller] EOU快速回应缓存未就绪，无法保证1.5秒首音");
-            yield break;
-        }
-
-        m_LatencyFillerPlayed = true;
-        m_LatencyFillerFromEou = true;
-        m_LatencyFillerText = fillerText;
-        m_LatencyFillerStartedAt = Time.realtimeSinceStartup;
-        m_LatencyFillerDuration = Mathf.Max(0.1f, fillerDuration);
-        m_CurrentlyPlayingText = fillerText;
-        m_TextBack.text = fillerText;
-        SetAnimator("state", 2);
-        IsAISpeaking = true;
-
-        if (m_LogStreamTimings)
-        {
-            float eouToFiller = Time.realtimeSinceStartup - eouTime;
-            Debug.Log($"[Timing] ★ EOU→快速首音: {eouToFiller:F2}s (目标≤1.5s)");
-            Debug.Log(preparedSingingBridge
-                ? $"[{(singingTurn ? "歌唱预反应" : "说话预反应")}] 播放预合成开场: \"{fillerText}\""
-                : $"[LatencyFiller] 播放EOU/{m_EouFillerContext}缓存短回应: \"{fillerText}\"");
-        }
-    }
-
     private void CancelPendingEouLatencyFiller(string reason, bool stopPlayedAudio)
     {
         m_EouFillerGeneration++;
@@ -2897,6 +4761,7 @@ public class ChatSample : MonoBehaviour
         m_EouCognitiveSingingSupport = false;
         m_FinalModeVerdict = "";
         m_FinalModeSoftDowngrade = false;
+        m_PendingSingingConfirmation = false;
         m_EouFillerContext = "neutral";
         if (m_LogStreamTimings) Debug.Log($"[LatencyFiller] 取消EOU快速回应 ({reason})");
         if (OnAISpeakDone != null) OnAISpeakDone();
@@ -2936,10 +4801,32 @@ public class ChatSample : MonoBehaviour
                       $"(开场时长 {m_LatencyFillerDuration:F2}s, 提前量 {leadSeconds:F2}s)");
     }
 
+    private static TTS.StreamingPlaybackPermission ResolveStreamingHandoff(
+        bool current, bool openerPlaying, float elapsed, float expectedDuration)
+    {
+        if (!current) return TTS.StreamingPlaybackPermission.Cancel;
+        if (!openerPlaying) return TTS.StreamingPlaybackPermission.Play;
+        // A broken playback flag must not hold a buffered request forever. Never
+        // seize the source by force: normal handoff waits for actual audio completion.
+        if (elapsed > Mathf.Max(0f, expectedDuration) + k_MaxFillerHandoffWaitSeconds)
+            return TTS.StreamingPlaybackPermission.Cancel;
+        return TTS.StreamingPlaybackPermission.Wait;
+    }
+
+    private TTS.StreamingPlaybackPermission GetFormalPlaybackPermission(int generation, int roundId)
+    {
+        bool current = generation == m_FormalResponseGeneration && !m_SilencedSpeechRoundIds.Contains(roundId);
+        bool openerPlaying = m_LatencyFillerPlayed && m_LatencyFillerStartedAt >= 0f &&
+            m_AudioSource != null && m_AudioSource.isPlaying;
+        return ResolveStreamingHandoff(current, openerPlaying,
+            Time.realtimeSinceStartup - m_LatencyFillerStartedAt, m_LatencyFillerDuration);
+    }
+
     private void MarkRealFirstAudioStarted()
     {
         if (m_RealFirstAudioStarted) return;
         m_RealFirstAudioStarted = true;
+        ReportPerceivedFormalAudio("reply");
         m_EouFillerGeneration++;
         m_EouFillerScheduled = false;
         CommitPlayedLatencyFiller();
@@ -2950,6 +4837,7 @@ public class ChatSample : MonoBehaviour
         m_EouCognitiveSingingSupport = false;
         m_FinalModeVerdict = "";
         m_FinalModeSoftDowngrade = false;
+        m_PendingSingingConfirmation = false;
         m_EouFillerContext = "neutral";
 
         float actual = Elapsed();
@@ -3102,24 +4990,24 @@ public class ChatSample : MonoBehaviour
     /// </summary>
     private void OnStreamComplete(string full)
     {
-        //★ 排障用：打印**未经任何剥离**的 LLM 原文。
-        //  现有流式日志(首块切出 / TTS流请求发出)打的都是切句并剥标签之后的结果，
-        //  所以"标签压根没生成"和"生成了但被吞掉"在日志里长得一模一样，无法区分。
-        //  典型待查问题：她把内心话当正文念出来(用第三人称指代用户)，而
-        //  <silent/> 连续三场 0 次——要判断是没打标签还是标签被吞，只能看原文。
-        //  平时关掉：原文会带上全部控制标签，很吵。
+        // ChatQW 已分离说话/内部文本/动作；这里是执行层输入，不是模型原文。
+        // 原文由 HandleRawLLMResponse 单独记录，绝不重新送入 TTS 或工具解析。
         if (m_LogRawLLMOutput)
-            Debug.Log($"[LLM原文] {(full ?? "").Replace("\n", "\\n")}");
+            Debug.Log($"[LLM执行层输入] {(full ?? "").Replace("\n", "\\n")}");
 
-        //ChatQW 在调用 onComplete 之前已把“已经说出口的快速开场”
-        //与本轮正式回复合并进 assistant 历史。本地副本必须在第一个
-        //正式回复完成时消费掉；否则 <continue/> 每续一轮都会把同一句
-        //assistant 前缀重新挂在请求末尾，把模型一次次拉回故事开头。
+        // Keep the decision/action plane separate from Markdown examples. The raw
+        // response remains available in a separate diagnostic log, but quoted protocol tags
+        // must never be dispatched as tools or memory writes.
+        full = RemoveQuotedAgentActionTags(full ?? "");
+
+        //可靠开场由 ChatQW 合并进 assistant 历史；uncertain/冲突开场只作为
+        //可撤销事实出现在本轮输入。两种情况都必须在第一个正式回复完成时消费掉，
+        //否则 <continue/> 会重复携带旧开场。
         if (!string.IsNullOrWhiteSpace(m_SpokenBridgeTextThisTurn))
         {
             m_SpokenBridgeTextThisTurn = "";
             if (m_LogSpeculativeListening)
-                Debug.Log("[说话预反应] assistant 前缀已合并进历史，后续 chain 不再重复注入");
+                Debug.Log("[说话预反应] 已消费本轮出声开场状态，后续 chain 不再重复注入");
         }
 
         //记忆写入标签的提取与应用不看 agent 开关——直接对话模式她也在记忆。
@@ -3128,15 +5016,20 @@ public class ChatSample : MonoBehaviour
         if (!string.IsNullOrEmpty(unknownTag))
         {
             m_LastUnknownTagNote = unknownTag;
-            Debug.LogWarning($"[Agent/Tag] 输出里有不存在的标签 {unknownTag}，已被整条丢弃");
+            //未知标签和同回复里的有效动作属于不同失败域。只剥掉未知标签并把事实
+            //留到下一次自然感知帧，不启动工具纠错 chain；否则一个写错的调度标签
+            //会让已经排队的 hum_back 被模型重复调用，形成 busy→二次纠错。
+            full = RemoveUnknownAgentTags(full ?? "");
+            Debug.LogWarning($"[Agent/Tag] 输出里有不存在的标签 {unknownTag}；" +
+                             "仅忽略未知标签，其它正文和有效动作继续处理");
         }
 
         string afterMemTags;
         var memOps = MemoryTagParser.Extract(full ?? "", out afterMemTags);
-        if (memOps != null && m_MemoryHub != null) m_MemoryHub.ApplyMemoryOps(memOps);
+        ApplyMemoryOpsWithGrounding(memOps);
         AgentSkillRequest skillRequest = ExtractSkillRequestTag(ref afterMemTags);
         AgentSkillControlRequest skillControl = ExtractSkillControlTag(ref afterMemTags);
-        AgentSingingIntentRequest singingIntent = ExtractSingingIntentTag(ref afterMemTags);
+        AgentSingingPolicyRequest singingPolicy = ExtractSingingPolicyTag(ref afterMemTags);
 
         //歌曲检索/记忆是角色能力，不是 Agent Loop 的调度语义。必须在判断 agent 开关前
         //提取并执行；否则用户关闭实时模式后，模型虽然给出标签却只会被剥掉而不落盘。
@@ -3145,19 +5038,29 @@ public class ChatSample : MonoBehaviour
         //否则等发现是复读时那一段已经被删掉了。
         bool selfRepeat = IsVerbatimSelfRepeat(
             StripAgentTagsForTTS(afterMemTags), out string selfRepeatReason);
-        bool singingIntentAccepted = false;
-        string singingIntentResult = "";
-        if (!selfRepeat && singingIntent != null)
+        bool singingPolicyAccepted = false;
+        string singingPolicyResult = "";
+        if (!selfRepeat && singingPolicy != null)
         {
-            singingIntentAccepted = TryApplySingingIntent(
-                singingIntent, out singingIntentResult);
-            if (!singingIntentAccepted)
-                NoteToolFailure("未执行 singing 结构化意图：" + singingIntentResult);
+            singingPolicyAccepted = TryApplySingingPolicy(
+                singingPolicy, out singingPolicyResult);
+            if (!singingPolicyAccepted)
+                ReportToolFailureForLlm(
+                    "singing_policy",
+                    "validation_rejected",
+                    singingPolicyResult,
+                    "仅在用户明确改变长期歌唱权限或主动性时使用 " +
+                    "‹singing_policy value=\"enable|disable|suppress_autonomy\"/›；" +
+                    "普通点歌、回唱和练唱直接使用业务工具，停止当前歌声使用 ‹singing_stop/›。");
         }
         if (!selfRepeat && skillControl != null &&
             !TryApplySkillControl(skillControl, out string skillControlResult))
         {
-            NoteToolFailure("未执行 Skill 权限变更：" + skillControlResult);
+            ReportToolFailureForLlm(
+                "skill_control",
+                "permission_change_rejected",
+                skillControlResult,
+                "不要自行改变权限；根据本轮已加载的 Skill 规则回答或自然询问用户。");
         }
         bool autonomousSkillApproved = false;
         string skillRequestRejection = "";
@@ -3168,42 +5071,58 @@ public class ChatSample : MonoBehaviour
             if (!autonomousSkillApproved && m_LogAgentLoop)
                 Debug.LogWarning($"[LLM技能] {skillRequest.Name} 自主申请未执行：" +
                                  skillRequestRejection);
+            if (!autonomousSkillApproved)
+            {
+                string requestCode = string.IsNullOrWhiteSpace(skillRequest.Name)
+                    ? "missing_required_attributes"
+                    : "skill_request_rejected";
+                ReportToolFailureForLlm(
+                    "skill_request",
+                    requestCode,
+                    skillRequestRejection,
+                    "这是真实用户轮，相关详细 Skill 规则已由路由器按语境加载；" +
+                    "不要重试 skill_request。直接按已加载规则回答或调用正确业务工具；" +
+                    "只读数据查询不需要开启有副作用的动作权限。");
+            }
         }
-        bool hadSingingAction = s_PracticeDropTagRegex.IsMatch(cleanFull) ||
+        bool hadSingingAction = s_PracticeConfirmTagRegex.IsMatch(cleanFull) ||
+            s_PracticeReviseTagRegex.IsMatch(cleanFull) ||
+            s_PracticeDropTagRegex.IsMatch(cleanFull) ||
             s_SongMemoryTagRegex.IsMatch(cleanFull) || s_SongSearchTagRegex.IsMatch(cleanFull) ||
-            s_SongSingTagRegex.IsMatch(cleanFull) || s_HumBackTagRegex.IsMatch(cleanFull) ||
-            (singingIntent != null && singingIntent.Action != "none");
+            s_SongSingTagRegex.IsMatch(cleanFull) || s_HumBackTagRegex.IsMatch(cleanFull);
         bool singingActionAllowed = CanExecuteSkillAction("singing", out string singingBlockReason);
-        if (singingIntent != null && !singingIntentAccepted)
-        {
-            singingActionAllowed = false;
-            singingBlockReason = "singing_intent 校验失败：" + singingIntentResult;
-        }
         AgentSongMemoryRequest songMemory = ExtractSongMemoryTag(ref cleanFull);
         AgentSongSearchRequest songSearch = ExtractSongSearchTag(ref cleanFull);
+        AgentSongCatalogRequest songCatalog = ExtractSongCatalogTag(ref cleanFull);
         AgentSongSingRequest songSing = ExtractSongSingTag(ref cleanFull);
+        m_PracticeEditFailedThisResponse = false;
+        ExtractAndApplyPracticeConfirmTag(ref cleanFull, !selfRepeat && singingActionAllowed);
+        ExtractAndApplyPracticeReviseTag(ref cleanFull, !selfRepeat && singingActionAllowed);
         ExtractAndApplyPracticeDropTag(ref cleanFull, !selfRepeat && singingActionAllowed);
         AgentHumBackRequest humBack = ExtractHumBackTag(ref cleanFull);
-        if (!selfRepeat)
-            ApplySingingIntentAction(
-                singingIntent, singingIntentAccepted, ref songSing, ref humBack);
-        if (!selfRepeat && singingActionAllowed && !m_AgentCurrentRoundIsTick &&
-            !ValidateUserSingingActionAuthorization(
-                singingIntentAccepted && singingIntent != null ? singingIntent.Actor : "",
-                singingIntentAccepted && singingIntent != null ? singingIntent.Action : "",
-                songSing != null,
-                humBack != null ? humBack.Mode : "",
-                out string userSingingAuthorizationFailure))
+        AgentSingingStopRequest singingStop = ExtractSingingStopTag(ref cleanFull);
+        if (!selfRepeat && singingStop != null)
         {
-            singingActionAllowed = false;
-            singingBlockReason = userSingingAuthorizationFailure;
+            bool continuesWithNewAction = songSing != null || humBack != null;
+            CancelSkillRuntimeActivity("singing", "singing-stop-tool");
+            if (continuesWithNewAction)
+            {
+                NoteSingingRoutingFact(
+                    "singing_stop",
+                    "old_activity_stopped_then_new_action_retained",
+                    "同一回复还包含新的歌唱动作；程序只停止旧活动，并继续处理新动作。" +
+                    "是否发起新动作仍来自角色本轮决定。");
+            }
+            if (m_LogAgentLoop)
+                Debug.Log("[LLM技能] singing_stop 已执行；reason=" + singingStop.Reason +
+                          (continuesWithNewAction ? "；同轮新歌唱动作保留" : ""));
         }
         string speakerName = ExtractSpeakerNameTag(ref cleanFull);
         AgentSpeakerManageRequest speakerManage = ExtractSpeakerManageTag(ref cleanFull);
         if (selfRepeat)
         {
             //标签照常从正文剥掉(不剥会被念出来)，但一个都不派发。
-            songMemory = null; songSearch = null; songSing = null; humBack = null;
+            songMemory = null; songSearch = null; songCatalog = null; songSing = null; humBack = null;
             speakerName = null; speakerManage = null;
             if (m_AgentRunning && !m_RoundSilencedForRepeat)
                 MarkRoundAsSilencedRepeat(
@@ -3219,44 +5138,72 @@ public class ChatSample : MonoBehaviour
         if (hadSingingAction && !singingActionAllowed)
         {
             songMemory = null; songSearch = null; songSing = null; humBack = null;
-            NoteToolFailure("未执行 singing Skill 动作：" + singingBlockReason);
+            ReportToolFailureForLlm(
+                "sing",
+                "action_not_authorized",
+                singingBlockReason,
+                "未播放。sing 是真实工具；不要创造 singing_action 标签。读取 singing 规则和素材 refs 后重新决定，也可询问或如实说明。");
             Debug.LogWarning("[LLM技能] 拦下未授权的 singing 动作：" + singingBlockReason);
         }
+        if (songCatalog != null &&
+            !CanInspectSkillData("singing", out string catalogInspectionBlockReason))
+        {
+            songCatalog = null;
+            ReportToolFailureForLlm(
+                "song_catalog",
+                "inspection_rules_not_loaded",
+                catalogInspectionBlockReason,
+                "只读查询不需要启用歌唱动作权限；使用本轮已加载的 singing 规则重新判断。");
+        }
         if (m_SongMemoryAcknowledgementInFlight &&
-            (songMemory != null || songSearch != null || songSing != null))
+            (songMemory != null || songSearch != null || songCatalog != null || songSing != null))
         {
             Debug.LogWarning("[SongMemory] 结果确认阶段忽略模型重复输出的歌曲工具标签");
+            NoteSingingRoutingFact(
+                "song_tools",
+                "ignored_duplicate",
+                "duplicate_during_memory_result_ack",
+                "落盘结果确认阶段重复输出的歌曲工具标签没有执行；" +
+                "已经返回的本机落盘结果仍是唯一依据。");
             songMemory = null;
             songSearch = null;
+            songCatalog = null;
             songSing = null;
         }
-        if (TryRerouteSongSingToPractice(ref songSing, ref humBack) && m_LogHumBack)
-            Debug.LogWarning("[SongSing→HumBack] 曲库标签指向本轮练唱片段，已保留顺序并改走 practice");
+        RejectInvalidSongSingMaterialSource(ref songSing);
+        bool songSingRerouted = TryRerouteSongSingToPractice(ref songSing, ref humBack);
+        if (songSingRerouted)
+        {
+            NoteSingingRoutingFact(
+                "song_sing",
+                "routed_for_validation",
+                "current_material_source_corrected",
+                $"角色决定演唱的意图已保留；实际素材不在长期曲库，已改走 " +
+                $"hum_back mode={humBack.Mode}, order={humBack.Order ?? ""}。" +
+                "程序没有替角色决定是否演唱，只纠正了客观素材来源；" +
+                "这个改路请求仍需通过 order 等参数校验才会执行。");
+            if (m_LogHumBack)
+                Debug.LogWarning($"[SongSing→HumBack] 曲库标签指向当前歌声素材，已按来源改走 {humBack.Mode}");
+        }
         if (ShouldDiscardSongSingToolForCurrentTurn(songSing))
         {
+            ReportToolFailureForLlm(
+                "song_sing",
+                "wrong_material_source",
+                "当前用户原话指向跟唱约定、正在发生的演唱、失败反馈或最近录音，" +
+                "而 song_sing 只读取长期曲库；本次曲库演唱没有执行。",
+                "先根据真实可用素材判断来源：即时录音用 hum_back echo，" +
+                "练唱清单用 hum_back practice；只有用户确实指向长期曲库时才用 song_sing。" +
+                "是否仍要演唱、解释或询问用户由你决定。");
             if (m_LogHumBack)
                 Debug.LogWarning("[SongSing] 模型把跟唱约定、当前演唱或失败陈述误写成曲库演唱；已丢弃该标签并重新分流");
             songSing = null;
         }
-        if (humBack != null) m_ExplicitHumBackHandled = true;
-        if (songMemory != null)
+        if (songMemory != null &&
+            string.Equals(songMemory.Action, "remember", StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(songMemory.Title))
         {
-            if (string.Equals(songMemory.Action, "remember", StringComparison.OrdinalIgnoreCase) &&
-                string.IsNullOrWhiteSpace(songMemory.Title))
-                songMemory.Title = ExtractExplicitSongTitle(m_LastUserMsg);
-            m_ExplicitSongRememberHandled = true;
-        }
-        else if (!selfRepeat && singingActionAllowed && ShouldFallbackToExplicitSongRemember())
-        {
-            songMemory = new AgentSongMemoryRequest
-            {
-                Action = "remember",
-                Title = ExtractExplicitSongTitle(m_LastUserMsg),
-                Reason = "用户明确要求记住最近歌声，但模型漏掉了 song_remember 标签",
-            };
-            m_ExplicitSongRememberHandled = true;
-            if (m_LogAgentLoop)
-                Debug.LogWarning("[SongMemory] 检测到用户明确保存歌声的请求，模型未调用 <song_remember/>，执行安全兜底");
+            songMemory.Title = ExtractExplicitSongTitle(m_LastUserMsg);
         }
 
         bool heldForSongMemory = m_HoldSpeechForSongMemoryResult;
@@ -3288,6 +5235,7 @@ public class ChatSample : MonoBehaviour
             CompleteSongMemoryImmediately("没有找到可用于保存的最近歌声音频，本次未写入本机曲库。");
         }
         if (songSearch != null) BeginSongSearch(songSearch);
+        if (songCatalog != null) BeginSongCatalogInspection(songCatalog);
         if (speakerManage != null) BeginSpeakerManage(speakerManage);
         //曾经在这里做「模型漏调 <song_sing/> 就按正则兜底」。已删除：8/9 实测触发 5 次、
         //成功 0 次，而正则从普通说话里编出来的"歌名"是「了呀」(出自"我刚才已经唱了呀")、
@@ -3296,25 +5244,22 @@ public class ChatSample : MonoBehaviour
         //更要命的是它会连带扣住她那一轮的正常回复(已扣留 7 次)，查不到歌之后整轮无声。
         //而那几轮模型自己**没有**调用 <song_sing/>——它判断"这不是点歌请求"，判断是对的，
         //是正则在第二次猜并且猜错。要不要从曲库唱，交给她自己决定。
+        if (m_PracticeEditFailedThisResponse && humBack != null)
+        {
+            humBack = null;
+            ReportToolFailureForLlm(
+                "hum_back",
+                "preceding_practice_edit_failed",
+                "同一回复中的来源确认/素材修订没有成功，因此没有播放旧版本。",
+                "请根据真实工具结果重新决定边界、素材身份，或自然询问用户；" +
+                "不要声称已经修复或播放。");
+        }
         if (songSing != null)
         {
             humBack = null;
             BeginSongSing(songSing);
         }
-        if (songSing == null && humBack == null && !selfRepeat && singingActionAllowed &&
-            singingIntentAccepted && singingIntent != null &&
-            singingIntent.Actor == "character" && singingIntent.Action == "echo" &&
-            ShouldFallbackToExplicitHumBack())
-        {
-            humBack = new AgentHumBackRequest
-            {
-                Mode = "echo",
-                Reason = "用户明确要求回哼最近旋律，但模型漏掉了 hum_back 标签",
-            };
-            m_ExplicitHumBackHandled = true;
-            if (m_LogHumBack)
-                Debug.LogWarning("[HumBack] 检测到明确回哼请求，模型未调用 <hum_back/>，执行安全兜底");
-        }
+        m_HumBackTransactionRetainedThisRound = false;
         if (humBack != null) QueueHumBack(humBack);
 
         //解析 agent 标签 — 从全文里抽出来 next/continue/silent/look，存到 m_Round*
@@ -3332,7 +5277,8 @@ public class ChatSample : MonoBehaviour
                 wantsContinue = true;
                 nextInSec = null;
             }
-            else if (skillRequest != null && wantsContinue)
+            else if (skillRequest != null && wantsContinue &&
+                !m_ToolCorrectionContinuationPending)
             {
                 //拒绝的申请不能靠它自带的 <continue/> 绕过权限闸反复重试。
                 wantsContinue = false;
@@ -3346,6 +5292,34 @@ public class ChatSample : MonoBehaviour
                 wantsContinue = false;
                 nextInSec = null;
             }
+            if (m_ToolCorrectionContinuationPending &&
+                !selfRepeat && !m_RoundSilencedForRepeat)
+            {
+                //程序只提供事实；紧接的一轮仍由同一个角色自然组织语言和正确工具调用。
+                wantsContinue = true;
+                nextInSec = null;
+            }
+            if (m_ToolCorrectionExhaustedThisRound)
+            {
+                //同一真实用户轮只自动纠正一次。第二次不再让错误标签自带的 continue
+                //形成循环；最终提示显示为系统状态，不伪装成角色台词。
+                wantsContinue = false;
+                nextInSec = null;
+                m_RoundWaitForUser = true;
+            }
+            if (m_HumBackTransactionRetainedThisRound)
+            {
+                //A real singing action is now the continuation of this assistant
+                //turn.  Do not start another LLM decision before its factual
+                //playback result exists; the result tick remains an LLM choice.
+                bool requestedContinue = wantsContinue;
+                wantsContinue = ShouldContinueAgentChainAfterHumBack(
+                    wantsContinue, m_HumBackTransactionRetainedThisRound);
+                if (requestedContinue && !wantsContinue && m_LogAgentLoop)
+                    Debug.Log("[HumBack/Transaction] 已受理或幂等保留歌唱动作；" +
+                              "<continue/> 延后到真实播放结果之后");
+                nextInSec = null;
+            }
             //兜底:引号异形/格式畸变导致 ParseAgentTags 没认出的标签,别让它进历史和感知帧
             cleanFull = StripAgentTagsForTTS(cleanFull);
             m_RoundNextInSec = nextInSec;
@@ -3353,6 +5327,11 @@ public class ChatSample : MonoBehaviour
             m_RoundContinue = wantsContinue;
             m_RoundSilent = wantsSilent;
             m_RoundLookRequest = wantsLook;
+            if (wantsContinue && m_ActiveSkillsThisRound.Contains("singing"))
+                AcquireSkillExecutionLease(
+                    "singing", "continue-chain 尚未完成歌唱相关决定");
+            else if (!wantsContinue && !IsSingingRuntimeActivityActive())
+                ReleaseSkillExecutionLease("singing", "continue-chain 已自然收口");
 
             //★ 立刻应用视觉状态变化——下一帧(chain or scheduled)就能反映新眼睛状态
             if (wantsLook.HasValue)
@@ -3361,6 +5340,7 @@ public class ChatSample : MonoBehaviour
                 if (m_AgentEyesOpen != newState)
                 {
                     m_AgentEyesOpen = newState;
+                    if (!newState) ArchiveClosedEyeImages();
                     if (m_LogAgentLoop)
                         Debug.Log($"[Agent] {(newState ? "<look/> 睁眼" : "<unlook/> 闭眼")}");
                 }
@@ -3399,6 +5379,7 @@ public class ChatSample : MonoBehaviour
                 cleanTail = MemoryTagParser.Strip(cleanTail);   //只剥不应用,操作已在全文提取过
                 AgentSongMemoryRequest ignoredMemory = ExtractSongMemoryTag(ref cleanTail);
                 AgentSongSearchRequest ignoredSearch = ExtractSongSearchTag(ref cleanTail);
+                AgentSongCatalogRequest ignoredCatalog = ExtractSongCatalogTag(ref cleanTail);
                 AgentSongSingRequest ignoredSongSing = ExtractSongSingTag(ref cleanTail);
                 AgentHumBackRequest ignoredHumBack = ExtractHumBackTag(ref cleanTail);
                 cleanTail = StripAgentTagsForTTS(cleanTail);
@@ -3522,6 +5503,7 @@ public class ChatSample : MonoBehaviour
         }
 
         Debug.Log("流式完整回复：" + full);
+        UpdateContinuationExecutionFacts();
 
         //—— 续派 chain：LLM 给了 <continue/> 就**立即**派下一帧 ——
         //不置 m_StreamComplete=true、不收 round。
@@ -3538,11 +5520,15 @@ public class ChatSample : MonoBehaviour
             m_RoundInnerCheckDone = false;   //★ inner 检测重置——否则 chain round 永远进不了 inner 模式，
                                              //   LLM 想用 <silent/> 自救破局会失败、内心独白被 TTS 念出来
             string requestedSkill = m_PendingAutonomousSkillName;
-            string chainReason = string.IsNullOrEmpty(requestedSkill)
-                ? "continue-chain"
-                : "skill-request:" + requestedSkill;
+            bool isToolCorrectionChain = m_ToolCorrectionContinuationPending;
+            string chainReason = isToolCorrectionChain
+                ? "tool-correction"
+                : string.IsNullOrEmpty(requestedSkill)
+                    ? "continue-chain"
+                    : "skill-request:" + requestedSkill;
             PrepareActiveSkillsForRound(null, chainReason);
             string frame = BuildPerceptionFrame(chainReason);
+            m_ToolCorrectionContinuationPending = false;
             m_PendingAutonomousSkillName = "";
             m_PendingAutonomousSkillReason = "";
             HarvestSongIds(frame);
@@ -3550,9 +5536,11 @@ public class ChatSample : MonoBehaviour
             ClearRoundParsed();  //清掉本轮解析；下一轮 OnStreamComplete 会重新写
             m_CurrentSpeechRoundId = ++m_SpeechRoundSequence;
             if (m_LogAgentLoop)
-                Debug.Log(string.IsNullOrEmpty(requestedSkill)
-                    ? "[Agent] <continue/> → 链接下一帧(TTS pipeline 不间断)"
-                    : $"[LLM技能] {requestedSkill} 详细规则已加载 → 链接自主执行帧");
+                Debug.Log(isToolCorrectionChain
+                    ? "[ToolCorrection] 真实失败事实已注入 → 链接一次角色纠错帧"
+                    : string.IsNullOrEmpty(requestedSkill)
+                        ? "[Agent] <continue/> → 链接下一帧(TTS pipeline 不间断)"
+                        : $"[LLM技能] {requestedSkill} 详细规则已加载 → 链接自主执行帧");
             //chain 中段也按当前眼睛状态决定是否附图——LLM 上一节如果 <look/> 了，从这一节起就开始看
             string chainImageUrl = MaybeCaptureScreenForLLM();
             DispatchFormalStream(frame, chainImageUrl, m_FormalResponseGeneration);
@@ -3568,6 +5556,15 @@ public class ChatSample : MonoBehaviour
         if (m_AgentRunning && m_RoundContinue &&
             m_ConsecutiveAITurns >= m_MaxConsecutiveAITurns)
         {
+            if (!IsSingingRuntimeActivityActive())
+                ReleaseSkillExecutionLease("singing", "continue-chain 达到轮次上限");
+            if (m_ToolCorrectionContinuationPending)
+            {
+                m_ToolCorrectionContinuationPending = false;
+                m_PendingToolCorrectionFrame = "";
+                m_PendingNonCharacterToolNotice =
+                    "系统：本轮工具纠错未能继续，请重新询问或稍后再试。";
+            }
             if (!string.IsNullOrEmpty(m_PendingAutonomousSkillName))
             {
                 m_PendingSkillStatusFrame =
@@ -3645,6 +5642,7 @@ public class ChatSample : MonoBehaviour
             //让 StreamAudioPlayer 能干净退出
             m_TTSSenderDone = true;
             //UI 复位
+            PublishPendingNonCharacterToolNotice();
             m_TextBack.text = "";
             SetAnimator("state", 0);
             CompleteSongMemoryAcknowledgementIfNeeded();
@@ -3672,6 +5670,13 @@ public class ChatSample : MonoBehaviour
         int pendingTagStart = FindPotentialAgentTagStart(buf);
         string speakable = pendingTagStart >= 0 ? buf.Substring(0, pendingTagStart) : buf;
         int boundary = FindFlushBoundary(speakable, !m_FirstChunkFlushed);
+        if (!m_FirstChunkFlushed && m_PreparedSingingBridgeClip != null)
+        {
+            int preparedBoundary = PreparedReplyBoundary(speakable, m_PreparedSingingBridgeText,
+                flushAll || pendingTagStart >= 0);
+            if (preparedBoundary == -2) return; // wait only for the remaining LLM text, not new inference
+            if (preparedBoundary >= 0) boundary = preparedBoundary;
+        }
 
         if (boundary >= 0)
         {
@@ -3691,6 +5696,14 @@ public class ChatSample : MonoBehaviour
                     RoundId = m_CurrentSpeechRoundId,
                     Text = completed
                 });
+                if (m_SubtitleOverlay != null)
+                {
+                    string semanticProbe = completed.TrimEnd();
+                    bool semanticBoundary = semanticProbe.Length > 0 &&
+                        IsStrongBoundary(semanticProbe[semanticProbe.Length - 1]);
+                    m_SubtitleOverlay.QueueTranslationChunk(
+                        m_FormalResponseGeneration, completed, semanticBoundary);
+                }
                 if (!m_FirstChunkFlushed)
                 {
                     m_FirstChunkFlushed = true;
@@ -3711,6 +5724,9 @@ public class ChatSample : MonoBehaviour
                     RoundId = m_CurrentSpeechRoundId,
                     Text = tail
                 });
+                if (m_SubtitleOverlay != null)
+                    m_SubtitleOverlay.QueueTranslationChunk(
+                        m_FormalResponseGeneration, tail, true);
             }
         }
     }
@@ -3831,6 +5847,10 @@ public class ChatSample : MonoBehaviour
                 if (Time.realtimeSinceStartup - waitStart > 25f)
                 {
                     Debug.LogError("TTS客户端无响应(>25s)，跳过此段: " + chunk);
+                    ReportTtsFailureOnce(
+                        "tts_timeout",
+                        "语音合成超时。",
+                        "streaming TTS callback exceeded 25 seconds");
                     break;
                 }
                 yield return null;
@@ -3853,6 +5873,10 @@ public class ChatSample : MonoBehaviour
             else
             {
                 if (m_LogStreamTimings) Debug.LogWarning($"[Stream] T+{Elapsed():F2}s TTS失败/跳过: \"{chunk}\"");
+                ReportTtsFailureOnce(
+                    "tts_failed",
+                    "部分语音未能播放。",
+                    "streaming TTS returned no audio clip");
             }
         }
     }
@@ -3864,128 +5888,262 @@ public class ChatSample : MonoBehaviour
     private IEnumerator StreamDirectTTSPlayer(int responseGeneration)
     {
         bool firstChunk = true;
+        TTS tts = m_ChatSettings.m_TextToSpeech;
+        PendingSpeechClip next = null;
+        bool nextDone = false, alive = true;
+        float nextRequestedAt = 0f;
+        AudioClip ownedClip = null;
 
-        while (true)
+        void ClearNext()
         {
-            if (responseGeneration != m_FormalResponseGeneration) yield break;
-            while (m_PendingChunks.Count == 0)
+            PendingSpeechClip old = next;
+            next = null;
+            if (old == null) return;
+            if (!nextDone && responseGeneration == m_FormalResponseGeneration) tts.CancelPreparedSpeech();
+            if (old.Clip != null) Destroy(old.Clip);
+        }
+        void PrefetchNext()
+        {
+            if (next != null || !tts.CanPrefetchNextSpeech || m_PendingChunks.Count == 0) return;
+            PendingSpeechChunk queued = m_PendingChunks.Peek();
+            if (m_SilencedSpeechRoundIds.Contains(queued.RoundId)) return;
+            string future = StripAgentTagsForTTS(queued.Text);
+            // Long paragraphs keep the PCM-streaming path; waiting for an entire
+            // long WAV could cost more than the lookahead saves. No text is truncated.
+            if (string.IsNullOrWhiteSpace(future) || future.Length > 64 || IsPurePunctuation(future)) return;
+            var slot = new PendingSpeechClip { RoundId = queued.RoundId, Text = future };
+            next = slot; nextDone = false; nextRequestedAt = Time.realtimeSinceStartup;
+            Debug.Log($"[TTS/Lookahead] 当前句合成已完成，播放期间预取下一句: \"{future}\"");
+            tts.PrepareSpeech(future, (clip, ignored) =>
             {
-                if (responseGeneration != m_FormalResponseGeneration) yield break;
-                if (m_StreamComplete)
+                if (!alive || responseGeneration != m_FormalResponseGeneration ||
+                    !ReferenceEquals(next, slot) || m_SilencedSpeechRoundIds.Contains(slot.RoundId))
                 {
-                    FinishSpeakingNaturally();
-                    yield break;
+                    if (clip != null) Destroy(clip);
+                    if (ReferenceEquals(next, slot)) nextDone = true;
+                    return;
                 }
-                yield return null;
-            }
+                slot.Clip = clip; nextDone = true;
+            });
+        }
 
-            PendingSpeechChunk speechChunk = m_PendingChunks.Dequeue();
-            if (m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId)) continue;
-            string text = speechChunk.Text;
-            //真正发声前的最后一道门，确保工具标签不会进入 TTS 或跟随 TTS 出现在字幕。
-            text = StripAgentTagsForTTS(text);
-            if (string.IsNullOrEmpty(text) || IsPurePunctuation(text)) continue;
-
-            bool started = false;
-            bool completed = false;
-            bool succeeded = false;
-            float audioDuration = 0f;
-
-            //先行开场既然已经出声，就让它把话说完。GPTSoVITSFASTAPI 只在首批 PCM 到达时
-            //才接管音源，所以请求可以提前发出去，提前量由 m_FillerHandoffLeadSec 控制。
-            if (firstChunk)
-                yield return StartCoroutine(WaitForSpokenFillerToFinish(
-                    responseGeneration, m_FillerHandoffLeadSec));
-            if (responseGeneration != m_FormalResponseGeneration) yield break;
-
-            if (m_LogStreamTimings) Debug.Log($"[Stream] T+{Elapsed():F2}s TTS流请求发出: \"{text}\"");
-
-            m_ChatSettings.m_TextToSpeech.SpeakStreaming(
-                text,
-                m_AudioSource,
-                _ => { started = true; },
-                (success, _, duration) =>
-                {
-                    succeeded = success;
-                    audioDuration = duration;
-                    completed = true;
-                });
-
-            while (!started && !completed)
+        try
+        {
+            while (true)
             {
                 if (responseGeneration != m_FormalResponseGeneration) yield break;
-                yield return null;
-            }
-
-            if (!started)
-            {
-                if (m_LogStreamTimings) Debug.LogWarning($"[Stream] T+{Elapsed():F2}s TTS流失败/跳过: \"{text}\"");
-                continue;
-            }
-
-            if (firstChunk) MarkRealFirstAudioStarted();
-            m_CurrentlyPlayingText = text;
-            if (firstChunk)
-            {
-                m_TextBack.text = "";
-                SetAnimator("state", 2);
-                IsAISpeaking = true;
-                firstChunk = false;
-
-                if (m_LogStreamTimings)
+                while (m_PendingChunks.Count == 0)
                 {
-                    Debug.Log($"[Stream] T+{Elapsed():F2}s 流式首音开始播放");
-                    if (m_EouTime > 0f && !m_AgentCurrentRoundIsTick)
+                    if (responseGeneration != m_FormalResponseGeneration) yield break;
+                    if (m_StreamComplete)
                     {
-                        float total = Time.realtimeSinceStartup - m_EouTime;
-                        Debug.Log($"[Timing] ★ EOU→流式首音 总延迟: {total:F2}s");
+                        ClearNext();
+                        FinishSpeakingNaturally();
+                        yield break;
                     }
-                    //锚点用过即弃：一次 EOU 只对应一次体感延迟，留着会被后续
-                    //自发轮次重复计入，把统计彻底污染。
-                    m_EouTime = 0f;
+                    yield return null;
                 }
-            }
 
-            //流开始时还不知道最终时长，先按字符数估算字幕速度；结束时强制补齐。
-            m_DirectStreamingSubtitlePrefix = m_TextBack.text;
-            float estimatedDuration = Mathf.Max(0.5f, text.Length * Mathf.Max(0.08f, m_WordWaitTime));
-            m_DirectStreamingSubtitleCoroutine = StartCoroutine(TypeSentence(text, estimatedDuration));
+                PendingSpeechChunk speechChunk = m_PendingChunks.Dequeue();
+                if (m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId)) continue;
+                string text = speechChunk.Text;
+                //真正发声前的最后一道门，确保工具标签不会进入 TTS 或跟随 TTS 出现在字幕。
+                text = StripAgentTagsForTTS(text);
+                if (string.IsNullOrEmpty(text) || IsPurePunctuation(text)) continue;
 
-            while (!completed)
-            {
-                if (responseGeneration != m_FormalResponseGeneration || !IsAISpeaking)
+                bool started = false;
+                bool completed = false;
+                bool succeeded = false;
+                float audioDuration = 0f;
+
+                if (next != null && (next.RoundId != speechChunk.RoundId || next.Text != text)) ClearNext();
+                if (next != null)
                 {
-                    m_ChatSettings.m_TextToSpeech.CancelStreaming();
-                    StopDirectStreamingSubtitle();
-                    yield break;
+                    while (!nextDone && Time.realtimeSinceStartup - nextRequestedAt < 25f)
+                    {
+                        if (responseGeneration != m_FormalResponseGeneration) yield break;
+                        if (m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId)) break;
+                        yield return null;
+                    }
+                    if (nextDone)
+                    {
+                        ownedClip = next.Clip; next.Clip = null; next = null;
+                        if (ownedClip != null) Debug.Log("[TTS/Lookahead] 命中已预取的下一句，无需重新合成");
+                    }
+                    else ClearNext();
                 }
-                yield return null;
-            }
-
-            StopDirectStreamingSubtitle();
-            if (IsAISpeaking)
-            {
-                m_TextBack.text = m_DirectStreamingSubtitlePrefix + text;
-            }
-
-            if (!IsAISpeaking) yield break;
-
-            if (succeeded)
-            {
-                m_AssistantHeardText.Append(text);
-                if (m_LogStreamTimings)
+                if (m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId))
                 {
-                    Debug.Log($"[Stream] T+{Elapsed():F2}s TTS流播放完成(音频{audioDuration:F2}s): \"{text}\"");
+                    if (ownedClip != null) Destroy(ownedClip);
+                    ownedClip = null;
+                    continue;
                 }
-            }
-            else if (m_LogStreamTimings)
-            {
-                Debug.LogWarning($"[Stream] T+{Elapsed():F2}s TTS流中断/失败: \"{text}\"");
-            }
-            m_CurrentlyPlayingText = "";
+                if (firstChunk && ownedClip == null) ownedClip = TakePreparedFormalReply(text);
 
-            //直播放流的下一段需要重新建立推理流，本身已有自然间隔；这里不再叠加
-            //完整AudioClip路径的句间呼吸，否则会让句间停顿被重复计算。
+                // Send synthesis immediately. PCM waits behind a playback gate while the
+                // opener speaks, instead of delaying the expensive network/model request.
+                if (responseGeneration != m_FormalResponseGeneration) yield break;
+
+                if (ownedClip != null)
+                {
+                    while (GetFormalPlaybackPermission(responseGeneration, speechChunk.RoundId) == TTS.StreamingPlaybackPermission.Wait)
+                        yield return null;
+                    if (GetFormalPlaybackPermission(responseGeneration, speechChunk.RoundId) == TTS.StreamingPlaybackPermission.Cancel)
+                        yield break;
+                    audioDuration = ownedClip.length;
+                    m_FormalBufferedClip = ownedClip;
+                    m_AudioSource.clip = ownedClip;
+                    m_AudioSource.loop = false;
+                    m_AudioSource.Play();
+                    started = true;
+                }
+                else
+                {
+                    m_FormalBufferedClip = null;
+                    if (m_LogStreamTimings) Debug.Log($"[Stream] T+{Elapsed():F2}s TTS流请求发出: \"{text}\"");
+
+                    m_ChatSettings.m_TextToSpeech.SpeakStreamingWithPlaybackGate(
+                        text,
+                        m_AudioSource,
+                        _ => { started = true; },
+                        (success, _, duration) =>
+                        {
+                            succeeded = success;
+                            audioDuration = duration;
+                            completed = true;
+                        },
+                        () => GetFormalPlaybackPermission(responseGeneration, speechChunk.RoundId));
+                }
+
+                while (!started && !completed)
+                {
+                    if (responseGeneration != m_FormalResponseGeneration) yield break;
+                    yield return null;
+                }
+
+                if (!started)
+                {
+                    if (m_LogStreamTimings) Debug.LogWarning($"[Stream] T+{Elapsed():F2}s TTS流失败/跳过: \"{text}\"");
+                    ReportTtsFailureOnce(
+                        "tts_failed",
+                        "部分语音未能播放。",
+                        "direct streaming TTS did not start");
+                    continue;
+                }
+
+                if (firstChunk) MarkRealFirstAudioStarted();
+                m_CurrentlyPlayingText = text;
+                if (firstChunk)
+                {
+                    m_TextBack.text = "";
+                    SetAnimator("state", 2);
+                    IsAISpeaking = true;
+                    firstChunk = false;
+
+                    if (m_LogStreamTimings)
+                    {
+                        Debug.Log($"[Stream] T+{Elapsed():F2}s 流式首音开始播放");
+                        if (m_EouTime > 0f && !m_AgentCurrentRoundIsTick)
+                        {
+                            float total = Time.realtimeSinceStartup - m_EouTime;
+                            Debug.Log($"[Timing] ★ EOU→流式首音 总延迟: {total:F2}s");
+                        }
+                        //锚点用过即弃：一次 EOU 只对应一次体感延迟，留着会被后续
+                        //自发轮次重复计入，把统计彻底污染。
+                        m_EouTime = 0f;
+                    }
+                }
+
+                //流开始时还不知道最终时长，先按字符数估算字幕速度；结束时强制补齐。
+                m_DirectStreamingSubtitlePrefix = m_TextBack.text;
+                m_DirectStreamingSubtitleRevealedChars = 0;
+                float estimatedDuration = ownedClip != null ? ownedClip.length :
+                    Mathf.Max(0.5f, text.Length * Mathf.Max(0.08f, m_WordWaitTime));
+                m_DirectStreamingSubtitleCoroutine = StartCoroutine(TypeSentence(
+                    text,
+                    estimatedDuration,
+                    responseGeneration,
+                    revealed => m_DirectStreamingSubtitleRevealedChars = revealed));
+
+                while (!completed)
+                {
+                    if (responseGeneration != m_FormalResponseGeneration || !IsAISpeaking ||
+                        m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId))
+                    {
+                        if (responseGeneration == m_FormalResponseGeneration)
+                        {
+                            m_ChatSettings.m_TextToSpeech.CancelStreaming();
+                            StopDirectStreamingSubtitle();
+                        }
+                        yield break;
+                    }
+                    PrefetchNext();
+                    if (ownedClip != null && !m_AudioSource.isPlaying)
+                    {
+                        succeeded = true;
+                        completed = true;
+                    }
+                    yield return null;
+                }
+
+                StopDirectStreamingSubtitle();
+                if (IsAISpeaking)
+                {
+                    if (m_SubtitleOverlay != null &&
+                        m_DirectStreamingSubtitleRevealedChars < text.Length)
+                        m_SubtitleOverlay.ReportSourceTextRevealed(
+                            responseGeneration,
+                            text,
+                            m_DirectStreamingSubtitleRevealedChars);
+                    m_DirectStreamingSubtitleRevealedChars = text.Length;
+                    m_TextBack.text = m_DirectStreamingSubtitlePrefix + text;
+                }
+
+                if (!IsAISpeaking) yield break;
+
+                if (succeeded)
+                {
+                    m_AssistantHeardText.Append(text);
+                    if (m_LogStreamTimings)
+                    {
+                        Debug.Log($"[Stream] T+{Elapsed():F2}s TTS流播放完成(音频{audioDuration:F2}s): \"{text}\"");
+                    }
+                }
+                else if (m_LogStreamTimings)
+                {
+                    Debug.LogWarning($"[Stream] T+{Elapsed():F2}s TTS流中断/失败: \"{text}\"");
+                }
+                if (!succeeded)
+                {
+                    ReportTtsFailureOnce(
+                        "tts_failed",
+                        "部分语音未能播放。",
+                        "direct streaming TTS ended unsuccessfully");
+                }
+                m_CurrentlyPlayingText = "";
+                if (ownedClip != null)
+                {
+                    if (m_AudioSource.clip == ownedClip) m_AudioSource.clip = null;
+                    if (m_FormalBufferedClip == ownedClip) m_FormalBufferedClip = null;
+                    Destroy(ownedClip); ownedClip = null;
+                }
+
+                //The next sentence may already be ready. Do not add another fixed wait.
+            }
+        }
+        finally
+        {
+            alive = false;
+            ClearNext();
+            if (ownedClip != null)
+            {
+                if (m_AudioSource != null && m_AudioSource.clip == ownedClip)
+                {
+                    m_AudioSource.Stop(); m_AudioSource.clip = null;
+                }
+                if (m_FormalBufferedClip == ownedClip) m_FormalBufferedClip = null;
+                Destroy(ownedClip);
+            }
         }
     }
 
@@ -4125,7 +6283,10 @@ public class ChatSample : MonoBehaviour
     /// </summary>
     private void FinishSpeakingNaturally()
     {
-        ClearUserTurnAwaitingReply("回复播完");
+        //所有正文播放路径（整段 WAV 与直流 PCM）都在这里汇合。
+        //不要再让各 TTS sender 自己决定歌唱交接门是否打开。
+        m_TTSSenderDone = true;
+        m_TextOutputDrainedGeneration = m_FormalResponseGeneration;
         m_LatencyFillerGeneration++;
         m_EouFillerGeneration++;
         m_EouFillerScheduled = false;
@@ -4149,6 +6310,7 @@ public class ChatSample : MonoBehaviour
         {
             m_ChatHistory.Add(heard);
         }
+        PublishPendingNonCharacterToolNotice();
 
         CompleteSongMemoryAcknowledgementIfNeeded();
 
@@ -4162,6 +6324,21 @@ public class ChatSample : MonoBehaviour
         //回哼属于当前 assistant turn 的后半段。先别收 Agent round、也别把麦克风
         //交还给 VAD；回哼播放结束后由 FinishHumBack() 统一完成这些动作。
         if (TryBeginPendingHumBack()) return;
+        if (HasHumBackExecutionWork())
+        {
+            //流式生产器可能已经消费 m_HumBackPending，并正在等待这段正文结束。
+            //事务仍未完成，不能在这里提前释放麦克风或结束 Agent round。
+            IsAISpeaking = true;
+            m_TextBack.text = "♪ …";
+            SetAnimator("state", 1);
+            if (m_LogHumBack)
+                Debug.Log("[HumBack/Transaction] 正文已播完；歌唱事务仍在准备/缓冲，保留当前回复所有权");
+            return;
+        }
+
+        //正文后面没有真实歌唱动作才算本轮已完整回应。
+        //有歌唱时由 FinishHumBack / song_sing 失败收尾路径清除。
+        ClearUserTurnAwaitingReply("回复播完");
 
         //收 agent round——per-round 状态(ring buffer / consec count) OnStreamComplete 已写过；
         //这里只负责按本 chain 最后一节的 <next in/> 排下一拍。
@@ -4183,7 +6360,7 @@ public class ChatSample : MonoBehaviour
         ClearUserTurnAwaitingReply("被用户打断");
 
         bool hasResponseWork = IsAISpeaking || IsVoiceOutputPlaying || m_FormalResponseInFlight
-            || m_HumBackPending || m_HumBackPreparingCarrier || m_HumBackPlaying
+            || IsSingingRuntimeActivityActive()
             || m_SentenceBuffer.Length > 0 || m_PendingChunks.Count > 0 || m_PendingClips.Count > 0;
         if (!hasResponseWork) return;
 
@@ -4193,6 +6370,8 @@ public class ChatSample : MonoBehaviour
         {
             float duration = m_LatencyFillerPlayed
                 ? Mathf.Max(0.1f, m_LatencyFillerDuration)
+                : m_FormalBufferedClip != null && m_AudioSource.clip == m_FormalBufferedClip
+                ? m_FormalBufferedClip.length
                 : m_ChatSettings.m_TextToSpeech.SupportsStreamingPlayback
                 ? Mathf.Max(0.5f, m_CurrentlyPlayingText.Length * Mathf.Max(0.08f, m_WordWaitTime))
                 : m_AudioSource.clip.length;
@@ -4227,6 +6406,7 @@ public class ChatSample : MonoBehaviour
 
         //把"已听到"切片入历史，并标记被打断让下一轮prompt里LLM知道"那句话她没说完"
         string heard = m_AssistantHeardText.ToString();
+        if (m_InterruptedUserQuestion != null) m_InterruptedHeardText = heard;
         m_AssistantHeardText.Length = 0;
         m_CurrentlyPlayingText = "";
 
@@ -4317,8 +6497,6 @@ public class ChatSample : MonoBehaviour
     [Header("角色自主歌曲记忆 — <song_remember/> / <song_rename/> / <song_forget/>")]
     [Tooltip("允许角色把最近一次歌唱/哼唱保存到本机，也可以稍后命名；未调用标签就会忽略该片段。")]
     [SerializeField] private bool m_EnableAutonomousSongMemory = true;
-    [Tooltip("演唱片段中用户明确要求记住/保存时，若模型漏掉 <song_remember/>，自动保存最近歌声；随口哼唱不会触发。")]
-    [SerializeField] private bool m_EnforceExplicitSongRemember = true;
     [Tooltip("同一个歌曲记忆操作的防重复间隔。改名不会被刚才的保存操作阻塞。")]
     [Range(2f, 60f)] [SerializeField] private float m_SongMemoryDuplicateCooldownSeconds = 10f;
 
@@ -4359,6 +6537,8 @@ public class ChatSample : MonoBehaviour
     [SerializeField] private string m_HumSVCURL = "http://127.0.0.1:9882/convert";
     [Tooltip("场景启动和首次回哼前自动检查 9882；未运行时由 Unity 静默启动项目内脚本。")]
     [SerializeField] private bool m_AutoStartHumSVC = true;
+    [Tooltip("singing Skill 首次按需加载时，在后台预载角色 RVC worker；不等待预热即可继续 LLM 回复。")]
+    [SerializeField] private bool m_PrewarmHumSVCOnSingingSkillLoad = true;
     [Tooltip("自动启动后等待 /health 就绪的最长时间。桥接服务本身很轻，RVC 模型仍按请求加载。")]
     [Range(5f, 120f)] [SerializeField] private float m_HumSVCStartupTimeoutSeconds = 45f;
     [Tooltip("相对于 Unity 项目根目录的 9882 启动脚本。")]
@@ -4471,6 +6651,11 @@ public class ChatSample : MonoBehaviour
         m_UserSpokeSinceLastSing = true;
         m_LastSungRepeatCount = 0;
         m_UserTurnAwaitingReplySince = Time.realtimeSinceStartup;
+        m_ToolCorrectionAttemptsThisUserTurn = 0;
+        m_ToolCorrectionContinuationPending = false;
+        m_ToolCorrectionExhaustedThisRound = false;
+        m_PendingToolCorrectionFrame = "";
+        m_PendingNonCharacterToolNotice = "";
     }
 
     /// <summary>这一轮已经回应过了（说出口或回哼播完），放行自主发言。</summary>
@@ -4498,9 +6683,75 @@ public class ChatSample : MonoBehaviour
     private bool m_AutonomyProbeInFlight = false;
     private int m_AutonomyProbeGeneration = 0;
     private float m_AutonomyProbeNotBefore = -999f;
+    //用户讲话期间，角色仍可做一次只存在于内部的自主意图预判；它绝不能直接
+    //变成声音或动作。用户轮完成后再把结果作为可忽略的参考交回正式角色轮。
+    private bool m_UserSpeechActiveForAutonomy = false;
+    private bool m_AutonomyProbeMustRemainPrivate = false;
+    private string m_DeferredAutonomyIntent = "";
+    private string m_DeferredAutonomyNovelty = "";
     private float m_LastUserTurnTime = -1f;
     private float m_LastAITurnTime = -1f;
+    //Only the actual transcript/text may ground user intent, names and memory facts.
     private string m_LastUserMsg = "";
+    private string m_LastUserEvidence = "";
+
+    // A VAD candidate revokes output, not the user's already accepted question.
+    // This is a same-turn continuation: no new user history, Skill age or tool budget.
+    private string m_InterruptedUserQuestion;
+    private string m_InterruptedHeardText = "";
+    private bool m_InterruptedAgentWasRunning;
+
+    private void PreservePendingReplyForInputCandidate()
+    {
+        if (m_InterruptedUserQuestion != null || m_UserTurnAwaitingReplySince <= 0f ||
+            m_AgentCurrentRoundIsTick || string.IsNullOrWhiteSpace(m_LastUserMsg)) return;
+        m_InterruptedUserQuestion = m_LastUserMsg;
+        m_InterruptedHeardText = m_AssistantHeardText.ToString();
+        m_InterruptedAgentWasRunning = m_AgentRunning;
+    }
+
+    private string ConsumeInterruptedReplyContext()
+    {
+        string question = m_InterruptedUserQuestion;
+        m_InterruptedUserQuestion = null; // consume once, before starting any async work
+        if (question == null || question != m_LastUserMsg ||
+            (m_InterruptedAgentWasRunning && !m_AgentRunning)) return null;
+        return "[输入中断结果——程序事实，不是新的用户话语]\n" +
+            "此前的用户问题尚未完成回应，系统因检测到新的输入候选而撤销了旧输出。" +
+            "该候选最终没有得到有效转写；这不证明用户没有发声，也不证明一定是噪声。\n" +
+            "待回应的用户原话：" + question + "\n" +
+            "中断前已播放的文字（按音频进度估计）：" +
+            (string.IsNullOrEmpty(m_InterruptedHeardText) ? "无" : m_InterruptedHeardText) + "\n" +
+            "此前 assistant 历史可能包含未播放的草稿，不能当作用户已听过。" +
+            "已完成的工具结果仍有效，不要仅因这次中断重复执行。" +
+            "请结合原问题和现在的事实重新决定：回应、询问用户，或保持沉默；不要直接续播旧草稿。";
+    }
+
+    private void ResumePendingReplyAfterEmptyInput()
+    {
+        m_UserSpeechActiveForAutonomy = false;
+        string context = ConsumeInterruptedReplyContext();
+        if (context == null || m_ChatSettings == null || m_ChatSettings.m_ChatModel == null ||
+            m_ChatSettings.m_TextToSpeech == null) return;
+        CancelAutonomyIntentProbe();
+        m_UserTurnAwaitingReplySince = Time.realtimeSinceStartup;
+        m_AgentCurrentRoundIsTick = false;
+        m_AgentRoundInFlight = m_AgentRunning;
+        ClearRoundParsed();
+        // Neither the failed input nor this continuation is a new real-user round.
+        if (m_AgentRunning) context += "\n" + BuildPerceptionFrame("input-candidate-empty");
+        m_EouTime = 0f; // do not count the failed candidate as this question's latency anchor
+        Debug.Log("[InputRecovery] 输入候选无有效转写；原问题交回 LLM，同轮重新决策（不续播旧音频）");
+        StartStreaming("", false, m_LastUserMsg, continueExistingUserTurn: true,
+            transientSystemContext: context);
+    }
+
+    private void SetCurrentUserInput(string utterance, string evidence)
+    {
+        m_InterruptedUserQuestion = null; // a valid new input supersedes the pending recovery
+        m_LastUserMsg = utterance ?? "";
+        m_LastUserEvidence = evidence ?? "";
+    }
     //—— 按需提示词技能 ——
     //“会不会”“本轮要不要加载详细规则”“这次能不能执行”是三件不同的事：
     //  · Definition = 角色拥有的能力以及如何识别相关语境；
@@ -4548,10 +6799,79 @@ public class ChatSample : MonoBehaviour
         public float SoftSuppressedUntil = -999f;
         public float LastSignalAt = -999f;
         public float LastAutonomousGrantAt = -999f;
+        // 权限方向由 LLM 结合完整语境判断；程序只保存触发该状态的本轮用户原话，
+        // 供日志与后续诊断追溯，不再要求模型复制一份 evidence。
+        public string LastPolicyUserText = "";
+        public float LastPolicyChangedAt = -999f;
     }
 
     private readonly Dictionary<string, SkillRouteState> m_SkillRouteStates =
         new Dictionary<string, SkillRouteState>(StringComparer.OrdinalIgnoreCase);
+
+    //短期路由窗口只说明“最近谈过这个 Skill”，不能代表一次尚未落地的动作已经结束。
+    //执行租约跨越 <continue/> 链持有详细规则；完成、失败、打断或链收口时立即释放。
+    //结构做成按 Skill 命名，后续新增联网等异步 Skill 时可直接复用。
+    private sealed class SkillExecutionLease
+    {
+        public int RoundsRemaining;
+        public float ExpiresAt;
+        public string Reason = "";
+    }
+
+    private readonly Dictionary<string, SkillExecutionLease> m_SkillExecutionLeases =
+        new Dictionary<string, SkillExecutionLease>(StringComparer.OrdinalIgnoreCase);
+    private const int k_SkillPlanningLeaseRounds = 6;
+    private const float k_SkillPlanningLeaseSeconds = 180f;
+    private const float k_SkillActionLeaseSeconds = 900f;
+
+    private void AcquireSkillExecutionLease(
+        string skillName, string reason, bool actionInFlight = false)
+    {
+        if (string.IsNullOrWhiteSpace(skillName)) return;
+        if (!m_SkillExecutionLeases.TryGetValue(skillName, out SkillExecutionLease lease))
+        {
+            lease = new SkillExecutionLease();
+            m_SkillExecutionLeases[skillName] = lease;
+        }
+        //普通 continue 不反复续命，避免模型自己无限循环让大 Skill 常驻；一旦真实工具
+        //已受理，则给足长歌生成/播放时间，结束路径仍会主动释放。
+        if (lease.RoundsRemaining <= 0 || actionInFlight)
+            lease.RoundsRemaining = actionInFlight
+                ? Mathf.Max(k_SkillPlanningLeaseRounds, m_MaxConsecutiveAITurns)
+                : k_SkillPlanningLeaseRounds;
+        float duration = actionInFlight ? k_SkillActionLeaseSeconds : k_SkillPlanningLeaseSeconds;
+        if (lease.ExpiresAt <= Time.realtimeSinceStartup || actionInFlight)
+            lease.ExpiresAt = Time.realtimeSinceStartup + duration;
+        lease.Reason = reason ?? "";
+        if (m_LogAgentLoop)
+            Debug.Log($"[LLM技能/Lease] {skillName} 已持有；rounds={lease.RoundsRemaining} " +
+                      $"seconds={duration:F0} reason={lease.Reason}");
+    }
+
+    private bool HasSkillExecutionLease(string skillName, float now)
+    {
+        if (!m_SkillExecutionLeases.TryGetValue(skillName, out SkillExecutionLease lease))
+            return false;
+        if (lease.RoundsRemaining > 0 && now < lease.ExpiresAt) return true;
+        m_SkillExecutionLeases.Remove(skillName);
+        if (m_LogAgentLoop)
+            Debug.Log($"[LLM技能/Lease] {skillName} 已过期，恢复按需路由");
+        return false;
+    }
+
+    private void ConsumeSkillExecutionLeaseRound(string skillName)
+    {
+        if (!m_SkillExecutionLeases.TryGetValue(skillName, out SkillExecutionLease lease)) return;
+        if (lease.RoundsRemaining > 0) lease.RoundsRemaining--;
+    }
+
+    private void ReleaseSkillExecutionLease(string skillName, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(skillName) ||
+            !m_SkillExecutionLeases.Remove(skillName)) return;
+        if (m_LogAgentLoop)
+            Debug.Log($"[LLM技能/Lease] {skillName} 已释放；reason={reason}");
+    }
 
     private static bool ContainsAnyOrdinalIgnoreCase(string text, string[] needles)
     {
@@ -4565,6 +6885,10 @@ public class ChatSample : MonoBehaviour
     }
 
     private readonly HashSet<string> m_ActiveSkillsThisRound =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    //一次真实用户轮可能包含动作执行、工具结果和纠错等多个 LLM chain。
+    //第一帧实际加载过的 Skill 固定到整条 chain 收口，避免倒计时在动作标签到达前卸载。
+    private readonly HashSet<string> m_UserTurnSkillPins =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private string m_PendingSkillStatusFrame = "";
     private string m_PendingAutonomousSkillName = "";
@@ -4591,15 +6915,15 @@ public class ChatSample : MonoBehaviour
         public string Reason;
     }
 
-    private sealed class AgentSingingIntentRequest
+    private sealed class AgentSingingPolicyRequest
     {
-        public string Permission;
-        public string Scope;
-        public string Actor;
-        public string Action;
-        public string Order;
-        public float Confidence = float.NaN;
-        public string Evidence;
+        public string Value;
+        public bool FromLegacyIntent;
+    }
+
+    private sealed class AgentSingingStopRequest
+    {
+        public string Reason;
     }
 
     private static readonly System.Text.RegularExpressions.Regex s_SkillRequestTagRegex =
@@ -4612,16 +6936,28 @@ public class ChatSample : MonoBehaviour
             @"<skill_control\b(?<attrs>[^>]*)>",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-    private static readonly System.Text.RegularExpressions.Regex s_SingingIntentTagRegex =
+    private static readonly System.Text.RegularExpressions.Regex s_SingingPolicyTagRegex =
+        new System.Text.RegularExpressions.Regex(
+            @"<singing_policy\b(?<attrs>[^>]*)>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    // 旧协议只作为平滑迁移入口：能明确读出持久权限变化时转成 singing_policy；
+    // no_change、动作、actor 等冗余字段全部忽略，绝不能再拦住普通歌唱工具。
+    private static readonly System.Text.RegularExpressions.Regex s_LegacySingingIntentTagRegex =
         new System.Text.RegularExpressions.Regex(
             @"<singing_intent\b(?<attrs>[^>]*)>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private static readonly System.Text.RegularExpressions.Regex s_SingingStopTagRegex =
+        new System.Text.RegularExpressions.Regex(
+            @"<singing_stop\b(?<attrs>[^>]*)>",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     private static readonly string[] s_SingingSkillTopicSignals =
     {
         "[演唱片段", "[混合歌唱转说话", "歌曲检索工具", "歌曲记忆工具", "旋律回哼工具",
         "练唱会话", "唱", "歌曲", "这首", "那首", "歌词", "旋律", "哼", "音调",
-        "调高", "调低", "升调", "降调", "起调", "曲库",
+        "调高", "调低", "升调", "降调", "起调", "移调", "半音", "半个音", "全音", "曲库",
         "歌って", "歌う", "歌を", "歌声", "歌詞", "曲を", "この曲", "その曲",
         "メロディ", "ハミング", "鼻歌", "キーを",
         "singing", "sing a song", "sing this", "sing that", "sing it", "sing for",
@@ -4631,7 +6967,9 @@ public class ChatSample : MonoBehaviour
     private static readonly string[] s_SingingSkillFollowupSignals =
     {
         "再来", "再一次", "重来", "刚才那", "这一段", "那一段", "第一段", "第二段",
-        "高一点", "低一点", "快一点", "慢一点", "顺序", "反过来",
+        "第三段", "第四段", "第五段", "第1段", "第2段", "第3段", "第4段", "第5段",
+        "高一点", "低一点", "提高", "降低", "抬高", "压低", "半音", "半个音", "全音", "移调",
+        "快一点", "慢一点", "顺序", "反过来",
         "もう一度", "もう一回", "さっきの", "高く", "低く", "速く", "遅く",
         "again", "one more", "higher", "lower", "faster", "slower"
     };
@@ -4734,11 +7072,18 @@ public class ChatSample : MonoBehaviour
         return null;
     }
 
-    private string DescribeSkillAccess(SkillRouteState state, bool activeThisRound)
+    private static bool ShouldCarrySkillForCurrentUserTurn(
+        bool isUserTurn,
+        bool wasPinnedByUserTurn)
     {
-        if (state.Access == SkillAccess.UserDisabled) return "用户已禁用";
-        if (state.Access == SkillAccess.SoftSuppressed) return "暂时不主动使用";
-        return activeThisRound ? "本轮已加载" : "可用、未加载";
+        return !isUserTurn && wasPinnedByUserTurn;
+    }
+
+    private static string DescribeSkillActionAccess(SkillRouteState state)
+    {
+        if (state.Access == SkillAccess.UserDisabled) return "用户已禁用有副作用的动作";
+        if (state.Access == SkillAccess.SoftSuppressed) return "暂时不主动执行动作";
+        return "可用";
     }
 
     private string BuildSkillCatalogContext()
@@ -4758,8 +7103,14 @@ public class ChatSample : MonoBehaviour
             SkillRouteDefinition definition = s_SkillRouteDefinitions[i];
             SkillRouteState state = GetSkillRouteState(definition.Name);
             sb.Append("- ").Append(definition.Name).Append(": ")
-              .Append(definition.AutonomousDescription).Append("；状态=")
-              .Append(DescribeSkillAccess(state, state.ActiveThisRound)).Append('\n');
+              .Append(definition.AutonomousDescription)
+              .Append("；详细规则=")
+              .Append(state.ActiveThisRound ? "本轮已加载" : "本轮未加载")
+              .Append("；动作权限=")
+              .Append(DescribeSkillActionAccess(state))
+              .Append("；只读数据检查=详细规则已加载时按该 Skill 协议执行，"
+                    + "不需要启用有副作用的动作权限")
+              .Append('\n');
         }
         return sb.ToString().Trim();
     }
@@ -4769,10 +7120,36 @@ public class ChatSample : MonoBehaviour
         if (!string.Equals(skillName, "singing", StringComparison.OrdinalIgnoreCase)) return;
         m_WaitingForRequestedSingAlong = false;
         ReleasePreparedSingingBridge(true);
-        if (m_HumBackPending || m_HumBackPreparingCarrier || m_HumBackPlaying)
+        if (HasHumBackExecutionWork())
             CancelPendingHumBack(reason, true);
         if (m_FastHumBackEouStaged || m_FastHumBackActive)
             RejectFastHumBackAfterFinal(reason);
+    }
+
+    private bool IsSingingRuntimeActivityActive()
+    {
+        return m_SongSingInFlight || HasHumBackExecutionWork();
+    }
+
+    /// <summary>
+    /// The hum-back transaction remains active from acceptance until every request,
+    /// prepared clip and playback buffer has drained.  In particular, a streamed
+    /// song whose first chunks are ready but are waiting for the spoken prelude is
+    /// still busy even though Pending/Preparing/Playing are all temporarily false.
+    /// </summary>
+    private bool HasHumBackExecutionWork()
+    {
+        return m_HumBackPending || m_HumBackPreparingCarrier || m_HumBackPlaying ||
+               m_ActiveHumBackClip != null || m_ActiveSVSRequest != null ||
+               m_ActiveHumSVCRequest != null || m_HumBackPlaybackCoroutine != null ||
+               m_HumStreamProducerCoroutine != null ||
+               m_HumStreamPlaybackCoroutine != null ||
+               m_HumStreamReadyClips.Count > 0 ||
+               m_HumStreamScheduledClips.Count > 0 ||
+               m_HumStreamWaitForTextOutputDrain ||
+               m_HumBackPrefixPreparing || m_PreparedHumBackPrefixClip != null ||
+               m_FastHumBackEouStaged || m_FastHumBackActive ||
+               m_FastHumBackFullClip != null;
     }
 
     private bool CanExecuteSkillAction(string skillName, out string reason)
@@ -4789,14 +7166,92 @@ public class ChatSample : MonoBehaviour
             reason = "用户已明确禁用该 Skill，只有用户明确重新开启才可执行";
             return false;
         }
-        if (state.Access == SkillAccess.SoftSuppressed)
+        if (state.Access == SkillAccess.SoftSuppressed && m_AgentCurrentRoundIsTick)
         {
-            reason = "该 Skill 当前处于暂不主动使用状态";
+            reason = "该 Skill 当前处于暂不主动使用状态；真实用户明确请求不受此限制";
             return false;
         }
         if (!state.ActiveThisRound || !m_ActiveSkillsThisRound.Contains(definition.Name))
         {
             reason = "详细 Skill 规则本轮未加载；自主行为应先用 <skill_request/> 申请";
+            return false;
+        }
+        reason = "";
+        return true;
+    }
+
+    private bool HasModerateSingingModeJudgment()
+    {
+        if (NormalizeObservedMode(m_LastObservedMode) == "singing" &&
+            m_LastObservedModeConfidence >= m_ModeReviewSingingConfidence &&
+            (string.IsNullOrWhiteSpace(m_LastObservedModeTranscript) ||
+             string.IsNullOrWhiteSpace(m_StreamingTranscript) ||
+             TranscriptContinuity(m_LastObservedModeTranscript, m_StreamingTranscript) >= 0.55f))
+            return true;
+
+        SpeculativeDraft draft = m_SpeculativeDraft;
+        return draft != null && NormalizeObservedMode(draft.observed_mode) == "singing" &&
+            Mathf.Clamp01(draft.mode_confidence) >= m_ModeReviewSingingConfidence &&
+            (string.IsNullOrWhiteSpace(draft.sourceTranscript) ||
+             string.IsNullOrWhiteSpace(m_StreamingTranscript) ||
+             TranscriptContinuity(draft.sourceTranscript, m_StreamingTranscript) >= 0.55f);
+    }
+
+    private static bool ShouldRequestRoleModeReviewFromMelody(
+        bool analysisAvailable,
+        float islandSeconds,
+        float contentSeconds,
+        float pitchStability,
+        float minIslandSeconds,
+        float minIslandRatio,
+        float minPitchStability)
+    {
+        if (!analysisAvailable || contentSeconds <= 0.01f) return false;
+        float ratio = Mathf.Clamp01(islandSeconds / contentSeconds);
+        return islandSeconds >= minIslandSeconds &&
+            ratio >= minIslandRatio && pitchStability >= minPitchStability;
+    }
+
+    private bool HasStrongMelodicReviewEvidence(SenseVoiceSpeechToText senseVoice)
+    {
+        return senseVoice != null && ShouldRequestRoleModeReviewFromMelody(
+            senseVoice.LastSingingAnalysisAvailable,
+            senseVoice.LastSingingIslandSeconds,
+            senseVoice.LastSingingContentSeconds,
+            senseVoice.LastPitchStability,
+            m_ModeReviewMelodicIslandSeconds,
+            m_ModeReviewMelodicIslandRatio,
+            m_ModeReviewPitchStability);
+    }
+
+    private bool HasStrongSingingModeJudgment()
+    {
+        if (NormalizeObservedMode(m_LastObservedMode) != "singing") return false;
+        if (m_LastObservedModeConfidence < m_SpeculativeSingingSupportConfidence) return false;
+        if (!string.IsNullOrWhiteSpace(m_LastObservedModeTranscript) &&
+            !string.IsNullOrWhiteSpace(m_StreamingTranscript) &&
+            TranscriptContinuity(m_LastObservedModeTranscript, m_StreamingTranscript) < 0.55f)
+            return false;
+        return true;
+    }
+
+    /// <summary>
+    /// 只读查看 Skill 自己的数据不等于使用被禁用的动作能力。用户即使关闭了 singing，
+    /// 仍应能问“你还记得哪些歌”；但详细 Skill 必须因当前语境真实加载，不能让未加载的
+    /// 自主 tick 绕过申请流程。这一层可复用于未来联网 Skill 的历史/缓存自查。
+    /// </summary>
+    private bool CanInspectSkillData(string skillName, out string reason)
+    {
+        SkillRouteDefinition definition = FindSkillDefinition(skillName);
+        if (definition == null)
+        {
+            reason = $"未知 Skill '{skillName}'";
+            return false;
+        }
+        SkillRouteState state = GetSkillRouteState(definition.Name);
+        if (!state.ActiveThisRound || !m_ActiveSkillsThisRound.Contains(definition.Name))
+        {
+            reason = "详细 Skill 规则本轮未加载；自主自查应先用 <skill_request/> 申请";
             return false;
         }
         reason = "";
@@ -4836,215 +7291,94 @@ public class ChatSample : MonoBehaviour
         return request;
     }
 
-    private static AgentSingingIntentRequest ExtractSingingIntentTag(ref string text)
+    private static AgentSingingPolicyRequest ExtractSingingPolicyTag(ref string text)
     {
         if (string.IsNullOrEmpty(text)) return null;
         text = SplitGluedAgentTags(text);
-        var match = s_SingingIntentTagRegex.Match(text);
+
+        var policyMatch = s_SingingPolicyTagRegex.Match(text);
+        var legacyMatch = s_LegacySingingIntentTagRegex.Match(text);
+        text = s_SingingPolicyTagRegex.Replace(text, "");
+        text = s_LegacySingingIntentTagRegex.Replace(text, "").Trim();
+
+        if (policyMatch.Success)
+        {
+            string attrs = policyMatch.Groups["attrs"].Value;
+            return new AgentSingingPolicyRequest
+            {
+                Value = ReadToolAttribute(attrs, "value").ToLowerInvariant(),
+            };
+        }
+
+        if (!legacyMatch.Success) return null;
+        string legacyAttrs = legacyMatch.Groups["attrs"].Value;
+        string permission = ReadToolAttribute(legacyAttrs, "permission").ToLowerInvariant();
+        string value = permission == "soft_suppress" ? "suppress_autonomy" : permission;
+        if (value != "enable" && value != "disable" && value != "suppress_autonomy")
+            return null;
+        return new AgentSingingPolicyRequest
+        {
+            Value = value,
+            FromLegacyIntent = true,
+        };
+    }
+
+    private static AgentSingingStopRequest ExtractSingingStopTag(ref string text)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        text = SplitGluedAgentTags(text);
+        var match = s_SingingStopTagRegex.Match(text);
         if (!match.Success) return null;
         string attrs = match.Groups["attrs"].Value;
-        var request = new AgentSingingIntentRequest
+        text = s_SingingStopTagRegex.Replace(text, "").Trim();
+        return new AgentSingingStopRequest
         {
-            Permission = ReadToolAttribute(attrs, "permission").ToLowerInvariant(),
-            Scope = ReadToolAttribute(attrs, "scope").ToLowerInvariant(),
-            Actor = ReadToolAttribute(attrs, "actor").ToLowerInvariant(),
-            Action = ReadToolAttribute(attrs, "action").ToLowerInvariant(),
-            Order = ReadToolAttribute(attrs, "order"),
-            Confidence = ReadToolFloatAttribute(attrs, "confidence", 0f, 1f),
-            Evidence = ReadToolAttribute(attrs, "evidence"),
+            Reason = ReadToolAttribute(attrs, "reason"),
         };
-        text = s_SingingIntentTagRegex.Replace(text, "").Trim();
-        return request;
-    }
-
-    private static string NormalizeSingingIntentEvidence(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return "";
-        var normalized = new System.Text.StringBuilder(text.Length);
-        foreach (char ch in text)
-            if (char.IsLetterOrDigit(ch))
-                normalized.Append(char.ToLowerInvariant(ch));
-        return normalized.ToString();
     }
 
     /// <summary>
-    /// 这里只做协议与证据校验，不重新解释“不要唱”到底修饰能力还是某几段。
-    /// evidence 必须逐字来自当前用户原话，避免模型拿自己的 reason 或历史内容改权限。
+    /// 这里只校验持久权限值。用户是否真的在改变长期权限或自主性，由读到完整语境的
+    /// LLM 判断；程序不再用逐字 evidence 或关键词重新裁决语义。
     /// </summary>
-    private static bool ValidateSingingIntentFields(
-        string permission,
-        string scope,
-        string actor,
-        string action,
-        string order,
-        float confidence,
-        string evidence,
-        string freshUserText,
+    private static bool ValidateSingingPolicyFields(
+        string value,
         out string rejectionReason)
     {
         rejectionReason = "";
-        permission = (permission ?? "").Trim().ToLowerInvariant();
-        scope = (scope ?? "").Trim().ToLowerInvariant();
-        actor = (actor ?? "").Trim().ToLowerInvariant();
-        action = (action ?? "").Trim().ToLowerInvariant();
-        order = (order ?? "").Trim();
-
-        if (permission != "no_change" && permission != "enable" &&
-            permission != "disable" && permission != "soft_suppress")
+        value = (value ?? "").Trim().ToLowerInvariant();
+        if (value != "enable" && value != "disable" && value != "suppress_autonomy")
         {
-            rejectionReason = "permission 必须是 no_change/enable/disable/soft_suppress";
-            return false;
-        }
-        if (scope != "none" && scope != "capability" && scope != "autonomy" &&
-            scope != "content_constraint" && scope != "stop_current")
-        {
-            rejectionReason = "scope 不受支持";
-            return false;
-        }
-        if (actor != "none" && actor != "user" && actor != "character")
-        {
-            rejectionReason = "actor 必须是 none/user/character";
-            return false;
-        }
-        if (action != "none" && action != "echo" && action != "practice" &&
-            action != "catalog" && action != "stop_current")
-        {
-            rejectionReason = "action 不受支持";
-            return false;
-        }
-        if (action != "none" && actor != "character")
-        {
-            rejectionReason = "真实歌唱动作的 actor 必须是 character；用户说自己唱不能派发角色歌唱";
-            return false;
-        }
-        if (float.IsNaN(confidence) || confidence < 0.75f)
-        {
-            rejectionReason = "confidence 低于 0.75；应先追问而不是改变权限或选择片段";
-            return false;
-        }
-
-        string normalizedEvidence = NormalizeSingingIntentEvidence(evidence);
-        string normalizedUser = NormalizeSingingIntentEvidence(
-            StripSingingPerceptionMetadata(freshUserText));
-        if (normalizedEvidence.Length < 2 || normalizedUser.Length == 0 ||
-            normalizedUser.IndexOf(normalizedEvidence, StringComparison.Ordinal) < 0)
-        {
-            rejectionReason = "evidence 不是当前用户原话中的连续片段";
-            return false;
-        }
-
-        if ((permission == "enable" || permission == "disable") && scope != "capability")
-        {
-            rejectionReason = "启用/禁用整项能力时 scope 必须是 capability";
-            return false;
-        }
-        if (permission == "soft_suppress" && scope != "autonomy")
-        {
-            rejectionReason = "暂时克制自主行为时 scope 必须是 autonomy";
-            return false;
-        }
-        if (scope == "content_constraint" &&
-            (permission != "no_change" || action != "practice"))
-        {
-            rejectionReason = "片段范围限制只能是 no_change + practice";
-            return false;
-        }
-        if (action == "practice" && string.IsNullOrWhiteSpace(order))
-        {
-            rejectionReason = "practice 必须显式列出 order，不能用空值默认全唱";
-            return false;
-        }
-        if (action != "practice" && !string.IsNullOrWhiteSpace(order))
-        {
-            rejectionReason = "只有 practice 动作可以携带 order";
-            return false;
-        }
-        if ((scope == "stop_current") != (action == "stop_current"))
-        {
-            rejectionReason = "停止当前播放必须使用 stop_current scope/action 配对";
-            return false;
-        }
-        if ((permission == "disable" || permission == "soft_suppress") &&
-            action != "none" && action != "stop_current")
-        {
-            rejectionReason = "停用或暂时克制不能同时发起新的歌唱动作";
+            rejectionReason = "value 必须是 enable/disable/suppress_autonomy";
             return false;
         }
         return true;
     }
 
-    /// <summary>
-    /// 真实用户轮里，LLM 只有同时说明“谁唱”和“执行什么”才可触发可听见的歌唱。
-    /// 这里不解析自然语言；语义仍由 singing Skill/LLM 判断，本地只核对结构化决定
-    /// 与最终工具是否一致，防止“我唱”旁边误带了角色的 song_sing/hum_back。
-    /// 自主 tick 没有新用户证据，走原有 Skill 申请/权限链，不使用本协议。
-    /// </summary>
-    private static bool ValidateUserSingingActionAuthorization(
-        string actor,
-        string action,
-        bool hasSongSing,
-        string humBackMode,
-        out string rejectionReason)
-    {
-        rejectionReason = "";
-        bool hasHumBack = !string.IsNullOrEmpty(humBackMode);
-        if (!hasSongSing && !hasHumBack) return true;
-
-        actor = (actor ?? "").Trim().ToLowerInvariant();
-        action = (action ?? "").Trim().ToLowerInvariant();
-        if (actor != "character")
-        {
-            rejectionReason = string.IsNullOrEmpty(actor)
-                ? "真实用户触发的歌唱动作缺少 singing_intent/actor"
-                : $"singing_intent 指定 actor={actor}，不能让角色代唱";
-            return false;
-        }
-        if (hasSongSing && hasHumBack)
-        {
-            rejectionReason = "同一轮不能同时授权 song_sing 与 hum_back";
-            return false;
-        }
-        if (hasSongSing && action != "catalog")
-        {
-            rejectionReason = $"song_sing 必须匹配 action=catalog，当前为 {action}";
-            return false;
-        }
-
-        if (hasHumBack)
-        {
-            string mode = humBackMode.Trim().ToLowerInvariant();
-            string expected = IsPracticeHumMode(mode) ? "practice" : "echo";
-            if (action != expected)
-            {
-                rejectionReason = $"hum_back mode={mode} 必须匹配 action={expected}，当前为 {action}";
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private bool TryApplySingingIntent(
-        AgentSingingIntentRequest request, out string result)
+    private bool TryApplySingingPolicy(
+        AgentSingingPolicyRequest request, out string result)
     {
         result = "";
         if (request == null)
         {
-            result = "缺少 singing_intent";
+            result = "缺少 singing_policy";
             return false;
         }
         if (m_AgentCurrentRoundIsTick)
         {
-            result = "自主 tick 不能借用用户权限意图协议";
+            result = "自主 tick 不能改变用户设置的 singing 权限";
             return false;
         }
-        if (!ValidateSingingIntentFields(
-                request.Permission, request.Scope, request.Actor, request.Action, request.Order,
-                request.Confidence, request.Evidence, m_LastUserMsg, out result))
+        if (!ValidateSingingPolicyFields(request.Value, out result))
             return false;
 
         SkillRouteDefinition definition = FindSkillDefinition("singing");
         SkillRouteState state = GetSkillRouteState("singing");
-        switch (request.Permission)
+        // 当前用户原话由程序直接取得。它只是状态来源记录，不参与第二次机械语义判定。
+        string policyUserText = StripSingingPerceptionMetadata(m_LastUserMsg).Trim();
+        state.LastPolicyUserText = policyUserText;
+        state.LastPolicyChangedAt = Time.realtimeSinceStartup;
+        switch (request.Value)
         {
             case "enable":
                 state.Access = SkillAccess.Available;
@@ -5065,62 +7399,23 @@ public class ChatSample : MonoBehaviour
                 CancelSkillRuntimeActivity("singing", "singing-intent-disabled");
                 result = "singing 已禁用；曲库和练唱数据未删除";
                 break;
-            case "soft_suppress":
+            case "suppress_autonomy":
                 state.Access = SkillAccess.SoftSuppressed;
                 state.SoftSuppressedUntil = Time.realtimeSinceStartup +
                     (definition != null ? definition.SoftSuppressSeconds : 180f);
                 state.RoundsRemaining = 0;
-                state.ActiveThisRound = false;
-                state.WasActive = false;
-                m_ActiveSkillsThisRound.Remove("singing");
-                CancelSkillRuntimeActivity("singing", "singing-intent-soft-suppressed");
-                result = "singing 已暂时停止自主使用";
-                break;
-            default:
-                result = "singing 权限保持不变";
+                //只约束后续自主 tick。真实用户当前或之后明确点歌仍可直接执行，
+                //也不把正在播放的歌当成“主动发起”而机械截断。
+                result = "singing 已暂时停止自主发起；用户明确点歌仍可执行";
                 break;
         }
 
         m_LastReferencedSkillName = "singing";
         m_LastReferencedSkillAt = Time.realtimeSinceStartup;
         if (m_LogAgentLoop)
-            Debug.Log($"[LLM技能/Intent] 已执行 permission={request.Permission}, " +
-                      $"scope={request.Scope}, actor={request.Actor}, action={request.Action}, " +
-                      $"order={request.Order}, " +
-                      $"confidence={request.Confidence:F2}; evidence={request.Evidence}; {result}");
+            Debug.Log($"[LLM技能/Policy] 已执行 value={request.Value}; " +
+                      $"user_text={policyUserText}; legacy={request.FromLegacyIntent}; {result}");
         return true;
-    }
-
-    private void ApplySingingIntentAction(
-        AgentSingingIntentRequest intent,
-        bool accepted,
-        ref AgentSongSingRequest songSing,
-        ref AgentHumBackRequest humBack)
-    {
-        if (!accepted || intent == null) return;
-        switch (intent.Action)
-        {
-            case "practice":
-                songSing = null;
-                if (humBack == null) humBack = new AgentHumBackRequest();
-                humBack.Mode = "practice";
-                humBack.Order = intent.Order;
-                if (string.IsNullOrWhiteSpace(humBack.Reason))
-                    humBack.Reason = "按 LLM 结合完整语境选定的练唱片段执行";
-                break;
-            case "echo":
-                songSing = null;
-                if (humBack == null) humBack = new AgentHumBackRequest();
-                humBack.Mode = "echo";
-                if (string.IsNullOrWhiteSpace(humBack.Reason))
-                    humBack.Reason = "按 LLM 结合完整语境确认回唱最近旋律";
-                break;
-            case "stop_current":
-                songSing = null;
-                humBack = null;
-                CancelSkillRuntimeActivity("singing", "singing-intent-stop-current");
-                break;
-        }
     }
 
     /// <summary>
@@ -5254,12 +7549,20 @@ public class ChatSample : MonoBehaviour
     {
         m_AuthorizedSkillControlNameThisRound = "";
         m_AuthorizedSkillControlActionThisRound = "";
+        bool isUserTurn = string.Equals(triggerReason, "user-spoke", StringComparison.Ordinal);
+        if (isUserTurn) m_UserTurnSkillPins.Clear();
         if (m_ChatSettings == null || m_ChatSettings.m_ChatModel == null) return;
 
+        bool isToolCorrection = string.Equals(
+            triggerReason, "tool-correction", StringComparison.Ordinal);
+        //纠错轮不是新的自主 tick，而是上一真实用户轮的延续。保留上一轮已经真实加载的
+        //详细规则，尤其要覆盖“动作权限已禁用、但用户正在做只读数据查询”的情形。
+        var correctionSkills = isToolCorrection
+            ? new HashSet<string>(m_ActiveSkillsThisRound, StringComparer.OrdinalIgnoreCase)
+            : null;
         m_ActiveSkillsThisRound.Clear();
         var activeSkills = new List<string>(s_SkillRouteDefinitions.Length);
         float now = Time.realtimeSinceStartup;
-        bool isUserTurn = string.Equals(triggerReason, "user-spoke", StringComparison.Ordinal);
         const string requestPrefix = "skill-request:";
         string autonomouslyRequested = !string.IsNullOrEmpty(triggerReason) &&
             triggerReason.StartsWith(requestPrefix, StringComparison.Ordinal)
@@ -5359,6 +7662,14 @@ public class ChatSample : MonoBehaviour
                 triggerReason.StartsWith(definition.TriggerReasonPrefix, StringComparison.Ordinal);
             bool autonomousGrant = string.Equals(
                 autonomouslyRequested, definition.Name, StringComparison.OrdinalIgnoreCase);
+            bool correctionCarry = correctionSkills != null &&
+                correctionSkills.Contains(definition.Name);
+            bool userTurnPinCarry = ShouldCarrySkillForCurrentUserTurn(
+                isUserTurn,
+                m_UserTurnSkillPins.Contains(definition.Name));
+            bool executionLeaseCarry = state.Access == SkillAccess.Available &&
+                (HasSkillExecutionLease(definition.Name, now) ||
+                 (definition.Name == "singing" && now - m_LastSingingRepairAt < 600f));
 
             bool strongSignal = false;
             string transitionReason = "（短期追问窗口）";
@@ -5385,22 +7696,32 @@ public class ChatSample : MonoBehaviour
 
             //即使当前权限已禁用，只要真实用户这一句谈到了该 Skill，也临时加载详细
             //规则供 LLM 判断“这是恢复、状态询问，还是业务范围限制”。执行闸仍先看
-            //Access；只有结构化意图明确 enable 后，同一回复里的动作才会放行。
+            //Access；只有 singing_policy 明确 enable 后，同一回复里的动作才会放行。
             bool interpretationOnly = semanticInspection && state.Access != SkillAccess.Available;
-            bool active = interpretationOnly || (state.Access == SkillAccess.Available &&
-                (strongSignal || state.RoundsRemaining > 0));
+            bool active = correctionCarry || userTurnPinCarry || interpretationOnly ||
+                (state.Access == SkillAccess.Available &&
+                (strongSignal || state.RoundsRemaining > 0 || executionLeaseCarry));
             if (!strongSignal && state.RoundsRemaining > 0)
                 state.RoundsRemaining--;
+            if (executionLeaseCarry) ConsumeSkillExecutionLeaseRound(definition.Name);
             if (active)
             {
                 activeSkills.Add(definition.Name);
                 m_ActiveSkillsThisRound.Add(definition.Name);
+                if (isUserTurn) m_UserTurnSkillPins.Add(definition.Name);
             }
+            if (correctionCarry) transitionReason = "（工具纠错轮沿用上一轮详细规则）";
+            else if (userTurnPinCarry) transitionReason = "（沿用当前真实用户轮 Skill 生命周期）";
+            else if (executionLeaseCarry) transitionReason = "（未完成动作持有执行租约）";
             state.ActiveThisRound = active;
 
             if (m_LogAgentLoop && active != state.WasActive)
                 Debug.Log($"[LLM技能] {definition.Name} {(active ? "已加载" : "已卸载")}" +
                           transitionReason);
+            //Skill 可能在 10 分钟追问窗口里仍逻辑 active，但服务端 90 秒空闲 worker
+            //已经释放；新的强相关用户信号也应发一次廉价幂等预热请求。
+            if (active && (!state.WasActive || strongSignal || autonomousGrant))
+                OnSkillBecameActive(definition.Name, state.Access);
             state.WasActive = active;
         }
 
@@ -5475,6 +7796,10 @@ public class ChatSample : MonoBehaviour
     private bool m_SongSearchInFlight = false;
     private bool m_SongSearchResultPending = false;
     private string m_LastSongSearchResult = "";
+    private bool m_SongCatalogInFlight = false;
+    private bool m_SongCatalogResultPending = false;
+    private string m_LastSongCatalogResult = "";
+    private int m_SongCatalogGeneration = 0;
     private bool m_SpeakerManageInFlight = false;
     private bool m_SpeakerManageResultPending = false;
     private string m_LastSpeakerManageResult = "";
@@ -5493,6 +7818,22 @@ public class ChatSample : MonoBehaviour
     //上一次查不到的 song_sing 目标。8/22 实测她拿同一个错 id 连打八次，
     //每次收到"not found"之后仍然对用户说「もうすぐよ」，其中两轮回复一字不差。
     private string m_LastFailedSongSingKey = "";
+    private enum SongSingFailureKind
+    {
+        None,
+        NotFound,
+        InvalidSelector,
+        IdentityMismatch,
+        AudioMissing,
+        DurationLimit,
+        Transport,
+        Server,
+        Other,
+    }
+    private SongSingFailureKind m_LastFailedSongSingKind = SongSingFailureKind.None;
+    private string m_LastFailedSongSingId = "";
+    private string m_LastFailedSongSingTitle = "";
+    private string m_LastFailedSongSingDetail = "";
 
     //刚**成功**唱过的目标。失败早就有重试拦截，成功却一点冷却都没有——
     //8/25 实测她把同一个 song_sing 连打四次、文本一字不差，用户全程没插话，
@@ -5511,7 +7852,6 @@ public class ChatSample : MonoBehaviour
     private string m_LastRememberedSongId = "";
     private float m_LastRememberedSongResultTime = -999f;
     private int m_SongMemoryGeneration = 0;
-    private bool m_ExplicitSongRememberHandled = false;
     private Coroutine m_SongMemoryAcknowledgementCoroutine;
     private bool m_SongMemoryAcknowledgementInFlight = false;
     private bool m_SongSingInFlight = false;
@@ -5520,6 +7860,11 @@ public class ChatSample : MonoBehaviour
     private bool m_HumBackPreparingCarrier = false;
     private bool m_HumBackPlaying = false;
     private int m_HumBackGeneration = 0;
+    //最近一次成功演唱后的客观状态。它不是强制等待计时器；自主意图探针和
+    //下一条真实用户消息都能看到这些事实，是否开口仍由 LLM 决定。
+    private bool m_PostHumBackFeedbackActive = false;
+    private float m_PostHumBackCompletedRealtime = -999f;
+    private string m_PostHumBackFeedbackSummary = "";
     private float[] m_PendingHumTimeline;
     private float m_PendingHumFrameSeconds = 0.10f;
     private string m_PendingHumLanguage = "";
@@ -5535,6 +7880,57 @@ public class ChatSample : MonoBehaviour
     private List<int> m_PendingHumSegmentSources;
     private int[] m_PendingHumSegmentShifts;
     private bool m_PendingHumUsesExplicitSegmentKey = false;
+    private bool m_PendingHumUsesMusicalPitchIntent = false;
+    private int m_PendingHumExtraTagsIgnored = 0;
+    //练唱音高事实分两层：源录音由用户输入分析实测；角色输出先按实际移调指令预计，
+    //播放完成后再走无 ASR/无记忆副作用的 F0 回测。稳定 ID 不随清单段号前移。
+    private sealed class PracticePitchState
+    {
+        public int StableId;
+        public int Revision;
+        public float CenterMidi;
+        //LLM 本轮请求的音乐目标。与 ExpectedCenterMidi 分开：闭环补偿时为了让实际
+        //输出到 G3，底层指令基准可能需要先发到 G#3。
+        public float RequestedCenterMidi;
+        public float ExpectedCenterMidi;
+        public int ExecutedShift;
+        public float UpdatedRealtime;
+        public bool FullyPlayed;
+        public bool Measured;
+        public float MeasurementWeight;
+        public float WeightedDeviation;
+        public float WeightedStability;
+        public float WeightedVoicedRatio;
+        public string MeasurementBackend;
+    }
+    private sealed class PracticePitchPlanEntry
+    {
+        public int StableId;
+        public int SourceIndex;
+        public float SourceCenterMidi;
+        public float RequestedCenterMidi;
+        public float TargetCenterMidi;
+        public int ExecutedShift;
+    }
+    private sealed class PracticePitchPlan
+    {
+        public int Revision;
+        public string MusicalIntent = "";
+        //只更新本次真实播放的片段；新片段集合也不删除其它 clip 的历史音高。
+        //初始化标记用于同一流式事务，不能作为清空状态表的依据。
+        public bool MergeWithCurrentArrangement;
+        public bool ArrangementInitialized;
+        public readonly List<PracticePitchPlanEntry> Entries =
+            new List<PracticePitchPlanEntry>();
+    }
+    private readonly Dictionary<int, PracticePitchState> m_PracticePitchStates =
+        new Dictionary<int, PracticePitchState>();
+    private PracticePitchPlan m_PendingPracticePitchPlan;
+    private int m_PracticePitchPlanRevision = 0;
+    //角色只保留“当前编排”里每个稳定片段最近一次真正唱到用户耳中的状态。
+    //局部重唱只替换对应片段；每段自己的 revision 仅用于防迟到回测污染。
+    private readonly HashSet<int> m_HumStreamPlayedPracticeStableIds =
+        new HashSet<int>();
     private bool m_PendingHumIsPracticeComposition = false;
     //这次连唱实际唱出去的段号(1 起)。清"待确认"标时要照它来，
     //order 指名了几段，没被唱到的段落不算用户确认过。
@@ -5603,12 +7999,16 @@ public class ChatSample : MonoBehaviour
     private bool m_HumSVCStartupInProgress = false;
     private bool m_HumSVCStartupSucceeded = false;
     private string m_HumSVCStartupDetail = "尚未检查";
+    private bool m_HumSVCPrewarmInProgress = false;
+    private float m_HumSVCPrewarmLastStartedAt = -999f;
     private Coroutine m_HumBackPlaybackCoroutine;
     private sealed class HumStreamReadyClip
     {
         public AudioClip Clip;
         public float GapBefore;
         public int SegmentNumber;
+        public int PracticeStableId;
+        public float ExpectedPitchCenterMidi;
     }
     private sealed class HumStreamScheduledClip
     {
@@ -5616,6 +8016,8 @@ public class ChatSample : MonoBehaviour
         public AudioSource Source;
         public double EndDspTime;
         public int SegmentNumber;
+        public int PracticeStableId;
+        public float ExpectedPitchCenterMidi;
     }
     private readonly Queue<HumStreamReadyClip> m_HumStreamReadyClips =
         new Queue<HumStreamReadyClip>();
@@ -5633,10 +8035,17 @@ public class ChatSample : MonoBehaviour
     private int m_HumStreamPlayedSegments = 0;
     private float m_HumStreamPlayedSeconds = 0f;
     private float m_HumStreamUnderrunSeconds = 0f;
+    // A valid multi-segment action can convert while its spoken prelude is still
+    // playing. Playback remains gated until the ordinary TTS pipeline drains.
+    private bool m_HumStreamWaitForTextOutputDrain = false;
     private bool m_HumBackNeedsHistoryEntry = false;
-    private bool m_ExplicitHumBackHandled = false;
     private bool m_WaitingForRequestedSingAlong = false;
     private float m_SingAlongRequestArmedAt = -999f;
+    //用户明确预告“下一轮我会唱”的短期听觉先验。它和持续跟唱状态分开：
+    //前者只帮助识别下一段输入，绝不授权角色自动播放、保存或持续跟唱。
+    private bool m_UpcomingUserSingingExpected = false;
+    private float m_UpcomingUserSingingExpectedAt = -999f;
+    private const float k_UpcomingUserSingingExpectationSeconds = 180f;
     private bool m_HumBackResultPending = false;
 
     //工具失败会粘住，直到有一次成功、或者展示够多次为止。
@@ -5663,17 +8072,49 @@ public class ChatSample : MonoBehaviour
     private int m_LastFailedHumBackCount = 0;
     //本轮正在派发的那个调用的身份，失败时用它计数。
     private string m_PendingHumBackKey = "";
+    //Identity of the real user turn that accepted the current transaction.  A
+    //same-key retry from its LLM continuation is an idempotent duplicate; a new
+    //user turn remains free to cancel/restart through the ordinary turn boundary.
+    private int m_PendingHumBackInputRevision = -1;
+    private bool m_HumBackTransactionRetainedThisRound = false;
 
     private string m_StickyToolFailure = "";
     private int m_StickyToolFailureCount = 0;
     private int m_StickyToolFailureShown = 0;
     private const int k_StickyToolFailureMaxFrames = 4;
+    //用户正在等待时，程序校验失败不能只写进“以后某一帧”再算了：把脱敏事实立即
+    //交回 LLM 修正一次。程序不替角色写台词；第二次仍失败才显示非角色化系统提示。
+    private string m_PendingToolCorrectionFrame = "";
+    private bool m_ToolCorrectionContinuationPending = false;
+    private bool m_ToolCorrectionExhaustedThisRound = false;
+    private int m_ToolCorrectionAttemptsThisUserTurn = 0;
+    private string m_PendingNonCharacterToolNotice = "";
+    //歌唱标签被顺序化或按客观素材源纠正时，只记录事实，不强制角色追加台词。
+    //下一帧由 LLM 自己判断要不要解释、继续或保持安静。
+    private string m_PendingSingingRoutingFact = "";
+    private const int k_MaxToolCorrectionAttemptsPerUserTurn = 1;
     private string m_LastHumBackResult = "";
     private bool m_AgentGracefulShutdownPending = false;
     // 本轮从 LLM 回复里解析出来的标签——OnStreamComplete 写、收尾时读
     private float? m_RoundNextInSec = null;
     private string m_RoundFocus = null;
     private bool m_RoundContinue = false;
+    private int m_NoSingingWorkContinuations = 0;
+
+    private void UpdateContinuationExecutionFacts()
+    {
+        if (IsSingingRuntimeActivityActive()) m_NoSingingWorkContinuations = 0;
+        else if (m_RoundContinue && m_ActiveSkillsThisRound.Contains("singing"))
+            ++m_NoSingingWorkContinuations;
+    }
+
+    private static string BuildContinuationExecutionFact(int count, bool workActive)
+    {
+        if (count <= 0 || workActive) return "";
+        return $"\n[执行事实：连续 {count} 次续接期间，没有歌声生成或播放任务在运行。" +
+            "口头计划与 <continue/> 不会启动演唱，不能作为正在准备歌声的依据。" +
+            "你仍可选择调用工具、先询问以澄清不确定性，或暂时安静；由你决定。]";
+    }
     private bool m_RoundSilent = false;
     //本轮是否检测到 <silent/> 前缀 → 内心独白模式：文本不进 TTS，仅入历史当作"心里说的"。
     //OnStreamDelta 检测前缀置位；OnStreamComplete 用它判断是否抑制后续 flush。
@@ -5719,10 +8160,12 @@ public class ChatSample : MonoBehaviour
         if (m_AgentRunning) return;
         m_AgentGracefulShutdownPending = false;
         m_AgentRunning = true;
+        m_SingingRequestSubmittedSinceUserTurn = false;
         m_AgentSessionStartTime = Time.realtimeSinceStartup;
         m_LastUserTurnTime = -1f;
         m_LastAITurnTime = -1f;
         m_LastUserMsg = "";
+        m_LastUserEvidence = "";
         m_LastAIMsgPlain = "";
         m_RecentAIUtterances.Clear();
         m_RepeatWatch.Clear();
@@ -5735,6 +8178,10 @@ public class ChatSample : MonoBehaviour
         m_AutonomyProbeGeneration++;
         m_AutonomyProbeInFlight = false;
         m_AutonomyProbeNotBefore = -999f;
+        m_UserSpeechActiveForAutonomy = false;
+        m_AutonomyProbeMustRemainPrivate = false;
+        m_DeferredAutonomyIntent = "";
+        m_DeferredAutonomyNovelty = "";
         m_ScheduledWakeReason = "";
         m_LastSpikeTime = -1f;
         m_LastSpikePeakRms = 0f;
@@ -5745,6 +8192,10 @@ public class ChatSample : MonoBehaviour
         m_LastSongSearchResult = "";
         m_LastSongSearchRequestTime = -999f;
         m_LastSongSearchSignature = "";
+        m_SongCatalogGeneration++;
+        m_SongCatalogInFlight = false;
+        m_SongCatalogResultPending = false;
+        m_LastSongCatalogResult = "";
         m_SongMemoryGeneration++;
         m_SongMemoryInFlight = false;
         m_SongMemoryResultPending = false;
@@ -5752,12 +8203,19 @@ public class ChatSample : MonoBehaviour
         m_LastSongMemoryResult = "";
         m_LastSongMemoryRequestTime = -999f;
         m_LastSongMemorySignature = "";
-        m_ExplicitSongRememberHandled = false;
-        m_ExplicitHumBackHandled = false;
         m_WaitingForRequestedSingAlong = false;
         m_SingAlongRequestArmedAt = -999f;
+        m_UpcomingUserSingingExpected = false;
+        m_UpcomingUserSingingExpectedAt = -999f;
+        m_EouExpectedUserSinging = false;
         m_HumBackResultPending = false;
         m_LastHumBackResult = "";
+        m_ToolCorrectionAttemptsThisUserTurn = 0;
+        m_ToolCorrectionContinuationPending = false;
+        m_ToolCorrectionExhaustedThisRound = false;
+        m_PendingToolCorrectionFrame = "";
+        m_PendingNonCharacterToolNotice = "";
+        m_PendingSingingRoutingFact = "";
         SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
             ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
             : null;
@@ -5811,26 +8269,40 @@ public class ChatSample : MonoBehaviour
             return m_FinalAsrRequestsInFlight > 0 || m_FormalResponseInFlight ||
                 !m_StreamComplete || IsAISpeaking || IsVoiceOutputPlaying ||
                 m_AgentRoundInFlight || m_SongMemoryInFlight ||
+                m_SongCatalogInFlight ||
                 m_SongMemoryAcknowledgementCoroutine != null ||
-                m_SongMemoryAcknowledgementInFlight || m_HumBackPending ||
-                m_HumBackPreparingCarrier || m_HumBackPlaying;
+                m_SongMemoryAcknowledgementInFlight || IsSingingRuntimeActivityActive();
         }
     }
 
     public void StopAgentLoop()
     {
+        m_InterruptedUserQuestion = null;
         ResetSpeculativeTurn();
+        ResetStreamingSemanticSingingLatch();
         m_AgentGracefulShutdownPending = false;
         if (!m_AgentRunning) return;
         m_AgentRunning = false;
         m_SongSearchGeneration++;
         m_SongSearchInFlight = false;
         m_SongSearchResultPending = false;
+        m_SongCatalogGeneration++;
+        m_SongCatalogInFlight = false;
+        m_SongCatalogResultPending = false;
         m_SongMemoryGeneration++;
         m_SongMemoryInFlight = false;
         m_SongMemoryResultPending = false;
         m_SongMemoryAcknowledgementRequired = false;
+        m_ToolCorrectionAttemptsThisUserTurn = 0;
+        m_ToolCorrectionContinuationPending = false;
+        m_ToolCorrectionExhaustedThisRound = false;
+        m_PendingToolCorrectionFrame = "";
+        m_PendingNonCharacterToolNotice = "";
+        m_PendingSingingRoutingFact = "";
         CancelAutonomyIntentProbe();
+        m_UserSpeechActiveForAutonomy = false;
+        m_DeferredAutonomyIntent = "";
+        m_DeferredAutonomyNovelty = "";
         m_ScheduledWakeReason = "";
         CancelPendingHumBack("agent-stop", false);
         if (m_PendingTickCo != null)
@@ -5890,11 +8362,26 @@ public class ChatSample : MonoBehaviour
     }
 
     /// <summary>
-    /// RTSpeechHandler 在 StartRecording 时调用——用户开口意味着 AI 连续轮次清零，
-    /// 待 tick 撤销(用户的话本身就会触发新一轮 LLM 调用)。
+    /// RTSpeechHandler 在 StartRecording 时调用——用户开口意味着 AI 的外放轮次让路，
+    /// 但内部自主 tick 可以继续形成一份不会直接说出口的私人预判。
     /// </summary>
     public void NotifyUserStartedSpeaking()
     {
+        PreservePendingReplyForInputCandidate();
+        m_InputAudioRevision++;
+        m_SingingRequestSubmittedSinceUserTurn = false;
+        m_SemanticCheckSerial++;
+        (m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText)?.CancelInputAnalyses();
+        m_NoSingingWorkContinuations = 0;
+        m_ListeningLatencyArmed = false;
+        m_ListeningFormalLatencyArmed = false;
+        m_StalledTurnAction = "";
+        m_LastBoundaryDecisionReason = "";
+        m_UserSpeechActiveForAutonomy = true;
+        //探针若已经发出，即使用户恰好在它返回前开口，也只能保存为私人想法；
+        //不能因为竞态而越过用户发言直接外放。
+        if (m_AutonomyProbeInFlight)
+            m_AutonomyProbeMustRemainPrivate = true;
         //StartRecording 只会在神经VAD确认真人后调用。若此刻仍有角色语音，按真正的
         //barge-in 保留已听到部分；若尚未出声，则直接废弃旧请求和待播队列。
         if (IsAISpeaking || IsVoiceOutputPlaying) Interrupt();
@@ -5903,27 +8390,43 @@ public class ChatSample : MonoBehaviour
         //没有被其 hasResponseWork 覆盖。用户一开口是硬边界：再用歌唱任务自己的
         //完整 hadWork 判据扫一次，确保上一轮的曲库演唱定位、生成、流式队列和播放都不能越界。
         CancelPendingHumBack("user-started-speaking-safety", true);
-        CancelAutonomyIntentProbe();
         ResetStreamingHumBackPrefix("new-user-turn", true);
         ResetSpeculativeTurn();
+        ResetStreamingSemanticSingingLatch();
+        m_StalledTurnDecisionNote = "";
         m_EouTurnWasSinging = false;
+        m_EouExpectedUserSinging = false;
         m_EouSingingRejectedByFinal = false;
         m_EouCognitiveSpeechVeto = false;
         m_EouCognitiveSingingSupport = false;
         m_FinalModeVerdict = "";
         m_FinalModeSoftDowngrade = false;
+        m_PendingSingingConfirmation = false;
         m_EouFillerContext = "neutral";
-        if (m_PendingTickCo != null)
-        {
-            StopCoroutine(m_PendingTickCo);
-            m_PendingTickCo = null;
-        }
         m_ConsecutiveAITurns = 0;
         m_SpikePulledForwardThisSilence = false;   //新一段沉默重新允许被拽回一次
         m_AutonomyProbeNotBefore = -999f;
-        m_ScheduledWakeReason = "";
         if (m_Urge != null) m_Urge.AbsorbUserUtterance(Time.realtimeSinceStartup);
-        if (m_LogAgentLoop) Debug.Log("[Agent] 用户开口 → 待 tick 撤销, 连续 AI 轮次清零");
+        if (m_LogAgentLoop)
+            Debug.Log("[Agent] 用户开口 → 外放轮次撤销；私人 tick/预判保留，连续 AI 轮次清零");
+    }
+
+    private void CancelSupersededSingingForAcceptedUserTurn(
+        SenseVoiceSpeechToText senseVoice)
+    {
+        if (m_FastHumBackEouStaged || m_FastHumBackActive) return;
+        if (senseVoice != null &&
+            (senseVoice.LastSpeakerKind == "ai" ||
+             senseVoice.LastSpeakerId == "ai_self"))
+            return;
+
+        bool hasOlderSingingWork = IsSingingRuntimeActivityActive();
+        if (!hasOlderSingingWork) return;
+
+        if (m_LogHumBack)
+            Debug.Log("[HumBack] 最终 ASR 已确认新的真实用户轮次；" +
+                      "取消未跨过 StartRecording 边界的旧歌唱任务");
+        CancelPendingHumBack("accepted-real-user-turn", true);
     }
 
     /// <summary>
@@ -5972,12 +8475,16 @@ public class ChatSample : MonoBehaviour
 
     /// <summary>
     /// 冲动模型的推进——每帧一步，纯 C# 算术，不碰任何推理服务。
-    /// 她正在说话/轮次在飞时不推进：那时冲动本来就在被消耗。
+    /// 她自己正在说话/正式轮次在飞时不推进；用户正在说话时可以推进，
+    /// 但点火只能形成不会外放的私人预判。
     /// </summary>
     private void StepUrge()
     {
         if (m_Urge == null || !m_Urge.Enabled) return;
         if (!m_AgentRunning || m_AgentGracefulShutdownPending) return;
+        bool userCurrentlySpeaking = m_UserSpeechActiveForAutonomy ||
+            Time.realtimeSinceStartup - m_LastStreamingPartialRealtime <
+                k_UserSpeakingHoldSeconds;
         if (m_AgentRoundInFlight || m_AutonomyProbeInFlight ||
             IsAISpeaking || IsVoiceOutputPlaying) return;
         if (Time.realtimeSinceStartup < m_AutonomyProbeNotBefore) return;
@@ -5990,19 +8497,19 @@ public class ChatSample : MonoBehaviour
         //
         //上一处补的 m_LastStreamingPartialRealtime 挡的是"用户还在说"，这一条挡的是
         //"用户说完了但还没轮到她说"，两者不重叠。
-        if (m_UserTurnAwaitingReplySince > 0f)
+        if (m_UserTurnAwaitingReplySince > 0f && !userCurrentlySpeaking)
         {
             //兜底分两档。回哼含 SVC 转换实测 30~50 秒，那期间必须能等；但普通轮
             //没有这个开销，万一还有没覆盖到的收尾路径，也不该让她哑上一分多钟。
-            bool humBackBusy = m_HumBackPending || m_HumBackPreparingCarrier ||
-                m_HumBackPlaying || m_FastHumBackActive;
+            bool humBackBusy = IsSingingRuntimeActivityActive();
             float cap = humBackBusy
                 ? k_UserTurnAwaitingReplyMaxSeconds
                 : k_UserTurnAwaitingReplyPlainCapSeconds;
             if (Time.realtimeSinceStartup - m_UserTurnAwaitingReplySince < cap) return;
             ClearUserTurnAwaitingReply($"等待超时({cap:F0}s)");
         }
-        // 用户还在说话时不许自主开口。
+        // 用户还在说话时可以继续产生想法，但 FireTick 只允许它进入私人预判，
+        // 不会在录音期间发出声音、动作或正式角色回复。
         //
         // 这道闸原来只挡"她自己在说"，不挡"用户正在说"。而感知帧里的"距用户上句"
         // 是从**上一轮提交**算起的——一轮【说话+唱歌】要二三十秒才提交，于是 8/11
@@ -6011,17 +8518,9 @@ public class ChatSample : MonoBehaviour
         // 「用户录音期间检测到旧AI开始发声」事后打断——声音已经放出去了，
         // 紧接着回哼开始，听感非常突兀。
         //
-        // 流式 partial 每来一帧就刷新一次时间戳，所以"最近还在收 partial"就等于
-        // "用户还在说"。比接一条录音状态过来简单，也不依赖 RTSpeechHandler 的内部状态。
-        // 和上面几条一样直接 return、不推进冲动——沿用这个函数注释里定下的规则
-        // 「她正在说话/轮次在飞时不推进」。若在这里调 Step 又丢弃返回值，点火会被
-        // 白白消耗掉。
-        if (Time.realtimeSinceStartup - m_LastStreamingPartialRealtime
-            < k_UserSpeakingHoldSeconds)
-            return;
-
         //待机漂移点火 = 她忽然想起了什么，按事件注入
-        if (m_MemoryHub != null && m_EnableMemoryRecall)
+        //用户正在表达时不另抽一条随机记忆来压过当前输入；此时只推进角色原有冲动。
+        if (!userCurrentlySpeaking && m_MemoryHub != null && m_EnableMemoryRecall)
         {
             float drift = m_MemoryHub.ConsumeDriftEnergy();
             if (drift > 0f) m_Urge.AddMemorySurfacing(drift);
@@ -6040,10 +8539,37 @@ public class ChatSample : MonoBehaviour
     private void CancelAutonomyIntentProbe()
     {
         m_AutonomyProbeGeneration++;
+        m_AutonomyProbeMustRemainPrivate = false;
         if (!m_AutonomyProbeInFlight) return;
         m_AutonomyProbeInFlight = false;
         if (m_ChatSettings != null && m_ChatSettings.m_ChatModel != null)
             m_ChatSettings.m_ChatModel.CancelEphemeralMsg();
+    }
+
+    private void StoreDeferredAutonomyThought(AutonomyIntentDecision decision)
+    {
+        if (decision == null || !decision.proceed) return;
+        m_DeferredAutonomyIntent = TruncateForFrame(
+            (decision.intent ?? "").Trim(), 180);
+        m_DeferredAutonomyNovelty = TruncateForFrame(
+            (decision.novelty ?? "").Trim(), 180);
+    }
+
+    private string ConsumeDeferredAutonomyThought()
+    {
+        string intent = m_DeferredAutonomyIntent;
+        string novelty = m_DeferredAutonomyNovelty;
+        m_DeferredAutonomyIntent = "";
+        m_DeferredAutonomyNovelty = "";
+        if (string.IsNullOrWhiteSpace(intent) &&
+            string.IsNullOrWhiteSpace(novelty))
+            return "";
+
+        return "\n[私人思考参考：这是你在用户尚未说完时形成、当时没有外放的一份临时想法。" +
+            (string.IsNullOrWhiteSpace(intent) ? "" : "当时的意图=" + intent + "。") +
+            (string.IsNullOrWhiteSpace(novelty) ? "" : "当时认为的新意=" + novelty + "。") +
+            "现在你已经收到用户的完整发言；请以完整语义为准，自主决定是否采用、修正或放弃这份想法，" +
+            "它不是必须回应的指令。]";
     }
 
     /// <summary>
@@ -6065,8 +8591,8 @@ public class ChatSample : MonoBehaviour
     {
         string reason = triggerReason ?? "";
         return reason == "session-start" || reason == "shutdown-cancelled" ||
-            reason == "song-search-result" || reason == "song-memory-result" ||
-            reason == "song-singing-result" || reason == "speaker-manage-result" ||
+            reason == "song-search-result" || reason == "song-catalog-result" ||
+            reason == "song-memory-result" || reason == "speaker-manage-result" ||
             reason.StartsWith("skill-request:", StringComparison.Ordinal);
     }
 
@@ -6108,9 +8634,13 @@ public class ChatSample : MonoBehaviour
 
     private string BuildAutonomyIntentProbePrompt(string triggerReason, string frame)
     {
+        string situation = m_UserSpeechActiveForAutonomy
+            ? "用户此刻仍在表达。你可以在心里形成自己的观察或想法，但本次判断绝不会直接外放；" +
+              "稍后必须结合用户完整发言，才能决定采用、修正或放弃。"
+            : "现在没有新的用户发言。系统只是给你一次自主行动机会。";
         return
             "[内部自主意图预判；不要把本条写成正式回复，不要调用工具，不要输出控制标签]\n" +
-            "现在没有新的用户发言。系统只是给你一次自主行动机会，触发原因=" +
+            situation + "触发原因=" +
             (triggerReason ?? "scheduled") + "。\n" +
             "先判断此刻是否真的出现了一个和你最近发言不同、值得开启正式轮次的新意图。" +
             "新意图可以来自你自己的新想法、刚浮现的记忆、环境变化、时间流逝后自然想换的话题，" +
@@ -6132,6 +8662,13 @@ public class ChatSample : MonoBehaviour
         AutonomyIntentDecision decision = null)
     {
         if (!m_AgentRunning || m_AgentGracefulShutdownPending) return;
+        if (m_UserSpeechActiveForAutonomy)
+        {
+            StoreDeferredAutonomyThought(decision);
+            if (m_LogAgentLoop)
+                Debug.Log("[Agent/自主意图] 用户仍在表达；只保存私人预判，不创建外放轮次");
+            return;
+        }
         if (IsAISpeaking || m_AgentRoundInFlight || IsVoiceOutputPlaying) return;
 
         if (decision != null)
@@ -6146,6 +8683,10 @@ public class ChatSample : MonoBehaviour
                 "也不要复述你最近说过的话。]";
         }
 
+        frame += ConsumeDeferredAutonomyThought();
+
+        m_ListeningLatencyArmed = false; //自主新话题不能冒充上一条未出声回复的首音
+        m_ListeningFormalLatencyArmed = false;
         HarvestSongIds(frame);
         m_ChatHistory.Add(frame);
         m_AgentRoundInFlight = true;
@@ -6175,6 +8716,7 @@ public class ChatSample : MonoBehaviour
         HarvestSongIds(frame);
         int generation = ++m_AutonomyProbeGeneration;
         m_AutonomyProbeInFlight = true;
+        m_AutonomyProbeMustRemainPrivate = m_UserSpeechActiveForAutonomy;
         string prompt = BuildAutonomyIntentProbePrompt(triggerReason, frame);
         if (m_LogAgentLoop)
             Debug.Log($"[Agent/自主意图] 开始预判 trigger={triggerReason}");
@@ -6183,18 +8725,40 @@ public class ChatSample : MonoBehaviour
         {
             if (generation != m_AutonomyProbeGeneration) return;
             m_AutonomyProbeInFlight = false;
-            if (!m_AgentRunning || m_AgentGracefulShutdownPending ||
-                m_AgentRoundInFlight || IsAISpeaking || IsVoiceOutputPlaying)
-                return;
+            bool privateOnly = m_AutonomyProbeMustRemainPrivate ||
+                m_UserSpeechActiveForAutonomy;
+            m_AutonomyProbeMustRemainPrivate = false;
+            if (!m_AgentRunning || m_AgentGracefulShutdownPending) return;
 
             if (!TryParseAutonomyIntentDecision(response, out AutonomyIntentDecision decision))
             {
+                if (privateOnly)
+                {
+                    if (m_LogAgentLoop)
+                        Debug.LogWarning("[Agent/自主意图] 私人预判无法解析；安静丢弃，不触发正式轮次");
+                    return;
+                }
+                if (m_AgentRoundInFlight || IsAISpeaking || IsVoiceOutputPlaying)
+                    return;
                 if (m_LogAgentLoop)
                     Debug.LogWarning("[Agent/自主意图] 预判输出无法解析，保留角色自主性并放行正式轮次");
                 PrepareActiveSkillsForRound(null, triggerReason);
                 DispatchPreparedAgentTick(triggerReason, frame);
                 return;
             }
+
+            if (privateOnly)
+            {
+                StoreDeferredAutonomyThought(decision);
+                if (m_LogAgentLoop)
+                    Debug.Log(decision.proceed
+                        ? $"[Agent/自主意图] 私人预判已保存：{TruncateForFrame(decision.intent, 120)}"
+                        : "[Agent/自主意图] 私人预判没有形成新想法；保持安静");
+                return;
+            }
+
+            if (m_AgentRoundInFlight || IsAISpeaking || IsVoiceOutputPlaying)
+                return;
 
             if (decision.proceed)
             {
@@ -6229,6 +8793,14 @@ public class ChatSample : MonoBehaviour
     {
         if (!m_AgentRunning || m_AgentGracefulShutdownPending) return;
         if (m_AutonomyProbeInFlight) return;
+        if (m_UserSpeechActiveForAutonomy)
+        {
+            if (m_EnableAutonomyIntentProbe)
+                BeginAutonomyIntentProbe(triggerReason);
+            else if (m_LogAgentLoop)
+                Debug.Log("[Agent/自主意图] 用户正在表达且预判功能关闭；本次 tick 安静略过");
+            return;
+        }
         //角色还在说话(<continue/>链上一帧还没收尾) → 让流水线走完再排
         if (IsAISpeaking || m_AgentRoundInFlight)
         {
@@ -6238,6 +8810,7 @@ public class ChatSample : MonoBehaviour
         }
         //连续 AI 轮次上限——工具结果仍允许回到角色手里一次，否则可能“查到了但不说”
         bool isSongToolResult = string.Equals(triggerReason, "song-search-result", StringComparison.Ordinal) ||
+            string.Equals(triggerReason, "song-catalog-result", StringComparison.Ordinal) ||
             string.Equals(triggerReason, "song-memory-result", StringComparison.Ordinal) ||
             string.Equals(triggerReason, "speaker-manage-result", StringComparison.Ordinal);
         //冲动模型接手后，"没人理"由疲劳表达(间隔逐次拉长，最终被 m_MaxTickSec 夹住)，
@@ -6266,12 +8839,21 @@ public class ChatSample : MonoBehaviour
     /// 返回拼好的字符串(已含感知帧 + 用户原话)。
     /// 同时更新 m_LastUserTurnTime / m_LastUserMsg, 把本轮标记为 user-triggered。
     /// </summary>
-    public string PrepareUserTurn(string userText)
+    public string PrepareUserTurn(string userText, string rawUserText = null)
     {
+        m_SingingRequestSubmittedSinceUserTurn = false;
+        m_NoSingingWorkContinuations = 0;
+        m_UserSpeechActiveForAutonomy = false;
+        //完整用户轮必须优先，不能让一个尚未返回的私人预判与正式回复并发占用模型。
+        //已经完成并保存的想法仍会在下方交给角色；没来得及完成的预判安静取消。
+        if (m_AutonomyProbeInFlight)
+        {
+            if (m_LogAgentLoop)
+                Debug.Log("[Agent/自主意图] 完整用户轮已到达；取消尚未完成的私人预判");
+            CancelAutonomyIntentProbe();
+        }
         m_LastUserTurnTime = Time.realtimeSinceStartup;
-        m_LastUserMsg = userText ?? "";
-        m_ExplicitSongRememberHandled = false;
-        m_ExplicitHumBackHandled = false;
+        SetCurrentUserInput(rawUserText ?? userText, userText);
         //情境召回:提及扫描同步生效(本帧可见),语境嵌入异步、作用于后续帧
         if (m_MemoryHub != null && m_EnableMemoryRecall)
             m_MemoryHub.NotifyUserUtterance(m_LastUserMsg);
@@ -6283,6 +8865,11 @@ public class ChatSample : MonoBehaviour
         if (!m_AgentRunning) return userText ?? "";
 
         string frame = BuildPerceptionFrame("user-spoke");
+        frame += ConsumeDeferredAutonomyThought();
+        //当前这一条用户消息已经成为播放后的真实反馈候选。状态已经写进 frame，
+        //随后清掉，避免未来自主 tick 继续把同一件事当成“还在等反馈”。
+        m_PostHumBackFeedbackActive = false;
+        m_PostHumBackFeedbackSummary = "";
         //用户那一句里带着 ASR 的「曲库里旋律接近的」候选行，完整 id 就在那儿——
         //她能看到的 id 都要入账，否则出处校验会把合法的调用也拦掉。
         string combined = frame + "\n" + (userText ?? "");
@@ -6305,6 +8892,7 @@ public class ChatSample : MonoBehaviour
         if (!m_AgentRunning) return;
         if (!m_AgentRoundInFlight) return;
         m_AgentRoundInFlight = false;
+        m_UserTurnSkillPins.Clear();
 
         if (m_AgentGracefulShutdownPending)
         {
@@ -6326,13 +8914,19 @@ public class ChatSample : MonoBehaviour
         //歌曲记忆有自己的单路径消费：明确保存请求由专用 continuation 给最终答复，
         //自主保存只把结果留给以后自然 tick。这里再按 pending 拉前会让同一结果同时
         //走“专用确认”和“通用 tick”，正是 8/28 两次逐字复读后的第三轮来源。
-        if (m_SongSearchResultPending && m_BringForwardOnSongSearchResult)
+        if (m_SongCatalogResultPending && m_BringForwardOnSongSearchResult)
+        {
+            ScheduleNextTick(m_MinTickSec, "song-catalog-result");
+        }
+        else if (m_SongSearchResultPending && m_BringForwardOnSongSearchResult)
         {
             ScheduleNextTick(m_MinTickSec, "song-search-result");
         }
         else if (m_HumBackResultPending && m_BringForwardOnSongSearchResult)
         {
-            ScheduleNextTick(m_MinTickSec, "song-singing-result");
+            //歌唱动作本身已经是角色的一次表达。结果返回后只给自主意图探针一次
+            //选择机会，不再像查询工具那样绕过预判、强制追加一句话。
+            ScheduleNextTick(m_MinTickSec, "song-action-result");
         }
         else if (m_RoundContinue)
         {
@@ -6363,6 +8957,8 @@ public class ChatSample : MonoBehaviour
         m_RoundLookRequest = null;
         m_RoundSilencedForRepeat = false;
         m_RoundWaitForUser = false;
+        m_ToolCorrectionExhaustedThisRound = false;
+        m_HumBackTransactionRetainedThisRound = false;
     }
 
     /// <summary>
@@ -6374,11 +8970,32 @@ public class ChatSample : MonoBehaviour
         var sb = new System.Text.StringBuilder();
         var now = System.DateTime.Now;
         sb.Append($"[感知帧 {now:HH:mm:ss}]");
+        sb.Append(BuildContinuationExecutionFact(m_NoSingingWorkContinuations,
+            IsSingingRuntimeActivityActive()));
+        if (m_SingingRequestSubmittedSinceUserTurn || IsSingingRuntimeActivityActive() ||
+            GetSkillRouteState("singing").ActiveThisRound || m_NoSingingWorkContinuations > 0)
+            sb.Append(BuildSingingExecutionSnapshot());
+        var pendingCaptureSense = m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText;
+        int pendingCaptures = pendingCaptureSense != null
+            ? pendingCaptureSense.PendingCompletedCaptureAnalysisCount : 0;
+        if (pendingCaptures > 0)
+            sb.Append($"\n[录音分析事实：之前有 {pendingCaptures} 份已经录完的音频仍在分析。" +
+                "这不代表没有录到；内容/分段尚未返回，不能据此声称知道其中的歌或已经准备好播放。]");
 
         if (!string.IsNullOrEmpty(m_PendingSkillStatusFrame))
         {
             sb.Append(m_PendingSkillStatusFrame);
             m_PendingSkillStatusFrame = "";
+        }
+        if (!string.IsNullOrEmpty(m_PendingToolCorrectionFrame))
+        {
+            sb.Append(m_PendingToolCorrectionFrame);
+            m_PendingToolCorrectionFrame = "";
+        }
+        if (!string.IsNullOrEmpty(m_PendingSingingRoutingFact))
+        {
+            sb.Append(m_PendingSingingRoutingFact);
+            m_PendingSingingRoutingFact = "";
         }
         if (!string.IsNullOrEmpty(triggerReason) &&
             triggerReason.StartsWith("skill-request:", StringComparison.Ordinal))
@@ -6413,11 +9030,8 @@ public class ChatSample : MonoBehaviour
         {
             float dt = rt - m_LastUserTurnTime;
             sb.Append($"\n距用户上句: {FormatDuration(dt)}");
-            //必须先剥掉感知前缀再截断。m_LastUserMsg 开头是
-            //「[说话人:主人; speaker_id:owner; 类型:owner; 可信度:0.78] [演唱片段; …]」，
-            //40 字的预算全被前缀吃掉——日志里这一栏长期是
-            //`("[说话人:主人; speaker_id:owner; 类型…")`，她连用户刚说了什么都看不到，
-            //自主发言时只能顺着自己上一句往下说，听感就是"慢一拍"。
+            //m_LastUserMsg 已与感知证据分开保存；这里兼容旧的带前缀调用，
+            //仍先剥离再截断，避免短摘要预算被元数据占满。
             string lastUserPlain = StripPerceptionPrefixes(m_LastUserMsg);
             if (!string.IsNullOrEmpty(lastUserPlain))
                 sb.Append($" (\"{TruncateForFrame(lastUserPlain, 40)}\")");
@@ -6456,6 +9070,16 @@ public class ChatSample : MonoBehaviour
             sb.Append("（这是工具候选；置信度不足时应明确保留不确定性）");
             m_SongSearchResultPending = false;
         }
+        if (m_SongCatalogInFlight)
+        {
+            sb.Append("\n曲库自查工具: 正在读取本机实时快照；结果前不得声称曲库里只有哪些歌");
+        }
+        if (m_SongCatalogResultPending && !string.IsNullOrEmpty(m_LastSongCatalogResult))
+        {
+            sb.Append("\n曲库自查工具结果:\n");
+            sb.Append(m_LastSongCatalogResult);
+            m_SongCatalogResultPending = false;
+        }
         if (m_SongMemoryInFlight)
         {
             sb.Append("\n歌曲记忆工具: 正在处理本机曲库；不要假装已经保存或改名成功");
@@ -6486,25 +9110,17 @@ public class ChatSample : MonoBehaviour
         {
             sb.Append("\n长期歌曲演唱工具: 正在从本地曲库定位真实音频；不要声称已经唱出或续唱成功");
         }
-        //上一次连唱的各段起调：在下一次连唱替换它之前一直有效，用户随时可能问起。
-        if (!string.IsNullOrEmpty(m_LastRenderPitchSummary) &&
-            Time.realtimeSinceStartup - m_LastRenderPitchAt < k_RenderPitchStickySeconds)
-        {
-            sb.Append("\n上次连唱各段起调: ").Append(m_LastRenderPitchSummary)
-              .Append("（用户问「刚才那几段是什么调」时直接照这个答，不用再去看屏幕或猜）");
-        }
         //失败要持续可见，而不是只闪一帧。次数是她最缺的那个事实。
         if (!string.IsNullOrEmpty(m_StickyToolFailure) &&
             m_StickyToolFailureShown < k_StickyToolFailureMaxFrames)
         {
             m_StickyToolFailureShown++;
-            sb.Append("\n⚠ 工具还没有成功过");
+            sb.Append("\n历史失败事件（当时状态，不代表当前仍失败；来源、可播放性与范围以本帧最新素材状态为准）");
             if (m_StickyToolFailureCount > 1)
                 sb.Append($"（同样的调用已经连续失败 {m_StickyToolFailureCount} 次）");
             sb.Append("：").Append(m_StickyToolFailure);
             if (m_StickyToolFailureCount > 1)
-                sb.Append(" 重复同一个调用不会有不同结果。换一种做法，"
-                          + "或者如实告诉用户这件事你现在做不到。");
+                sb.Append(" 若当前条件仍未变化，重复相同参数通常无效；状态已改变则按最新事实判断，可修正或询问。");
         }
         if (m_PracticeDropResultPending && !string.IsNullOrEmpty(m_LastPracticeDropResult))
         {
@@ -6512,11 +9128,31 @@ public class ChatSample : MonoBehaviour
             sb.Append(m_LastPracticeDropResult);
             m_PracticeDropResultPending = false;
         }
+        if (m_PracticeEditResultPending && !string.IsNullOrEmpty(m_LastPracticeEditResult))
+        {
+            sb.Append("\n练唱素材来源/修订工具结果: ");
+            sb.Append(m_LastPracticeEditResult);
+            m_PracticeEditResultPending = false;
+        }
         if (m_HumBackResultPending && !string.IsNullOrEmpty(m_LastHumBackResult))
         {
             sb.Append("\n旋律回哼工具结果: ");
             sb.Append(m_LastHumBackResult);
             m_HumBackResultPending = false;
+        }
+        if (m_PostHumBackFeedbackActive)
+        {
+            float ago = Mathf.Max(
+                0f, Time.realtimeSinceStartup - m_PostHumBackCompletedRealtime);
+            sb.Append("\n歌唱播放后客观状态: action=completed, " +
+                      $"completed_ago={ago:F1}s, unity_playback_completed=true, " +
+                      "physical_audibility=unknown, ");
+            sb.Append(triggerReason == "user-spoke"
+                ? "当前用户发言是播放完成后的首个反馈候选；结合原话理解。"
+                : "user_feedback=none_yet；没有反馈不等于播放失败。" +
+                  "是否开口、询问或安静等待由你自己判断。");
+            if (!string.IsNullOrWhiteSpace(m_PostHumBackFeedbackSummary))
+                sb.Append(" action_summary=").Append(m_PostHumBackFeedbackSummary);
         }
         if (!string.IsNullOrEmpty(m_LastUnknownTagNote))
         {
@@ -6530,6 +9166,12 @@ public class ChatSample : MonoBehaviour
             ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
             : null;
         sb.Append(BuildSessionSongLedgerClause());
+        sb.Append(BuildSingingMaterialFacts(practiceSenseVoice));
+        if (!string.IsNullOrEmpty(m_PracticeSemanticResolutionNote))
+        {
+            sb.Append(m_PracticeSemanticResolutionNote);
+            m_PracticeSemanticResolutionNote = "";
+        }
         if (!string.IsNullOrEmpty(m_SelfRepeatNote))
         {
             sb.Append("\n复读拦截: " + m_SelfRepeatNote);
@@ -6542,76 +9184,13 @@ public class ChatSample : MonoBehaviour
             sb.Append(m_PracticeSessionCarryNote);
             m_PracticeSessionCarryNote = "";
         }
-        if (practiceSenseVoice != null && practiceSenseVoice.PracticePhraseCount > 0)
-        {
-            //必须逐段列出身份。只报一个总数时她无从分辨哪段是哪段，用户说
-            //「先唱沉默着走了那段」她就翻译不成段号——8/16 实测因此空转七轮。
-            //光有歌词还不够：那一场 7 段跨了两首歌、跨了好几轮，她连着三次选错段。
-            //所以要带上"属于哪首歌"和"多久以前唱的"，这两条正是用户区分它们的方式。
-            var phrases = practiceSenseVoice.DescribePracticePhrases();
-            float totalSeconds = 0f;
-            sb.Append($"\n练唱会话: 已按练唱先后记录 {phrases.Count} 段：");
-            foreach (var phrase in phrases)
-            {
-                totalSeconds += phrase.Seconds;
-                string lyric = (phrase.Lyrics ?? "").Trim();
-                if (lyric.Length > 20) lyric = lyric.Substring(0, 20) + "…";
-                sb.Append($" [{phrase.Index}] {(lyric.Length > 0 ? "\"" + lyric + "\"" : "（无歌词）")}" +
-                          $" {phrase.Seconds:F1}s {FormatDuration(phrase.AgoSeconds)}前");
-                //同一句被教了好几遍时必须标出来。不标的话清单里两段歌词一模一样，
-                //用户说"第二次教你的那段"她对不上段号，只能把两遍都唱出去。
-                if (phrase.TakeTotal > 1)
-                    sb.Append($" ←同一句的第{phrase.TakeIndex}/{phrase.TakeTotal}遍");
-                //待确认不拦任何用途，它只是个警示：这一段有可能根本不是歌声。
-                //必须显出来——不显的话用户说"那不是唱歌"时，她无从知道该去掉哪一段。
-                if (phrase.PendingConfirmation)
-                    sb.Append(" ←待确认(声学判唱、转写读起来像说话；可以照常唱，" +
-                              "用户若说那不是唱歌就 <practice_drop order=\"" +
-                              phrase.Index + "\"/>)");
-                //各段起调不一定一致，连起来听会觉得"某一段偏低"。她看不到就只能猜——
-                //8/20 实测她猜"升八度"并写了 key="2"，三段被一起抬高 2 个半音，
-                //段间差原封不动，用户连问三轮都听不出变化。
-                //只摆绝对值，不写"比其它段低几个半音"：后者要先认定某几段是共同基调，
-                //而用户唱另一首歌、或者每段起调本来就不同时，这个认定是凭空造的。
-                //以哪一段为准由用户指定——8/20 他自己说的就是"以第一段为音调基础"。
-                if (!string.IsNullOrEmpty(phrase.PitchBaseNote))
-                    sb.Append($" 起调{phrase.PitchBaseNote}");
-                if (!string.IsNullOrEmpty(phrase.SongName))
-                    sb.Append($" 疑似《{phrase.SongName}》");
-                else if (!string.IsNullOrEmpty(phrase.SongId))
-                    //必须给完整 id。原来这里截到 6 位，而候选行给的是完整 id——
-                    //8/22 实测她把显示用的 7a69c7 当成真 id 填进 <song_sing/>，
-                    //连打八次全部 'remembered song not found'，而 7a69c7763f6f 就在曲库里。
-                    sb.Append($" 疑似曲库 id={phrase.SongId}");
-                //语言是最硬的换歌信号：人一般不会把中文歌和日文歌混在一条里唱。
-                //8/22 实测她把中文《忘记时间》塞进 One Last Kiss 两次，用户纠正两次。
-                if (!string.IsNullOrEmpty(phrase.Language))
-                    sb.Append($" {phrase.Language}");
-                //唱这一段之前用户说的话——换歌和重唱的意图就在这句里，而清单原本
-                //只有声学与歌词事实：「第2/2遍」说明是重复，说不出为什么重复。
-                if (!string.IsNullOrEmpty(phrase.PrecedingSpeech))
-                    sb.Append($" ←唱这段前用户说：\"{TruncateForFrame(phrase.PrecedingSpeech, 40)}\"");
-            }
-            //会话里混着两首歌、或者同一句有多遍时，"默认顺序"一定是错的。
-            //把这件事在清单里说破，而不是等她合完了再在工具结果里补一句。
-            string mixNote = BuildPracticeAmbiguityNote(phrases);
-            if (!string.IsNullOrEmpty(mixNote)) sb.Append(mixNote);
-            //显式点歌没有整曲硬上限；自主发起仍应克制，避免角色未经同意占用几分钟。
-            sb.Append($"；全部连起来约 {totalSeconds:F0}s。用户明确要求完整演唱时没有总时长上限，" +
-                      $"系统会按约 {HumStreamChunkSeconds:F0}s 的自然块边生成边播放" +
-                      $"（单块保护上限 {m_HumBackMaxSeconds:F0}s）；" +
-                      $"你自主发起时总长软限制为 {m_AutonomousSingingMaxSeconds:F0}s，超出就用 order 选一小段。" +
-                      "mode=practice 会保留全部片段与先后，不会为了时长裁掉歌曲开头。" +
-                      "默认按上面的先后；用 order 选段与定序（如 order=\"2,1\" 先唱第2段再第1段，" +
-                      "order=\"5\" 只唱第5段）。" +
-                      "「疑似」只是旋律线索，最终按歌词自己判断哪几段属于同一首");
-        }
+        // Unified clip facts above include identity, boundaries and measured pitch.
 
         //视觉状态——告诉 LLM 自己的眼睛现在开着还是闭着
         if (m_EnableScreenVision)
         {
             sb.Append(m_AgentEyesOpen
-                ? "\n视觉: 睁眼(本帧附了屏幕截图，你看得到)"
+                ? "\n视觉: 睁眼（程序将尝试采集；是否成功及对应时刻，以实际图片附件为准）"
                 : "\n视觉: 闭眼(用 <look/> 可以睁眼)");
         }
 
@@ -6695,6 +9274,9 @@ public class ChatSample : MonoBehaviour
             case "user-spoke":
                 sb.Append("\n(用户刚开口讲了下面这段话，请回应)");
                 break;
+            case "input-candidate-empty":
+                sb.Append("\n(输入候选没有有效转写；这是原用户问题的重新决策，不是新用户轮或自主时钟)");
+                break;
             case "song-search-result":
                 sb.Append("\n(你主动调用的歌曲检索刚返回；可以自然说出发现，也可以只在心里记下)");
                 break;
@@ -6712,10 +9294,13 @@ public class ChatSample : MonoBehaviour
 
     private string FormatDuration(float sec)
     {
+        if (float.IsNaN(sec) || float.IsInfinity(sec)) return "时间未知";
         if (sec < 1f) return "刚刚";
-        if (sec < 60f) return $"{sec:F0}秒";
-        if (sec < 3600f) return $"{sec / 60f:F0}分{(sec % 60f):F0}秒";
-        return $"{sec / 3600f:F0}小时{((sec % 3600f) / 60f):F0}分";
+        // 总秒数只取整一次，再整除/取余，避免 100 秒被写成“2分40秒”。
+        int total = Mathf.FloorToInt(Mathf.Min(sec, int.MaxValue / 2));
+        if (total < 60) return $"{total}秒";
+        if (total < 3600) return $"{total / 60}分{total % 60}秒";
+        return $"{total / 3600}小时{(total % 3600) / 60}分";
     }
 
     private string TruncateForFrame(string s, int max)
@@ -6740,7 +9325,11 @@ public class ChatSample : MonoBehaviour
     /// </summary>
     private string MaybeCaptureScreenForLLM()
     {
-        if (!m_AgentRunning || !m_EnableScreenVision || !m_AgentEyesOpen) return null;
+        if (!m_AgentRunning || !m_EnableScreenVision || !m_AgentEyesOpen)
+        {
+            ArchiveClosedEyeImages();
+            return null;
+        }
         try
         {
             string url = DesktopCapture.CaptureToBase64Jpeg(
@@ -6762,8 +9351,17 @@ public class ChatSample : MonoBehaviour
         }
     }
 
+    private void ArchiveClosedEyeImages()
+    {
+        if (m_ChatSettings == null || m_ChatSettings.m_ChatModel == null) return;
+        int count = m_ChatSettings.m_ChatModel.ArchiveHistoricalImagePixels();
+        if (count > 0 && m_LogAgentLoop)
+            Debug.Log($"[Agent] 视觉: 归档 {count} 帧历史像素，保留当时的文字对话；后续闭眼请求不重复附图");
+    }
+
     private class AgentSongMemoryRequest
     {
+        public string SourceRef = "";
         public string Action = "";
         public string SongId = "";
         public string Title = "";
@@ -6771,68 +9369,6 @@ public class ChatSample : MonoBehaviour
         public string Lyrics = "";
         public string Aliases = "";
         public string Reason = "";
-    }
-
-    private bool ShouldHoldSpeechForExplicitSongRemember()
-    {
-        //只要用户明确要求保存歌声，就扣住模型第一阶段回复；是否真的有可保存音频，
-        //交给工具返回成功/失败。这样即使音频已过期，也不会先说“已经记住”。
-        return CanExecuteSkillAction("singing", out _) &&
-            !m_AgentCurrentRoundIsTick && IsExplicitSongRememberRequest(m_LastUserMsg);
-    }
-
-    private static bool IsExplicitSongRememberRequest(string utterance)
-    {
-        string text = utterance ?? "";
-        string lower = text.ToLowerInvariant();
-
-        string[] negative =
-        {
-            "不要记", "别记", "不用记", "不需要记", "不要保存", "别保存", "忘掉",
-            "don't remember", "do not remember", "don't save", "do not save", "forget this",
-            "覚えない", "覚えなく", "記録しない", "保存しない"
-        };
-        foreach (string phrase in negative)
-            if (lower.Contains(phrase)) return false;
-
-        string[] explicitRequests =
-        {
-            "记住这", "记住我", "希望你记住", "帮我记住", "记下这", "保存这", "存下这",
-            "把这段记", "把我唱", "以后听到要认", "能记住", "可以记住", "要记住",
-            "想让你记住", "请记住", "给我记住", "能保存", "可以保存",
-            "remember this", "remember my singing", "save this", "save my singing", "keep this melody",
-            "覚えて", "記録して", "保存して"
-        };
-        foreach (string phrase in explicitRequests)
-        {
-            if (!lower.Contains(phrase)) continue;
-            //没有本轮演唱标签时，还必须明确指代歌声/歌曲/旋律，防止把“记住这件事”
-            //误判成歌曲落盘请求。
-            bool singingTurn = text.IndexOf("[演唱片段", StringComparison.Ordinal) >= 0;
-            bool songReference = lower.Contains("歌") || lower.Contains("唱") || lower.Contains("哼") ||
-                lower.Contains("旋律") || lower.Contains("曲") || lower.Contains("melody") ||
-                lower.Contains("song") || lower.Contains("sing");
-            return singingTurn || songReference;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// 只兜底“语音服务仍持有最近歌声 + 用户明确要求保存这首歌/这段旋律”的窄场景。
-    /// 用户可以先唱完、下一句话再命名并要求保存；没有明确请求的随口哼唱仍交给角色判断。
-    /// </summary>
-    private bool ShouldFallbackToExplicitSongRemember()
-    {
-        if (!m_EnableAutonomousSongMemory || !m_EnforceExplicitSongRemember ||
-            m_ExplicitSongRememberHandled || m_AgentCurrentRoundIsTick)
-            return false;
-
-        SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
-            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
-            : null;
-        if (senseVoice == null || !senseVoice.HasFreshSingingAudio()) return false;
-
-        return IsExplicitSongRememberRequest(m_LastUserMsg);
     }
 
     private static bool IsExplicitHumBackRequest(string utterance)
@@ -6923,6 +9459,26 @@ public class ChatSample : MonoBehaviour
             "刚才", "刚刚", "方才", "这首", "这一首", "这段", "这一段",
             "我刚唱", "我们刚唱", "最近那首", "recent song", "just sang",
             "that phrase", "this phrase", "さっき", "この曲", "このフレーズ"
+        };
+        foreach (string reference in references)
+            if (lower.Contains(reference)) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// 比“最近那首歌”更窄：只有明确指向刚唱/刚录的具体片段或旋律，才能据此
+    /// 纠正素材源。宽泛的“这首歌”仍留给 LLM 结合上下文判断。
+    /// </summary>
+    private static bool IsRecentPerformanceMaterialReference(string utterance)
+    {
+        string lower = StripSingingPerceptionMetadata(utterance).ToLowerInvariant();
+        string[] references =
+        {
+            "刚才唱", "刚刚唱", "方才唱", "我刚唱", "我们刚唱",
+            "刚才录", "刚刚录", "我录的", "这段", "这一段", "刚才的片段",
+            "刚刚的片段", "这个旋律", "这段旋律", "刚才的旋律", "刚刚的旋律",
+            "just sang", "just recorded", "this phrase", "that phrase", "this melody",
+            "さっき歌", "今歌った", "このフレーズ", "このメロディ"
         };
         foreach (string reference in references)
             if (lower.Contains(reference)) return true;
@@ -7028,39 +9584,110 @@ public class ChatSample : MonoBehaviour
         return !hasSelector && IsRecentSingingReference(semanticText);
     }
 
+    private bool RejectInvalidSongSingMaterialSource(ref AgentSongSingRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.SourceValidationError))
+            return false;
+        string detail = request.SourceValidationError;
+        ReportToolFailureForLlm(
+            "song_sing",
+            "invalid_material_source",
+            detail + " 本次没有读取或播放任何音频。",
+            "请结合本轮歌唱素材事实重新自主选择：recent_turn 用 hum_back echo，" +
+            "practice 用 hum_back practice，library 才用 song_sing；拿不准可以先询问用户。");
+        if (m_LogHumBack)
+            Debug.LogWarning("[Singing/Source] " + detail);
+        request = null;
+        return true;
+    }
+
     /// <summary>
-    /// song_sing 只面向长期曲库；order 和“刚录的几段/练习片段”只属于本轮
-    /// practice 会话。模型偶尔会把两套协议拼在一起，这里不再只丢标签，而是把
-    /// 无歧义的练唱意图改走 hum_back，并保留它写出的段序。
+    /// song_sing 只面向长期曲库；order 和“刚录的几段/练习片段”只属于当前素材。
+    /// 模型已经自主决定要唱之后，如果误把明确的当前素材写成曲库标签，这里只纠正
+    /// 客观素材源：即时录音走 echo，落入练唱会话的片段走 practice。是否唱不由这里决定。
     /// </summary>
     private bool TryRerouteSongSingToPractice(
         ref AgentSongSingRequest songSing,
         ref AgentHumBackRequest humBack)
     {
-        if (songSing == null || !IsSongSingPracticeIntent(
-                m_LastUserMsg, songSing.Reason, songSing.Order))
-            return false;
+        if (songSing == null) return false;
+        if (songSing.UnifiedSing) return false;
+
+        string semanticText = StripSingingPerceptionMetadata(m_LastUserMsg);
+        string declaredSource = NormalizeSingingMaterialSource(songSing.Source);
+        bool practiceIntent = declaredSource == "practice" || IsSongSingPracticeIntent(
+            semanticText, songSing.Reason, songSing.Order);
+        bool recentMaterialIntent = !practiceIntent &&
+            (declaredSource == "recent_turn" ||
+             (IsRecentPerformanceMaterialReference(semanticText) &&
+              IsExplicitHumBackRequest(semanticText) &&
+              !HasRememberedSongCue(semanticText) &&
+              !UserExplicitlySuppliedSongSelector(semanticText, songSing) &&
+              HasRecentSingableMaterial()));
+        if (!practiceIntent && !recentMaterialIntent) return false;
+
+        SenseVoiceSpeechToText sense = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+            : null;
+        bool useImmediateEcho = recentMaterialIntent && sense != null &&
+            sense.HasFreshSingingAudio() && HasRecentPlayableSingingPerformance();
+        string correctedMode = useImmediateEcho ? "echo" : "practice";
+        string correctedOrder = songSing.Order ?? "";
+        if (recentMaterialIntent && !useImmediateEcho &&
+            string.IsNullOrWhiteSpace(correctedOrder) && sense != null &&
+            sense.PracticePhraseCount > 0)
+            correctedOrder = sense.PracticePhraseCount.ToString();
 
         if (humBack == null)
         {
-            humBack = new AgentHumBackRequest
-            {
-                Mode = "practice",
-                Order = songSing.Order ?? "",
-                Reason = string.IsNullOrWhiteSpace(songSing.Reason)
-                    ? "曲库标签实际指向本轮练唱片段，已确定性重路由"
-                    : songSing.Reason,
-            };
+            // song_sing 用错素材源时，只纠正工具，不得重新创建一个残缺请求。
+            // 角色已经提交的 pitch_plan / transpose 等音乐目标以及 pace / expression
+            // 都属于她的主观演唱决定，应当原样进入 hum_back；非法值继续走同一套校验回报。
+            humBack = BuildSongSingPracticeReroute(
+                songSing, correctedMode, correctedOrder);
         }
         else
         {
-            humBack.Mode = "practice";
+            humBack.Mode = correctedMode;
+            humBack.Source = correctedMode == "echo" ? "recent_turn" : "practice";
             if (string.IsNullOrWhiteSpace(humBack.Order))
-                humBack.Order = songSing.Order ?? "";
+                humBack.Order = correctedOrder;
+            humBack.SourceValidationError = ValidateHumBackMaterialSource(humBack);
         }
         songSing = null;
-        m_ExplicitHumBackHandled = true;
         return true;
+    }
+
+    private static AgentHumBackRequest BuildSongSingPracticeReroute(
+        AgentSongSingRequest songSing,
+        string correctedMode,
+        string correctedOrder)
+    {
+        AgentHumBackRequest request = songSing != null
+            ? songSing.HumBackCompatibleRequest
+            : null;
+        if (request == null) request = new AgentHumBackRequest();
+        request.Mode = correctedMode;
+        request.Source = correctedMode == "echo" ? "recent_turn" : "practice";
+        request.SourceValidationError = ValidateHumBackMaterialSource(request);
+        request.Order = correctedOrder ?? "";
+        request.Reason = songSing == null || string.IsNullOrWhiteSpace(songSing.Reason)
+            ? "曲库标签实际指向当前真实歌声素材，已按客观来源纠正"
+            : songSing.Reason;
+        return request;
+    }
+
+    private static bool UserExplicitlySuppliedSongSelector(
+        string userText,
+        AgentSongSingRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(userText)) return false;
+        if (!string.IsNullOrWhiteSpace(request.SongId) &&
+            userText.IndexOf(request.SongId.Trim(), StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+        string title = (request.Title ?? "").Trim();
+        return IsPlausibleUnquotedSongTitle(title) &&
+            TextContainsNormalizedSongTitle(userText, title);
     }
 
     private static bool IsSongSingPracticeIntent(
@@ -7079,8 +9706,7 @@ public class ChatSample : MonoBehaviour
         // DealingTextCallback only adds this marker after both singing evidence and an
         // exit phrase were confirmed. Checking raw text here would misread an ordinary
         // request such as "我不会唱，你唱给我听" as a cancelled performance.
-        return !string.IsNullOrEmpty(m_LastUserMsg) &&
-            m_LastUserMsg.IndexOf("[混合歌唱转说话", StringComparison.Ordinal) >= 0;
+        return m_LastUserEvidence.IndexOf("[混合歌唱转说话", StringComparison.Ordinal) >= 0;
     }
 
     private static bool IsPracticeCompositionRequest(string utterance)
@@ -7160,10 +9786,58 @@ public class ChatSample : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// 只判断用户是否明确说“接下来由我唱”。这不是动作权限或意图路由，只是下一次
+    /// 麦克风输入的短期声学先验，因此刻意不把“接下来你唱”之类的角色点歌算进来。
+    /// </summary>
+    private static bool AnnouncesUpcomingUserSinging(string utterance)
+    {
+        string lower = StripSingingPerceptionMetadata(utterance).ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(lower)) return false;
+        string[] announcements =
+        {
+            "我先唱", "我要唱", "我准备唱", "我再唱", "我来唱", "我唱一", "我接着唱",
+            "接下来我唱", "下一段我唱", "下一首我唱", "等我唱", "听我唱", "听我哼",
+            "跟着我唱", "跟我唱", "跟着我哼", "跟我哼", "学我唱",
+            "i will sing", "i'll sing", "let me sing", "listen to me sing", "follow my singing",
+            "私が歌", "私から歌", "これから歌う", "もう一度歌う", "私の歌を聞"
+        };
+        foreach (string phrase in announcements)
+            if (lower.Contains(phrase)) return true;
+        return false;
+    }
+
+    private bool HasUpcomingUserSingingExpectation()
+    {
+        if (!m_UpcomingUserSingingExpected) return false;
+        if (Time.realtimeSinceStartup - m_UpcomingUserSingingExpectedAt <=
+            k_UpcomingUserSingingExpectationSeconds)
+            return true;
+        m_UpcomingUserSingingExpected = false;
+        if (m_LogHumBack)
+            Debug.Log("[Singing/Expected] 用户预告的下一轮歌声已超过 3 分钟，取消声学先验");
+        return false;
+    }
+
+    private bool HasExpectedUserSingingAcousticContext()
+    {
+        return m_EouExpectedUserSinging || HasUpcomingUserSingingExpectation() ||
+            HasActiveSingAlongRequest();
+    }
+
+    private void UpdateUpcomingUserSingingExpectation(string completedUserTurn)
+    {
+        bool announced = AnnouncesUpcomingUserSinging(completedUserTurn);
+        m_EouExpectedUserSinging = false;
+        m_UpcomingUserSingingExpected = announced;
+        m_UpcomingUserSingingExpectedAt = announced ? Time.realtimeSinceStartup : -999f;
+        if (announced && m_LogHumBack)
+            Debug.Log("[Singing/Expected] 用户明确预告下一轮会唱；仅启用一次声学复核，不自动回唱");
+    }
+
     private bool IsCurrentTurnConfirmedSinging()
     {
-        return !string.IsNullOrEmpty(m_LastUserMsg) &&
-            m_LastUserMsg.IndexOf("[演唱片段", StringComparison.Ordinal) >= 0;
+        return m_LastUserEvidence.IndexOf("[演唱片段", StringComparison.Ordinal) >= 0;
     }
 
     private bool HasActiveSingAlongRequest()
@@ -7185,7 +9859,6 @@ public class ChatSample : MonoBehaviour
     {
         m_WaitingForRequestedSingAlong = true;
         m_SingAlongRequestArmedAt = Time.realtimeSinceStartup;
-        m_ExplicitHumBackHandled = true;
         //**不再清空练唱会话。**
         //原来只要"当前没 armed"就重开一个会话、把之前教过的段全丢掉。而用户在
         //"教新段落"和"让她合起来唱"之间来回时必然反复触发 arm，于是 8/17 实测：
@@ -7220,9 +9893,9 @@ public class ChatSample : MonoBehaviour
     }
 
     /// <summary>
-    /// A real singing request must not stream ordinary TTS lyrics before the model's tool tag
-    /// arrives. Hold the textual body only when a playable performance already exists, or when
-    /// an armed invitation has just been fulfilled by a confirmed singing turn.
+    /// 已经约定好的轮唱在用户真实唱完后可走确定性快速回唱，因此需要提前扣住普通 TTS。
+    /// 普通点歌/回唱请求则等待 LLM 自己选择工具；不能因为程序猜测它会唱就先把正文扣住，
+    /// 否则模型选择不唱或漏写工具时会造成整轮失声。
     /// </summary>
     private bool ShouldHoldSpeechForExplicitHumBack()
     {
@@ -7248,63 +9921,7 @@ public class ChatSample : MonoBehaviour
             return false;
         if (!confirmedSinging && IsSingAlongInvitation(m_LastUserMsg)) return false;
         bool armedPerformance = confirmedSinging && HasActiveSingAlongRequest();
-        bool directPerformance = IsExplicitHumBackRequest(m_LastUserMsg);
-        return (armedPerformance || directPerformance) && HasRecentPlayableSingingPerformance();
-    }
-
-    /// <summary>
-    /// 用户明确要求回哼时，即使本地模型漏写工具标签也执行；自主回哼仍完全交给模型判断。
-    /// 这里只确认语义，最近是否还有可演奏旋律由 QueueHumBack 做最终检查。
-    /// </summary>
-    private bool ShouldFallbackToExplicitHumBack()
-    {
-        if (!CanExecuteSkillAction("singing", out _) ||
-            !m_EnableAutonomousHumBack || m_ExplicitHumBackHandled ||
-            m_AgentCurrentRoundIsTick)
-            return false;
-
-        if (IsCurrentTurnSpokenSingingExit())
-        {
-            m_ExplicitHumBackHandled = true;
-            if (m_LogHumBack)
-                Debug.Log("[HumBack] 本轮歌唱后明确转为口语退出；不执行确定性跟唱兜底");
-            return false;
-        }
-
-        bool confirmedSinging = IsCurrentTurnConfirmedSinging();
-        //多段范围与顺序交给 singing Skill 的结构化语义，不再在模型漏标时
-        //用 order="" 兜底成“全部”。这类轮次也不预先扣留正常回答。
-        if (!confirmedSinging && IsPracticeCompositionRequest(m_LastUserMsg))
-            return false;
-        if (!confirmedSinging && IsHumBackCancellation(m_LastUserMsg))
-        {
-            m_WaitingForRequestedSingAlong = false;
-            m_ExplicitHumBackHandled = true;
-            if (m_LogHumBack) Debug.Log("[HumBack] 用户取消了待唱请求");
-            return false;
-        }
-        if (!confirmedSinging && IsSingAlongInvitation(m_LastUserMsg))
-        {
-            // “能不能跟着我唱”是在约定下一步；不能把这句普通说话本身拿去变声。
-            ArmSingAlongForNextPerformance();
-            return false;
-        }
-
-        SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
-            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
-            : null;
-        float[] timeline;
-        float frameSeconds;
-        string language;
-        bool hasPlayablePerformance = senseVoice != null &&
-            senseVoice.TryGetRecentSingingPerformance(out timeline, out frameSeconds, out language);
-        if (confirmedSinging && HasActiveSingAlongRequest())
-        {
-            if (hasPlayablePerformance) RefreshActiveSingAlongSession();
-            return hasPlayablePerformance;
-        }
-        if (!IsExplicitHumBackRequest(m_LastUserMsg)) return false;
-        return hasPlayablePerformance;
+        return armedPerformance && HasRecentPlayableSingingPerformance();
     }
 
     /// <summary>
@@ -7350,6 +9967,7 @@ public class ChatSample : MonoBehaviour
         AgentSongMemoryRequest request = new AgentSongMemoryRequest
         {
             Action = match.Groups["action"].Value.Trim().ToLowerInvariant(),
+            SourceRef = ReadToolAttribute(attrs, "source_ref"),
             SongId = ReadToolAttribute(attrs, "id"),
             Title = ReadToolAttribute(attrs, "title"),
             Artist = ReadToolAttribute(attrs, "artist"),
@@ -7368,9 +9986,27 @@ public class ChatSample : MonoBehaviour
         public string Reason = "";
     }
 
+    private class AgentSongCatalogRequest
+    {
+        public string Query = "";
+        public int Offset = 0;
+        public int Limit = 30;
+        public bool IncludeUnnamed = false;
+        public string Reason = "";
+    }
+
     private class AgentHumBackRequest
     {
+        public bool UnifiedSing;
+        public string ClipRefs = "";
+        public bool ConfirmUser;
+        public string Range = "current";
+        public float StartSeconds = float.NaN;
+        public float EndSeconds = float.NaN;
         public string Mode = "echo";
+        //素材来源由角色结合语境显式表达；mode 仍负责具体播放方式。
+        //留空兼容旧回复，执行层会从 mode 推断并照常校验真实可用性。
+        public string Source = "";
         public string Lyrics = "";
         public string Reason = "";
         //演唱参数：她可以自己决定这一遍怎么唱。NaN/未指定时沿用按 seed 生成的默认档，
@@ -7380,25 +10016,512 @@ public class ChatSample : MonoBehaviour
         public float Expression = float.NaN;  //演绎强度：0=逐帧复刻用户，1=尽量按她自己的表现
         //practice 的演唱顺序，如 "2,1"；空串按练唱先后。段号见感知帧里的练唱会话清单。
         public string Order = "";
+        //clean=默认干净边界；expanded=明确针对漏唱/边界不完整时采用相邻旋律岛扩展版。
+        //只对 practice 有意义，决定仍来自角色，不由程序按用户关键词代选。
+        public string Capture = "clean";
+        //在所选 capture 上再做明确裁剪。只支持单段，避免一个数被机械套到多段。
+        public float TrimHeadSeconds = 0f;
+        public float TrimTailSeconds = 0f;
+        //由 LLM 基于完整语义填写；程序不搜“不要说话”等关键词。若 true 而所选
+        //expanded 边界仍含已分类为 speech 的片段，执行前把冲突事实退回给 LLM。
+        public bool ExcludeSpeech = false;
         //key 写成逗号分隔时(如 "0,4,0")是**逐段各自移调**，一项对应 order 里的一段。
         //整条统一移调是一个数、走原来的单次转换；逐段要 N 次转换，慢一些但能只动一段。
         public float[] KeyPerSegment = null;
+        //旧协议兼容：新回复应使用下面的 pitch_plan / transpose 音乐目标。
+        public string TargetNote = "";
+        public int AlignToPracticeIndex = 0;
+        //旧的拆分接口：角色表达音乐目标，程序负责把它翻译成 SVC 半音参数。
+        //pitch_target: D4 或 keep,keep,D4；pitch_delta: +M2 或 keep,keep,+m2；
+        //pitch_match: 练唱清单段号。target_note/align_to 仅作旧回复兼容。
+        public string PitchTarget = "";
+        public string PitchDelta = "";
+        public string PitchMatch = "";
+        //规范化主接口：每项对应 order 中同一位置，可混合 keep、A3、+m2、match:1。
+        //transpose 是把所选各段基于角色最近一次实际演唱统一做相对移调的快捷操作。
+        public string PitchPlan = "";
+        public string Transpose = "";
+        //解析阶段发现非法/冲突参数时保留真实原因，执行层会把它交回 LLM 纠错，
+        //绝不静默截断成另一个动作。
+        public string ValidationError = "";
+        public string SourceValidationError = "";
+        public int ExtraTagsIgnored = 0;
     }
 
     //逐段移调这一次实际发生了什么，回报给她时如实写出来(包括"你写了 N 项但只有 M 段")。
     private string m_LastPracticeShiftNote = "";
 
-    //上一次连唱之后各段的实际起调。工具结果只出现一帧，之后就沉进历史——
-    //8/25 实测用户连问四轮"这三段的音调是多少"，她答不上来，还跑去开视觉看屏幕，
-    //而答案就在她刚收到的那条工具结果里（一次答的还是上一轮的旧数据）。
-    //这个数在下一次连唱之前一直成立，所以留着，别只闪一帧。
-    private string m_LastRenderPitchSummary = "";
-    private float m_LastRenderPitchAt = -999f;
-    //超过这个时间就不再占感知帧的位置——再久用户多半已经在聊别的了。
-    private const float k_RenderPitchStickySeconds = 300f;
-
     //上一轮出现过的不存在标签，点破一次就清掉。
     private string m_LastUnknownTagNote = "";
+
+    /// <summary>
+    /// 把角色表达的乐理目标换算成转换器实际需要的逐段半音值。
+    /// LLM 决定“想成为哪个音/音程/参考段”；程序只读取音高事实、做算术并检查量程。
+    /// </summary>
+    private bool TryResolvePracticePitchTarget(
+        AgentHumBackRequest request,
+        SenseVoiceSpeechToText.PracticeComposition composition,
+        out int[] directShifts,
+        out float[] targetCenters,
+        out string note,
+        out string failure)
+    {
+        directShifts = null;
+        targetCenters = null;
+        note = "";
+        failure = "";
+        if (request == null || !HasMusicalPitchIntent(request))
+            return true;
+        if (!IsPracticeHumMode(request.Mode))
+        {
+            failure = "pitch_plan/transpose 及旧 pitch_* 音高属性只适用于 practice 练唱片段；" +
+                      "echo 没有可引用的逐段音高状态。";
+            return false;
+        }
+        if (composition == null || composition.SegmentWavs == null ||
+            composition.SegmentWavs.Count == 0 || composition.SegmentMedians == null ||
+            composition.SegmentMedians.Count != composition.SegmentWavs.Count)
+        {
+            failure = "当前练唱素材没有完整的逐段中心音高证据，无法可靠执行音乐目标。";
+            return false;
+        }
+
+        List<SenseVoiceSpeechToText.PracticePhraseInfo> phrases = null;
+        SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+            : null;
+        if (senseVoice != null) phrases = senseVoice.DescribePracticePhrases();
+
+        int count = composition.SegmentWavs.Count;
+        var currentCenters = new float[count];
+        var stableIds = new int[count];
+        for (int i = 0; i < count; i++)
+        {
+            int sourceIndex = composition.SegmentSourceIndices != null &&
+                              i < composition.SegmentSourceIndices.Count
+                ? composition.SegmentSourceIndices[i]
+                : i + 1;
+            SenseVoiceSpeechToText.PracticePhraseInfo phrase =
+                FindPracticePhraseInfo(phrases, sourceIndex);
+            stableIds[i] = phrase != null ? phrase.StableId : 0;
+            currentCenters[i] = GetCurrentPracticeCenterMidi(
+                stableIds[i], composition.SegmentMedians[i]);
+        }
+
+        targetCenters = new float[count];
+        string planSpec = (request.PitchPlan ?? "").Trim();
+        string transposeSpec = (request.Transpose ?? "").Trim();
+        string targetSpec = !string.IsNullOrWhiteSpace(request.PitchTarget)
+            ? request.PitchTarget.Trim()
+            : request.TargetNote.Trim();
+        string deltaSpec = (request.PitchDelta ?? "").Trim();
+        string matchSpec = !string.IsNullOrWhiteSpace(request.PitchMatch)
+            ? request.PitchMatch.Trim()
+            : request.AlignToPracticeIndex > 0
+                ? request.AlignToPracticeIndex.ToString()
+                : "";
+
+        if (!string.IsNullOrWhiteSpace(planSpec))
+        {
+            string[] values = SplitPitchValueList(planSpec);
+            if (values.Length != 1 && values.Length != count)
+            {
+                failure = $"pitch_plan 写了 {values.Length} 项，而 order 选择了 {count} 段；" +
+                          "请写一个共同目标，或为每段各写一项。";
+                return false;
+            }
+            for (int i = 0; i < count; i++)
+            {
+                string value = values.Length == 1 ? values[0] : values[i];
+                if (IsSourcePitchToken(value))
+                {
+                    targetCenters[i] = composition.SegmentMedians[i];
+                    continue;
+                }
+                if (IsKeepPitchToken(value))
+                {
+                    targetCenters[i] = currentCenters[i];
+                    continue;
+                }
+                if (TryParseMidiNote(value, out float absolute))
+                {
+                    targetCenters[i] = absolute;
+                    continue;
+                }
+                if (TryParseMusicalInterval(value, out float delta))
+                {
+                    targetCenters[i] = currentCenters[i] + delta;
+                    continue;
+                }
+                if (TryParsePitchPlanMatchToken(value, out int referenceIndex))
+                {
+                    SenseVoiceSpeechToText.PracticePhraseInfo reference =
+                        FindPracticePhraseInfo(phrases, referenceIndex);
+                    if (reference == null || reference.PitchCenterMidi <= 0f)
+                    {
+                        failure = $"pitch_plan 第 {i + 1} 项引用的清单第 {referenceIndex} 段" +
+                                  "没有可用中心音高事实。";
+                        return false;
+                    }
+                    targetCenters[i] = GetCurrentPracticeCenterMidi(
+                        reference.StableId, reference.PitchCenterMidi);
+                    continue;
+                }
+                failure = $"pitch_plan 的第 {i + 1} 项 \"{value}\" 无法理解；" +
+                          "请使用 keep、source、A3、+half_step、+whole_step、+m3 或 match:1。";
+                return false;
+            }
+            if (values.Length == 1 &&
+                TryParsePitchPlanMatchToken(values[0], out int sharedReferenceIndex))
+            {
+                note = $"音乐目标：所选各段统一匹配清单第 {sharedReferenceIndex} 段的当前中心音高 " +
+                       $"{FormatPitchMidi(targetCenters[0])}。";
+            }
+            else if (values.Length == 1 && TryParseMidiNote(values[0], out _))
+            {
+                note = $"音乐目标：所选各段统一到共同中心音高 {values[0]}。";
+            }
+            else
+            {
+                note = "音乐目标：逐段计划=" +
+                       (values.Length == 1 ? values[0] : string.Join(",", values)) + "。";
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(targetSpec))
+        {
+            string[] values = SplitPitchValueList(targetSpec);
+            if (values.Length != 1 && values.Length != count)
+            {
+                failure = $"pitch_target 写了 {values.Length} 项，而 order 选择了 {count} 段；" +
+                          "请写一个共同目标音，或为每段各写一项。";
+                return false;
+            }
+            for (int i = 0; i < count; i++)
+            {
+                string value = values.Length == 1 ? values[0] : values[i];
+                if (IsKeepPitchToken(value)) targetCenters[i] = currentCenters[i];
+                else if (!TryParseMidiNote(value, out targetCenters[i]))
+                {
+                    failure = $"pitch_target 的第 {i + 1} 项 \"{value}\" 不是完整音名；" +
+                              "请使用 D4、D#4、Eb4 或 keep。";
+                    return false;
+                }
+            }
+            note = "音乐目标：" + (values.Length == 1
+                ? $"所选各段的中心音高设为 {values[0]}"
+                : $"逐段中心音高设为 {string.Join(",", values)}") + "。";
+        }
+        else if (!string.IsNullOrWhiteSpace(deltaSpec))
+        {
+            string[] values = SplitPitchValueList(deltaSpec);
+            if (values.Length != 1 && values.Length != count)
+            {
+                failure = $"pitch_delta 写了 {values.Length} 项，而 order 选择了 {count} 段；" +
+                          "请写一个共同音程，或为每段各写一项。";
+                return false;
+            }
+            for (int i = 0; i < count; i++)
+            {
+                string value = values.Length == 1 ? values[0] : values[i];
+                float delta = 0f;
+                if (!IsKeepPitchToken(value) && !TryParseMusicalInterval(value, out delta))
+                {
+                    failure = $"pitch_delta 的第 {i + 1} 项 \"{value}\" 不是有效音程；" +
+                              "请使用 +whole_step、-half_step、+m3 或 keep。";
+                    return false;
+                }
+                targetCenters[i] = currentCenters[i] + delta;
+            }
+            note = "音乐目标：在各段当前中心音高基础上按 " +
+                   (values.Length == 1 ? values[0] : string.Join(",", values)) +
+                   " 调整。";
+        }
+        else if (!string.IsNullOrWhiteSpace(transposeSpec))
+        {
+            if (!TryParseMusicalInterval(transposeSpec, out float transposeDelta))
+            {
+                failure = $"transpose=\"{transposeSpec}\" 不是有效音程。";
+                return false;
+            }
+            for (int i = 0; i < count; i++)
+                targetCenters[i] = currentCenters[i] + transposeDelta;
+            note = $"音乐目标：在角色最近一次实际演唱基础上整体移调 {transposeSpec}。";
+        }
+        else
+        {
+            if (!int.TryParse(matchSpec, out int matchIndex) || matchIndex <= 0)
+            {
+                failure = $"pitch_match=\"{matchSpec}\" 不是有效的练唱清单段号。";
+                return false;
+            }
+            SenseVoiceSpeechToText.PracticePhraseInfo reference =
+                FindPracticePhraseInfo(phrases, matchIndex);
+            if (reference == null || reference.PitchCenterMidi <= 0f)
+            {
+                failure = $"练唱清单第 {matchIndex} 段没有可用的中心音高事实，无法作为参考。";
+                return false;
+            }
+            float referenceCenter = GetCurrentPracticeCenterMidi(
+                reference.StableId, reference.PitchCenterMidi);
+            for (int i = 0; i < count; i++) targetCenters[i] = referenceCenter;
+            note = $"音乐目标：所选各段匹配清单第 {matchIndex} 段的当前中心音高 " +
+                   $"{FormatPitchMidi(referenceCenter)}。";
+        }
+
+        directShifts = new int[count];
+        var calibrationNotes = new List<string>();
+        for (int i = 0; i < count; i++)
+        {
+            float rendererBias = 0f;
+            bool calibrated = TryGetReliablePracticeRendererBias(
+                stableIds[i], out rendererBias);
+            float rawShift = targetCenters[i] - composition.SegmentMedians[i] -
+                             (calibrated ? rendererBias : 0f);
+            int shift = QuantizeCalibratedPitchShift(
+                composition.SegmentMedians[i],
+                targetCenters[i],
+                calibrated ? rendererBias : 0f);
+            if (shift < -12 || shift > 12)
+            {
+                int sourceIndex = composition.SegmentSourceIndices != null &&
+                    i < composition.SegmentSourceIndices.Count
+                        ? composition.SegmentSourceIndices[i]
+                        : i + 1;
+                failure = $"清单第 {sourceIndex} 段要达到 {FormatPitchMidi(targetCenters[i])} " +
+                          $"需要实际移调 {rawShift:+0.##;-0.##;0} 个半音，超出转换器 ±12 半音量程；" +
+                          "程序没有静默截断，本次未执行。";
+                directShifts = null;
+                targetCenters = null;
+                return false;
+            }
+            directShifts[i] = shift;
+            if (calibrated && Mathf.Abs(rendererBias) >= 0.05f)
+            {
+                int sourceIndex = composition.SegmentSourceIndices != null &&
+                                  i < composition.SegmentSourceIndices.Count
+                    ? composition.SegmentSourceIndices[i]
+                    : i + 1;
+                int uncalibratedShift = QuantizeCalibratedPitchShift(
+                    composition.SegmentMedians[i], targetCenters[i], 0f);
+                calibrationNotes.Add(shift != uncalibratedShift
+                    ? $"清单[{sourceIndex}] 最近输出误差" +
+                      $"{rendererBias:+0.00;-0.00;0.00}半音，整数移调指令由" +
+                      $"{uncalibratedShift:+0;-0;0}调整为{shift:+0;-0;0}半音"
+                    : $"清单[{sourceIndex}] 最近输出误差" +
+                      $"{rendererBias:+0.00;-0.00;0.00}半音；受整数半音粒度限制，" +
+                      $"底层指令仍为{shift:+0;-0;0}半音，未执行小数补偿");
+            }
+        }
+        note += "程序已根据用户原始录音与角色最近一次实际演唱换算底层整数半音；" +
+                "LLM 无需计算或维护 key。";
+        if (calibrationNotes.Count > 0)
+            note += "闭环校准：" + string.Join("；", calibrationNotes) + "。";
+        return true;
+    }
+
+    private static bool HasMusicalPitchIntent(AgentHumBackRequest request)
+    {
+        return request != null &&
+               (!string.IsNullOrWhiteSpace(request.PitchTarget) ||
+                !string.IsNullOrWhiteSpace(request.PitchDelta) ||
+                !string.IsNullOrWhiteSpace(request.PitchMatch) ||
+                !string.IsNullOrWhiteSpace(request.PitchPlan) ||
+                !string.IsNullOrWhiteSpace(request.Transpose) ||
+                !string.IsNullOrWhiteSpace(request.TargetNote) ||
+                request.AlignToPracticeIndex > 0);
+    }
+
+    private static SenseVoiceSpeechToText.PracticePhraseInfo FindPracticePhraseInfo(
+        List<SenseVoiceSpeechToText.PracticePhraseInfo> phrases, int index)
+    {
+        if (phrases == null) return null;
+        for (int i = 0; i < phrases.Count; i++)
+            if (phrases[i] != null && phrases[i].Index == index) return phrases[i];
+        return null;
+    }
+
+    private float GetCurrentPracticeCenterMidi(int stableId, float sourceCenter)
+    {
+        return stableId > 0 && m_PracticePitchStates.TryGetValue(
+                   stableId, out PracticePitchState state)
+            ? state.CenterMidi
+            : sourceCenter;
+    }
+
+    private bool TryGetReliablePracticeRendererBias(int stableId, out float bias)
+    {
+        bias = 0f;
+        if (stableId <= 0 || !m_PracticePitchStates.TryGetValue(
+                stableId, out PracticePitchState state) ||
+            !state.Measured || state.MeasurementWeight <= 0f)
+            return false;
+        float stability = state.WeightedStability / state.MeasurementWeight;
+        float voiced = state.WeightedVoicedRatio / state.MeasurementWeight;
+        float measuredBias = state.CenterMidi - state.ExpectedCenterMidi;
+        //这是执行校准，不是音乐决策。只采用证据稳定、且仍像正常渲染误差的最近结果；
+        //极端偏差留给 LLM/用户判断，避免一次 F0 八度误检把下一遍推走。
+        if (stability < 0.55f || voiced < 0.35f || Mathf.Abs(measuredBias) > 2.5f)
+            return false;
+        bias = measuredBias;
+        return true;
+    }
+
+    private static int QuantizeCalibratedPitchShift(
+        float sourceCenterMidi,
+        float requestedCenterMidi,
+        float rendererBiasSemitones)
+    {
+        return Mathf.RoundToInt(
+            requestedCenterMidi - sourceCenterMidi - rendererBiasSemitones);
+    }
+
+    private static string FormatPitchMidiPrecise(float midi)
+    {
+        if (midi <= 0f || float.IsNaN(midi) || float.IsInfinity(midi)) return "未知";
+        int nearest = Mathf.RoundToInt(midi);
+        int cents = Mathf.RoundToInt((midi - nearest) * 100f);
+        return $"{SenseVoiceSpeechToText.MidiToNoteName(midi)}" +
+               $"({midi:F2}, {cents:+0;-0;0}c)";
+    }
+
+    private static string[] SplitPitchValueList(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return new string[0];
+        string[] values = raw.Split(
+            new[] { ',', '，', '、', ';', '；' },
+            StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < values.Length; i++) values[i] = values[i].Trim();
+        return values;
+    }
+
+    private static bool TryParsePitchPlanMatchToken(string raw, out int practiceIndex)
+    {
+        practiceIndex = 0;
+        var match = System.Text.RegularExpressions.Regex.Match(
+            (raw ?? "").Trim(),
+            @"^(?:match|same_as)\s*:\s*(?<index>\d+)$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success &&
+               int.TryParse(match.Groups["index"].Value, out practiceIndex) &&
+               practiceIndex > 0;
+    }
+
+    private static bool IsKeepPitchToken(string value)
+    {
+        string token = (value ?? "").Trim().ToLowerInvariant();
+        return token == "keep" || token == "same" || token == "保持" ||
+               token == "不变" || token == "维持" || token == "0";
+    }
+
+    private static bool IsSourcePitchToken(string value)
+    {
+        string token = (value ?? "").Trim().ToLowerInvariant();
+        return token == "source" || token == "original" || token == "user" ||
+               token == "原唱" || token == "原调" || token == "用户原唱";
+    }
+
+    /// <summary>
+    /// 支持标准音程名与无歧义步进名：M2/m2/P5/P8、half_step、whole_step。
+    /// 数字半音写法只为旧协议解析保留；规范化 pitch_plan/transpose 会在校验层拒绝它。
+    /// </summary>
+    private static bool TryParseMusicalInterval(string text, out float semitones)
+    {
+        semitones = 0f;
+        string value = (text ?? "").Trim().Replace("−", "-");
+        if (value.Length == 0) return false;
+        var namedStep = System.Text.RegularExpressions.Regex.Match(
+            value,
+            @"^(?<sign>[+-]?)(?<name>half[_ -]?step|semitone|whole[_ -]?step)$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (namedStep.Success)
+        {
+            bool whole = namedStep.Groups["name"].Value.StartsWith(
+                "whole", StringComparison.OrdinalIgnoreCase);
+            float amount = whole ? 2f : 1f;
+            semitones = namedStep.Groups["sign"].Value == "-" ? -amount : amount;
+            return true;
+        }
+        var numeric = System.Text.RegularExpressions.Regex.Match(
+            value,
+            @"^(?<sign>[+-]?)(?<number>\d+(?:\.\d+)?)\s*(?:st|semitones?|半音)?$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (numeric.Success && float.TryParse(
+                numeric.Groups["number"].Value,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out float number))
+        {
+            semitones = numeric.Groups["sign"].Value == "-" ? -number : number;
+            return true;
+        }
+
+        var interval = System.Text.RegularExpressions.Regex.Match(
+            value, @"^(?<sign>[+-]?)(?<quality>[PpMmAaDd])(?<degree>[1-8])$");
+        if (!interval.Success) return false;
+        string quality = interval.Groups["quality"].Value;
+        int degree = int.Parse(interval.Groups["degree"].Value);
+        int baseSemitones;
+        switch (degree)
+        {
+            case 1: baseSemitones = 0; break;
+            case 2: baseSemitones = 2; break;
+            case 3: baseSemitones = 4; break;
+            case 4: baseSemitones = 5; break;
+            case 5: baseSemitones = 7; break;
+            case 6: baseSemitones = 9; break;
+            case 7: baseSemitones = 11; break;
+            case 8: baseSemitones = 12; break;
+            default: return false;
+        }
+        bool perfectClass = degree == 1 || degree == 4 || degree == 5 || degree == 8;
+        if (quality == "m")
+        {
+            if (perfectClass) return false;
+            baseSemitones--;
+        }
+        else if (quality == "M")
+        {
+            if (perfectClass) return false;
+        }
+        else if (quality == "P" || quality == "p")
+        {
+            if (!perfectClass) return false;
+        }
+        else if (quality == "A" || quality == "a") baseSemitones++;
+        else if (quality == "D" || quality == "d")
+            baseSemitones -= perfectClass ? 1 : 2;
+        else return false;
+        semitones = interval.Groups["sign"].Value == "-" ? -baseSemitones : baseSemitones;
+        return true;
+    }
+
+    /// <summary>
+    /// +1st/+2st 同时长得像“第一个/第二个音程”和“一个/两个半音”，不再允许 LLM
+    /// 在规范化接口中输出。旧 pitch_delta 仍可读旧存档，但新接口只接受明确命名。
+    /// </summary>
+    private static bool IsAmbiguousNumericStepToken(string text)
+    {
+        return System.Text.RegularExpressions.Regex.IsMatch(
+            (text ?? "").Trim().Replace("−", "-"),
+            @"^[+-]?\d+(?:\.\d+)?\s*(?:st|semitones?|半音)?$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    private static string FormatPitchMidi(float midi)
+    {
+        return midi > 0f
+            ? $"{SenseVoiceSpeechToText.MidiToNoteName(midi)}({Mathf.RoundToInt(midi)})"
+            : "未知";
+    }
+
+    private static float[] ShiftPitchTimeline(float[] timeline, int semitones)
+    {
+        if (timeline == null) return null;
+        var shifted = new float[timeline.Length];
+        for (int i = 0; i < timeline.Length; i++)
+            shifted[i] = timeline[i] > 1f ? timeline[i] + semitones : timeline[i];
+        return shifted;
+    }
 
     /// <summary>
     /// 决定这一次要不要走"逐段各自移调"。要走的话算出每段实际发给转换服务的半音数。
@@ -7425,9 +10548,9 @@ public class ChatSample : MonoBehaviour
         int count = composition.SegmentWavs.Count;
         if (keyPerSegment.Length != count)
         {
-            //数目对不上时不猜她想动哪一段——少写的按 0 补，多写的丢掉，并且明说。
-            note = $"注意：key 写了 {keyPerSegment.Length} 项，而这一次有 {count} 段。" +
-                   "多出的已忽略、缺的按不移调处理。要精确控制就让 key 的项数和 order 的段数一致。";
+            note = $"未执行：key 写了 {keyPerSegment.Length} 项，而本次 order 实际选择 {count} 段；" +
+                   "程序不会猜测缺项或丢弃多项，请让两者数量完全一致。";
+            return null;
         }
         if (composition.MedianMidi <= 0f)
         {
@@ -7442,24 +10565,23 @@ public class ChatSample : MonoBehaviour
         //段间差是用户唱出来的、不受任何护栏约束——8/22 实测就出现了差 6 个半音的两段，
         //±4 根本够不到，她三次写 ±6 全被静默截断，结果不对还以为是系统在自动调整。
         //±12 是变声器本身的量程(一个八度)，和服务端一致。
-        //放宽的风险(把某段拽走一个八度)由结果起调那一行兜底：写歪了立刻看得见。
-        var clamped = new List<string>();
+        //放宽的风险(把某段拽走一个八度)由结果中心音高那一行兜底：写歪了立刻看得见。
         var wide = new List<string>();
         for (int i = 0; i < keyPerSegment.Length; i++)
         {
-            float capped = Mathf.Clamp(keyPerSegment[i], -12f, 12f);
-            if (Mathf.Abs(capped - keyPerSegment[i]) > 0.01f)
-                clamped.Add($"第{i + 1}项 {keyPerSegment[i]:0.#}→{capped:0.#}");
+            float capped = keyPerSegment[i];
+            if (float.IsNaN(capped) || float.IsInfinity(capped) || capped < -12f || capped > 12f)
+            {
+                note = $"未执行：key 第 {i + 1} 项 {capped:0.##} 超出逐段范围 −12～+12；" +
+                       "程序没有静默截断。";
+                return null;
+            }
             //超过纯五度就不再是"同一个人唱得高一点"了。不拦，但要说。
             if (Mathf.Abs(capped) > 7f) wide.Add($"第{i + 1}项 {capped:+0.#;-0.#}");
-            keyPerSegment[i] = capped;
         }
-        if (clamped.Count > 0)
-            note += $"注意：逐段 key 的可用范围是 −12~+12，超出的已被截断（{string.Join("、", clamped)}）。" +
-                    "所以这一次的实际效果和你写的数字不一致。";
         if (wide.Count > 0)
             note += $"提醒：{string.Join("、", wide)} 超过了纯五度。" +
-                    "移调这么多会明显不像同一个人在唱——若只是想让几段起调一致，" +
+                    "移调这么多会明显不像同一个人在唱——若只是想让几段中心音高一致，" +
                     "先确认是不是把基准段选反了；确实需要跨这么大时，" +
                     "把差值分摊到两段上（基准段往下、目标段往上）通常更自然。";
 
@@ -7490,7 +10612,7 @@ public class ChatSample : MonoBehaviour
         //否则事后被问起时她手上什么都没有，只能编。
         //两层上限都没碰到才能这么说。key 那一层(±4)在上面刚判过，
         //这里再确认 semitone_shift 那一层(±12)也没滑动。少判一层就会变成谎话。
-        if (Mathf.Abs(slide) <= 0.01f && clamped.Count == 0)
+        if (Mathf.Abs(slide) <= 0.01f)
             note += "（本次没有触及任何移调上限，各段实发值就是你写的 key 加同一个基准量；" +
                     "若结果不如预期，原因在 key 本身，不是系统限制。）";
         if (Mathf.Abs(slide) > 0.01f)
@@ -7534,6 +10656,133 @@ public class ChatSample : MonoBehaviour
     }
 
     /// <summary>
+    /// 没有新的音高目标时，不替 LLM 猜一个新目标：若角色已经唱过这些稳定片段，
+    /// 就沿用各段最近一次音乐目标，并用可靠的角色输出 F0 偏差重新求解底层整数指令；
+    /// 从未唱过的段才用初次音域适配。
+    /// </summary>
+    private bool TryBuildCurrentPracticeArrangement(
+        SenseVoiceSpeechToText senseVoice,
+        SenseVoiceSpeechToText.PracticeComposition composition,
+        int performanceOffset,
+        out int[] shifts,
+        out float[] requestedCenters,
+        out string note)
+    {
+        shifts = null;
+        requestedCenters = null;
+        note = "";
+        if (senseVoice == null || composition == null ||
+            composition.SegmentWavs == null || composition.SegmentMedians == null ||
+            composition.SegmentWavs.Count == 0 ||
+            composition.SegmentMedians.Count != composition.SegmentWavs.Count)
+            return false;
+
+        List<SenseVoiceSpeechToText.PracticePhraseInfo> phrases =
+            senseVoice.DescribePracticePhrases();
+        int count = composition.SegmentWavs.Count;
+        var stableIds = new int[count];
+        bool hasCurrentSegment = false;
+        for (int i = 0; i < count; i++)
+        {
+            int sourceIndex = composition.SegmentSourceIndices != null &&
+                              i < composition.SegmentSourceIndices.Count
+                ? composition.SegmentSourceIndices[i]
+                : i + 1;
+            SenseVoiceSpeechToText.PracticePhraseInfo phrase =
+                FindPracticePhraseInfo(phrases, sourceIndex);
+            stableIds[i] = phrase != null ? phrase.StableId : 0;
+            if (stableIds[i] > 0 && m_PracticePitchStates.ContainsKey(stableIds[i]))
+                hasCurrentSegment = true;
+        }
+        if (!hasCurrentSegment) return false;
+
+        int[] initialShifts = BuildUniformStreamingShifts(composition, performanceOffset);
+        if (initialShifts == null || initialShifts.Length != count) return false;
+        shifts = new int[count];
+        requestedCenters = new float[count];
+        var carried = new List<string>();
+        var initialized = new List<string>();
+        var calibrated = new List<string>();
+        var calibrationLimited = new List<string>();
+        for (int i = 0; i < count; i++)
+        {
+            int sourceIndex = composition.SegmentSourceIndices != null &&
+                              i < composition.SegmentSourceIndices.Count
+                ? composition.SegmentSourceIndices[i]
+                : i + 1;
+            if (stableIds[i] > 0 && m_PracticePitchStates.TryGetValue(
+                    stableIds[i], out PracticePitchState state))
+            {
+                float requestedCenter = state.RequestedCenterMidi > 0f
+                    ? state.RequestedCenterMidi
+                    : state.CenterMidi;
+                bool hasReliableBias = TryGetReliablePracticeRendererBias(
+                    stableIds[i], out float rendererBias);
+                int carriedShift = ResolveCarriedPracticeShift(
+                    composition.SegmentMedians[i],
+                    requestedCenter,
+                    state.ExecutedShift,
+                    hasReliableBias,
+                    rendererBias);
+                if (carriedShift < -12 || carriedShift > 12)
+                {
+                    //上一条指令已经通过量程检查；闭环修正越界时宁可保持它，也不能把
+                    //新值静默截断成另一个目标。把限制写进工具结果供角色如实判断。
+                    calibrationLimited.Add(
+                        $"[{sourceIndex}] 输出偏差{rendererBias:+0.00;-0.00;0.00}半音" +
+                        $"需要底层{carriedShift:+0;-0;0}半音，超出±12，" +
+                        $"本轮保留上次{state.ExecutedShift:+0;-0;0}半音");
+                    carriedShift = state.ExecutedShift;
+                }
+                else if (hasReliableBias && Mathf.Abs(rendererBias) >= 0.05f)
+                {
+                    calibrated.Add(carriedShift != state.ExecutedShift
+                        ? $"[{sourceIndex}] 根据最近输出偏差" +
+                          $"{rendererBias:+0.00;-0.00;0.00}半音，把底层指令由" +
+                          $"{state.ExecutedShift:+0;-0;0}校准为{carriedShift:+0;-0;0}半音"
+                        : $"[{sourceIndex}] 最近输出偏差" +
+                          $"{rendererBias:+0.00;-0.00;0.00}半音，受整数半音粒度限制，" +
+                          $"底层指令保持{carriedShift:+0;-0;0}半音");
+                }
+                shifts[i] = carriedShift;
+                requestedCenters[i] = requestedCenter;
+                carried.Add($"[{sourceIndex}]");
+            }
+            else
+            {
+                shifts[i] = initialShifts[i];
+                requestedCenters[i] = composition.SegmentMedians[i] + shifts[i];
+                initialized.Add($"[{sourceIndex}]");
+            }
+        }
+        note = "本轮没有提交新的音高目标；程序沿用当前编排中各段最近一次音乐目标" +
+               $"（{string.Join("、", carried)}）" +
+               (initialized.Count > 0
+                   ? $"；从未演唱过的段（{string.Join("、", initialized)}）使用初次音域适配"
+                   : "") + "。" +
+               (calibrated.Count > 0
+                   ? "闭环校准：" + string.Join("；", calibrated) + "。"
+                   : "") +
+               (calibrationLimited.Count > 0
+                   ? "闭环校准受量程限制：" + string.Join("；", calibrationLimited) + "。"
+                   : "");
+        return true;
+    }
+
+    private static int ResolveCarriedPracticeShift(
+        float sourceCenterMidi,
+        float requestedCenterMidi,
+        int previousExecutedShift,
+        bool hasReliableRendererBias,
+        float rendererBiasSemitones)
+    {
+        return hasReliableRendererBias
+            ? QuantizeCalibratedPitchShift(
+                sourceCenterMidi, requestedCenterMidi, rendererBiasSemitones)
+            : previousExecutedShift;
+    }
+
+    /// <summary>
     /// 单个学习片段本身也可能是一整首长录音。把超过单块硬保护时长的项继续拆小，并让
     /// 子块继承原段的移调、来源段号；只有第一个子块保留原段前的呼吸停顿。
     /// </summary>
@@ -7570,8 +10819,10 @@ public class ChatSample : MonoBehaviour
                 wavs.Add(wav);
                 gaps.Add(composition.Gaps != null && i < composition.Gaps.Count
                     ? composition.Gaps[i] : 0f);
-                medians.Add(composition.SegmentMedians != null && i < composition.SegmentMedians.Count
-                    ? composition.SegmentMedians[i] : 0f);
+                medians.Add(composition.SegmentMedians != null &&
+                            i < composition.SegmentMedians.Count
+                    ? composition.SegmentMedians[i]
+                    : 0f);
                 sources.Add(composition.SegmentSourceIndices != null &&
                             i < composition.SegmentSourceIndices.Count
                     ? composition.SegmentSourceIndices[i] : i + 1);
@@ -7587,8 +10838,16 @@ public class ChatSample : MonoBehaviour
                 wavs.Add(split.SegmentWavs[child]);
                 gaps.Add(child == 0 && composition.Gaps != null && i < composition.Gaps.Count
                     ? composition.Gaps[i] : 0f);
-                medians.Add(composition.SegmentMedians != null && i < composition.SegmentMedians.Count
-                    ? composition.SegmentMedians[i] : 0f);
+                //子块的旋律区间可能与整段中心相差很多。保留子块自己的实测中位数，
+                //这样播放后的 F0 回测是在比较“本块实际值 vs 本块预计值”，不会把
+                //正常旋律走向误报成移调偏差。
+                medians.Add(split.SegmentMedians != null &&
+                            child < split.SegmentMedians.Count
+                    ? split.SegmentMedians[child]
+                    : (composition.SegmentMedians != null &&
+                       i < composition.SegmentMedians.Count
+                        ? composition.SegmentMedians[i]
+                        : 0f));
                 sources.Add(composition.SegmentSourceIndices != null &&
                             i < composition.SegmentSourceIndices.Count
                     ? composition.SegmentSourceIndices[i] : i + 1);
@@ -7621,14 +10880,20 @@ public class ChatSample : MonoBehaviour
 
     private class AgentSongSingRequest
     {
+        public bool UnifiedSing;
         public string SongId = "";
         public string Title = "";
         public string Mode = "memory";
+        public string Source = "";
+        public string SourceValidationError = "";
         public string Reason = "";
         // song_sing 不消费段序；保留它只为识别模型把 practice 参数写错了工具。
         public string Order = "";
         //只唱某一段时填这一段的歌词。空 = 维持 mode 的既有语义。
         public string SegmentLyrics = "";
+        //模型偶尔把当前练唱素材误写成 song_sing。兼容转路由时必须保留它已经表达的
+        //音乐目标和演绎参数，不能只保留 order 后静默丢掉 pitch_plan / transpose。
+        public AgentHumBackRequest HumBackCompatibleRequest = null;
     }
 
     private static readonly System.Text.RegularExpressions.Regex s_SongSingTagRegex =
@@ -7636,9 +10901,11 @@ public class ChatSample : MonoBehaviour
             @"<song_sing\b(?<attrs>[^>]*)>",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-    private AgentSongSingRequest ExtractSongSingTag(ref string text)
+    private static AgentSongSingRequest ExtractSongSingTag(ref string text)
     {
         if (string.IsNullOrEmpty(text)) return null;
+        AgentSongSingRequest unifiedSong = ExtractUnifiedLibrarySing(ref text);
+        if (unifiedSong != null) return unifiedSong;
         var match = s_SongSingTagRegex.Match(text);
         if (!match.Success) return null;
         string attrs = match.Groups["attrs"].Value;
@@ -7647,18 +10914,26 @@ public class ChatSample : MonoBehaviour
             SongId = ReadToolAttribute(attrs, "id"),
             Title = ReadToolAttribute(attrs, "title"),
             Mode = ReadToolAttribute(attrs, "mode"),
+            Source = ReadToolAttribute(attrs, "source"),
             Reason = ReadToolAttribute(attrs, "reason"),
             Order = ReadToolAttribute(attrs, "order"),
             SegmentLyrics = ReadToolAttribute(attrs, "lyrics"),
+            HumBackCompatibleRequest = ParseHumBackCompatibleAttributes(attrs),
         };
         if (string.IsNullOrWhiteSpace(request.Mode)) request.Mode = "memory";
+        string normalizedSource = NormalizeSingingMaterialSource(request.Source);
+        if (!string.IsNullOrWhiteSpace(request.Source) && normalizedSource.Length == 0)
+            request.SourceValidationError =
+                $"source=\"{request.Source}\" 不是已知歌唱素材源；" +
+                "只能使用 recent_turn、practice 或 library。";
+        else request.Source = normalizedSource;
         text = s_SongSingTagRegex.Replace(text, "").Trim();
         return request;
     }
 
     private static readonly System.Text.RegularExpressions.Regex s_HumBackTagRegex =
         new System.Text.RegularExpressions.Regex(
-            @"<hum_back\b(?<attrs>[^>]*)>",
+            @"<(?<tool>hum_back|sing)\b(?<attrs>[^>]*)>",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     //她会把两个标签粘成一个词写出来，最典型的是 <silenthum_back mode="practice" …/>。
@@ -7668,11 +10943,11 @@ public class ChatSample : MonoBehaviour
     private static readonly string[] s_GluableTagNames =
     {
         "silent", "continue", "noop", "look", "unlook", "next", "skill_request", "skill_control",
-        "singing_intent",
+        "singing_policy", "singing_stop", "singing_intent",
         "note", "memory_add", "memory_update", "memory_link", "speaker_name", "speaker_manage",
-        "song_search", "song_remember", "song_rename", "song_forget", "song_sing",
-        "practice_drop",
-        "hum_back",
+        "song_search", "song_catalog", "song_remember", "song_rename", "song_forget", "song_sing",
+        "practice_confirm", "practice_revise", "practice_drop",
+        "hum_back", "sing", "clip_confirm", "clip_revise", "clip_drop",
     };
 
     private static readonly System.Text.RegularExpressions.Regex s_GluedTagRegex =
@@ -7751,14 +11026,7 @@ public class ChatSample : MonoBehaviour
             string name = m.Groups["name"].Value;
             //<think> 由 StripLeadingThinkBlock 单独处理，不算写错。
             if (string.Equals(name, "think", StringComparison.OrdinalIgnoreCase)) continue;
-            bool known = false;
-            foreach (string candidate in s_GluableTagNames)
-                if (string.Equals(name, candidate, StringComparison.OrdinalIgnoreCase))
-                {
-                    known = true;
-                    break;
-                }
-            if (known) continue;
+            if (IsKnownAgentTagName(name)) continue;
             string text = m.Value;
             if (text.Length > 60) text = text.Substring(0, 60) + "…";
             return text;
@@ -7766,20 +11034,221 @@ public class ChatSample : MonoBehaviour
         return "";
     }
 
+    //来源待确认候选由正式角色显式确认。这个工具只改变“是谁唱的”这一项事实，
+    //不替角色决定是否播放，也不把 evidence_only 硬升级成 ready。
+    private static readonly System.Text.RegularExpressions.Regex s_PracticeConfirmTagRegex =
+        new System.Text.RegularExpressions.Regex(
+            @"<(?:practice_confirm|clip_confirm)\b(?<attrs>[^>]*)>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private void ExtractAndApplyPracticeConfirmTag(ref string text, bool apply = true)
+    {
+        ExtractAndApplyClipConfirmTags(ref text, apply);
+        if (string.IsNullOrEmpty(text)) return;
+        var matches = s_PracticeConfirmTagRegex.Matches(text);
+        if (matches.Count == 0) return;
+        text = s_PracticeConfirmTagRegex.Replace(text, "").Trim();
+        if (!apply) return;
+
+        SenseVoiceSpeechToText sense = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+            : null;
+        if (sense == null)
+        {
+            RecordPracticeEditFailureForLlm(
+                "未执行来源确认：语音模块不可用。",
+                "speech_module_unavailable",
+                "不要声称已确认或已播放；可以如实说明当前无法读取素材，或稍后再试。");
+            return;
+        }
+        var ids = new List<int>();
+        var captureSelections = new Dictionary<int, string>();
+        for (int i = 0; i < matches.Count; i++)
+        {
+            string attrs = matches[i].Groups["attrs"].Value;
+            string raw = ReadToolAttribute(attrs, "candidate_id") ??
+                         ReadToolAttribute(attrs, "id");
+            foreach (int id in ParsePositiveIdList(raw))
+            {
+                if (!ids.Contains(id)) ids.Add(id);
+                if (!string.IsNullOrWhiteSpace(ReadToolAttribute(attrs, "capture")))
+                    captureSelections[id] = attrs;
+            }
+        }
+        if (ids.Count == 0)
+        {
+            RecordPracticeEditFailureForLlm(
+                "未执行来源确认：practice_confirm 缺少有效 candidate_id。",
+                "missing_candidate_id",
+                "只可填写感知帧当前列出的 pending candidate_id；若目标已经在练唱清单，" +
+                "它不需要再次确认，直接用 hum_back practice 的 stable:N 播放引用。 ");
+            return;
+        }
+        var alreadyConfirmedStableIds = new Dictionary<int, int>();
+        for (int i = 0; i < ids.Count; i++)
+        {
+            if (sense.HasKnownSingingCandidate(ids[i]))
+            {
+                if (sense.TryResolveConfirmedSingingCandidate(
+                        ids[i], out int knownStableId, out int _))
+                    alreadyConfirmedStableIds[ids[i]] = knownStableId;
+                continue;
+            }
+            string readyHint = sense.TryResolvePracticeStableId(
+                    ids[i], out int readyIndex)
+                ? $"同号的 stable_id={ids[i]} 确实存在于练唱清单第 {readyIndex} 段，" +
+                  $"其状态是 playback=ready / confirmation=not_required；若你指的是它，" +
+                  $"请用 <hum_back mode=\"practice\" source=\"practice\" " +
+                  $"order=\"stable:{ids[i]}\"/>。"
+                : "请重新读取当前 pending candidate_id 与 ready stable_id；" +
+                  "拿不准用户指哪份素材时可以先询问。";
+            RecordPracticeEditFailureForLlm(
+                $"未执行来源确认：candidate_id={ids[i]} 既不在当前隔离候选中，" +
+                "也不存在已确认的历史映射；本轮没有改变任何候选。",
+                "candidate_not_found",
+                readyHint + " 不要仅口头承诺播放；决定现在唱时，同一回复还必须提交 hum_back。 ");
+            return;
+        }
+
+        var mappings = new List<string>();
+        for (int i = 0; i < ids.Count; i++)
+        {
+            if (captureSelections.TryGetValue(ids[i], out string selection) &&
+                !alreadyConfirmedStableIds.ContainsKey(ids[i]))
+            {
+                float head = ReadToolFloatAttributeUnclamped(selection, "trim_head_seconds");
+                float tail = ReadToolFloatAttributeUnclamped(selection, "trim_tail_seconds");
+                if (string.IsNullOrWhiteSpace(ReadToolAttribute(selection, "trim_head_seconds"))) head = 0f;
+                if (string.IsNullOrWhiteSpace(ReadToolAttribute(selection, "trim_tail_seconds"))) tail = 0f;
+                if (!sense.PrepareQuarantinedCaptureForConfirmation(ids[i],
+                    ReadToolAttribute(selection, "capture"), head, tail, out string recoveryError))
+                {
+                    RecordPracticeEditFailureForLlm(recoveryError, "candidate_recovery_failed",
+                        "原录音保留，可重新选择范围或询问用户；没有替换成其它素材。");
+                    return;
+                }
+            }
+            if (!sense.ConfirmQuarantinedSingingCandidateWithPlaybackStatus(
+                    ids[i], out int phraseIndex, out string playbackStatus))
+            {
+                RecordPracticeEditFailureForLlm(
+                    $"来源确认执行失败：candidate_id={ids[i]}；其余已完成结果保持。",
+                    "candidate_confirmation_failed",
+                    "重新读取工具结果中的已完成映射和当前候选；不要重复猜编号。" +
+                    "可用当前正确身份重试，也可先询问用户。");
+                return;
+            }
+            bool idempotent = alreadyConfirmedStableIds.TryGetValue(
+                ids[i], out int priorStableId);
+            mappings.Add(phraseIndex > 0
+                ? idempotent
+                    ? $"candidate_id={ids[i]} 早已确认并消费→stable_id={priorStableId}" +
+                      $"（当前清单第 {phraseIndex} 段；本次为幂等 no-op）"
+                    : $"candidate_id={ids[i]}→stable_id=" +
+                      ResolvePracticeStableIdAtIndex(sense, phraseIndex) +
+                      $"（当前清单第 {phraseIndex} 段）"
+                : $"candidate_id={ids[i]} source=confirmed_user, playback={playbackStatus}");
+        }
+        RecordPracticeEditResult(
+            "成功：正式角色根据完整语境确认了素材来源：" + string.Join("；", mappings) +
+            "。这不代表已经播放；是否演唱仍由角色决定。", false);
+    }
+
+    private static int ResolvePracticeStableIdAtIndex(
+        SenseVoiceSpeechToText sense, int index1Based)
+    {
+        if (sense == null || index1Based <= 0) return 0;
+        List<SenseVoiceSpeechToText.PracticePhraseInfo> phrases =
+            sense.DescribePracticePhrases();
+        return index1Based <= phrases.Count && phrases[index1Based - 1] != null
+            ? phrases[index1Based - 1].StableId : 0;
+    }
+
+    //“修复/重切”是非破坏性编辑，不得翻译成 practice_drop。每次都从不可变原始
+    //clean/expanded 生成新版本，成功后才替换当前可播放版本。
+    private static readonly System.Text.RegularExpressions.Regex s_PracticeReviseTagRegex =
+        new System.Text.RegularExpressions.Regex(
+            @"<(?:practice_revise|clip_revise)\b(?<attrs>[^>]*)>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private void ExtractAndApplyPracticeReviseTag(ref string text, bool apply = true)
+    {
+        ExtractAndApplyClipReviseTags(ref text, apply);
+        if (string.IsNullOrEmpty(text)) return;
+        var matches = s_PracticeReviseTagRegex.Matches(text);
+        if (matches.Count == 0) return;
+        text = s_PracticeReviseTagRegex.Replace(text, "").Trim();
+        if (!apply) return;
+        SenseVoiceSpeechToText sense = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+            : null;
+        if (sense == null)
+        {
+            RecordPracticeEditResult("未执行素材修订：语音模块不可用。", true);
+            return;
+        }
+
+        var completed = new List<string>();
+        for (int i = 0; i < matches.Count; i++)
+        {
+            string attrs = matches[i].Groups["attrs"].Value;
+            if (!int.TryParse(ReadToolAttribute(attrs, "stable_id"), out int stableId) ||
+                stableId <= 0)
+            {
+                RecordPracticeEditResult(
+                    "未执行素材修订：practice_revise 必须用感知帧中的 stable_id 指定素材；" +
+                    "清单 order 会前移，不能用于跨轮修复。", true);
+                return;
+            }
+            string capture = ReadToolAttribute(attrs, "capture") ?? "clean";
+            float trimHead = ReadToolFloatAttributeUnclamped(attrs, "trim_head_seconds");
+            float trimTail = ReadToolFloatAttributeUnclamped(attrs, "trim_tail_seconds");
+            if (float.IsNaN(trimHead)) trimHead = 0f;
+            if (float.IsNaN(trimTail)) trimTail = 0f;
+            bool excludeSpeech = ReadToolBoolAttribute(attrs, "exclude_speech", false);
+            if (!sense.TryRevisePracticePhrase(
+                    stableId, capture, trimHead, trimTail, excludeSpeech,
+                    out string result, out string failure))
+            {
+                RecordPracticeEditResult(
+                    "未执行素材修订：" + failure +
+                    (completed.Count > 0
+                        ? "；此前已经成功完成：" + string.Join("；", completed)
+                        : ""), true);
+                return;
+            }
+            //边界版本变化后，旧的角色演唱音高回测不再能无条件代表这份新版本。
+            m_PracticePitchStates.Remove(stableId);
+            completed.Add(result);
+        }
+        RecordPracticeEditResult("成功：" + string.Join("；", completed), false);
+    }
+
+    private static List<int> ParsePositiveIdList(string raw)
+    {
+        var result = new List<int>();
+        foreach (System.Text.RegularExpressions.Match match in
+                 System.Text.RegularExpressions.Regex.Matches(raw ?? "", @"\d+"))
+            if (int.TryParse(match.Value, out int id) && id > 0 && !result.Contains(id))
+                result.Add(id);
+        return result;
+    }
+
     //长期曲库那一层早就有 <song_forget/>，练唱会话这一层一直没有对称物：
     //只能整场重置或者到上限时挤掉最老的。于是一段被误收的说话、或者用户唱错想撤回的
     //那一遍，会一直挂在清单里，还会被默认顺序原样唱出去。
     private static readonly System.Text.RegularExpressions.Regex s_PracticeDropTagRegex =
         new System.Text.RegularExpressions.Regex(
-            @"<practice_drop\b(?<attrs>[^>]*)>",
+            @"<(?:practice_drop|clip_drop)\b(?<attrs>[^>]*)>",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     /// <summary>
-    /// 摘出并**立即执行** <c>&lt;practice_drop order="N"/&gt;</c>。
+    /// 摘出并**立即执行**本轮全部 <c>&lt;practice_drop order="N"/&gt;</c>。
     /// </summary>
     /// <remarks>
-    /// 就地做完而不排队：删一段是纯本地的列表操作，没有任何 IO。
-    /// 排队反而会让同一轮里后面的 hum_back 拿到删除前的段号。
+    /// 就地做完而不排队：删段是纯本地的列表操作，没有任何 IO。
+    /// 同轮多个标签先以删除前的清单原子校验，再按段号倒序执行；这样既不会因
+    /// 前一次删除造成后续段号错位，也不会让后面的 hum_back 拿到删除前的段号。
     /// </remarks>
     /// <param name="apply">
     /// false 时只把标签从正文剥掉、不真的删段。复读轮走这条路——
@@ -7788,17 +11257,15 @@ public class ChatSample : MonoBehaviour
     /// </param>
     private void ExtractAndApplyPracticeDropTag(ref string text, bool apply = true)
     {
+        ExtractAndApplyClipDropTags(ref text, apply);
         if (string.IsNullOrEmpty(text)) return;
-        var match = s_PracticeDropTagRegex.Match(text);
-        if (!match.Success) return;
-        string attrs = match.Groups["attrs"].Value;
-        string order = ReadToolAttribute(attrs, "order");
-        string reason = ReadToolAttribute(attrs, "reason");
+        var matches = s_PracticeDropTagRegex.Matches(text);
+        if (matches.Count == 0) return;
         text = s_PracticeDropTagRegex.Replace(text, "").Trim();
         if (!apply)
         {
             if (m_LogAgentLoop)
-                Debug.LogWarning($"[Agent/复读] practice_drop order=\"{order}\" 未执行");
+                Debug.LogWarning("[Agent/复读] practice_drop 未执行");
             return;
         }
 
@@ -7810,35 +11277,152 @@ public class ChatSample : MonoBehaviour
             RecordPracticeDropResult("未执行：语音模块不可用，练唱会话没有变化。", true);
             return;
         }
-        int index;
-        if (!int.TryParse((order ?? "").Trim(), out index))
+        List<SenseVoiceSpeechToText.PracticePhraseInfo> snapshot =
+            senseVoice.DescribePracticePhrases();
+        var stableIds = new List<int>(matches.Count);
+        var originalIndexByStableId = new Dictionary<int, int>();
+        var reasonByStableId = new Dictionary<int, string>();
+        string validationFailure = "";
+        for (int i = 0; i < matches.Count; i++)
+        {
+            string attrs = matches[i].Groups["attrs"].Value;
+            string rawStable = (ReadToolAttribute(attrs, "stable_id") ?? "").Trim();
+            string rawOrder = (ReadToolAttribute(attrs, "order") ?? "").Trim();
+            string reason = (ReadToolAttribute(attrs, "reason") ?? "").Trim();
+            int originalIndex = -1;
+            int stableId = 0;
+            if (rawStable.Length > 0)
+            {
+                if (!int.TryParse(rawStable, out stableId) || stableId <= 0)
+                {
+                    validationFailure = $"stable_id=\"{rawStable}\" 不是有效稳定身份";
+                    break;
+                }
+                for (int p = 0; p < snapshot.Count; p++)
+                    if (snapshot[p] != null && snapshot[p].StableId == stableId)
+                    {
+                        originalIndex = p + 1;
+                        break;
+                    }
+                if (originalIndex < 0)
+                {
+                    validationFailure = $"stable_id={stableId} 不在删除前练唱清单中";
+                    break;
+                }
+                if (rawOrder.Length > 0 &&
+                    (!int.TryParse(rawOrder, out int assertedOrder) ||
+                     assertedOrder != originalIndex))
+                {
+                    validationFailure = $"stable_id={stableId} 当前是第 {originalIndex} 段，" +
+                                        $"与同时给出的 order=\"{rawOrder}\" 不一致";
+                    break;
+                }
+            }
+            else
+            {
+                if (!int.TryParse(rawOrder, out originalIndex) ||
+                    originalIndex < 1 || originalIndex > snapshot.Count)
+                {
+                    validationFailure = $"order=\"{rawOrder}\" 不是删除前清单中的有效段号";
+                    break;
+                }
+                stableId = snapshot[originalIndex - 1].StableId;
+            }
+            if (!stableIds.Contains(stableId)) stableIds.Add(stableId);
+            originalIndexByStableId[stableId] = originalIndex;
+            if (!string.IsNullOrWhiteSpace(reason)) reasonByStableId[stableId] = reason;
+        }
+        if (stableIds.Count == 0 || !string.IsNullOrEmpty(validationFailure))
         {
             RecordPracticeDropResult(
-                $"未执行：order=\"{(order ?? "").Trim()}\" 不是一个段号。" +
-                $"练唱会话现在有 {senseVoice.PracticePhraseCount} 段，" +
-                "照感知帧清单里的段号填一个整数。练唱会话没有变化。", true);
+                "未执行：" + validationFailure + "。本轮全部 practice_drop 都未执行，" +
+                "练唱会话没有变化。", true);
             return;
         }
-        string dropped, failure;
-        int remaining;
-        if (!senseVoice.DropPracticePhrase(index, out dropped, out remaining, out failure))
+
+        //日志仍按删除前段号倒序显示；执行本身使用 stable_id，清单前移不再改变目标。
+        stableIds.Sort((left, right) =>
+            originalIndexByStableId[right].CompareTo(originalIndexByStableId[left]));
+
+        var droppedParts = new List<string>(stableIds.Count);
+        int remaining = snapshot.Count;
+        for (int i = 0; i < stableIds.Count; i++)
         {
-            RecordPracticeDropResult("未执行：" + failure + "。练唱会话没有变化。", true);
-            return;
+            int stableId = stableIds[i];
+            int originalIndex = originalIndexByStableId[stableId];
+            if (!senseVoice.DropPracticePhraseByStableId(
+                    stableId, out string dropped, out remaining,
+                    out string failure))
+            {
+                string partial = droppedParts.Count > 0
+                    ? "部分执行：已去掉" + string.Join("、", droppedParts) + "；"
+                    : "未执行：";
+                RecordPracticeDropResult(
+                    partial + $"处理 stable_id={stableId}（删除前第 {originalIndex} 段）时失败：" +
+                    failure + "。" +
+                    $"练唱会话当前还剩 {senseVoice.PracticePhraseCount} 段。", true);
+                return;
+            }
+            string part = $"stable_id={stableId}（删除前第 {originalIndex} 段，{dropped}）";
+            if (reasonByStableId.TryGetValue(stableId, out string reason))
+                part += $"〔理由：{reason}〕";
+            droppedParts.Add(part);
         }
         //段号会前移，必须点破。不说的话她下一句还按旧段号写 order，唱出来的是别的段。
-        string note = $"成功：已从练唱会话去掉第 {index} 段（{dropped}）。" +
+        string note = $"成功：已从练唱会话去掉{string.Join("、", droppedParts)}。" +
                       $"现在还剩 {remaining} 段";
         note += remaining > 0
-            ? "，**它们的段号已经整体前移**，请照感知帧里的新清单重新认段号，不要沿用刚才那套。"
+            ? "，显示段号已经整体前移；后续跨轮修正请继续使用 stable_id。"
             : "，练唱会话已经空了。";
-        if (!string.IsNullOrWhiteSpace(reason))
-            note += $"（你给的理由：{reason.Trim()}）";
         RecordPracticeDropResult(note, false);
+    }
+
+    /// <summary>
+    /// 以同一份删除前清单校验批量段号，并返回去重后的倒序执行顺序。
+    /// 返回空数组表示整批拒绝，调用方不得做任何删除。
+    /// </summary>
+    private static int[] NormalizePracticeDropIndices(
+        int[] requestedIndices,
+        int originalCount,
+        out string failure)
+    {
+        failure = "";
+        if (requestedIndices == null || requestedIndices.Length == 0)
+        {
+            failure = "没有提供要删除的练唱段号";
+            return Array.Empty<int>();
+        }
+        if (originalCount <= 0)
+        {
+            failure = "练唱会话本来就是空的";
+            return Array.Empty<int>();
+        }
+
+        var unique = new List<int>(requestedIndices.Length);
+        for (int i = 0; i < requestedIndices.Length; i++)
+        {
+            int index = requestedIndices[i];
+            if (index == int.MinValue)
+            {
+                failure = "至少一个 order 不是整数段号；请照感知帧清单填写";
+                return Array.Empty<int>();
+            }
+            if (index < 1 || index > originalCount)
+            {
+                failure = $"删除前练唱清单只有 {originalCount} 段，order=\"{index}\" 超出范围";
+                return Array.Empty<int>();
+            }
+            if (!unique.Contains(index)) unique.Add(index);
+        }
+        unique.Sort((left, right) => right.CompareTo(left));
+        return unique.ToArray();
     }
 
     private string m_LastPracticeDropResult = "";
     private bool m_PracticeDropResultPending = false;
+    private string m_LastPracticeEditResult = "";
+    private bool m_PracticeEditResultPending = false;
+    private bool m_PracticeEditFailedThisResponse = false;
 
     private void RecordPracticeDropResult(string result, bool warning)
     {
@@ -7849,32 +11433,162 @@ public class ChatSample : MonoBehaviour
             Debug.Log("[Practice/Drop] " + m_LastPracticeDropResult);
     }
 
+    private void RecordPracticeEditResult(string result, bool warning)
+    {
+        m_LastPracticeEditResult = result ?? "";
+        m_PracticeEditResultPending = !string.IsNullOrWhiteSpace(m_LastPracticeEditResult);
+        if (warning) m_PracticeEditFailedThisResponse = true;
+        if (warning) NoteToolFailure(m_LastPracticeEditResult);
+        if (m_LogHumBack)
+            Debug.Log("[Practice/Edit] " + m_LastPracticeEditResult);
+    }
+
+    private void RecordPracticeEditFailureForLlm(
+        string result, string code, string correction, string tool = "clip_confirm")
+    {
+        m_LastPracticeEditResult = result ?? "";
+        m_PracticeEditResultPending = !string.IsNullOrWhiteSpace(m_LastPracticeEditResult);
+        m_PracticeEditFailedThisResponse = true;
+        ReportToolFailureForLlm(
+            tool, code, m_LastPracticeEditResult, correction);
+        if (m_LogHumBack)
+            Debug.Log("[Practice/Edit] " + m_LastPracticeEditResult);
+    }
+
     private AgentHumBackRequest ExtractHumBackTag(ref string text)
     {
         if (string.IsNullOrEmpty(text)) return null;
         text = SplitGluedAgentTags(text);
-        var match = s_HumBackTagRegex.Match(text);
-        if (!match.Success) return null;
+        var matches = s_HumBackTagRegex.Matches(text);
+        if (matches.Count == 0) return null;
+        var match = matches[0];
         string attrs = match.Groups["attrs"].Value;
-        AgentHumBackRequest request = new AgentHumBackRequest
+        AgentHumBackRequest request = ParseHumBackCompatibleAttributes(attrs);
+        if (string.Equals(match.Groups["tool"].Value, "sing", StringComparison.OrdinalIgnoreCase))
+            ConfigureUnifiedSing(request, attrs);
+        request.ExtraTagsIgnored = Math.Max(0, matches.Count - 1);
+        text = s_HumBackTagRegex.Replace(text, "").Trim();
+        if (request.ExtraTagsIgnored > 0)
+        {
+            NoteSingingRoutingFact(
+                "hum_back",
+                "extra_actions_ignored",
+                $"同一回复包含 {matches.Count} 个 hum_back；程序只执行第一个，" +
+                $"其余 {request.ExtraTagsIgnored} 个没有执行。一次回复只提交一个真实歌唱动作。");
+            if (m_LogHumBack)
+                Debug.LogWarning($"[HumBack] 同一回复出现 {matches.Count} 个 hum_back；只保留第一个");
+        }
+        return request;
+    }
+
+    private static AgentHumBackRequest ParseHumBackCompatibleAttributes(string attrs)
+    {
+        string rawKey = ReadToolAttribute(attrs, "key");
+        string rawAlignTo = ReadToolAttribute(attrs, "align_to");
+        float[] keyList = ParseKeyList(rawKey);
+        var request = new AgentHumBackRequest
         {
             Mode = ReadToolAttribute(attrs, "mode"),
+            Source = ReadToolAttribute(attrs, "source"),
             Lyrics = ReadToolAttribute(attrs, "lyrics"),
             Reason = ReadToolAttribute(attrs, "reason"),
-            Key = ReadToolFloatAttribute(attrs, "key", -4f, 4f),
-            KeyPerSegment = ParseKeyList(ReadToolAttribute(attrs, "key")),
+            Key = keyList == null ? ReadToolFloatAttributeUnclamped(attrs, "key") : float.NaN,
+            KeyPerSegment = keyList,
             Pace = ReadToolFloatAttribute(attrs, "pace", 0.8f, 1.25f),
             Expression = ReadToolFloatAttribute(attrs, "expression", 0f, 1f),
             Order = ReadToolAttribute(attrs, "order"),
+            Capture = ReadToolAttribute(attrs, "capture"),
+            TrimHeadSeconds = ReadToolFloatAttributeUnclamped(attrs, "trim_head_seconds"),
+            TrimTailSeconds = ReadToolFloatAttributeUnclamped(attrs, "trim_tail_seconds"),
+            ExcludeSpeech = ReadToolBoolAttribute(attrs, "exclude_speech", false),
+            TargetNote = ReadToolAttribute(attrs, "target_note"),
+            PitchTarget = ReadToolAttribute(attrs, "pitch_target"),
+            PitchDelta = ReadToolAttribute(attrs, "pitch_delta"),
+            PitchMatch = ReadToolAttribute(attrs, "pitch_match"),
+            PitchPlan = ReadToolAttribute(attrs, "pitch_plan"),
+            Transpose = ReadToolAttribute(attrs, "transpose"),
         };
         if (string.IsNullOrWhiteSpace(request.Mode)) request.Mode = "echo";
-        text = s_HumBackTagRegex.Replace(text, "").Trim();
+        if (string.IsNullOrWhiteSpace(request.Capture)) request.Capture = "clean";
+        if (float.IsNaN(request.TrimHeadSeconds)) request.TrimHeadSeconds = 0f;
+        if (float.IsNaN(request.TrimTailSeconds)) request.TrimTailSeconds = 0f;
+        if (request.TrimHeadSeconds < 0f || request.TrimTailSeconds < 0f)
+            request.ValidationError = "trim_head_seconds / trim_tail_seconds 不能是负数";
+        request.SourceValidationError = ValidateHumBackMaterialSource(request);
+        string pitchValidation = ValidateHumBackPitchAttributes(
+            rawKey, rawAlignTo, request);
+        if (string.IsNullOrWhiteSpace(request.ValidationError))
+            request.ValidationError = pitchValidation;
         return request;
     }
 
     private static readonly System.Text.RegularExpressions.Regex s_SongSearchTagRegex =
         new System.Text.RegularExpressions.Regex(
             @"<song_search\b(?<attrs>[^>]*)>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Removes known self-closing agent tags that occur inside Markdown inline-code
+    /// or fenced-code spans. A model may name a tool while explaining its plan;
+    /// quoted syntax is documentation, not an executable action.
+    /// </summary>
+    private static string RemoveQuotedAgentActionTags(string raw)
+    {
+        if (string.IsNullOrEmpty(raw) || raw.IndexOf('`') < 0 || raw.IndexOf('<') < 0)
+            return raw ?? "";
+
+        var matches = s_AnyOpenTagRegex.Matches(raw);
+        if (matches.Count == 0) return raw;
+        var result = new System.Text.StringBuilder(raw);
+        bool changed = false;
+        for (int i = matches.Count - 1; i >= 0; i--)
+        {
+            System.Text.RegularExpressions.Match match = matches[i];
+            if (!IsKnownAgentTagName(match.Groups["name"].Value) ||
+                !IsInsideMarkdownCodeSpan(raw, match.Index))
+                continue;
+            result.Remove(match.Index, match.Length);
+            changed = true;
+        }
+        if (!changed) return raw;
+
+        // Avoid leaving an empty pair of backticks in user-visible/TTS text after
+        // removing a quoted tag. Non-empty explanatory code spans are preserved.
+        return System.Text.RegularExpressions.Regex.Replace(
+            result.ToString(), @"(?s)(`{1,})\s*\1", "").Trim();
+    }
+
+    private static bool IsInsideMarkdownCodeSpan(string text, int index)
+    {
+        bool inside = false;
+        int delimiterLength = 0;
+        for (int i = 0; i < index;)
+        {
+            if (text[i] != '`')
+            {
+                i++;
+                continue;
+            }
+            int runStart = i;
+            while (i < index && text[i] == '`') i++;
+            int runLength = i - runStart;
+            if (!inside)
+            {
+                inside = true;
+                delimiterLength = runLength;
+            }
+            else if (runLength >= delimiterLength)
+            {
+                inside = false;
+                delimiterLength = 0;
+            }
+        }
+        return inside;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex s_SongCatalogTagRegex =
+        new System.Text.RegularExpressions.Regex(
+            @"<song_catalog\b(?<attrs>[^>]*)>",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     //<speaker_name name="小悠"/> —— 给"刚说话的这个人"改声纹档案里的显示名。
@@ -8066,6 +11780,25 @@ public class ChatSample : MonoBehaviour
         return request;
     }
 
+    private static AgentSongCatalogRequest ExtractSongCatalogTag(ref string text)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        var match = s_SongCatalogTagRegex.Match(text);
+        if (!match.Success) return null;
+        string attrs = match.Groups["attrs"].Value;
+        AgentSongCatalogRequest request = new AgentSongCatalogRequest
+        {
+            Query = ReadToolAttribute(attrs, "query"),
+            Offset = ReadToolIntAttribute(attrs, "offset", 0, 0, 1000000),
+            Limit = ReadToolIntAttribute(attrs, "limit", 30, 1, 50),
+            IncludeUnnamed = ReadToolBoolAttribute(attrs, "include_unnamed", false),
+            Reason = ReadToolAttribute(attrs, "reason"),
+        };
+        if (request.Query.Length > 100) request.Query = request.Query.Substring(0, 100);
+        text = s_SongCatalogTagRegex.Replace(text, "").Trim();
+        return request;
+    }
+
     /// <summary>
     /// 读一个数值属性并夹到合法区间。缺省或写得不合法时返回 NaN，交给调用方回落到
     /// 按 seed 生成的默认档——她漏写或写错都不该让这次演唱失败。
@@ -8099,6 +11832,209 @@ public class ChatSample : MonoBehaviour
         return values.ToArray();
     }
 
+    private static float ReadToolFloatAttributeUnclamped(string attrs, string name)
+    {
+        string raw = ReadToolAttribute(attrs, name);
+        if (string.IsNullOrWhiteSpace(raw)) return float.NaN;
+        var number = System.Text.RegularExpressions.Regex.Match(
+            raw, @"[-+]?\d*\.?\d+");
+        if (!number.Success) return float.NaN;
+        return float.TryParse(
+            number.Value,
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out float value)
+                ? value
+                : float.NaN;
+    }
+
+    /// <summary>
+    /// key 是相对移调，不是 MIDI 音高。越界/歧义参数必须拒绝，不能把 62 静默夹成 +4。
+    /// 该函数保持静态，便于 Editor 回归直接覆盖协议边界。
+    /// </summary>
+    private static string ValidateHumBackPitchAttributes(
+        string rawKey, string rawAlignTo, AgentHumBackRequest request)
+    {
+        bool hasKey = !string.IsNullOrWhiteSpace(rawKey);
+        bool hasLegacyTarget = !string.IsNullOrWhiteSpace(request.TargetNote);
+        bool hasLegacyAlign = !string.IsNullOrWhiteSpace(rawAlignTo);
+        bool hasTarget = !string.IsNullOrWhiteSpace(request.PitchTarget);
+        bool hasDelta = !string.IsNullOrWhiteSpace(request.PitchDelta);
+        bool hasMatch = !string.IsNullOrWhiteSpace(request.PitchMatch);
+        bool hasPlan = !string.IsNullOrWhiteSpace(request.PitchPlan);
+        bool hasTranspose = !string.IsNullOrWhiteSpace(request.Transpose);
+        if (hasLegacyTarget && hasTarget)
+            return "target_note 与 pitch_target 表达的是同一种绝对音高目标，只能填写一个。";
+        if (hasLegacyAlign && hasMatch)
+            return "align_to 与 pitch_match 表达的是同一种参考段目标，只能填写一个。";
+        int musicalModeCount = (hasLegacyTarget || hasTarget ? 1 : 0) +
+                               (hasLegacyAlign || hasMatch ? 1 : 0) +
+                               (hasDelta ? 1 : 0) +
+                               (hasPlan ? 1 : 0) +
+                               (hasTranspose ? 1 : 0);
+        if (musicalModeCount > 1)
+            return "pitch_plan、transpose、pitch_target、pitch_delta、pitch_match " +
+                   "表达的是不同音乐目标，一次只能选择一种。";
+        if (musicalModeCount > 0 && hasKey)
+            return "音乐目标已经由规范化音高属性表达，不能再同时填写底层 key。";
+
+        if (hasLegacyAlign)
+        {
+            if (!int.TryParse(rawAlignTo.Trim(), out int alignIndex) || alignIndex <= 0)
+                return $"align_to=\"{rawAlignTo}\" 不是有效的练唱清单段号（必须是正整数）。";
+            request.AlignToPracticeIndex = alignIndex;
+        }
+        if (hasMatch &&
+            (!int.TryParse(request.PitchMatch.Trim(), out int matchIndex) || matchIndex <= 0))
+            return $"pitch_match=\"{request.PitchMatch}\" 不是有效的练唱清单段号（必须是正整数）。";
+
+        if (hasKey)
+        {
+            bool declaresList = rawKey.IndexOfAny(new[] { ',', '，', '、', ';', '；' }) >= 0;
+            if (declaresList && request.KeyPerSegment == null)
+                return $"key=\"{rawKey}\" 不是有效的逐段数字列表。";
+            if (request.KeyPerSegment != null)
+            {
+                for (int i = 0; i < request.KeyPerSegment.Length; i++)
+                {
+                    float value = request.KeyPerSegment[i];
+                    if (float.IsNaN(value) || float.IsInfinity(value))
+                        return $"key 第 {i + 1} 项不是有效数字。";
+                    if (value < -12f || value > 12f)
+                        return $"key 第 {i + 1} 项为 {value:0.##}，超出逐段相对移调范围 −12～+12；本次未执行。";
+                }
+            }
+            else
+            {
+                if (float.IsNaN(request.Key) || float.IsInfinity(request.Key))
+                    return $"key=\"{rawKey}\" 不是有效的相对移调数字。";
+                if (request.Key < -4f || request.Key > 4f)
+                    return $"key={request.Key:0.##} 超出整条相对移调范围 −4～+4；" +
+                           "如果想指定绝对中心音高，请使用 pitch_plan（例如 pitch_plan=\"D4\"）。";
+            }
+        }
+
+        if (hasLegacyTarget && !TryParseMidiNote(request.TargetNote, out float _))
+            return $"target_note=\"{request.TargetNote}\" 不是有效音名；请使用 C4、D#4、Eb4 这类写法。";
+        if (hasTarget)
+        {
+            string[] values = SplitPitchValueList(request.PitchTarget);
+            if (values.Length == 0) return "pitch_target 不能为空。";
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (IsKeepPitchToken(values[i])) continue;
+                if (!TryParseMidiNote(values[i], out float _))
+                    return $"pitch_target 第 {i + 1} 项 \"{values[i]}\" 不是完整音名；" +
+                           "请使用 C4、D#4、Eb4 或 keep。";
+            }
+        }
+        if (hasDelta)
+        {
+            string[] values = SplitPitchValueList(request.PitchDelta);
+            if (values.Length == 0) return "pitch_delta 不能为空。";
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (IsKeepPitchToken(values[i])) continue;
+                if (!TryParseMusicalInterval(values[i], out float _))
+                    return $"pitch_delta 第 {i + 1} 项 \"{values[i]}\" 不是有效音程；" +
+                           "请使用 +whole_step、-half_step、+m3 或 keep。";
+            }
+        }
+        if (hasPlan)
+        {
+            string[] values = SplitPitchValueList(request.PitchPlan);
+            if (values.Length == 0) return "pitch_plan 不能为空。";
+            string[] selectedSegments = SplitPitchValueList(request.Order);
+            if (values.Length == 1 && selectedSegments.Length > 1 &&
+                TryParsePitchPlanMatchToken(values[0], out int sharedReference))
+            {
+                return $"order 选择了 {selectedSegments.Length} 段，但单个 " +
+                       $"pitch_plan=\"match:{sharedReference}\" 的作用域有歧义：" +
+                       "程序无法知道是全部所选段都匹配，还是只调整其中一段。" +
+                       "请为 order 的每个位置逐项填写（例如 keep,match:1,keep）；" +
+                       "若确实要全部匹配，也请重复写出每一项。";
+            }
+            for (int i = 0; i < values.Length; i++)
+            {
+                string value = values[i];
+                if (!IsKeepPitchToken(value) && IsAmbiguousNumericStepToken(value))
+                    return $"pitch_plan 第 {i + 1} 项 \"{value}\" 使用了有歧义的数字 st/半音单位；" +
+                           "半音请写 +half_step/-half_step，全音请写 +whole_step/-whole_step，" +
+                           "其它音程请写 +m3、-P5 这类标准音程名。";
+                if (IsKeepPitchToken(value) || IsSourcePitchToken(value) ||
+                    TryParseMidiNote(value, out float _) ||
+                    TryParseMusicalInterval(value, out float _) ||
+                    TryParsePitchPlanMatchToken(value, out int _))
+                    continue;
+                return $"pitch_plan 第 {i + 1} 项 \"{value}\" 无法理解；" +
+                       "请使用 keep、source、A3、+half_step、+whole_step、+m3 或 match:1。";
+            }
+        }
+        if (hasTranspose)
+        {
+            if (IsAmbiguousNumericStepToken(request.Transpose))
+                return $"transpose=\"{request.Transpose}\" 使用了有歧义的数字 st/半音单位；" +
+                       "半音请写 +half_step/-half_step，全音请写 +whole_step/-whole_step。";
+            if (!TryParseMusicalInterval(request.Transpose, out float _))
+                return $"transpose=\"{request.Transpose}\" 不是有效音程；" +
+                       "请使用 +half_step、-whole_step、+m3 或 -P5。";
+        }
+        return "";
+    }
+
+    private static bool IsKnownAgentTagName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        foreach (string candidate in s_GluableTagNames)
+            if (string.Equals(name, candidate, StringComparison.OrdinalIgnoreCase))
+                return true;
+        return false;
+    }
+
+    private static string RemoveUnknownAgentTags(string raw)
+    {
+        if (string.IsNullOrEmpty(raw) || raw.IndexOf('<') < 0) return raw ?? "";
+        raw = SplitGluedAgentTags(raw);
+        return s_AnyOpenTagRegex.Replace(raw, match =>
+        {
+            string name = match.Groups["name"].Value;
+            if (string.Equals(name, "think", StringComparison.OrdinalIgnoreCase) ||
+                IsKnownAgentTagName(name))
+                return match.Value;
+            return "";
+        });
+    }
+
+    /// <summary>C-1=0、C4=60；支持升降号的标准音名。</summary>
+    private static bool TryParseMidiNote(string noteText, out float midi)
+    {
+        midi = 0f;
+        var match = System.Text.RegularExpressions.Regex.Match(
+            (noteText ?? "").Trim(),
+            @"^(?<note>[A-Ga-g])(?<accidental>[#♯b♭]?)(?<octave>-?\d+)$");
+        if (!match.Success || !int.TryParse(match.Groups["octave"].Value, out int octave))
+            return false;
+        int semitone;
+        switch (char.ToUpperInvariant(match.Groups["note"].Value[0]))
+        {
+            case 'C': semitone = 0; break;
+            case 'D': semitone = 2; break;
+            case 'E': semitone = 4; break;
+            case 'F': semitone = 5; break;
+            case 'G': semitone = 7; break;
+            case 'A': semitone = 9; break;
+            case 'B': semitone = 11; break;
+            default: return false;
+        }
+        string accidental = match.Groups["accidental"].Value;
+        if (accidental == "#" || accidental == "♯") semitone++;
+        else if (accidental == "b" || accidental == "♭") semitone--;
+        int value = (octave + 1) * 12 + semitone;
+        if (value < 0 || value > 127) return false;
+        midi = value;
+        return true;
+    }
+
     private static float ReadToolFloatAttribute(
         string attrs, string name, float min, float max)
     {
@@ -8115,6 +12051,23 @@ public class ChatSample : MonoBehaviour
                 out float value))
             return float.NaN;
         return Mathf.Clamp(value, min, max);
+    }
+
+    private static int ReadToolIntAttribute(
+        string attrs, string name, int defaultValue, int min, int max)
+    {
+        string raw = ReadToolAttribute(attrs, name);
+        if (!int.TryParse(raw, out int value)) return defaultValue;
+        return Mathf.Clamp(value, min, max);
+    }
+
+    private static bool ReadToolBoolAttribute(
+        string attrs, string name, bool defaultValue)
+    {
+        string raw = ReadToolAttribute(attrs, name).Trim().ToLowerInvariant();
+        if (raw == "true" || raw == "1" || raw == "yes") return true;
+        if (raw == "false" || raw == "0" || raw == "no") return false;
+        return defaultValue;
     }
 
     private static string ReadToolAttribute(string attrs, string name)
@@ -8410,14 +12363,14 @@ public class ChatSample : MonoBehaviour
         }
         //song_search 的返回原文里若出现这个名字，就算工具确认过。
         if (!string.IsNullOrEmpty(m_LastSongSearchResult) &&
-            m_LastSongSearchResult.ToLowerInvariant().Contains(probe))
+            TextContainsNormalizedSongTitle(m_LastSongSearchResult, title))
         {
             source = "song_search 结果";
             return true;
         }
         //用户自己说过——含当前这一轮。历史里偶数位是用户。
         if (!string.IsNullOrEmpty(m_LastUserMsg) &&
-            m_LastUserMsg.ToLowerInvariant().Contains(probe))
+            TextContainsNormalizedSongTitle(m_LastUserMsg, title))
         {
             source = "用户刚说的话";
             return true;
@@ -8431,7 +12384,7 @@ public class ChatSample : MonoBehaviour
                 scanned++;
                 string turn = m_ChatHistory[i];
                 if (!string.IsNullOrEmpty(turn) &&
-                    turn.ToLowerInvariant().Contains(probe))
+                    TextContainsNormalizedSongTitle(turn, title))
                 {
                     source = "用户先前说过";
                     return true;
@@ -8624,7 +12577,7 @@ public class ChatSample : MonoBehaviour
             case "remember":
                 senseVoice.RememberSong(
                     request.SongId, request.Title, request.Artist, request.Lyrics,
-                    request.Aliases, request.Reason, callback);
+                    request.Aliases, request.Reason, callback, request.SourceRef);
                 break;
             case "rename":
                 senseVoice.RenameRememberedSong(
@@ -8722,6 +12675,141 @@ public class ChatSample : MonoBehaviour
         if (!m_SongMemoryAcknowledgementInFlight) return;
         m_SongMemoryAcknowledgementInFlight = false;
         if (m_LogAgentLoop) Debug.Log("[SongMemory] 落盘结果确认已完成");
+    }
+
+    private void BeginSongCatalogInspection(AgentSongCatalogRequest request)
+    {
+        if (request == null) return;
+        SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+            : null;
+        if (senseVoice == null)
+        {
+            RecordSongCatalogResult("曲库自查失败：当前语音服务不可用。", true);
+            return;
+        }
+        if (m_SongCatalogInFlight)
+        {
+            RecordSongCatalogResult("曲库自查未重复执行：上一页仍在读取中。", true);
+            return;
+        }
+
+        m_SongCatalogInFlight = true;
+        m_SongCatalogResultPending = false;
+        int generation = ++m_SongCatalogGeneration;
+        if (m_LogAgentLoop)
+            Debug.Log($"[SongCatalog] 角色只读自查 query=\"{request.Query}\" " +
+                      $"offset={request.Offset} limit={request.Limit} " +
+                      $"includeUnnamed={request.IncludeUnnamed} reason={request.Reason}");
+
+        senseVoice.InspectSongCatalog(
+            request.Query,
+            request.Offset,
+            request.Limit,
+            request.IncludeUnnamed,
+            result =>
+            {
+                if (generation != m_SongCatalogGeneration) return;
+                m_SongCatalogInFlight = false;
+                if (result == null || !result.Ok)
+                {
+                    string detail = result == null || string.IsNullOrWhiteSpace(result.Error)
+                        ? "服务没有返回结果"
+                        : TruncateForFrame(result.Error, 240);
+                    RecordSongCatalogResult("曲库自查失败：" + detail, true);
+                }
+                else
+                {
+                    if (CatalogProvesLastFailedSongExists(result))
+                    {
+                        if (m_LogHumBack)
+                            Debug.Log("[SongSing] 新鲜曲库快照已证明上次未找到的目标存在；清除失败缓存");
+                        ClearSongSingFailureCache();
+                    }
+                    string summary = BuildSongCatalogInspectionSummary(result);
+                    HarvestSongIds(summary);
+                    RecordSongCatalogResult(summary, false);
+                }
+
+                if (m_AgentRunning && !m_AgentRoundInFlight &&
+                    !IsAISpeaking && !IsVoiceOutputPlaying)
+                {
+                    ScheduleNextTick(m_MinTickSec, "song-catalog-result");
+                }
+            });
+    }
+
+    private static string BuildSongCatalogInspectionSummary(
+        SenseVoiceSpeechToText.SongCatalogInspectionResult result)
+    {
+        if (result == null || !result.Ok) return "曲库自查没有得到可用快照。";
+        var sb = new System.Text.StringBuilder();
+        sb.Append("本机曲库实时自查结果（只读；这是完整后端快照，不是本场台账）：")
+          .Append($"总条目 {result.TotalEntries}，命名条目 {result.NamedEntries}，")
+          .Append($"未命名条目 {result.UnnamedEntries}，")
+          .Append($"命名条目按标题精确归并为 {result.UniqueExactTitleGroups} 组。")
+          .Append("“条目数”和“标题组数”都不等于独立歌曲数；同名可能是重复记录，也可能真是同名曲。\n");
+
+        if (!string.IsNullOrWhiteSpace(result.Query))
+            sb.Append($"筛选 query=\"{result.Query}\"，匹配 {result.MatchedEntries} 条；");
+        else
+            sb.Append(result.IncludeUnnamed
+                ? $"当前查看命名及未命名条目，共 {result.MatchedEntries} 条；"
+                : $"当前只列命名条目，共 {result.MatchedEntries} 条；未命名只计数、不在本页展开；");
+
+        int shown = result.Entries != null ? result.Entries.Length : 0;
+        if (shown == 0)
+        {
+            sb.Append("本页没有条目。\n");
+        }
+        else
+        {
+            sb.Append($"本页为第 {result.Offset + 1}～{result.Offset + shown} 条：\n");
+            for (int i = 0; i < shown; i++)
+            {
+                SenseVoiceSpeechToText.SongCatalogEntry entry = result.Entries[i];
+                if (entry == null) continue;
+                string display = entry.named && !string.IsNullOrWhiteSpace(entry.title)
+                    ? "《" + entry.title.Trim() + "》"
+                    : "未命名旋律";
+                sb.Append("- ").Append(display);
+                if (!string.IsNullOrWhiteSpace(entry.artist))
+                    sb.Append(" / ").Append(entry.artist.Trim());
+                sb.Append(" id=").Append(entry.song_id)
+                  .Append($"；参考录音={entry.reference_count}，独立段={entry.unique_segment_count}");
+                if (entry.duplicate_variant_count > 0)
+                    sb.Append($"，重复版本={entry.duplicate_variant_count}");
+                sb.Append(entry.can_continue ? "，可尝试续唱" : "，没有已知后续段");
+                sb.Append('\n');
+            }
+        }
+
+        if (result.HasMore)
+        {
+            sb.Append($"还有后续页；下一次必须沿用 query=\"{result.Query}\"、")
+              .Append($"include_unnamed={result.IncludeUnnamed.ToString().ToLowerInvariant()}，")
+              .Append($"并调用 offset={result.NextOffset} limit={result.Limit}。")
+              .Append("若用户问的是完整清单，在取完所有页之前不得声称“以上就是全部”或“曲库里只有这些”。");
+        }
+        else
+        {
+            sb.Append("本次筛选已经到末页，可以据此回答该筛选范围内的完整清单。")
+              .Append("若 include_unnamed=false，只能说命名清单完整，不能说曲库没有其它未命名记忆。");
+        }
+        return sb.ToString().Trim();
+    }
+
+    private void RecordSongCatalogResult(string result, bool warning)
+    {
+        m_LastSongCatalogResult = result ?? "";
+        m_SongCatalogResultPending = !string.IsNullOrWhiteSpace(m_LastSongCatalogResult);
+        if (warning) NoteToolFailure(m_LastSongCatalogResult);
+        else if (m_SongCatalogResultPending) ClearToolFailure();
+        if (m_LogAgentLoop)
+        {
+            if (warning) Debug.LogWarning("[SongCatalog] " + m_LastSongCatalogResult);
+            else Debug.Log("[SongCatalog] " + m_LastSongCatalogResult);
+        }
     }
 
     private void BeginSongSearch(AgentSongSearchRequest request)
@@ -9282,9 +13370,26 @@ public class ChatSample : MonoBehaviour
 
     /// <summary>
     /// Runs after SendDataInternal has appended the authoritative final user turn.
-    /// Returning true means this deterministic tool round owns the response and LLM
-    /// generation is intentionally skipped.
+    /// Publish playable captures or retained evidence before source confirmation
+    /// and the role's perception frame; this method never schedules singing.
     /// </summary>
+    private void CommitConfirmedSingingBeforePerception()
+    {
+        // Availability is a perception fact, independent of permission to sing.
+        // Conflicting/uncertain evidence remains in the existing quarantine path.
+        var sense = m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText;
+        if (sense == null) return;
+        if (IsCurrentTurnConfirmedSinging() && !m_FinalModeSoftDowngrade &&
+            !(m_EouCognitiveSpeechVeto && !FinalEvidenceOverridesSpeculation()) &&
+            sense.CommitRecentSingingToPracticeSession(out int count) && m_LogHumBack)
+            Debug.Log($"[HumBack/Practice] 感知帧前已记录最终确认片段 sequence={count}");
+        // Commit can fail when clean is <3s even though expanded contains the song.
+        // Also run after a speech veto: retaining evidence is not permission to sing.
+        sense.RetainCurrentSingingEvidenceClip(
+            m_StreamingSemanticSingingObservedThisTurn || m_FinalModeVerdict == "singing" ||
+            m_PendingSingingConfirmation);
+    }
+
     private bool TryHandleDirectSingAlongTurn()
     {
         if (!CanExecuteSkillAction("singing", out string skillBlockReason))
@@ -9297,63 +13402,40 @@ public class ChatSample : MonoBehaviour
         if (m_EouCognitiveSpeechVeto && !FinalEvidenceOverridesSpeculation())
         {
             RejectFastHumBackAfterFinal("speculative-cognition-classified-speech");
-            m_ExplicitHumBackHandled = true;
             if (m_LogHumBack)
                 Debug.Log("[HumBack] 心里话高置信度判断为普通说话；跳过自动复唱，交给LLM正常回应");
             return false;
         }
-        //软降级：声学确定在唱但文字判为说话。演唱素材照常保留(用户确认后仍可回哼)，
-        //只是不再自动唱回来，也不写进练唱会话——那正是被误判时最扰人的两件事。
-        //不再静默：DealingTextCallback 已经往 _msg 里注入了追问指示，她会开口确认。
+        //语义/声学任一方向冲突时都不走程序自动复唱。素材尽量暂存，双方证据已经由
+        //DealingTextCallback 交给正式 LLM；是否确认、怎样问，由角色结合语境决定。
         if (m_FinalModeSoftDowngrade)
         {
-            RejectFastHumBackAfterFinal("final-mode-text-says-speech");
-            m_ExplicitHumBackHandled = true;
+            RejectFastHumBackAfterFinal("singing-mode-evidence-conflict");
             if (m_LogHumBack)
-                Debug.Log("[HumBack] 文字判为说话；跳过自动复唱，保留素材并由她追问确认");
+                Debug.Log("[HumBack] 语义与声学证据冲突；跳过程序自动复唱，交给角色确认");
             return false;
         }
         if (IsCurrentTurnSpokenSingingExit())
         {
             RejectFastHumBackAfterFinal("singing-ended-with-spoken-exit");
-            m_ExplicitHumBackHandled = true;
             if (m_LogHumBack)
-                Debug.Log("[HumBack] 用户在歌唱末尾改为说话；跳过练习提交与自动复唱，交给LLM正常回应");
+                Debug.Log("[HumBack] 混合轮以口语收束；干净歌唱岛已在感知阶段保留，" +
+                          "这里只跳过程序自动复唱并交给LLM决定后续动作");
             return false;
         }
         bool confirmedSinging = IsCurrentTurnConfirmedSinging();
-        // 用户可能把“再唱一遍，你跟我唱”和真正的第一句歌放在同一轮。
-        // 最终 ASR 已确认歌声时，也允许这句话直接开启持续练唱会话。
-        if (confirmedSinging && !HasActiveSingAlongRequest() &&
-            IsSingAlongInvitation(m_LastUserMsg))
-        {
-            ArmSingAlongForNextPerformance();
-        }
-        bool armed = HasActiveSingAlongRequest();
+        //Only an explicit role tool action may establish a standing follow request.
+        //Neither lyrics nor perception/boundary prose can arm it by substring matching.
+        // Closing a quiet capture is not permission to override the role's choice to wait.
+        // Confirmed songs were committed before perception; execution is separate.
+        bool armed = HasActiveSingAlongRequest() && m_StalledTurnAction != "continue";
 
-        //唱了就记，与"要不要跟唱"无关。
-        //原来这里绑着 armed：用户没先说过"跟着我唱"就一段都不记。8/16 实测用户
-        //直接唱了两段、都判高区、都进了持久曲库，练唱会话却是 0 段——于是他说
-        //「把刚才那两段合起来唱」时 mode=practice 连续两次失败(「只有 0 段，至少
-        //需要两段」)，她只好改走 mode=continue，靠 0.69 的旋律相似度(我量过的
-        //跨组中位就是 0.675，等于噪声)命中了一条混着《演员》和 Lemon 的污染条目，
-        //把 Lemon 唱了出来。
-        //正确的分工是：**唱了就进记忆**；要不要复现、要不要和别的段结合，
-        //由用户和她自己商量决定。感知帧里已经在报「练唱会话: 已记录 N 段」，
-        //她看得到有多少料，判断权在她。
-        if (confirmedSinging)
+        if (confirmedSinging && armed)
         {
             SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
                 ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
                 : null;
-            int phraseCount;
-            if (senseVoice != null &&
-                senseVoice.CommitRecentSingingToPracticeSession(out phraseCount) &&
-                m_LogHumBack)
-                Debug.Log($"[HumBack/Practice] 已记录最终确认片段 sequence={phraseCount} " +
-                          $"(armed={armed})");
-
-            if (armed) TryAbortHumBackOnRetraction(senseVoice);
+            TryAbortHumBackOnRetraction(senseVoice);
         }
 
         // A preview request can fail before final ASR arrives.  Drop only the staged
@@ -9414,7 +13496,6 @@ public class ChatSample : MonoBehaviour
             m_FastHumBackFinalDecisionReceived = true;
             m_FastHumBackFinalConfirmed = true;
             RefreshActiveSingAlongSession();
-            m_ExplicitHumBackHandled = true;
             m_HumBackNeedsHistoryEntry = m_ChatHistory != null && m_ChatHistory.Count % 2 == 1;
             CancelPendingEouLatencyFiller("direct-confirmed-sing-along", true);
 
@@ -9445,7 +13526,6 @@ public class ChatSample : MonoBehaviour
         if (!confirmedSinging || !armed || !HasRecentPlayableSingingPerformance()) return false;
         QueueHumBack(new AgentHumBackRequest { Mode = "echo", Reason = "armed-sing-along-fast-path" });
         if (!m_HumBackPending) return false;
-        m_ExplicitHumBackHandled = true;
         CancelPendingEouLatencyFiller("direct-confirmed-sing-along", true);
         bool started = TryBeginPendingHumBack();
         if (started && m_LogHumBack)
@@ -9523,10 +13603,7 @@ public class ChatSample : MonoBehaviour
         {
             if (!discard) return;
             if (m_HumBackPlaying || m_FastHumBackPrefixPlaybackStarted) return;
-            bool stillWorking = m_HumBackPending || m_HumBackPreparingCarrier ||
-                m_SongSingInFlight || m_ActiveHumSVCRequest != null ||
-                m_ActiveSVSRequest != null || m_FastHumBackActive ||
-                m_FastHumBackEouStaged;
+            bool stillWorking = IsSingingRuntimeActivityActive();
             if (!stillWorking) return;
             CancelPendingHumBack("user-retracted-take", false);
             if (m_LogHumBack)
@@ -9629,6 +13706,57 @@ public class ChatSample : MonoBehaviour
             lower == "session" || lower == "full";
     }
 
+    private static string NormalizeSingingMaterialSource(string source)
+    {
+        string lower = (source ?? "").Trim().ToLowerInvariant();
+        if (lower.Length == 0) return "";
+        if (lower == "recent_turn" || lower == "recent" || lower == "current" ||
+            lower == "echo")
+            return "recent_turn";
+        if (lower == "practice" || lower == "session") return "practice";
+        if (lower == "library" || lower == "catalog" || lower == "memory")
+            return "library";
+        return "";
+    }
+
+    private static string ValidateHumBackMaterialSource(AgentHumBackRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.Source)) return "";
+        string original = request.Source;
+        string source = NormalizeSingingMaterialSource(original);
+        if (source.Length == 0)
+            return $"source=\"{original}\" 不是已知歌唱素材源；" +
+                   "只能使用 recent_turn、practice 或 library。";
+        request.Source = source;
+
+        string mode = (request.Mode ?? "echo").Trim().ToLowerInvariant();
+        if (mode == "follow")
+            return "hum_back mode=\"follow\" 只建立下一段轮唱约定，不读取任何素材，" +
+                   "不应填写 source。";
+        string expected = IsPracticeHumMode(mode) ? "practice" : "recent_turn";
+        if (source != expected)
+            return $"hum_back mode=\"{request.Mode}\" 读取 source={expected}，" +
+                   $"但本次写的是 source={source}；程序没有替换素材。";
+        return "";
+    }
+
+    private static bool RequiresExplicitPracticeOrder(
+        string mode,
+        string order,
+        int practicePhraseCount)
+    {
+        return IsPracticeHumMode(mode) && string.IsNullOrWhiteSpace(order) &&
+               practicePhraseCount > 1;
+    }
+
+    private static string BuildMissingPracticeOrderFailure(int practicePhraseCount)
+    {
+        int count = Mathf.Max(2, practicePhraseCount);
+        return $"练唱会话有 {count} 段，但 practice 没有显式 order。" +
+               "系统不会再把空 order 猜成全部；" +
+               "请按用户语境列出准确段号，拿不准就先询问。";
+    }
+
     //查不到就重试同一个 id 是死循环，拦下之后要给她能走的下一步。
     private const float k_SongSingRetryBlockSeconds = 90f;
 
@@ -9642,12 +13770,11 @@ public class ChatSample : MonoBehaviour
         if (dropped <= 0) return "";
         if (kept > 0)
             return $"\n练唱会话变动: 刚才重启了一次实时模式，最早的 {dropped} 段因为太久远被清掉了，" +
-                   $"剩下 {kept} 段**已经重新编号**（现在的 [1] 是原来的 [{dropped + 1}]）。" +
-                   "你之前笔记里记的段号从这一刻起全部作废——" +
-                   "要唱哪一段请照下面这份清单重新认，或者直接把那一段的歌词片段写进 order。";
+                   $"剩下 {kept} 段的 clip 身份保持不变；已移除的引用不会指向其它录音。" +
+                   "请按最新素材清单选择 refs，不再按显示段号猜测。";
         return $"\n练唱会话变动: 刚才重启了一次实时模式，之前那 {dropped} 段因为太久远已经全部清掉，" +
                "现在练唱会话是空的。你笔记里记的段号（第3段、第5段之类）**全部作废**，" +
-               "照着它们发 <hum_back mode=\"practice\" order=\"N\"/> 一定会失败。" +
+               "旧引用已不可用，不会改指向新素材。" +
                "想唱用户的旋律就请他再唱一遍；" +
                "如果那段旋律你之前存进过长期曲库，可以改用 <song_sing/>。" +
                "**不要说「我这就唱」然后什么都没发生**，也不要以为自己的记忆坏了——" +
@@ -9695,6 +13822,108 @@ public class ChatSample : MonoBehaviour
             .ToLowerInvariant();
     }
 
+    private static SongSingFailureKind ClassifySongSingFailureCode(string errorCode)
+    {
+        switch ((errorCode ?? "").Trim().ToLowerInvariant())
+        {
+            case "not_found": return SongSingFailureKind.NotFound;
+            case "invalid_request":
+            case "invalid_selector": return SongSingFailureKind.InvalidSelector;
+            case "audio_missing":
+            case "no_playable_audio":
+            case "invalid_audio": return SongSingFailureKind.AudioMissing;
+            case "duration_limit": return SongSingFailureKind.DurationLimit;
+            case "transport": return SongSingFailureKind.Transport;
+            case "server_unavailable":
+            case "server_error": return SongSingFailureKind.Server;
+            default: return SongSingFailureKind.Other;
+        }
+    }
+
+    private static bool IsStableSongSingFailure(SongSingFailureKind kind)
+    {
+        return kind == SongSingFailureKind.NotFound ||
+            kind == SongSingFailureKind.InvalidSelector ||
+            kind == SongSingFailureKind.IdentityMismatch;
+    }
+
+    private void ClearSongSingFailureCache()
+    {
+        m_LastFailedSongSingKey = "";
+        m_LastFailedSongSingKind = SongSingFailureKind.None;
+        m_LastFailedSongSingId = "";
+        m_LastFailedSongSingTitle = "";
+        m_LastFailedSongSingDetail = "";
+        m_LastFailedSongSingTime = -999f;
+    }
+
+    private void RememberSongSingFailure(
+        string key,
+        SongSingFailureKind kind,
+        string songId,
+        string title,
+        string detail)
+    {
+        // 只有对同一参数重试仍必然失败的结果才防重试。网络波动、服务异常、音频损坏
+        // 和时长策略都不是“曲库里没有”，不能污染下一轮的事实。
+        if (!IsStableSongSingFailure(kind))
+        {
+            if (key == m_LastFailedSongSingKey) ClearSongSingFailureCache();
+            return;
+        }
+        m_LastFailedSongSingKey = key ?? "";
+        m_LastFailedSongSingKind = kind;
+        m_LastFailedSongSingId = (songId ?? "").Trim();
+        m_LastFailedSongSingTitle = (title ?? "").Trim();
+        m_LastFailedSongSingDetail = detail ?? "";
+        m_LastFailedSongSingTime = Time.realtimeSinceStartup;
+    }
+
+    private string BuildSongSingRetryBlockMessage(string songSingKey)
+    {
+        string reason;
+        switch (m_LastFailedSongSingKind)
+        {
+            case SongSingFailureKind.IdentityMismatch:
+                reason = "上次曲库解析成了另一首歌；原样重试仍有唱错歌的风险";
+                break;
+            case SongSingFailureKind.InvalidSelector:
+                reason = "上次使用的曲库选择参数无效；原样重试不会改变结果";
+                break;
+            default:
+                reason = "上次实时曲库查询没有找到这个目标；原样重试不会改变结果";
+                break;
+        }
+        string detail = string.IsNullOrWhiteSpace(m_LastFailedSongSingDetail)
+            ? ""
+            : " 上次返回：" + TruncateForFrame(m_LastFailedSongSingDetail, 140) + "。";
+        return $"未执行：这个目标（{TruncateForFrame(songSingKey, 60)}）{reason}。" +
+            detail +
+            "结果事实：本次没有唱出，也没有音频正在加载。可重新查看曲库并使用其中的完整 id，" +
+            "也可以改用当前练唱会话里确实存在的片段。";
+    }
+
+    private bool CatalogProvesLastFailedSongExists(
+        SenseVoiceSpeechToText.SongCatalogInspectionResult result)
+    {
+        if (result == null || !result.Ok || result.Entries == null ||
+            m_LastFailedSongSingKind != SongSingFailureKind.NotFound)
+            return false;
+        foreach (SenseVoiceSpeechToText.SongCatalogEntry entry in result.Entries)
+        {
+            if (entry == null) continue;
+            if (!string.IsNullOrWhiteSpace(m_LastFailedSongSingId) &&
+                string.Equals(entry.song_id, m_LastFailedSongSingId,
+                    StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (!string.IsNullOrWhiteSpace(m_LastFailedSongSingTitle) &&
+                (AreSongTitlesCompatible(m_LastFailedSongSingTitle, entry.title) ||
+                 AreSongTitlesCompatible(m_LastFailedSongSingTitle, entry.display_name)))
+                return true;
+        }
+        return false;
+    }
+
     /// <summary>
     /// id 长得像感知帧里的显示截断时点破它——这是 8/22 那八次失败的全部原因。
     /// </summary>
@@ -9725,6 +13954,74 @@ public class ChatSample : MonoBehaviour
             timeline != null && timeline.Length > 0;
     }
 
+    /// <summary>
+    /// 把三种容易混淆的素材源作为短事实交给角色。它只提供系统当前真正持有的
+    /// 信息，不替角色决定要不要唱；尤其不把旋律相似的曲库候选当成用户刚录的片段。
+    /// </summary>
+    private string BuildSingingMaterialFacts(SenseVoiceSpeechToText sense)
+    {
+        if (sense == null) return "";
+        if (!GetSkillRouteState("singing").ActiveThisRound &&
+            !IsCurrentTurnConfirmedSinging())
+            return sense.PracticePhraseCount > 0 || sense.DescribeQuarantinedSingingCandidates().Count > 0
+                ? BuildSingingClipOverview(sense) : "";
+        return BuildUnifiedClipFacts(sense);
+    }
+
+    private static void AppendBoundarySubsegments(
+        System.Text.StringBuilder sb,
+        string label,
+        SenseVoiceSpeechToText.SingingBoundarySubsegment[] segments)
+    {
+        if (sb == null || segments == null || segments.Length == 0) return;
+        sb.Append(' ').Append(label).Append("=[");
+        bool wrote = false;
+        for (int i = 0; i < segments.Length; i++)
+        {
+            SenseVoiceSpeechToText.SingingBoundarySubsegment segment = segments[i];
+            if (segment == null) continue;
+            if (wrote) sb.Append("; ");
+            wrote = true;
+            sb.Append(segment.expanded_start_seconds.ToString("F2"))
+              .Append('~')
+              .Append(segment.expanded_end_seconds.ToString("F2"))
+              .Append("s/")
+              .Append(string.IsNullOrWhiteSpace(segment.type)
+                  ? "unknown" : segment.type)
+              .Append("/voiced=")
+              .Append(segment.voiced_ratio.ToString("F2"))
+              .Append("/smooth=")
+              .Append(segment.pitch_smooth_ratio.ToString("F2"));
+        }
+        sb.Append("]（时间相对 expanded 起点；聚合转写属于整个 extra；" +
+                  "窗口只提供细粒度声学证据，不替你认定说话或歌唱）");
+    }
+
+    private static void AppendBoundaryReviewConflict(
+        System.Text.StringBuilder sb,
+        string label,
+        bool required,
+        string aggregateType,
+        float melodicSeconds,
+        float melodicRatio,
+        float longestRunSeconds)
+    {
+        if (sb == null || !required) return;
+        sb.Append(" 边界冲突=")
+          .Append(label)
+          .Append(" 的聚合类型是 ")
+          .Append(string.IsNullOrWhiteSpace(aggregateType)
+              ? "unknown" : aggregateType)
+          .Append("，但带时间戳窗口含 ")
+          .Append(melodicSeconds.ToString("F2"))
+          .Append("s 旋律证据（占比=")
+          .Append(melodicRatio.ToString("F2"))
+          .Append("，最长连续=")
+          .Append(longestRunSeconds.ToString("F2"))
+          .Append("s）。两份证据都不构成最终裁决；请结合歌词、用户原话和完整语境" +
+                  "自主选择 clean/expanded/精确裁剪，拿不准可以先询问用户。");
+    }
+
     private static string ExtractBracketedSongTitle(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
@@ -9745,6 +14042,13 @@ public class ChatSample : MonoBehaviour
             normalized.Append(char.ToLowerInvariant(ch));
         }
         return normalized.ToString();
+    }
+
+    private static bool TextContainsNormalizedSongTitle(string text, string title)
+    {
+        string haystack = NormalizeSongTitleForComparison(text);
+        string needle = NormalizeSongTitleForComparison(title);
+        return needle.Length >= 2 && haystack.Contains(needle);
     }
 
     private static bool AreSongTitlesCompatible(string expected, string actual)
@@ -9816,20 +14120,23 @@ public class ChatSample : MonoBehaviour
     private void BeginSongSing(AgentSongSingRequest request)
     {
         if (request == null) return;
-        //下面每一条失败都会走 RecordHumBackResult，而那里按 m_PendingHumBackKey 记账。
-        //曲库演唱不是 hum_back，先把账本清干净，免得算到上一次回哼头上。
-        m_PendingHumBackKey = "";
+        m_SingingRequestSubmittedSinceUserTurn = true;
         if (!m_EnableAutonomousRememberedSongSinging || !m_EnableAutonomousHumBack ||
             !m_IsVoiceMode)
         {
             RecordHumBackResult("未执行：长期曲库演唱功能当前已关闭。", true);
             return;
         }
-        if (m_SongSingInFlight || m_HumBackPending || m_HumBackPreparingCarrier || m_HumBackPlaying)
+        if (m_SongSingInFlight || HasHumBackExecutionWork())
         {
-            RecordHumBackResult("未执行：已经有一个真实歌唱任务正在进行。", true);
+            RecordHumBackResult(
+                "未执行：已经有一个真实歌唱任务正在进行。", true, false);
             return;
         }
+        //下面每一条失败都会走 RecordHumBackResult，而那里按 m_PendingHumBackKey 记账。
+        //曲库演唱不是 hum_back；仅在确认没有旧事务后再清账，不能破坏在飞动作的幂等键。
+        m_PendingHumBackKey = "";
+        m_PendingHumBackInputRevision = -1;
         SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
             ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
             : null;
@@ -9876,13 +14183,7 @@ public class ChatSample : MonoBehaviour
         if (songSingKey == m_LastFailedSongSingKey &&
             Time.realtimeSinceStartup - m_LastFailedSongSingTime < k_SongSingRetryBlockSeconds)
         {
-            RecordHumBackResult(
-                $"未执行：这个目标（{TruncateForFrame(songSingKey, 60)}）刚才已经查过，" +
-                "曲库里没有，重试同一个只会得到同样的结果。" +
-                "不要再说「马上就唱」。可选的下一步：用感知帧候选行里 id= 后面的**完整** id 重试" +
-                "（清单里的 id 也是完整的，别截断）；或者用 <hum_back mode=\"practice\" order=\"N\"/> " +
-                "唱本轮练唱会话里的第 N 段；或者如实告诉用户你还没记住这一段。",
-                true);
+            RecordHumBackResult(BuildSongSingRetryBlockMessage(songSingKey), true);
             if (m_LogHumBack)
                 Debug.LogWarning("[SongSing] 拦下对刚失败目标的原样重试: " + songSingKey);
             return;
@@ -9897,9 +14198,12 @@ public class ChatSample : MonoBehaviour
             performanceSeed, out semitoneOffset, out rmsMixRate, out protect,
             out interpretation);
         int generation = ++m_SongSingGeneration;
-        float totalSongLimit = m_AgentCurrentRoundIsTick
-            ? m_AutonomousSingingMaxSeconds
-            : 0f;
+        // 曲库解析/传输层不再替角色裁掉整首歌。自主时长只作为感知帧中的决策信息：
+        // 角色可以主动选一小段，但一旦她决定唱完整内容，程序按自然块流式承接。
+        // 这也避免曲库查询结果续轮被标成 tick 时误把用户点歌重新套上 60 秒上限。
+        const float totalSongLimit = 0f;
+        AcquireSkillExecutionLease("singing", "song_sing 已受理并等待完整播放", true);
+        m_LastSingingRepairAt = -99999f;
         m_SongSingInFlight = true;
         m_HumBackResultPending = false;
         m_LastHumBackResult = "";
@@ -9925,10 +14229,14 @@ public class ChatSample : MonoBehaviour
                     string detail = result == null || string.IsNullOrWhiteSpace(result.Error)
                         ? "本地曲库没有返回结果"
                         : TruncateForFrame(result.Error, 220);
-                    m_LastFailedSongSingKey = songSingKey;
-                    m_LastFailedSongSingTime = Time.realtimeSinceStartup;
+                    SongSingFailureKind failureKind = result == null
+                        ? SongSingFailureKind.Transport
+                        : ClassifySongSingFailureCode(result.ErrorCode);
+                    RememberSongSingFailure(
+                        songSingKey, failureKind, request.SongId, request.Title, detail);
                     RecordHumBackResult(
-                        "未执行：" + detail + "。不得声称已经从记忆中唱出或续唱成功。" +
+                        "未执行：" + detail + "。失败类型=" + failureKind +
+                        "；结果事实：本次没有从记忆中唱出或续唱成功。" +
                         BuildSongSingIdHint(request.SongId),
                         true);
                     if (m_LogHumBack) Debug.LogWarning("[SongSing] " + detail);
@@ -9937,8 +14245,12 @@ public class ChatSample : MonoBehaviour
                 }
                 if (!ValidateResolvedSongIdentity(request, result, out string identityProblem))
                 {
-                    m_LastFailedSongSingKey = songSingKey;
-                    m_LastFailedSongSingTime = Time.realtimeSinceStartup;
+                    RememberSongSingFailure(
+                        songSingKey,
+                        SongSingFailureKind.IdentityMismatch,
+                        request.SongId,
+                        request.Title,
+                        identityProblem);
                     RecordHumBackResult(
                         "未执行：" + identityProblem + "。为避免唱错歌，返回音频已丢弃；" +
                         "请重新查询正确 id，或改用 <hum_back mode=\"practice\"/> 唱本轮练习片段。",
@@ -9948,6 +14260,10 @@ public class ChatSample : MonoBehaviour
                     CompleteSongSingToolRoundIfIdle();
                     return;
                 }
+
+                // 本次真实解析成功就是比旧失败缓存更新的事实。
+                if (songSingKey == m_LastFailedSongSingKey)
+                    ClearSongSingFailureCache();
 
                 string resolvedSongName = string.IsNullOrWhiteSpace(result.DisplayName)
                     ? (string.IsNullOrWhiteSpace(result.Title) ? result.SongId : result.Title)
@@ -10036,6 +14352,8 @@ public class ChatSample : MonoBehaviour
         bool outputIdle = !IsVoiceOutputPlaying && m_PendingChunks.Count == 0 &&
             m_PendingClips.Count == 0;
         if (!outputIdle) return;
+        ClearUserTurnAwaitingReply("曲库演唱结束");
+        ReleaseSkillExecutionLease("singing", "song_sing 已结束且没有待播放音频");
         m_TTSSenderDone = true;
         m_TextBack.text = "";
         SetAnimator("state", 0);
@@ -10060,7 +14378,20 @@ public class ChatSample : MonoBehaviour
     {
         if (request == null) return "";
         return ((request.Mode ?? "") + "|" + (request.Order ?? "") + "|" +
+                (request.Capture ?? "") + "|" +
+                request.TrimHeadSeconds.ToString("0.###") + "|" +
+                request.TrimTailSeconds.ToString("0.###") + "|" +
+                (request.ExcludeSpeech ? "exclude-speech" : "") + "|" +
                 (request.Lyrics ?? "") + "|" +
+                (request.PitchTarget ?? "") + "|" +
+                (request.PitchDelta ?? "") + "|" +
+                (request.PitchMatch ?? "") + "|" +
+                (request.PitchPlan ?? "") + "|" +
+                (request.Transpose ?? "") + "|" +
+                (request.TargetNote ?? "") + "|" +
+                (request.AlignToPracticeIndex > 0
+                    ? request.AlignToPracticeIndex.ToString()
+                    : "") + "|" +
                 (float.IsNaN(request.Key) ? "" : request.Key.ToString("0.##")) + "|" +
                 (request.KeyPerSegment == null
                     ? ""
@@ -10069,6 +14400,8 @@ public class ChatSample : MonoBehaviour
 
     private string BuildEchoUnavailableNote(SenseVoiceSpeechToText senseVoice)
     {
+        if (senseVoice != null && !string.IsNullOrEmpty(senseVoice.RecentSingingMaterialConflict))
+            return "未执行回唱：" + senseVoice.RecentSingingMaterialConflict;
         string why = "当时没有取得可播放的旋律";
         int practiceCount = 0;
         if (senseVoice != null)
@@ -10095,47 +14428,220 @@ public class ChatSample : MonoBehaviour
         return note;
     }
 
+    private static bool IsIdempotentHumBackDuplicate(
+        string requestKey,
+        string activeKey,
+        bool hasActiveWork,
+        int inputRevision,
+        int activeInputRevision)
+    {
+        return hasActiveWork && !string.IsNullOrWhiteSpace(requestKey) &&
+               string.Equals(requestKey, activeKey, StringComparison.Ordinal) &&
+               inputRevision == activeInputRevision;
+    }
+
+    private static bool ShouldContinueAgentChainAfterHumBack(
+        bool requestedContinue,
+        bool humBackTransactionRetained)
+    {
+        return requestedContinue && !humBackTransactionRetained;
+    }
+
+    private static bool IsHumBackTextOutputDrained(
+        bool waitForTextDrain,
+        bool senderDone,
+        bool generationDrained,
+        bool hasPendingChunks,
+        bool hasPendingClips,
+        bool audioPlaying)
+    {
+        if (!waitForTextDrain) return true;
+        //senderDone 保留无正文/silent 短路；generationDrained 由真实播放收尾统一产生。
+        //两者只证明不会再生产新正文，队列和 AudioSource 仍必须客观为空。
+        return (senderDone || generationDrained) &&
+               !hasPendingChunks && !hasPendingClips && !audioPlaying;
+    }
+
+    private string BuildHumBackBusyFact()
+    {
+        string state = m_HumBackPlaying
+            ? "playing"
+            : m_HumStreamWaitForTextOutputDrain &&
+              (m_HumStreamReadyClips.Count > 0 || m_HumStreamScheduledClips.Count > 0)
+                ? "prepared_waiting_for_text"
+                : (m_HumBackPreparingCarrier || m_ActiveSVSRequest != null ||
+                   m_ActiveHumSVCRequest != null || m_HumStreamProducerCoroutine != null)
+                    ? "preparing"
+                    : m_HumBackPending ? "queued" : "finishing";
+        float estimatedTotal = m_PendingHumTimeline != null
+            ? m_PendingHumTimeline.Length *
+              Mathf.Clamp(m_PendingHumFrameSeconds, 0.02f, 0.25f)
+            : 0f;
+        string order = m_PendingHumIsPracticeComposition
+            ? m_LastPracticeOrderUsed
+            : "-";
+        string key = !string.IsNullOrWhiteSpace(m_PendingPerSegmentKeyText)
+            ? m_PendingPerSegmentKeyText
+            : m_PendingHumSemitoneOffset.ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        return $"当前已有 hum_back 动作，state={state}, mode={m_PendingHumMode}, " +
+               $"order={order}, key={key}, played_seconds={m_HumStreamPlayedSeconds:F1}, " +
+               $"estimated_total_seconds={estimatedTotal:F1}；这次新调用没有执行。";
+    }
+
     private void QueueHumBack(AgentHumBackRequest request)
     {
-        if (!m_EnableAutonomousHumBack || !m_IsVoiceMode || request == null) return;
+        if (request == null) return;
+        m_SingingRequestSubmittedSinceUserTurn = true;
+        if (request.UnifiedSing && !TryResolveUnifiedSing(request, out string singFailure))
+        {
+            RecordHumBackResult("未执行：" + singFailure, true);
+            ReportToolFailureForLlm("sing", "material_not_ready", singFailure,
+                "保留所选 refs，按素材事实修正；不确定可询问。sing 不填写 source/mode/order，" +
+                "只填写清单中的 refs；当前无可播放版本时按证据选 range 或起止时间。");
+            return;
+        }
+        if (!string.IsNullOrWhiteSpace(request.SourceValidationError))
+        {
+            string sourceProblem = request.SourceValidationError;
+            RecordHumBackResult("未执行：" + sourceProblem, true);
+            ReportToolFailureForLlm(
+                "hum_back",
+                "invalid_material_source",
+                sourceProblem + " 本次没有读取或播放任何音频。",
+                "请结合本轮歌唱素材事实重新自主选择：recent_turn 对应 echo，" +
+                "practice 对应 practice，library 对应 song_sing；拿不准可以先询问用户。");
+            if (m_LogHumBack)
+                Debug.LogWarning("[HumBack/Source] " + sourceProblem);
+            return;
+        }
+        if (!string.IsNullOrWhiteSpace(request.ValidationError))
+        {
+            string reason = "未执行：" + request.ValidationError;
+            RecordHumBackResult(reason, true);
+            ReportToolFailureForLlm(
+                "hum_back",
+                "invalid_pitch_parameter",
+                request.ValidationError,
+                "practice 请直接表达音乐目标：逐段用 pitch_plan（可混用 keep、D4、+whole_step、" +
+                "match:清单段号），整体升降用 transpose=\"+half_step\"；不要输出 +Nst。" +
+                "程序负责换算底层半音值；请重新决定后只调用一次。");
+            if (m_LogHumBack) Debug.LogWarning("[HumBack/Pitch] " + reason);
+            return;
+        }
+        if (!m_EnableAutonomousHumBack || !m_IsVoiceMode) return;
+        if (string.Equals(request.Mode, "follow", StringComparison.OrdinalIgnoreCase))
+        {
+            //This is a tool selected by the role, not a phrase inferred from its own notes.
+            if (!CanExecuteSkillAction("singing", out string followBlock))
+            {
+                RecordHumBackResult("未开启轮唱：" + followBlock, true);
+                return;
+            }
+            ArmSingAlongForNextPerformance();
+            RecordHumBackResult("轮唱已开启：等待下一段真实歌声，听完该段后回唱；没有播放旧录音。" +
+                "这不是同步合唱，是否已到合适接话时机仍需独立判断。", false);
+            return;
+        }
+        string capture = (request.Capture ?? "clean").Trim().ToLowerInvariant();
+        if (capture.Length == 0) capture = "clean";
+        if (capture != "clean" && capture != "expanded")
+        {
+            RecordHumBackResult(
+                $"未执行：capture=\"{request.Capture}\" 不存在；只能选择 clean 或 expanded。",
+                true);
+            return;
+        }
+        if (capture == "expanded" && !IsPracticeHumMode(request.Mode))
+        {
+            RecordHumBackResult(
+                "未执行：expanded 是练唱清单里保存的可恢复边界，只能与 mode=\"practice\" 一起使用。",
+                true);
+            return;
+        }
+        if ((request.TrimHeadSeconds > 0.001f || request.TrimTailSeconds > 0.001f) &&
+            !IsPracticeHumMode(request.Mode))
+        {
+            RecordHumBackResult(
+                "未执行：明确秒数裁剪只适用于 mode=\"practice\" 的已保存边界素材。",
+                true);
+            return;
+        }
+        request.Capture = capture;
         if (IsPracticeHumMode(request.Mode) && string.IsNullOrWhiteSpace(request.Order))
         {
             SenseVoiceSpeechToText practiceSense = m_ChatSettings != null
                 ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
                 : null;
-            if (practiceSense != null && practiceSense.PracticePhraseCount > 1)
+            int practicePhraseCount = practiceSense != null
+                ? practiceSense.PracticePhraseCount
+                : 0;
+            if (RequiresExplicitPracticeOrder(
+                    request.Mode, request.Order, practicePhraseCount))
             {
-                m_ExplicitHumBackHandled = true;
-                RecordHumBackResult(
-                    $"未执行：练唱会话有 {practiceSense.PracticePhraseCount} 段，" +
-                    "但 practice 没有显式 order。系统不会再把空 order 猜成全部；" +
-                    "请按用户语境列出准确段号，拿不准就先询问。",
-                    true);
+                string missingOrder = BuildMissingPracticeOrderFailure(
+                    practicePhraseCount);
+                RecordHumBackResult("未执行：" + missingOrder, true);
+                ReportToolFailureForLlm(
+                    "hum_back",
+                    "missing_practice_order",
+                    missingOrder,
+                    $"当前练唱清单的客观编号范围是 1..{practicePhraseCount}。" +
+                    "请重新结合用户原话自主选择：指向刚才的多段时使用 " +
+                    "hum_back mode=practice 并显式列出 order；真有歧义时先询问。" +
+                    "不要因为知道歌名或曲库 id 改用 song_sing，也不要声称已经播放。");
                 if (m_LogHumBack)
                     Debug.LogWarning("[HumBack/Practice] 拦下多段空 order，避免默认全唱");
                 return;
             }
         }
-        if (m_HumBackPending || m_HumBackPreparingCarrier || m_HumBackPlaying)
+        string humBackKey = BuildHumBackKey(request);
+        bool hasActiveHumBack = HasHumBackExecutionWork();
+        if (IsIdempotentHumBackDuplicate(
+                humBackKey,
+                m_PendingHumBackKey,
+                hasActiveHumBack,
+                m_InputAudioRevision,
+                m_PendingHumBackInputRevision))
         {
-            if (m_LogHumBack) Debug.LogWarning("[HumBack] 已有回哼任务，忽略重复调用");
+            //The same LLM chain can repeat a tool tag while the originally accepted
+            //audio is being generated or waiting for its spoken prelude.  Preserve
+            //the original transaction exactly as-is: no buffer reset, no second HTTP
+            //request, and no false tool failure for the character to explain.
+            m_HumBackTransactionRetainedThisRound = true;
+            if (m_LogHumBack)
+                Debug.Log("[HumBack/Transaction] 同一真实用户轮重复提交相同 hum_back；" +
+                          "已幂等沿用原动作 key=" + humBackKey);
+            return;
+        }
+        if (hasActiveHumBack)
+        {
+            string busyFact = BuildHumBackBusyFact();
+            RecordHumBackResult("未执行：" + busyFact, true, false);
+            ReportToolFailureForLlm(
+                "hum_back",
+                "busy",
+                busyFact,
+                "不要声称新参数已经播放。结合用户刚才的真实意图，自然说明当前动作状态；" +
+                "旧动作结束或被新的真实用户轮次取消后，再决定是否重新提交新参数。" +
+                "程序没有替你决定等待、重试还是询问用户。");
+            if (m_LogHumBack) Debug.LogWarning("[HumBack] " + busyFact);
             return;
         }
 
-        if (IsCurrentTurnSpokenSingingExit())
-        {
-            m_ExplicitHumBackHandled = true;
-            RecordHumBackResult(
-                "未执行：用户在歌唱末尾已经转为口语并表示不会继续、忘词或停止。" +
-                "本轮应正常回应用户，不得复读整段混合音频。",
-                false);
-            if (m_LogHumBack)
-                Debug.Log("[HumBack] 忽略混合歌唱转说话轮次的工具调用");
-            return;
-        }
+        //新的动作已经被真正受理，上一遍“等待反馈”的状态不再代表当前现场。
+        m_PostHumBackFeedbackActive = false;
+        m_PostHumBackFeedbackSummary = "";
+        m_PendingPracticePitchPlan = null;
+        m_HumStreamPlayedPracticeStableIds.Clear();
+        m_PendingHumUsesMusicalPitchIntent = false;
+        m_PendingHumExtraTagsIgnored = 0;
+
+        //混合轮只禁止程序未经角色决定自动跟唱。若角色已经看完前置/尾部口语与
+        //干净歌唱岛事实并明确调用 hum_back，就允许读取裁净后的 recent_turn/practice
+        //素材；执行层绝不改用未裁剪的整轮录音。
 
         //同一个调用已经连续失败够多次：不再派发，把仅剩的两条路写清楚。
-        string humBackKey = BuildHumBackKey(request);
         if (humBackKey == m_LastFailedHumBackKey &&
             m_LastFailedHumBackCount >= k_HumBackBlockAfterFailures)
         {
@@ -10153,6 +14659,7 @@ public class ChatSample : MonoBehaviour
         }
 
         m_PendingHumBackKey = humBackKey;
+        m_PendingHumBackInputRevision = m_InputAudioRevision;
 
         if (ShouldBlockRepeatSinging(
                 BuildSungTargetKey(
@@ -10168,13 +14675,8 @@ public class ChatSample : MonoBehaviour
         bool composePractice = IsPracticeHumMode(request.Mode) ||
             IsPracticeCompositionRequest(m_LastUserMsg);
         bool confirmedSinging = IsCurrentTurnConfirmedSinging();
-        //是否属于“不要唱任何东西”还是“不要唱第 1～3 段、只唱第 4～5 段”，
-        //已经由 singing_intent 结合完整语境判断。这里不再用“不要唱”子串二次否决。
-        if (!composePractice && !confirmedSinging && IsSingAlongInvitation(m_LastUserMsg))
-        {
-            ArmSingAlongForNextPerformance();
-            return;
-        }
+        //是否真要唱、由谁唱、唱哪些段已经由 LLM 结合完整语境并选择业务工具。
+        //这里不再用“不要唱”子串二次否决，避免把内容限制误当成能力禁用。
         if (HasActiveSingAlongRequest())
         {
             if (!confirmedSinging && !composePractice && !IsExplicitHumBackRequest(m_LastUserMsg))
@@ -10248,6 +14750,27 @@ public class ChatSample : MonoBehaviour
         m_LastPracticeShiftNote = "";
         if (composePractice)
         {
+            if (!senseVoice.TryValidatePracticeBoundarySelection(
+                    request.Order,
+                    request.Capture == "expanded",
+                    request.TrimHeadSeconds,
+                    request.TrimTailSeconds,
+                    request.ExcludeSpeech,
+                    out string boundaryConflict))
+            {
+                RecordHumBackResult("未执行：" + boundaryConflict, true);
+                ReportToolFailureForLlm(
+                    "hum_back",
+                    "boundary_selection_conflict",
+                    boundaryConflict,
+                    "这是播放前的真实边界冲突，不是程序替你选择。请结合 head_extra/" +
+                    "tail_extra/clean_lead_in_unverified 的时长、类型和转写，" +
+                    "自主改选 clean、expanded、明确裁剪，" +
+                    "或自然询问用户；不要声称已经播放。");
+                if (m_LogHumBack)
+                    Debug.LogWarning("[HumBack/Boundary] " + boundaryConflict);
+                return;
+            }
             SenseVoiceSpeechToText.PracticeComposition composition;
             string failure;
             if (!senseVoice.TryBuildSingingPracticeComposition(
@@ -10255,25 +14778,22 @@ public class ChatSample : MonoBehaviour
                     0f,
                     out composition,
                     out failure,
-                    request.Order) || composition == null)
+                    request.Order,
+                    request.Capture == "expanded",
+                    request.TrimHeadSeconds,
+                    request.TrimTailSeconds) || composition == null)
             {
                 RecordHumBackResult(
                     "未执行：" + failure + "。不得声称已经把练习片段连续唱出。",
                     true);
+                ReportToolFailureForLlm(
+                    "hum_back",
+                    "practice_composition_unavailable",
+                    failure,
+                    "程序没有替换素材或静默回退。请根据真实练唱清单、边界状态和用户语义" +
+                    "自主改选 capture/order/裁剪；仍有歧义时可自然询问用户，" +
+                    "不要声称已经播放。");
                 if (m_LogHumBack) Debug.LogWarning("[HumBack/Practice] " + failure);
-                return;
-            }
-            if (m_AgentCurrentRoundIsTick &&
-                composition.DurationSeconds > m_AutonomousSingingMaxSeconds + 0.02f)
-            {
-                RecordHumBackResult(
-                    $"未执行：这是角色自主发起的歌唱，完整内容约 {composition.DurationSeconds:F1}s，" +
-                    $"超过自主歌唱软限制 {m_AutonomousSingingMaxSeconds:F1}s。" +
-                    "若用户明确要求完整演唱，可以不受这个总时长限制；否则请用 order 主动选一小段。",
-                    true);
-                if (m_LogHumBack)
-                    Debug.LogWarning($"[HumBack/Practice] 自主歌唱软限制 " +
-                                     $"{composition.DurationSeconds:F1}s > {m_AutonomousSingingMaxSeconds:F1}s");
                 return;
             }
             m_LastPracticeOrderUsed = string.IsNullOrWhiteSpace(request.Order)
@@ -10302,46 +14822,138 @@ public class ChatSample : MonoBehaviour
             sourceWav = composition.WavBytes;
             phraseCount = composition.PhraseCount;
             sourceDuration = composition.DurationSeconds;
-            variationDiagnostic = composition.VariationDiagnostic;
-            //必须在 ResolvePerSegmentShifts 之前抄下来——那个方法会就地把
-            //超范围的项截断，抄晚了记的就不是她写的原值。
+            variationDiagnostic = composition.VariationDiagnostic +
+                (request.Capture == "expanded" ? ";capture=expanded" : ";capture=clean") +
+                (request.TrimHeadSeconds > 0.001f
+                    ? $";trim_head={request.TrimHeadSeconds:F2}s" : "") +
+                (request.TrimTailSeconds > 0.001f
+                    ? $";trim_tail={request.TrimTailSeconds:F2}s" : "");
+            if (!TryResolvePracticePitchTarget(
+                    request, composition, out int[] musicalShifts,
+                    out float[] musicalTargetCenters,
+                    out string targetNote, out string targetFailure))
+            {
+                RecordHumBackResult("未执行：" + targetFailure, true);
+                ReportToolFailureForLlm(
+                    "hum_back",
+                    "pitch_alignment_unavailable",
+                    targetFailure,
+                    "根据当前练唱清单重新选择 order、pitch_plan 或 transpose；" +
+                    "不要自己换算底层 key，也不要声称已经对齐或播放。");
+                if (m_LogHumBack)
+                    Debug.LogWarning("[HumBack/Pitch] " + targetFailure);
+                return;
+            }
+            if (musicalShifts == null && TryBuildCurrentPracticeArrangement(
+                    senseVoice,
+                    composition,
+                    semitoneOffset,
+                    out int[] currentArrangementShifts,
+                    out float[] currentArrangementCenters,
+                    out string currentArrangementNote))
+            {
+                musicalShifts = currentArrangementShifts;
+                musicalTargetCenters = currentArrangementCenters;
+                targetNote = currentArrangementNote;
+            }
+            m_PendingHumUsesMusicalPitchIntent = musicalShifts != null;
+            if (musicalShifts != null)
+            {
+                if (musicalShifts.Length == 1)
+                {
+                    //普通单段路径会把 global shift 加回来；这里先扣掉，并在请求层关闭
+                    //auto-F0，确保最终发给 SVC 的就是音乐目标换算出的实际半音值。
+                    semitoneOffset = musicalShifts[0] - m_HumSVCSemitoneShift;
+                    request.Key = float.NaN;
+                    request.KeyPerSegment = null;
+                }
+                else
+                {
+                    request.Key = float.NaN;
+                    request.KeyPerSegment = null;
+                    practiceSegmentShifts = musicalShifts;
+                }
+                if (!string.IsNullOrWhiteSpace(targetNote))
+                    m_LastPracticeShiftNote = targetNote;
+            }
+            //旧 key 只在角色确实提交它时留作兼容诊断；音乐目标不再伪装成 key。
             m_PendingPerSegmentKeyText = request.KeyPerSegment == null
                 ? ""
                 : string.Join(",", System.Array.ConvertAll(
                     request.KeyPerSegment, v => v.ToString("0.##")));
-            SenseVoiceSpeechToText.PracticeComposition explicitlyShifted = ResolvePerSegmentShifts(
-                request.KeyPerSegment, composition, out practiceSegmentShifts,
-                out string shiftNote);
-            if (!string.IsNullOrEmpty(shiftNote)) m_LastPracticeShiftNote = shiftNote;
-            m_PendingHumUsesExplicitSegmentKey = explicitlyShifted != null;
-            if (m_PendingHumUsesExplicitSegmentKey)
-            {
-                practiceSegments = composition;
-                variationDiagnostic += "; 逐段移调 " + string.Join("/", practiceSegmentShifts);
-                //不同段可能有不同 key，不能跨段合并；只拆开单段里超过目标块长的部分。
-                ExpandOversizedStreamingSegments(
-                    senseVoice, practiceSegments, ref practiceSegmentShifts);
-            }
+            string shiftNote = "";
+            SenseVoiceSpeechToText.PracticeComposition explicitlyShifted = null;
+            if (musicalShifts != null && musicalShifts.Length >= 2)
+                explicitlyShifted = composition;
             else
             {
-                //统一 key 时从已经包含全部自然停顿的完整源重新按约 30 秒切块，
-                //避免十几个短句各付一次模型固定开销。
-                if (!senseVoice.TryBuildSingingStreamChunks(
-                        composition.WavBytes,
-                        composition.MidiTimeline,
-                        composition.FrameSeconds,
-                        HumStreamChunkSeconds,
-                        out practiceSegments,
-                        out string streamPlanFailure) || practiceSegments == null)
-                {
-                    practiceSegments = composition;
-                    if (m_LogHumBack)
-                        Debug.LogWarning("[HumBack/Stream] 统一练唱分块失败，保留自然段计划: " +
-                                         streamPlanFailure);
-                }
-                practiceSegmentShifts = BuildUniformStreamingShifts(
-                    practiceSegments, semitoneOffset);
+                explicitlyShifted = ResolvePerSegmentShifts(
+                    request.KeyPerSegment, composition, out practiceSegmentShifts,
+                    out shiftNote);
             }
+            if (!string.IsNullOrEmpty(shiftNote))
+            {
+                if (shiftNote.StartsWith("未执行：", StringComparison.Ordinal))
+                {
+                    RecordHumBackResult(shiftNote, true);
+                    ReportToolFailureForLlm(
+                        "hum_back",
+                        "invalid_segment_key",
+                        shiftNote.Substring("未执行：".Length).Trim(),
+                        "让 key 列表项数与 order 实际选择的片段数完全一致，" +
+                        "且每项保持在 −12～+12；不要依赖程序补项或截断。");
+                    if (m_LogHumBack) Debug.LogWarning("[HumBack/Pitch] " + shiftNote);
+                    return;
+                }
+                m_LastPracticeShiftNote = string.IsNullOrWhiteSpace(m_LastPracticeShiftNote)
+                    ? shiftNote
+                    : m_LastPracticeShiftNote + shiftNote;
+            }
+            m_PendingHumUsesExplicitSegmentKey = explicitlyShifted != null;
+            //每一次 practice 都保留自然片段边界。此前没有显式音高目标时会把整首重新
+            //切成约 30 秒块，第一次自动 +6 的实际输出无法再对应回用户的第几段，角色
+            //因此只看得到用户录音音高。现在统一按稳定片段转换；长片段仍可在内部拆块。
+            practiceSegments = composition;
+            if (musicalShifts != null)
+                practiceSegmentShifts = musicalShifts;
+            else if (explicitlyShifted == null)
+                practiceSegmentShifts = BuildUniformStreamingShifts(
+                    composition, semitoneOffset);
+
+            if (practiceSegmentShifts == null ||
+                practiceSegmentShifts.Length != composition.SegmentWavs.Count)
+            {
+                RecordHumBackResult(
+                    "未执行：程序没能为每个练唱片段建立实际移调计划。", true);
+                return;
+            }
+
+            if (practiceSegmentShifts.Length == 1)
+            {
+                //单段可能走独立 SVS；它读取旋律时间轴而不是 SVC 的 semitone_shift。
+                //所有 practice（包括没有显式目标的第一次自动音域适配）都必须把同一份
+                //实际计划落实到乐谱，否则状态会记成“+6”，耳中却仍是原调。
+                timeline = ShiftPitchTimeline(
+                    composition.MidiTimeline, practiceSegmentShifts[0]);
+            }
+
+            m_PendingPracticePitchPlan = BuildPracticePitchPlan(
+                senseVoice,
+                composition,
+                practiceSegmentShifts,
+                musicalTargetCenters,
+                string.IsNullOrWhiteSpace(targetNote) ? "" : targetNote.Trim());
+            if (m_PendingPracticePitchPlan == null)
+            {
+                RecordHumBackResult(
+                    "未执行：程序没能建立角色本次演唱的逐段音高状态。", true);
+                return;
+            }
+            if (m_PendingHumUsesExplicitSegmentKey || musicalShifts != null)
+                variationDiagnostic += "; 逐段移调 " +
+                                       string.Join("/", practiceSegmentShifts);
+            ExpandOversizedStreamingSegments(
+                senseVoice, practiceSegments, ref practiceSegmentShifts);
         }
         else
         {
@@ -10403,6 +15015,8 @@ public class ChatSample : MonoBehaviour
         m_PendingHumSegmentShifts = practiceSegmentShifts;
         m_PendingHumIsPracticeComposition = composePractice;
         m_PendingHumPlayedIndices = playedPracticeIndices;
+        m_PendingPracticePlaybackFacts = "";
+        if (composePractice) CapturePracticePlaybackFacts(senseVoice, playedPracticeIndices);
         m_PendingHumIsCatalogSong = false;
         m_PendingHumIsCatalogContinuation = false;
         m_PendingCatalogSongName = "";
@@ -10413,14 +15027,21 @@ public class ChatSample : MonoBehaviour
         m_PendingHumInterpretation = interpretation;
         m_PendingHumVariationDiagnostic = variationDiagnostic ?? "";
         m_PendingHumRenderer = "pending";
+        m_PendingHumExtraTagsIgnored = request.ExtraTagsIgnored;
+        AcquireSkillExecutionLease("singing", "hum_back 已受理并等待完整播放", true);
+        m_LastSingingRepairAt = -99999f;
         m_HumBackPending = true;
+        m_HumBackTransactionRetainedThisRound = true;
         if (m_LogHumBack)
         {
             float duration = timeline.Length * m_PendingHumFrameSeconds;
             Debug.Log($"[HumBack] 已排队 mode={m_PendingHumMode} phrases={phraseCount} " +
                       $"frames={timeline.Length} melody={duration:F1}s source={sourceDuration:F1}s " +
                       $"seed={performanceSeed} shiftOffset={semitoneOffset} " +
-                      $"她指定=[key={(float.IsNaN(request.Key) ? "-" : request.Key.ToString("0.#"))} " +
+                      $"她指定=[pitch_plan={request.PitchPlan} transpose={request.Transpose} " +
+                      $"pitch_target={request.PitchTarget} pitch_delta={request.PitchDelta} " +
+                      $"pitch_match={request.PitchMatch} " +
+                      $"key={(float.IsNaN(request.Key) ? "-" : request.Key.ToString("0.#"))} " +
                       $"pace={(float.IsNaN(request.Pace) ? "-" : request.Pace.ToString("0.##"))} " +
                       $"expr={(float.IsNaN(request.Expression) ? "-" : request.Expression.ToString("0.##"))}] " +
                       $"rms={rmsMixRate:F2} protect={protect:F2} interp={interpretation:F2} " +
@@ -10428,12 +15049,25 @@ public class ChatSample : MonoBehaviour
                       $"variation=\"{m_PendingHumVariationDiagnostic}\" " +
                       $"reason=\"{m_PendingHumReason}\"");
         }
+        bool textOutputBusy = IsVoiceOutputPlaying || !m_TTSSenderDone ||
+            m_PendingChunks.Count > 0 || m_PendingClips.Count > 0;
+        bool canPrepareStream = m_EnableNeuralHumSVC &&
+            m_PendingHumSegmentWavs != null && m_PendingHumSegmentShifts != null &&
+            CanPreparePlannedSingingChunks(m_PendingHumSegmentWavs.Count, m_PendingHumSegmentShifts.Length,
+                m_PendingHumIsPracticeComposition && m_PendingPracticePitchPlan != null, m_EnableStreamedFullSongSVC);
+        if (textOutputBusy && canPrepareStream && TryBeginPendingHumBack(true) && m_LogHumBack)
+            Debug.Log("[HumBack/Stream] 正文仍在播放；已并行准备歌声，实际播放等待正文结束");
     }
 
     /// <summary>
     /// 在当前文字回复完全播放后启动旋律回哼。准备载体的阶段也算角色正在回应，
     /// 因而实时 VAD 会继续走 barge-in 路径，用户可以随时打断。
     /// </summary>
+    private static bool CanPreparePlannedSingingChunks(int chunks, int shifts, bool hasPlan, bool streamingEnabled)
+    {
+        return chunks > 0 && chunks == shifts && (hasPlan || (streamingEnabled && chunks >= 2));
+    }
+
     private bool TryBuildPendingTimelineScoreJson(out string scoreJson)
     {
         scoreJson = "";
@@ -10508,7 +15142,7 @@ public class ChatSample : MonoBehaviour
         return !string.IsNullOrWhiteSpace(scoreJson);
     }
 
-    private bool TryBeginPendingHumBack()
+    private bool TryBeginPendingHumBack(bool prepareWhileTextOutputDrains = false)
     {
         if (!m_HumBackPending || m_HumBackPreparingCarrier || m_HumBackPlaying) return false;
         if (m_AudioSource == null || m_PendingHumTimeline == null || m_PendingHumTimeline.Length == 0)
@@ -10520,14 +15154,27 @@ public class ChatSample : MonoBehaviour
             return false;
         }
 
+        bool textOutputBusy = IsVoiceOutputPlaying || !m_TTSSenderDone ||
+            m_PendingChunks.Count > 0 || m_PendingClips.Count > 0;
+        bool isStreamedMultiSegment = m_EnableNeuralHumSVC && m_PendingHumSegmentWavs != null &&
+            m_PendingHumSegmentShifts != null &&
+            CanPreparePlannedSingingChunks(m_PendingHumSegmentWavs.Count, m_PendingHumSegmentShifts.Length,
+                m_PendingHumIsPracticeComposition && m_PendingPracticePitchPlan != null, m_EnableStreamedFullSongSVC);
+        if (textOutputBusy && (!prepareWhileTextOutputDrains || !isStreamedMultiSegment))
+            return false;
+        m_HumStreamWaitForTextOutputDrain = textOutputBusy && prepareWhileTextOutputDrains;
+
         m_HumBackPending = false;
         m_HumBackPreparingCarrier = false;
         m_HumBackPlaying = false;
         int generation = ++m_HumBackGeneration;
         m_HumBackNeedsHistoryEntry = m_ChatHistory != null && m_ChatHistory.Count % 2 == 1;
         IsAISpeaking = true;
-        m_TextBack.text = "♪ …";
-        SetAnimator("state", 1);
+        if (!m_HumStreamWaitForTextOutputDrain)
+        {
+            m_TextBack.text = "♪ …";
+            SetAnimator("state", 1);
+        }
 
         SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
             ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
@@ -10609,10 +15256,16 @@ public class ChatSample : MonoBehaviour
 
         //多块歌曲优先走 SVC 流水线：第一块回来就开唱，后续转换与播放重叠。
         //独立 SVS 目前仍是整条请求/整条响应，等它支持分块乐谱后再接入同一消费者。
-        if (m_EnableStreamedFullSongSVC && m_EnableNeuralHumSVC && hasNeuralInputs &&
+        bool requiresPerSegmentPitchExecution =
+            m_PendingHumIsPracticeComposition && m_PendingPracticePitchPlan != null &&
             m_PendingHumSegmentWavs != null && m_PendingHumSegmentShifts != null &&
             m_PendingHumSegmentWavs.Count == m_PendingHumSegmentShifts.Length &&
-            m_PendingHumSegmentWavs.Count >= 2)
+            m_PendingHumSegmentWavs.Count >= 1;
+        if ((m_EnableStreamedFullSongSVC || requiresPerSegmentPitchExecution) &&
+            m_EnableNeuralHumSVC && hasNeuralInputs &&
+            m_PendingHumSegmentWavs != null && m_PendingHumSegmentShifts != null &&
+            m_PendingHumSegmentWavs.Count == m_PendingHumSegmentShifts.Length &&
+            (m_PendingHumSegmentWavs.Count >= 2 || requiresPerSegmentPitchExecution))
         {
             m_PendingHumRenderer = "svc-stream";
             m_HumBackPreparingCarrier = true;
@@ -10620,6 +15273,15 @@ public class ChatSample : MonoBehaviour
             m_PendingHumSourceWav = null;
             m_HumStreamProducerCoroutine = StartCoroutine(
                 RequestPerSegmentNeuralHumBack(generation, targetPath));
+            return true;
+        }
+
+        if (requiresPerSegmentPitchExecution)
+        {
+            const string pitchBackendMissing =
+                "逐段音乐目标需要歌声转换服务，但该服务或角色参考音频当前不可用；" +
+                "程序没有改走会丢失逐段音高目标的其它渲染器";
+            FinishHumBack(generation, false, pitchBackendMissing);
             return true;
         }
 
@@ -10940,6 +15602,55 @@ public class ChatSample : MonoBehaviour
         int lastSlash = url.LastIndexOf('/');
         if (lastSlash > scheme + 2) url = url.Substring(0, lastSlash);
         return url.TrimEnd('/');
+    }
+
+    private void OnSkillBecameActive(string skillName, SkillAccess access)
+    {
+        if (!string.Equals(skillName, "singing", StringComparison.OrdinalIgnoreCase) ||
+            access != SkillAccess.Available || !m_EnableNeuralHumSVC ||
+            !m_PrewarmHumSVCOnSingingSkillLoad || m_HumSVCPrewarmInProgress)
+            return;
+        //短窗口内反复卸载/重载只需复用服务端 90 秒 worker，不必刷请求。
+        if (Time.realtimeSinceStartup - m_HumSVCPrewarmLastStartedAt < 20f) return;
+        m_HumSVCPrewarmLastStartedAt = Time.realtimeSinceStartup;
+        StartCoroutine(PrewarmHumSVCForSkill());
+    }
+
+    private IEnumerator PrewarmHumSVCForSkill()
+    {
+        m_HumSVCPrewarmInProgress = true;
+        bool ready = false;
+        string readyDetail = "";
+        yield return EnsureHumSVCReady((ok, detail) =>
+        {
+            ready = ok;
+            readyDetail = detail;
+        });
+        if (!ready)
+        {
+            m_HumSVCPrewarmInProgress = false;
+            if (m_LogHumBack)
+                Debug.LogWarning("[HumBack/SVC/Warmup] 后台预热跳过: " + readyDetail);
+            yield break;
+        }
+
+        string warmupURL = GetHumSVCBaseURL() + "/warmup";
+        using (UnityWebRequest request = UnityWebRequest.PostWwwForm(warmupURL, ""))
+        {
+            request.timeout = 180;
+            //该协程只挂起自己；正式 LLM/TTS/字幕与用户打断都继续运行。
+            yield return request.SendWebRequest();
+            if (m_LogHumBack)
+            {
+                if (request.result == UnityWebRequest.Result.Success)
+                    Debug.Log("[HumBack/SVC/Warmup] singing Skill 后台预热完成: " +
+                              request.downloadHandler.text);
+                else
+                    Debug.LogWarning("[HumBack/SVC/Warmup] 后台预热失败但不阻塞对话: " +
+                                     request.error + " HTTP=" + request.responseCode);
+            }
+        }
+        m_HumSVCPrewarmInProgress = false;
     }
 
     private IEnumerator ProbeHumSVCHealth(Action<bool, string> completed)
@@ -11361,6 +16072,28 @@ public class ChatSample : MonoBehaviour
         }
     }
 
+    private int ResolvePendingPracticeStableIdForStreamSegment(int segmentPosition)
+    {
+        if (m_PendingPracticePitchPlan == null ||
+            m_PendingPracticePitchPlan.Entries.Count == 0)
+            return 0;
+        //单段被自然切成多块时，每块都属于同一练唱段。
+        if (m_PendingPracticePitchPlan.Entries.Count == 1)
+            return m_PendingPracticePitchPlan.Entries[0].StableId;
+        //practice 现在始终保留自然片段边界；长片段拆出的子块也继承同一清单段号。
+        //echo/曲库整曲的 SegmentSourceIndices 仍只是块号，不能误当成练唱清单段号。
+        if (!m_PendingHumIsPracticeComposition || m_PendingHumSegmentSources == null ||
+            segmentPosition < 0 || segmentPosition >= m_PendingHumSegmentSources.Count)
+            return 0;
+        int sourceIndex = m_PendingHumSegmentSources[segmentPosition];
+        for (int i = 0; i < m_PendingPracticePitchPlan.Entries.Count; i++)
+        {
+            PracticePitchPlanEntry entry = m_PendingPracticePitchPlan.Entries[i];
+            if (entry.SourceIndex == sourceIndex) return entry.StableId;
+        }
+        return 0;
+    }
+
     /// <summary>
     /// 分块生产者：转换服务仍按顺序一次处理一块，但每块回来就放进播放队列，
     /// 不再等待整首全部转换完成。所有块共用一个 performance seed 和整曲基准移调。
@@ -11369,6 +16102,7 @@ public class ChatSample : MonoBehaviour
     {
         var segments = m_PendingHumSegmentWavs;
         var gaps = m_PendingHumSegmentGaps;
+        var medians = m_PendingHumSegmentMedians;
         int[] shifts = m_PendingHumSegmentShifts;
 
         ClearHumStreamClipBuffers(true);
@@ -11478,6 +16212,11 @@ public class ChatSample : MonoBehaviour
                     Clip = piece,
                     GapBefore = gaps != null && i < gaps.Count ? Mathf.Max(0f, gaps[i]) : 0f,
                     SegmentNumber = i + 1,
+                    PracticeStableId = ResolvePendingPracticeStableIdForStreamSegment(i),
+                    ExpectedPitchCenterMidi = medians != null && i < medians.Count &&
+                                              i < shifts.Length && medians[i] > 0f
+                        ? medians[i] + shifts[i]
+                        : 0f,
                 });
                 m_HumStreamBufferedSeconds += piece.length;
                 m_HumStreamConvertedSegments++;
@@ -11523,19 +16262,67 @@ public class ChatSample : MonoBehaviour
                     scheduled.Source.clip = null;
                 }
                 if (m_ActiveHumBackClip == scheduled.Clip) m_ActiveHumBackClip = null;
+                byte[] pitchMeasurementWav = null;
+                float pitchMeasurementSeconds = 0f;
                 if (scheduled.Clip != null)
                 {
+                    pitchMeasurementSeconds = scheduled.Clip.length;
+                    if (scheduled.PracticeStableId > 0 &&
+                        scheduled.ExpectedPitchCenterMidi > 0f &&
+                        m_PendingPracticePitchPlan != null)
+                    {
+                        try
+                        {
+                            pitchMeasurementWav = WavUtility.FromAudioClip(scheduled.Clip);
+                        }
+                        catch (Exception ex)
+                        {
+                            if (m_LogHumBack)
+                                Debug.LogWarning(
+                                    "[HumBack/PitchVerify] 流式块编码失败: " + ex.Message);
+                        }
+                    }
                     m_HumStreamPlayedSeconds += scheduled.Clip.length;
                     m_HumStreamBufferedSeconds = Mathf.Max(
                         0f, m_HumStreamBufferedSeconds - scheduled.Clip.length);
                     Destroy(scheduled.Clip);
                 }
                 m_HumStreamPlayedSegments++;
+                if (scheduled.PracticeStableId > 0)
+                {
+                    m_HumStreamPlayedPracticeStableIds.Add(scheduled.PracticeStableId);
+                    CommitPracticePitchPlan(
+                        m_PendingPracticePitchPlan,
+                        false,
+                        new HashSet<int> { scheduled.PracticeStableId });
+                }
+                if (pitchMeasurementWav != null && m_PendingPracticePitchPlan != null)
+                    RequestRenderedPitchMeasurement(
+                        pitchMeasurementWav,
+                        scheduled.PracticeStableId,
+                        m_PendingPracticePitchPlan.Revision,
+                        scheduled.ExpectedPitchCenterMidi,
+                        pitchMeasurementSeconds);
                 m_HumStreamScheduledClips.RemoveAt(i);
             }
 
             bool scheduledOne = false;
-            if (m_HumStreamReadyClips.Count > 0 && secondary != null && m_AudioSource != null)
+            bool textOutputDrained = IsHumBackTextOutputDrained(
+                m_HumStreamWaitForTextOutputDrain,
+                m_TTSSenderDone,
+                m_TextOutputDrainedGeneration == m_FormalResponseGeneration,
+                m_PendingChunks.Count > 0,
+                m_PendingClips.Count > 0,
+                m_AudioSource != null && m_AudioSource.isPlaying);
+            if (m_HumStreamWaitForTextOutputDrain && textOutputDrained)
+            {
+                m_HumStreamWaitForTextOutputDrain = false;
+                if (m_LogHumBack)
+                    Debug.Log($"[HumBack/Stream] 正文已结束，使用已缓冲的 " +
+                              $"{m_HumStreamReadyClips.Count} 块开始演唱");
+            }
+            if (textOutputDrained && m_HumStreamReadyClips.Count > 0 &&
+                secondary != null && m_AudioSource != null)
             {
                 int slot = -1;
                 if (sourceAvailableAt[0] <= now + 0.01d) slot = 0;
@@ -11573,6 +16360,8 @@ public class ChatSample : MonoBehaviour
                             Source = source,
                             EndDspTime = end,
                             SegmentNumber = ready.SegmentNumber,
+                            PracticeStableId = ready.PracticeStableId,
+                            ExpectedPitchCenterMidi = ready.ExpectedPitchCenterMidi,
                         });
                         if (!m_HumBackPlaying)
                         {
@@ -11590,6 +16379,11 @@ public class ChatSample : MonoBehaviour
                 }
             }
 
+            if (m_HumStreamWaitForTextOutputDrain && !textOutputDrained)
+            {
+                yield return null;
+                continue;
+            }
             if (m_HumStreamProducerDone && m_HumStreamReadyClips.Count == 0 &&
                 m_HumStreamScheduledClips.Count == 0)
             {
@@ -11745,7 +16539,8 @@ public class ChatSample : MonoBehaviour
         form.AddField("diffusion_steps", Mathf.Clamp(m_HumSVCDiffusionSteps, 4, 30));
         form.AddField(
             "auto_f0_adjust",
-            !isSVSPostPolish && m_HumSVCAutoF0Adjust ? "true" : "false");
+            !isSVSPostPolish && !m_PendingHumUsesMusicalPitchIntent &&
+            m_HumSVCAutoF0Adjust ? "true" : "false");
         form.AddField(
             "semitone_shift",
             isSVSPostPolish
@@ -11950,9 +16745,8 @@ public class ChatSample : MonoBehaviour
         if (qw == null) return;
         SenseVoiceSpeechToText senseVoice = m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText;
         if (senseVoice == null) return;
-        //必须是**裸转写**。m_LastUserMsg 带着 [说话人:…] [演唱片段; 歌唱概率:…; 旋律:…]
-        //这些感知前缀，里面"演唱片段""歌唱概率""旋律"几个词等于在提示里先替它把
-        //答案说了——8/12 首次上机 5 次复核 4 次答 singing，就是这么来的。
+        //必须是裸转写，不读 m_LastUserEvidence 中的感知前缀；“演唱片段”等
+        //程序标签不是独立语义证据。此处直接读取本次 ASR，避免旧用户轮串入。
         string transcript = (senseVoice.LastText ?? "").Trim();
         if (string.IsNullOrWhiteSpace(transcript)) return;
         string segment = senseVoice.LastSegmentLyrics ?? "";
@@ -11990,9 +16784,9 @@ public class ChatSample : MonoBehaviour
         if (m_SemanticVerdictSerial != m_SemanticCheckSerial) return false;
         if (m_SemanticVerdict != "speech") return false;
 
-        //声学高区时文字没有否决权——这条规则 §模态判定 那里已经立过，判据是
-        //「模糊带(<0.58) 文字全权否决；高区(>=0.58) 只做软降级、保留演唱」，
-        //理由是混合轮文字仍有 2/5 会答错，误杀代价太大。
+        //声学 uncertain 时，程序自动路径已经被 m_FinalModeSoftDowngrade 拦住；
+        //还能走到这里的只能是看过完整证据后的正式角色 LLM 主动调用。此时轻量
+        //裸文本分类器不能反过来否决更有上下文的角色决定。
         //这里原来完全没应用它，于是同一个冲突被两条路判出相反结果：
         //8/23 实测 prob=0.73 stab=0.71 岛=9.47s/内容10.60s 的一轮真唱，
         //[模态判定] 已经决定「保留演唱，改为出声追问」，转换也跑完了，
@@ -12000,11 +16794,18 @@ public class ChatSample : MonoBehaviour
         SenseVoiceSpeechToText vetoSenseVoice = m_ChatSettings != null
             ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
             : null;
+        if (vetoSenseVoice != null && vetoSenseVoice.LastAcousticModeUncertain)
+        {
+            if (m_LogHumBack)
+                Debug.Log("[HumBack/Veto] 声学仍为 uncertain；程序自动路径已关闭，" +
+                          "保留正式角色 LLM 的主动回唱决定");
+            return false;
+        }
         if (vetoSenseVoice != null && vetoSenseVoice.LastSingingProbability >= 0.58f)
         {
             if (m_LogHumBack)
                 Debug.Log("[HumBack/Veto] 文字判说话，但声学 " +
-                          $"prob={vetoSenseVoice.LastSingingProbability:F2} 在高区" +
+                          $"prob={vetoSenseVoice.LastSingingProbability:F3} 在高区" +
                           "——按软降级规则不否决，照常播出");
             return false;
         }
@@ -12114,34 +16915,270 @@ public class ChatSample : MonoBehaviour
         m_PendingPerSegmentKeyText = "";
         if (string.IsNullOrEmpty(current)) return "";
 
-        string note =
-            $"本次 key=\"{current}\"。**key 是相对每段原始录音的绝对值，" +
-            "不是在上一次结果上叠加**——写 0 不等于\"维持上一次的调整\"，" +
-            "而是把那一段打回原始音高。";
+        string note = $"相对 key=\"{current}\"（相对于各段原始录音，不是增量）";
         if (!string.IsNullOrEmpty(previous) && previous != current)
-            note += $"（上一次你写的是 key=\"{previous}\"。）";
-        note +=
-            "想在本次结果上再动某一段：**把本次这一串照抄下来，只改要动的那一项**。" +
-            $"例如只把最后一段再抬半音 → key=\"{BuildKeyBumpExample(current)}\"。";
-        return note;
+            note += $"，previous_key=\"{previous}\"";
+        return note + "。这是旧 key 兼容结果；以后用 pitch_plan 逐段表达 keep、绝对音名、" +
+               "相对音程或 match:清单段号，用 transpose 表达整体升降。";
     }
 
-    /// <summary>给一个照着本次 key 改最后一项的现成例子——比讲道理管用。</summary>
-    private static string BuildKeyBumpExample(string current)
+    private PracticePitchPlan BuildPracticePitchPlan(
+        SenseVoiceSpeechToText senseVoice,
+        SenseVoiceSpeechToText.PracticeComposition composition,
+        int[] executedShifts,
+        float[] intendedCenters,
+        string musicalIntent)
     {
-        var parts = (current ?? "").Split(',');
-        if (parts.Length == 0) return current ?? "";
-        int last = parts.Length - 1;
-        if (float.TryParse(
-                parts[last].Trim(), System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out float v))
-            parts[last] = (v + 1f).ToString("0.##");
-        return string.Join(",", parts);
+        if (senseVoice == null || composition == null || executedShifts == null ||
+            composition.SegmentMedians == null ||
+            executedShifts.Length != composition.SegmentMedians.Count)
+            return null;
+        List<SenseVoiceSpeechToText.PracticePhraseInfo> phrases =
+            senseVoice.DescribePracticePhrases();
+        var plan = new PracticePitchPlan
+        {
+            MusicalIntent = musicalIntent ?? "",
+        };
+        for (int i = 0; i < executedShifts.Length; i++)
+        {
+            int sourceIndex = composition.SegmentSourceIndices != null &&
+                              i < composition.SegmentSourceIndices.Count
+                ? composition.SegmentSourceIndices[i]
+                : i + 1;
+            SenseVoiceSpeechToText.PracticePhraseInfo phrase =
+                FindPracticePhraseInfo(phrases, sourceIndex);
+            float sourceCenter = composition.SegmentMedians[i];
+            float executedCenter = sourceCenter + executedShifts[i];
+            float requestedCenter = intendedCenters != null && i < intendedCenters.Length
+                ? intendedCenters[i]
+                : executedCenter;
+            plan.Entries.Add(new PracticePitchPlanEntry
+            {
+                StableId = phrase != null ? phrase.StableId : 0,
+                SourceIndex = sourceIndex,
+                SourceCenterMidi = sourceCenter,
+                RequestedCenterMidi = requestedCenter,
+                TargetCenterMidi = executedCenter,
+                ExecutedShift = executedShifts[i],
+            });
+        }
+        if (plan.Entries.Count == 0) return null;
+        var currentStableIds = new int[m_PracticePitchStates.Count];
+        m_PracticePitchStates.Keys.CopyTo(currentStableIds, 0);
+        var nextStableIds = new int[plan.Entries.Count];
+        for (int i = 0; i < plan.Entries.Count; i++)
+            nextStableIds[i] = plan.Entries[i].StableId;
+        plan.MergeWithCurrentArrangement = ShouldMergePracticeArrangement(
+            currentStableIds, nextStableIds);
+        plan.Revision = ++m_PracticePitchPlanRevision;
+        return plan;
+    }
+
+    private static bool ShouldMergePracticeArrangement(
+        int[] currentStableIds,
+        int[] nextStableIds)
+    {
+        if (currentStableIds == null || currentStableIds.Length == 0 ||
+            nextStableIds == null || nextStableIds.Length == 0)
+            return false;
+        for (int i = 0; i < nextStableIds.Length; i++)
+            if (nextStableIds[i] <= 0)
+                return false;
+        return true;
+    }
+
+    /// <summary>
+    /// 只有真实播放完成的块才能推进“当前角色演唱中心音高”。先写入实际执行指令的
+    /// 预计结果；同一 revision 的异步输出 F0 回测回来后不会被 Finish 再覆盖掉。
+    /// </summary>
+    private void CommitPracticePitchPlan(
+        PracticePitchPlan plan,
+        bool completed,
+        HashSet<int> fullyPlayedStableIds)
+    {
+        if (plan == null) return;
+        bool anyHeard = false;
+        for (int i = 0; i < plan.Entries.Count; i++)
+        {
+            PracticePitchPlanEntry entry = plan.Entries[i];
+            if (entry.StableId > 0 && (completed ||
+                (fullyPlayedStableIds != null && fullyPlayedStableIds.Contains(entry.StableId))))
+            {
+                anyHeard = true;
+                break;
+            }
+        }
+        if (anyHeard && !plan.ArrangementInitialized)
+        {
+            // State belongs to the stable recording, not the latest selected set.
+            // Singing B for the first time must not erase A's measured output.
+            // Drop/revision paths invalidate only their explicitly affected clip.
+            plan.ArrangementInitialized = true;
+        }
+        for (int i = 0; i < plan.Entries.Count; i++)
+        {
+            PracticePitchPlanEntry entry = plan.Entries[i];
+            if (entry.StableId <= 0) continue;
+            bool heard = completed ||
+                (fullyPlayedStableIds != null && fullyPlayedStableIds.Contains(entry.StableId));
+            if (!heard) continue;
+            if (m_PracticePitchStates.TryGetValue(
+                    entry.StableId, out PracticePitchState current) &&
+                current.Revision == plan.Revision)
+            {
+                current.RequestedCenterMidi = entry.RequestedCenterMidi;
+                current.ExpectedCenterMidi = entry.TargetCenterMidi;
+                current.ExecutedShift = entry.ExecutedShift;
+                current.UpdatedRealtime = Time.realtimeSinceStartup;
+                current.FullyPlayed = current.FullyPlayed || completed;
+                if (!current.Measured) current.CenterMidi = entry.TargetCenterMidi;
+                continue;
+            }
+            m_PracticePitchStates[entry.StableId] = new PracticePitchState
+            {
+                StableId = entry.StableId,
+                Revision = plan.Revision,
+                CenterMidi = entry.TargetCenterMidi,
+                RequestedCenterMidi = entry.RequestedCenterMidi,
+                ExpectedCenterMidi = entry.TargetCenterMidi,
+                ExecutedShift = entry.ExecutedShift,
+                UpdatedRealtime = Time.realtimeSinceStartup,
+                FullyPlayed = completed,
+                Measured = false,
+            };
+        }
+    }
+
+    /// <summary>
+    /// 播放完成后才发起，不进入用户 ASR，也不写练唱记忆。流式长歌按每块“实测值减
+    /// 本块预计值”累计偏差，避免旋律本身在不同区间的高低变化污染整段中心音高。
+    /// revision 防止上一轮迟到的结果覆盖同一练唱段的新一轮演唱。
+    /// </summary>
+    private void RequestRenderedPitchMeasurement(
+        byte[] wavBytes,
+        int stableId,
+        int revision,
+        float expectedChunkCenterMidi,
+        float durationSeconds)
+    {
+        if (wavBytes == null || wavBytes.Length <= 44 || stableId <= 0 ||
+            revision <= 0 || expectedChunkCenterMidi <= 0f)
+            return;
+        SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
+            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
+            : null;
+        if (senseVoice == null) return;
+
+        senseVoice.AnalyzeRenderedSingingPitch(wavBytes, result =>
+        {
+            if (result == null || !result.Ok)
+            {
+                if (m_LogHumBack)
+                    Debug.LogWarning("[HumBack/PitchVerify] 输出回测失败，保留预计值: " +
+                                     (result != null ? result.Error : "empty result"));
+                return;
+            }
+            if (!m_PracticePitchStates.TryGetValue(
+                    stableId, out PracticePitchState state) ||
+                state.Revision != revision)
+            {
+                if (m_LogHumBack)
+                    Debug.Log($"[HumBack/PitchVerify] 忽略迟到结果 stable={stableId} " +
+                              $"revision={revision}");
+                return;
+            }
+
+            float weight = Mathf.Max(0.05f, durationSeconds) *
+                           Mathf.Max(0.05f, result.VoicedRatio);
+            float deviation = result.CenterMidi - expectedChunkCenterMidi;
+            state.WeightedDeviation += deviation * weight;
+            state.WeightedStability += result.Stability * weight;
+            state.WeightedVoicedRatio += result.VoicedRatio * weight;
+            state.MeasurementWeight += weight;
+            state.CenterMidi = state.ExpectedCenterMidi +
+                               state.WeightedDeviation / state.MeasurementWeight;
+            state.MeasurementBackend = result.Backend ?? "";
+            state.Measured = true;
+            state.UpdatedRealtime = Time.realtimeSinceStartup;
+            if (m_LogHumBack)
+                Debug.Log($"[HumBack/PitchVerify] stable={stableId} revision={revision} " +
+                          $"expectedChunk={FormatPitchMidiPrecise(expectedChunkCenterMidi)} " +
+                          $"measuredChunk={FormatPitchMidiPrecise(result.CenterMidi)} " +
+                          $"deviation={deviation:+0.00;-0.00;0.00}st " +
+                          $"current={FormatPitchMidiPrecise(state.CenterMidi)} " +
+                          $"stability={result.Stability:F2} voiced={result.VoicedRatio:F2} " +
+                          $"backend={result.Backend}");
+        });
+    }
+
+    private static string BuildPracticePitchPlanResult(
+        PracticePitchPlan plan,
+        bool completed,
+        HashSet<int> fullyPlayedStableIds)
+    {
+        if (plan == null || plan.Entries.Count == 0) return "";
+        var values = new List<string>();
+        for (int i = 0; i < plan.Entries.Count; i++)
+        {
+            PracticePitchPlanEntry entry = plan.Entries[i];
+            bool heard = completed || (entry.StableId > 0 && fullyPlayedStableIds != null &&
+                                        fullyPlayedStableIds.Contains(entry.StableId));
+            string status = heard
+                ? (completed ? "已完整播放" : "中断前已播放部分")
+                : "未播放";
+            string commandBasis = Mathf.Abs(
+                entry.RequestedCenterMidi - entry.TargetCenterMidi) >= 0.05f
+                ? $"，底层指令基准{FormatPitchMidiPrecise(entry.TargetCenterMidi)}"
+                : "";
+            values.Add($"清单[{entry.SourceIndex}] 目标" +
+                       $"{FormatPitchMidiPrecise(entry.RequestedCenterMidi)}" +
+                       $"（{status}，实发{entry.ExecutedShift:+0;-0;0}半音" +
+                       commandBasis + "）");
+        }
+        return "本次角色演唱音高计划=" + string.Join("、", values) +
+               "。这些值依据实际移调指令计算；已播放音频会在后台做无副作用 F0 回测，" +
+               "完成后把感知帧更新为输出实测，不阻塞播放。当前预计值不得说成歌曲调性" +
+               "或已经完成的声学验证。";
+    }
+
+    private static string BuildIgnoredExtraHumBackFact(int ignoredCount)
+    {
+        return ignoredCount > 0
+            ? $" 同一回复中另外 {ignoredCount} 个 hum_back 没有执行；" +
+              "一次回复只执行第一个真实歌唱动作。"
+            : "";
+    }
+
+    private string BuildCurrentPracticePitchStateSummary(
+        List<SenseVoiceSpeechToText.PracticePhraseInfo> phrases)
+    {
+        if (phrases == null || phrases.Count == 0 || m_PracticePitchStates.Count == 0)
+            return "";
+        var values = new List<string>();
+        for (int i = 0; i < phrases.Count; i++)
+        {
+            SenseVoiceSpeechToText.PracticePhraseInfo phrase = phrases[i];
+            if (phrase == null || phrase.StableId <= 0 ||
+                !m_PracticePitchStates.TryGetValue(
+                    phrase.StableId, out PracticePitchState state))
+                continue;
+            string kind = state.Measured ? "输出实测" : "预计";
+            string target = state.Measured
+                ? $"，目标{FormatPitchMidiPrecise(state.RequestedCenterMidi)}"
+                : "";
+            values.Add($"[{phrase.Index}] {FormatPitchMidiPrecise(state.CenterMidi)}" +
+                       $"（{kind}{target}）");
+        }
+        return values.Count == 0
+            ? ""
+            : "\n角色当前演唱编排的逐段中心音高（每段只保留最近一次，局部重唱只更新该段）: " +
+              string.Join("；", values) +
+              "。输出实测来自角色生成音频的独立 F0 回测；预计值来自已执行移调指令。";
     }
 
     private string BuildPracticeShiftNote(
         int[] segmentShifts, List<float> segmentMedians, List<int> segmentSources,
-        int wholeClipShift)
+        int wholeClipShift, bool musicalPitchIntent)
     {
         string note = m_LastPracticeShiftNote ?? "";
         if (segmentShifts != null && segmentShifts.Length >= 2)
@@ -12150,9 +17187,9 @@ public class ChatSample : MonoBehaviour
             //还对用户说"这次我会确保只调整第二段"。所以这里必须写明是逐段还是整条。
             note += "本次按逐段移调执行，各段实际发出的半音数为 " +
                     string.Join("、", segmentShifts) +
-                    "（已含把音域拉进你声线的基准量，所以数字不等于你写的 key）。";
+                    "（已含把音域拉进你声线的基准量，所以数字不等于相对 key）。";
             //光给发出去的数字还不够：8/21 实测她拿到回报之后仍然一个半音一个半音地试，
-            //三轮只从 +1 加到 +3，而实际差 6 个。把**移调后各段的起调**也报出来，
+            //三轮只从 +1 加到 +3，而实际差 6 个。把**移调后各段的中心音高**也报出来，
             //她就能直接相减算出还差多少，不必靠用户一轮轮说"还是低"。
             if (segmentMedians != null && segmentMedians.Count == segmentShifts.Length)
             {
@@ -12169,14 +17206,10 @@ public class ChatSample : MonoBehaviour
                     after.Add($"{label} {SenseVoiceSpeechToText.MidiToNoteName(result)}" +
                               $"({Mathf.RoundToInt(result)})");
                 }
-                m_LastRenderPitchSummary = string.Join("、", after);
-                m_LastRenderPitchAt = Time.realtimeSinceStartup;
-                note += "唱出来之后各段的起调是 " + m_LastRenderPitchSummary +
-                        "。要哪几段一样高，就把这几个数相减，一次把差值补够——" +
-                        "不要一个半音一个半音地试。" +
-                        "（`key` 的第 i 项对应 `order` 的第 i 个位置，不是清单段号；" +
-                        "上面每项前面的 清单[N] 就是它对应的清单段号。）";
-                //光报结果起调还不够。8/26 实测她 key="2,0,2" 一次调齐了三段，
+                note += "按移调指令计算的中心音高=" + string.Join("、", after) + "。" +
+                        "这是预计值而非输出音频 F0 回测；以后以某段为准写 " +
+                        "pitch_plan=\"match:清单段号\"，绝对目标写 pitch_plan=\"D4\"。";
+                //光报结果中心音高还不够。8/26 实测她 key="2,0,2" 一次调齐了三段，
                 //下一轮想"再抬第三段半个音"就写了 key="0,0,1"——**当成增量了**。
                 //于是前两段被打回原始音高，刚调齐的又散了。她的 reason 写着
                 //「第一段和第二段保持原样」，意图是对的，是没人告诉她 key 的语义。
@@ -12184,7 +17217,7 @@ public class ChatSample : MonoBehaviour
                 note += BuildPerSegmentKeySemanticsNote();
             }
         }
-        else if (wholeClipShift != 0)
+        else if (!musicalPitchIntent && wholeClipShift != 0)
         {
             note += $"注意：本次 key={wholeClipShift:+0;-0} 作用在**整条**音频上，" +
                     "所有段一起被抬高或降低了，段与段之间的高低差没有变。" +
@@ -12194,16 +17227,6 @@ public class ChatSample : MonoBehaviour
         return note;
     }
 
-    /// <summary>刚靠"唱出去且没被打断"确认掉的段落，说给她听一次。</summary>
-    private string BuildEchoPromotionNote()
-    {
-        var indices = m_JustConfirmedPhraseIndices;
-        m_JustConfirmedPhraseIndices = null;
-        if (indices == null || indices.Count == 0) return "";
-        string list = string.Join("、", indices);
-        return $" 另外：第 {list} 段原本因为转写读起来像说话而标着「待确认」，" +
-               "现在你已经把它唱出来、用户也听完了没有异议，这个标已经去掉了。";
-    }
 
     private string BuildHumBackLeadInNote()
     {
@@ -12303,52 +17326,6 @@ public class ChatSample : MonoBehaviour
             FinishHumBack(generation, true, "played");
     }
 
-    /// <summary>
-    /// 一段唱出去、用户听完没有异议，就把它的"待确认"标清掉。
-    /// </summary>
-    /// <remarks>
-    /// 确认的形式不是用户嘴上答"是"再去解析，而是**他听到了实际生成的音频**——
-    /// 那比任何文字确认都硬，也不需要新增一套"确认回传"机制。
-    /// 被打断则不清：那正是他觉得不对的信号。
-    /// 只清这次真的唱出去的段落：order 指名了几段，没被唱到的段落不算确认过。
-    /// </remarks>
-    private void ConfirmPlayedPracticePhrases(bool completed)
-    {
-        m_JustConfirmedPhraseIndices = null;
-        if (!completed) return;
-        if (m_PendingHumIsCatalogSong) return;   //曲库演唱唱的不是练唱会话里的段落
-        SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
-            ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
-            : null;
-        if (senseVoice == null) return;
-
-        var pending = senseVoice.PendingConfirmationPracticeIndices();
-        if (pending.Count == 0) return;
-
-        List<int> played;
-        if (m_PendingHumIsPracticeComposition)
-        {
-            //连唱：只有 order 点到的那几段被他听见了
-            played = m_PendingHumPlayedIndices;
-            if (played == null || played.Count == 0) return;
-        }
-        else
-        {
-            //回哼：唱的是最近演唱缓存，也就是刚写进去的最后一段
-            played = new List<int> { senseVoice.PracticePhraseCount };
-        }
-
-        var toConfirm = new List<int>();
-        foreach (int idx in pending)
-            if (played.Contains(idx)) toConfirm.Add(idx);
-        if (toConfirm.Count == 0) return;
-
-        senseVoice.ConfirmPracticePhrases(toConfirm);
-        m_JustConfirmedPhraseIndices = toConfirm;
-        if (m_LogHumBack)
-            Debug.Log("[HumBack/Practice] 唱出去且用户没打断，第 " +
-                      string.Join("、", toConfirm) + " 段去掉待确认标");
-    }
 
     private void FinishHumBack(int generation, bool completed, string detail)
     {
@@ -12357,13 +17334,36 @@ public class ChatSample : MonoBehaviour
         int streamedTotalSegments = m_HumStreamTotalSegments;
         float streamedPlayedSeconds = m_HumStreamPlayedSeconds;
         bool wasStreamed = streamedTotalSegments > 0;
+        float playedDuration = wasStreamed
+            ? streamedPlayedSeconds
+            : (m_ActiveHumBackClip != null ? m_ActiveHumBackClip.length : 0f);
+        PracticePitchPlan usedPitchPlan = m_PendingPracticePitchPlan;
+        byte[] nonStreamPitchMeasurementWav = null;
+        PracticePitchPlanEntry nonStreamPitchEntry = null;
+        if (completed && !wasStreamed && m_ActiveHumBackClip != null &&
+            usedPitchPlan != null && usedPitchPlan.Entries.Count == 1)
+        {
+            nonStreamPitchEntry = usedPitchPlan.Entries[0];
+            try
+            {
+                nonStreamPitchMeasurementWav =
+                    WavUtility.FromAudioClip(m_ActiveHumBackClip);
+            }
+            catch (Exception ex)
+            {
+                if (m_LogHumBack)
+                    Debug.LogWarning(
+                        "[HumBack/PitchVerify] 完整输出编码失败: " + ex.Message);
+            }
+        }
+        bool wasUserRequested = !m_AgentCurrentRoundIsTick;
         if (m_HumStreamPlaybackCoroutine != null)
         {
             StopCoroutine(m_HumStreamPlaybackCoroutine);
             m_HumStreamPlaybackCoroutine = null;
         }
         ClearHumStreamClipBuffers(true);
-        ConfirmPlayedPracticePhrases(completed);
+        // Playback completion does not establish who sang the source recording.
         //回哼就是这一轮的回应（快速路径不生成正式回复），播完即算已回应
         ClearUserTurnAwaitingReply(completed ? "回哼播完" : "回哼结束");
         if (m_AudioSource != null && m_AudioSource.clip == m_ActiveHumBackClip)
@@ -12394,21 +17394,37 @@ public class ChatSample : MonoBehaviour
 
         bool needsHistory = m_HumBackNeedsHistoryEntry;
         bool wasPracticeComposition = m_PendingHumIsPracticeComposition;
+        RecordPracticePlaybackOutcome(wasPracticeComposition, completed);
         bool wasCatalogSong = m_PendingHumIsCatalogSong;
         bool wasCatalogContinuation = m_PendingHumIsCatalogContinuation;
         string catalogSongName = m_PendingCatalogSongName;
         string renderer = m_PendingHumRenderer ?? "unknown";
+        string ignoredExtraHumBackFact = BuildIgnoredExtraHumBackFact(
+            m_PendingHumExtraTagsIgnored);
         //必须在下面那批清空之前抓走：工具结果是在本函数**后半段**才拼的，
         //8/21 实测整场四次逐段移调，回报里一个字都没有，就是被这里清掉了。
         int[] usedSegmentShifts = m_PendingHumSegmentShifts;
         List<float> usedSegmentMedians = m_PendingHumSegmentMedians;
         List<int> usedSegmentSources = m_PendingHumSegmentSources;
         bool usedExplicitSegmentKey = m_PendingHumUsesExplicitSegmentKey;
+        bool usedMusicalPitchIntent = m_PendingHumUsesMusicalPitchIntent;
         int usedWholeClipShift = m_PendingHumSemitoneOffset;
+        var fullyPlayedPitchIds = new HashSet<int>(m_HumStreamPlayedPracticeStableIds);
+        CommitPracticePitchPlan(usedPitchPlan, completed, fullyPlayedPitchIds);
+        if (nonStreamPitchMeasurementWav != null && nonStreamPitchEntry != null)
+            RequestRenderedPitchMeasurement(
+                nonStreamPitchMeasurementWav,
+                nonStreamPitchEntry.StableId,
+                usedPitchPlan.Revision,
+                nonStreamPitchEntry.TargetCenterMidi,
+                playedDuration);
+        string pitchPlanResult = BuildPracticePitchPlanResult(
+            usedPitchPlan, completed, fullyPlayedPitchIds);
         m_HumBackNeedsHistoryEntry = false;
         m_HumBackPending = false;
         m_HumBackPreparingCarrier = false;
         m_HumBackPlaying = false;
+        m_HumStreamWaitForTextOutputDrain = false;
         m_PendingHumTimeline = null;
         m_PendingHumLanguage = "";
         m_PendingHumReason = "";
@@ -12421,11 +17437,16 @@ public class ChatSample : MonoBehaviour
         m_PendingHumSegmentSources = null;
         m_PendingHumSegmentShifts = null;
         m_PendingHumUsesExplicitSegmentKey = false;
+        m_PendingHumUsesMusicalPitchIntent = false;
+        m_PendingHumExtraTagsIgnored = 0;
+        m_PendingPracticePitchPlan = null;
+        m_HumStreamPlayedPracticeStableIds.Clear();
         m_PendingHumIsPracticeComposition = false;
         m_PendingHumIsCatalogSong = false;
         m_PendingHumIsCatalogContinuation = false;
         m_PendingCatalogSongName = "";
         m_PendingHumVariationDiagnostic = "";
+        m_PendingHumPlayedIndices = null;
         m_PendingHumRenderer = "pending";
         m_FastHumBackEouStaged = false;
         m_FastHumBackActive = false;
@@ -12491,6 +17512,23 @@ public class ChatSample : MonoBehaviour
         if (needsHistory && m_ChatHistory != null) m_ChatHistory.Add(actionText);
         if (completed)
         {
+            m_PostHumBackFeedbackActive = true;
+            m_PostHumBackCompletedRealtime = Time.realtimeSinceStartup;
+            string kind = wasCatalogSong
+                ? "catalog"
+                : wasPracticeComposition ? "practice" : "echo";
+            string order = wasPracticeComposition ? m_LastPracticeOrderUsed : "-";
+            m_PostHumBackFeedbackSummary =
+                $"type={kind}, order={order}, duration={playedDuration:F1}s, " +
+                $"requested_by={(wasUserRequested ? "user" : "autonomy")}";
+        }
+        else
+        {
+            m_PostHumBackFeedbackActive = false;
+            m_PostHumBackFeedbackSummary = "";
+        }
+        if (completed)
+        {
             string rendererFact = renderer == "independent-svs"
                 ? " 渲染事实：本次由独立 SVS 根据歌词/旋律重新生成，不是变声。"
                 : (renderer == "svc-post-polish"
@@ -12501,6 +17539,7 @@ public class ChatSample : MonoBehaviour
                     : (renderer == "legacy"
                         ? " 渲染事实：本次使用旧式本地哼声合成。"
                         : "")));
+            rendererFact += ignoredExtraHumBackFact;
             RecordHumBackResult(
                 wasCatalogSong
                     ? (wasCatalogContinuation
@@ -12510,17 +17549,18 @@ public class ChatSample : MonoBehaviour
                     //把实际用的顺序回报出来。原来只写"按原顺序"，用户连着七轮要求
                     //反过来唱，她四次都读不出这句话的意思是"我无视了你的顺序要求"。
                     : (wasPracticeComposition
-                        ? $"成功：练唱会话中的片段已按顺序 {m_LastPracticeOrderUsed} 合成为一次连续演唱，" +
-                          "并真实播放完成。每次演绎的呼吸间隔、轻微速度和力度可以不同。" +
-                          "若用户要的顺序与此不同，下次用 order 指定（如 order=\"2,1\"）。" +
+                        ? $"成功：practice 已真实播放完成；order=\"{m_LastPracticeOrderUsed}\"。" +
                           BuildPracticeShiftNote(
-                              usedExplicitSegmentKey ? usedSegmentShifts : null,
+                              usedExplicitSegmentKey && !usedMusicalPitchIntent
+                                  ? usedSegmentShifts
+                                  : null,
                               usedSegmentMedians,
-                              usedSegmentSources, usedWholeClipShift) +
-                          m_LastPracticeDuplicateNote + BuildEchoPromotionNote() +
+                              usedSegmentSources, usedWholeClipShift,
+                              usedMusicalPitchIntent) +
+                          pitchPlanResult +
+                          m_LastPracticeDuplicateNote +
                           rendererFact
                         : "成功：回哼音频已经真实播放完成。现在可以自然评价刚才的回哼，但不要夸大为同步合唱。" +
-                          BuildEchoPromotionNote() +
                           BuildHumBackLeadInNote() + rendererFact),
                 false);
             float now = Time.realtimeSinceStartup;
@@ -12537,15 +17577,23 @@ public class ChatSample : MonoBehaviour
                     ? $"失败：流式歌唱只实际播放了 {streamedPlayedSegments}/{streamedTotalSegments} 块" +
                       $"（约 {streamedPlayedSeconds:F1} 秒），随后中断。原因：" +
                       TruncateForFrame(detail, 300) +
-                      "。必须如实说没有完整唱完；可以谈已经听到的部分，但不得声称整首完成。"
+                      (string.IsNullOrEmpty(pitchPlanResult) ? "" : "。" + pitchPlanResult) +
+                      "。必须如实说没有完整唱完；可以谈已经听到的部分，但不得声称整首完成。" +
+                      ignoredExtraHumBackFact
                     : "失败：回哼音频没有生成或播放。原因：" +
                       TruncateForFrame(detail, 300) +
-                      "。必须如实承认没有唱出来，不得让用户评价不存在的声音。",
+                      "。必须如实承认没有唱出来，不得让用户评价不存在的声音。" +
+                      ignoredExtraHumBackFact,
                 true);
         }
+        //The transaction has now produced its final factual result.  Its identity
+        //must not leak into a later real user turn.
+        m_PendingHumBackKey = "";
+        m_PendingHumBackInputRevision = -1;
 
         if (m_LogHumBack)
             Debug.Log($"[HumBack] {(completed ? "播放完成" : "未能播放")} detail={detail}");
+        ReleaseSkillExecutionLease("singing", completed ? "歌唱动作播放完成" : "歌唱动作失败结束");
         OnAgentRoundComplete();
         if (OnAISpeakDone != null) OnAISpeakDone();
         if (m_ChatSettings != null && m_ChatSettings.m_TextToSpeech != null)
@@ -12554,18 +17602,27 @@ public class ChatSample : MonoBehaviour
 
     private void CancelPendingHumBack(string reason, bool recordInterrupted)
     {
-        bool hadWork = m_SongSingInFlight || m_HumBackPending || m_HumBackPreparingCarrier || m_HumBackPlaying ||
-            m_ActiveHumBackClip != null || m_ActiveSVSRequest != null ||
-            m_ActiveHumSVCRequest != null ||
-            m_HumStreamProducerCoroutine != null || m_HumStreamPlaybackCoroutine != null ||
-            m_HumStreamReadyClips.Count > 0 || m_HumStreamScheduledClips.Count > 0 ||
-            m_HumBackPrefixPreparing || m_PreparedHumBackPrefixClip != null ||
-            m_FastHumBackEouStaged || m_FastHumBackActive || m_FastHumBackFullClip != null;
-        if (!hadWork) return;
+        bool hadWork = m_SongSingInFlight || HasHumBackExecutionWork();
+        if (!hadWork)
+        {
+            m_PendingHumExtraTagsIgnored = 0;
+            m_PendingHumBackKey = "";
+            m_PendingHumBackInputRevision = -1;
+            ReleaseSkillExecutionLease("singing", reason + "（尚未进入工具执行）");
+            return;
+        }
 
         int interruptedStreamPlayed = m_HumStreamPlayedSegments;
+        RecordPracticePlaybackOutcome(m_PendingHumIsPracticeComposition, false);
         int interruptedStreamTotal = m_HumStreamTotalSegments;
         float interruptedStreamSeconds = m_HumStreamPlayedSeconds;
+        string ignoredExtraHumBackFact = BuildIgnoredExtraHumBackFact(
+            m_PendingHumExtraTagsIgnored);
+        PracticePitchPlan interruptedPitchPlan = m_PendingPracticePitchPlan;
+        var interruptedPitchIds = new HashSet<int>(m_HumStreamPlayedPracticeStableIds);
+        CommitPracticePitchPlan(interruptedPitchPlan, false, interruptedPitchIds);
+        string interruptedPitchResult = BuildPracticePitchPlanResult(
+            interruptedPitchPlan, false, interruptedPitchIds);
         m_SongSingGeneration++;
         m_SongSingInFlight = false;
         m_HumBackGeneration++;
@@ -12643,14 +17700,19 @@ public class ChatSample : MonoBehaviour
                     ? $"中断：流式歌唱被用户打断，当时已完整播放 " +
                       $"{interruptedStreamPlayed}/{interruptedStreamTotal} 块、约 " +
                       $"{interruptedStreamSeconds:F1} 秒；后续转换和队列均已取消。" +
-                      "不得声称已经完整唱完。"
-                    : "中断：回哼开始后被用户打断，没有完整播放。不得声称已经完整唱完。",
+                      (string.IsNullOrEmpty(interruptedPitchResult)
+                          ? ""
+                          : interruptedPitchResult) +
+                      "不得声称已经完整唱完。" + ignoredExtraHumBackFact
+                    : "中断：回哼开始后被用户打断，没有完整播放。不得声称已经完整唱完。" +
+                      ignoredExtraHumBackFact,
                 true);
         }
         m_HumBackNeedsHistoryEntry = false;
         m_HumBackPending = false;
         m_HumBackPreparingCarrier = false;
         m_HumBackPlaying = false;
+        m_HumStreamWaitForTextOutputDrain = false;
         m_PendingHumTimeline = null;
         m_PendingHumLanguage = "";
         m_PendingHumReason = "";
@@ -12663,6 +17725,10 @@ public class ChatSample : MonoBehaviour
         m_PendingHumSegmentSources = null;
         m_PendingHumSegmentShifts = null;
         m_PendingHumUsesExplicitSegmentKey = false;
+        m_PendingHumUsesMusicalPitchIntent = false;
+        m_PendingHumExtraTagsIgnored = 0;
+        m_PendingPracticePitchPlan = null;
+        m_HumStreamPlayedPracticeStableIds.Clear();
         m_PendingHumIsPracticeComposition = false;
         m_PendingHumIsCatalogSong = false;
         m_PendingHumIsCatalogContinuation = false;
@@ -12688,7 +17754,10 @@ public class ChatSample : MonoBehaviour
         m_HumStreamPlayedSegments = 0;
         m_HumStreamPlayedSeconds = 0f;
         m_HumStreamUnderrunSeconds = 0f;
+        m_PendingHumBackKey = "";
+        m_PendingHumBackInputRevision = -1;
         IsAISpeaking = false;
+        ReleaseSkillExecutionLease("singing", reason);
         if (m_LogHumBack) Debug.Log($"[HumBack] 已取消 reason={reason}");
     }
 
@@ -12721,6 +17790,147 @@ public class ChatSample : MonoBehaviour
         }
     }
 
+    private static string SanitizeToolFeedbackValue(string value, int maxChars = 280)
+    {
+        string safe = (value ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
+        //反馈会作为系统事实重新交给 LLM。即使未来 reason 含有服务端返回文本，也不能
+        //让其中看似标签的内容变成下一轮可执行指令。
+        safe = safe.Replace('<', '‹').Replace('>', '›');
+        if (safe.Length > maxChars) safe = safe.Substring(0, maxChars) + "…";
+        return safe;
+    }
+
+    private void NoteSingingRoutingFact(string tool, string code, string detail)
+    {
+        NoteSingingRoutingFact(tool, "accepted_with_routing", code, detail);
+    }
+
+    private void NoteSingingRoutingFact(
+        string tool,
+        string status,
+        string code,
+        string detail)
+    {
+        string fact = "\n[歌唱工具路由事实；来自本地程序，仅说明实际发生了什么] " +
+            "tool=" + SanitizeToolFeedbackValue(tool, 64) +
+            ", status=" + SanitizeToolFeedbackValue(status, 64) + ", code=" +
+            SanitizeToolFeedbackValue(code, 96) +
+            ", detail=" + SanitizeToolFeedbackValue(detail, 420) +
+            " 不要把素材纠正说成用户改变了要求；是否继续表达由你结合当前语境决定。";
+        if (string.IsNullOrEmpty(m_PendingSingingRoutingFact))
+            m_PendingSingingRoutingFact = fact;
+        else
+            m_PendingSingingRoutingFact += fact;
+    }
+
+    private static string BuildToolCorrectionFrame(
+        string tool,
+        string code,
+        string reason,
+        string activeSkills,
+        string correction)
+    {
+        return "\n[工具纠错事实；来自本地程序，优先于聊天记忆和你的猜测]\n" +
+            "tool=" + SanitizeToolFeedbackValue(tool, 64) + "\n" +
+            "status=rejected\n" +
+            "code=" + SanitizeToolFeedbackValue(code, 80) + "\n" +
+            "reason=" + SanitizeToolFeedbackValue(reason) + "\n" +
+            "round=real_user\n" +
+            "loaded_skill_rules=" + SanitizeToolFeedbackValue(activeSkills, 160) + "\n" +
+            "correction=" + SanitizeToolFeedbackValue(correction, 420) + "\n" +
+            "请根据这些事实用你自己的自然语气重新决定：" +
+            "可以选正确工具、自然询问或如实说明，程序不替你决定；" +
+            "不要复述字段，不要编造权限或成功状态。" +
+            "若文字声称马上执行，同轮必须提交可验证的工具请求；" +
+            "选择不执行就不要先口头承诺。" +
+            "本纠错轮不要用 ‹silent/› 或 ‹silence/› 掩盖这条真实失败。]";
+    }
+
+    private string DescribeActiveSkillsForToolFeedback()
+    {
+        if (m_ActiveSkillsThisRound.Count == 0) return "none";
+        var sb = new System.Text.StringBuilder();
+        foreach (string skill in m_ActiveSkillsThisRound)
+        {
+            if (sb.Length > 0) sb.Append(',');
+            sb.Append(skill);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// 把同步校验失败作为事实交回 LLM。只有真实用户正在等待时才立即纠错；自主 tick
+    /// 仍用粘性失败在自然下一帧反思，避免后台小故障突然打扰用户。
+    /// </summary>
+    private void ReportToolFailureForLlm(
+        string tool,
+        string code,
+        string reason,
+        string correction)
+    {
+        // Error categories and legacy execution names are not model-facing tools.
+        // Offer the canonical interface even when an old response hit an adapter.
+        if (tool == "hum_back")
+        {
+            tool = "sing";
+            correction = "按 reason 中的真实失败原因重新决定。演唱只用 <sing refs=\"清单中的clip引用\"/>，" +
+                "音乐目标用 pitch_plan 或 transpose；来源/边界状态可询问或显式确认/选择范围。" +
+                "不填写 source/mode/order，不改用其它录音冒充原素材。";
+        }
+        else if (tool == "practice_confirm") tool = "clip_confirm";
+        if (tool == "sing" || tool == "clip_confirm" || tool == "clip_revise" || tool == "clip_drop")
+            m_LastSingingRepairAt = Time.realtimeSinceStartup;
+        string safeReason = SanitizeToolFeedbackValue(reason);
+        NoteToolFailure($"{tool} 未执行：{safeReason}");
+        bool realUserWaiting = m_AgentRunning && !m_AgentCurrentRoundIsTick &&
+            m_AgentRoundInFlight && m_UserTurnAwaitingReplySince > 0f;
+        if (!realUserWaiting) return;
+
+        string frame = BuildToolCorrectionFrame(
+            tool, code, safeReason, DescribeActiveSkillsForToolFeedback(), correction);
+        if (m_ToolCorrectionContinuationPending)
+        {
+            //同一份坏回复可能同时带错两个标签；它们属于同一次纠错，不消耗第二次机会。
+            m_PendingToolCorrectionFrame += frame;
+            return;
+        }
+        if (m_ToolCorrectionAttemptsThisUserTurn >= k_MaxToolCorrectionAttemptsPerUserTurn)
+        {
+            m_ToolCorrectionExhaustedThisRound = true;
+            m_PendingNonCharacterToolNotice =
+                "系统：角色连续两次未能完成本轮工具调用，请重新询问或稍后再试。";
+            if (m_LogAgentLoop)
+                Debug.LogWarning($"[ToolCorrection] 已达单轮纠错上限 tool={tool} code={code}");
+            return;
+        }
+
+        m_ToolCorrectionAttemptsThisUserTurn++;
+        m_PendingToolCorrectionFrame = frame;
+        m_ToolCorrectionContinuationPending = true;
+        if (m_LogAgentLoop)
+            Debug.LogWarning($"[ToolCorrection] 将真实失败交回 LLM " +
+                             $"tool={tool} code={code} attempt={m_ToolCorrectionAttemptsThisUserTurn}");
+    }
+
+    /// <summary>
+    /// 最终安全网只显示为系统状态，不走角色 TTS，也不假装某个尚未调用的具体工具失败。
+    /// </summary>
+    private bool PublishPendingNonCharacterToolNotice()
+    {
+        if (string.IsNullOrWhiteSpace(m_PendingNonCharacterToolNotice)) return false;
+        string notice = m_PendingNonCharacterToolNotice.Trim();
+        m_PendingNonCharacterToolNotice = "";
+        HandleSystemNotice(new SystemNotice(
+            "tool_correction_exhausted",
+            SystemNoticeSeverity.Error,
+            notice,
+            "The single-turn LLM tool-correction budget was exhausted.",
+            "ToolCorrection",
+            true));
+        if (m_LogAgentLoop) Debug.LogWarning("[ToolCorrection/Fallback] " + notice);
+        return true;
+    }
+
     /// <summary>
     /// 记下一次没成功的工具调用。同一条重复出现时只累加次数，不刷屏。
     /// </summary>
@@ -12749,7 +17959,10 @@ public class ChatSample : MonoBehaviour
         m_StickyToolFailureShown = 0;
     }
 
-    private void RecordHumBackResult(string result, bool warning)
+    private void RecordHumBackResult(
+        string result,
+        bool warning,
+        bool attributeWarningToPendingTransaction = true)
     {
         m_LastHumBackResult = result ?? "";
         m_HumBackResultPending = !string.IsNullOrWhiteSpace(m_LastHumBackResult);
@@ -12757,7 +17970,8 @@ public class ChatSample : MonoBehaviour
         if (warning)
         {
             NoteToolFailure(m_LastHumBackResult);
-            if (!string.IsNullOrEmpty(m_PendingHumBackKey))
+            if (attributeWarningToPendingTransaction &&
+                !string.IsNullOrEmpty(m_PendingHumBackKey))
             {
                 if (m_PendingHumBackKey == m_LastFailedHumBackKey) m_LastFailedHumBackCount++;
                 else
@@ -12771,6 +17985,7 @@ public class ChatSample : MonoBehaviour
                 //查不到曲库，就能把一个还没试过的 hum_back 直接判成"连续失败 2 次"而拦掉；
                 //② 拦截本身也记一次失败，计数于是自己往上滚，"已经连续失败 N 次"越报越大。
                 m_PendingHumBackKey = "";
+                m_PendingHumBackInputRevision = -1;
             }
         }
         else if (m_HumBackResultPending)
@@ -13003,18 +18218,23 @@ public class ChatSample : MonoBehaviour
             return;
 
         m_WriteState = true;
-        StartCoroutine(SetTextPerWord(_msg));
+        StartCoroutine(SetTextPerWord(_msg, m_FormalResponseGeneration));
     }
 
-    private IEnumerator SetTextPerWord(string _msg)
+    private IEnumerator SetTextPerWord(string _msg, int responseGeneration)
     {
         int currentPos = 0;
         while (m_WriteState)
         {
+            if (responseGeneration != m_FormalResponseGeneration) yield break;
             yield return new WaitForSeconds(m_WordWaitTime);
+            if (responseGeneration != m_FormalResponseGeneration) yield break;
             currentPos++;
             //更新显示的内容
             m_TextBack.text = _msg.Substring(0, currentPos);
+            if (m_SubtitleOverlay != null)
+                m_SubtitleOverlay.ReportSourceCharacterRevealed(
+                    responseGeneration, _msg[currentPos - 1]);
 
             m_WriteState = currentPos < _msg.Length;
 

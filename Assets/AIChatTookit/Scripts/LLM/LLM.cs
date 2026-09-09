@@ -9,6 +9,35 @@ using UnityEngine;
 public class LLM:MonoBehaviour
 {
     /// <summary>
+    /// User-visible runtime failures.  Consumers render these as non-character notices;
+    /// they must never be inserted into dialogue history or spoken through TTS.
+    /// </summary>
+    public event Action<SystemNotice> OnSystemNotice;
+
+    /// <summary>
+    /// Diagnostic copy of the model's response content before channel projection.
+    /// Never use this event to dispatch speech, actions or history writes.
+    /// </summary>
+    public event Action<string> OnRawResponse;
+    // Diagnostic only: final serialized main request; consumers must not log
+    // the full payload (which may contain images) or dispatch anything from it.
+    public event Action<string> OnRequestDiagnostic;
+    protected void RaiseRequestDiagnostic(string json) => OnRequestDiagnostic?.Invoke(json);
+    // Protocol failures are routed to the existing LLM correction path, never TTS.
+    public event Action<string> OnOutputFormatError;
+    protected void RaiseOutputFormatError(string reason) => OnOutputFormatError?.Invoke(reason);
+
+    protected void RaiseRawResponse(string content)
+    {
+        OnRawResponse?.Invoke(content ?? "");
+    }
+
+    protected void RaiseSystemNotice(SystemNotice notice)
+    {
+        if (notice != null && OnSystemNotice != null) OnSystemNotice(notice);
+    }
+
+    /// <summary>
     /// API地址。各子类在Awake()里硬编码覆盖，Inspector值不起作用，故隐藏。
     /// </summary>
     [HideInInspector]
@@ -43,6 +72,23 @@ public class LLM:MonoBehaviour
     [SerializeField] public List<SendData> m_DataList = new List<SendData>();
 
     /// <summary>
+    /// 闭眼后停止重复提交旧截图像素。只归档附件，不删除当时的文字对话或改写记忆；
+    /// 再睁眼时新截图仍可正常提交，旧帧不会自动复活、反复打断稳定前缀缓存。
+    /// </summary>
+    public int ArchiveHistoricalImagePixels()
+    {
+        int archived = 0;
+        if (m_DataList == null) return archived;
+        foreach (SendData message in m_DataList)
+        {
+            if (message == null || message.imageArchived || string.IsNullOrEmpty(message.imageDataUrl)) continue;
+            message.imageArchived = true;
+            archived++;
+        }
+        return archived;
+    }
+
+    /// <summary>
     /// 每次请求追加到消息列表**最末尾**的易变上下文（当前用于拓扑记忆网络的记忆块）。
     ///
     /// 它不进 m_DataList，因此不会随对话沉淀进历史。放在末尾是关键：前面的
@@ -50,6 +96,8 @@ public class LLM:MonoBehaviour
     /// 若把它拼进感知帧，帧会留在历史里，等于每轮复制一份，白白占用上下文并加速触发裁剪。
     /// </summary>
     [System.NonSerialized] public string TrailingContext = "";
+    /// <summary>One-request preparation facts; consumed by the provider, never dialogue history.</summary>
+    [System.NonSerialized] public string RequestContext = "";
     /// <summary>
     /// 本轮按需加载的技能提示词。和 TrailingContext 一样只在请求序列化时临时插入，
     /// 不写进 m_DataList；因此技能启停不会改写稳定的 system 前缀，也不会在历史里复制。
@@ -328,6 +376,42 @@ public class LLM:MonoBehaviour
     }
 
     /// <summary>
+    /// 持续声响下的轮次边界复核。它与普通投机草稿分开管理：边界判断优先级更高，
+    /// 不能被歌唱预反应的逐帧刷新取消或饿死；同样不得写入正式对话历史。
+    /// </summary>
+    public virtual bool SupportsTurnBoundaryMessages { get { return false; } }
+
+    public virtual void PostTurnBoundaryMsg(
+        string prompt,
+        System.Action<string> callback)
+    {
+        if (callback != null) callback("");
+    }
+
+    public virtual void CancelTurnBoundaryMsg()
+    {
+    }
+
+    /// <summary>
+    /// Stateless utility inference with a caller-provided minimal system prompt.  It is
+    /// intentionally separate from PostMsg/PostEphemeralMsg so translation cannot enter,
+    /// cancel, or inherit the character conversation.  Providers opt in explicitly.
+    /// </summary>
+    public virtual bool SupportsUtilityMessages { get { return false; } }
+
+    public virtual void PostUtilityMessage(
+        string systemPrompt,
+        string input,
+        Action<bool, string, string> callback)
+    {
+        if (callback != null) callback(false, "", "provider does not support utility messages");
+    }
+
+    public virtual void CancelUtilityMessage()
+    {
+    }
+
+    /// <summary>
     /// 撤销当前正式回复。用户重新开口或打断角色时调用。
     /// 子类应同时停止网络请求，并保证过期回调不再写入历史或触发 TTS。
     /// </summary>
@@ -373,6 +457,7 @@ public class LLM:MonoBehaviour
         /// [NonSerialized] 让 JsonUtility 不会自动塞到 JSON 里——我们走手动 JSON 路径处理它。
         /// </summary>
         [NonSerialized] public string imageDataUrl;
+        [NonSerialized] public bool imageArchived;
         public SendData() { }
         public SendData(string _role, string _content)
         {

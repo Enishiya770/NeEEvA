@@ -39,6 +39,9 @@ public class TTS : MonoBehaviour
     /// </summary>
     public virtual bool SupportsStreamingPlayback => false;
 
+    /// <summary>True only after current synthesis has finished; playback may continue.</summary>
+    public virtual bool CanPrefetchNextSpeech => false;
+
     /// <summary>
     /// 流式合成并直接播放。onStarted 在首批 PCM 开始播放时触发，
     /// onCompleted(success, text, audioDuration) 在音频播放完或失败时触发。
@@ -50,6 +53,35 @@ public class TTS : MonoBehaviour
         Action<bool, string, float> onCompleted)
     {
         onCompleted?.Invoke(false, text, 0f);
+    }
+
+    public enum StreamingPlaybackPermission { Wait, Play, Cancel }
+
+    /// <summary>Start synthesis now; a capable backend buffers PCM until playback is permitted.</summary>
+    public virtual void SpeakStreamingWithPlaybackGate(
+        string text, AudioSource output, Action<string> onStarted,
+        Action<bool, string, float> onCompleted, Func<StreamingPlaybackPermission> playbackGate)
+    {
+        StartCoroutine(WaitForStreamingPlayback(text, output, onStarted, onCompleted, playbackGate));
+    }
+
+    // Compatibility path for other providers, which cannot yet buffer independently.
+    private IEnumerator WaitForStreamingPlayback(string text, AudioSource output,
+        Action<string> onStarted, Action<bool, string, float> onCompleted,
+        Func<StreamingPlaybackPermission> playbackGate)
+    {
+        while (playbackGate != null)
+        {
+            StreamingPlaybackPermission permission = playbackGate();
+            if (permission == StreamingPlaybackPermission.Cancel)
+            {
+                onCompleted?.Invoke(false, text, 0f);
+                yield break;
+            }
+            if (permission == StreamingPlaybackPermission.Play) break;
+            yield return null;
+        }
+        SpeakStreaming(text, output, onStarted, onCompleted);
     }
 
     /// <summary>取消当前流式请求与播放。</summary>

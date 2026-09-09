@@ -39,13 +39,13 @@ public class GPTSoVITSFASTAPI : TTS
     [SerializeField] private bool m_WarmUpLatencyFillerVariants = true;
 
     [Header("流式播放预缓冲（秒）")]
-    [SerializeField, Range(0.1f, 2f)] private float m_StreamingPrebufferSeconds = 0.5f;
+    [SerializeField, Range(0.1f, 2f)] private float m_StreamingPrebufferSeconds = 0.65f;
 
     [Header("Streaming rebuffer target after an underrun (seconds)")]
-    [SerializeField, Range(0.2f, 2f)] private float m_StreamingResumeBufferSeconds = 0.65f;
+    [SerializeField, Range(0.2f, 2f)] private float m_StreamingResumeBufferSeconds = 0.85f;
 
     [Header("Maximum adaptive prebuffer after an unstable stream (seconds)")]
-    [SerializeField, Range(0.5f, 2.5f)] private float m_MaxAdaptivePrebufferSeconds = 1.25f;
+    [SerializeField, Range(0.5f, 2.5f)] private float m_MaxAdaptivePrebufferSeconds = 1.5f;
 
     [Header("GPT-SoVITS streaming mode (3 uses fixed, faster chunks)")]
     [SerializeField, Range(2, 3)] private int m_StreamingMode = 3;
@@ -59,6 +59,7 @@ public class GPTSoVITSFASTAPI : TTS
     private UnityWebRequest m_ActiveStreamingRequest;
     private AudioSource m_ActiveStreamingOutput;
     private bool m_StreamCancelled;
+    private int m_StreamGeneration;
     private float m_AdaptivePrebufferSeconds;
     private readonly Dictionary<Language, List<LatencyFillerEntry>> m_LatencyFillerClips =
         new Dictionary<Language, List<LatencyFillerEntry>>();
@@ -89,6 +90,9 @@ public class GPTSoVITSFASTAPI : TTS
     }
 
     public override bool SupportsStreamingPlayback => true;
+    public override bool CanPrefetchNextSpeech =>
+        (m_ActiveStreamingRequest == null || m_ActiveStreamingRequest.isDone) &&
+        (m_ActivePreparedRequest == null || m_ActivePreparedRequest.isDone);
 
     public override void SpeakStreaming(
         string text,
@@ -96,23 +100,33 @@ public class GPTSoVITSFASTAPI : TTS
         Action<string> onStarted,
         Action<bool, string, float> onCompleted)
     {
+        SpeakStreamingWithPlaybackGate(text, output, onStarted, onCompleted, null);
+    }
+
+    public override void SpeakStreamingWithPlaybackGate(
+        string text, AudioSource output, Action<string> onStarted,
+        Action<bool, string, float> onCompleted, Func<StreamingPlaybackPermission> playbackGate)
+    {
         CancelWarmUpForRealRequest();
         CancelStreaming();
         m_StreamCancelled = false;
-        StartCoroutine(StreamVoice(text, output, onStarted, onCompleted));
+        StartCoroutine(StreamVoice(text, output, onStarted, onCompleted, playbackGate, m_StreamGeneration));
     }
 
     public override void CancelStreaming()
     {
+        m_StreamGeneration++;
         m_StreamCancelled = true;
         if (m_ActiveStreamingRequest != null && !m_ActiveStreamingRequest.isDone)
         {
             m_ActiveStreamingRequest.Abort();
         }
+        m_ActiveStreamingRequest = null;
         if (m_ActiveStreamingOutput != null)
         {
             m_ActiveStreamingOutput.Stop();
         }
+        m_ActiveStreamingOutput = null;
     }
 
     /// <summary>
@@ -340,6 +354,7 @@ public class GPTSoVITSFASTAPI : TTS
 
     public override void PrepareSpeech(string text, Action<AudioClip, string> callback)
     {
+        CancelWarmUpForRealRequest();
         text = Regex.Replace(text ?? string.Empty, "<think>.*?</think>", "", RegexOptions.Singleline).Trim();
         if (string.IsNullOrEmpty(text))
         {
@@ -462,8 +477,17 @@ public class GPTSoVITSFASTAPI : TTS
         string text,
         AudioSource output,
         Action<string> onStarted,
-        Action<bool, string, float> onCompleted)
+        Action<bool, string, float> onCompleted,
+        Func<StreamingPlaybackPermission> playbackGate, int generation)
     {
+        bool gateCancelled = false;
+        bool IsCurrent()
+        {
+            if (m_StreamCancelled || generation != m_StreamGeneration || gateCancelled) return false;
+            if (playbackGate != null && playbackGate() == StreamingPlaybackPermission.Cancel)
+                gateCancelled = true;
+            return !gateCancelled;
+        }
         text = Regex.Replace(text ?? string.Empty, "<think>.*?</think>", "", RegexOptions.Singleline).Trim();
         if (string.IsNullOrEmpty(text) || output == null)
         {
@@ -489,11 +513,11 @@ public class GPTSoVITSFASTAPI : TTS
         bool started = false;
         bool success = false;
         float requestStart = Time.realtimeSinceStartup;
+        float headerAt = -1f, firstPcmAt = -1f, bufferReadyAt = -1f;
 
         using (UnityWebRequest request = new UnityWebRequest(m_PostURL, "POST"))
         {
             m_ActiveStreamingRequest = request;
-            m_ActiveStreamingOutput = output;
             request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(postJson));
             request.downloadHandler = pcmHandler;
             request.SetRequestHeader("Content-Type", "application/json");
@@ -502,28 +526,44 @@ public class GPTSoVITSFASTAPI : TTS
             UnityWebRequestAsyncOperation operation = request.SendWebRequest();
 
             //等 WAV 头和最小预缓冲。短句若已经完整返回，也立即开始播放。
-            while (!m_StreamCancelled && !pcmHandler.HeaderReady && !operation.isDone)
+            while (IsCurrent() && !pcmHandler.HeaderReady && !operation.isDone)
             {
                 yield return null;
             }
 
-            if (!m_StreamCancelled && pcmHandler.HeaderReady && !pcmHandler.FormatError)
+            if (IsCurrent() && pcmHandler.HeaderReady && !pcmHandler.FormatError)
             {
+                headerAt = Time.realtimeSinceStartup;
                 float initialPrebuffer = Mathf.Clamp(
                     Mathf.Max(m_StreamingPrebufferSeconds, m_AdaptivePrebufferSeconds),
                     0.1f,
                     m_MaxAdaptivePrebufferSeconds);
                 int wantedSamples = Mathf.CeilToInt(
                     pcmHandler.SampleRate * pcmHandler.Channels * initialPrebuffer);
-                while (!m_StreamCancelled && !operation.isDone && pcmHandler.BufferedSampleCount < wantedSamples)
+                while (IsCurrent() && !operation.isDone && pcmHandler.BufferedSampleCount < wantedSamples)
                 {
+                    if (firstPcmAt < 0f && pcmHandler.TotalSamplesReceived > 0)
+                        firstPcmAt = Time.realtimeSinceStartup;
+                    yield return null;
+                }
+
+                bufferReadyAt = Time.realtimeSinceStartup;
+                if (firstPcmAt < 0f && pcmHandler.TotalSamplesReceived > 0) firstPcmAt = bufferReadyAt;
+                // The network request and synthesis have already run. Waiting here
+                // leaves the opener's AudioSource untouched while PCM accumulates.
+                while (IsCurrent() && playbackGate != null)
+                {
+                    StreamingPlaybackPermission permission = playbackGate();
+                    if (permission == StreamingPlaybackPermission.Cancel) { gateCancelled = true; break; }
+                    if (permission == StreamingPlaybackPermission.Play) break;
                     yield return null;
                 }
 
                 if (operation.isDone) pcmHandler.MarkInputComplete();
 
-                if (!m_StreamCancelled && pcmHandler.TotalSamplesReceived > 0)
+                if (IsCurrent() && pcmHandler.TotalSamplesReceived > 0)
                 {
+                    m_ActiveStreamingOutput = output;
                     streamingClip = AudioClip.Create(
                         "GPT-SoVITS-stream",
                         pcmHandler.SampleRate * Mathf.Max(10, m_MaxStreamingClipSeconds),
@@ -536,6 +576,10 @@ public class GPTSoVITSFASTAPI : TTS
                     output.Play();
                     started = true;
                     onStarted?.Invoke(text);
+                    Debug.Log($"[TTS/Timing] header={headerAt - requestStart:F2}s " +
+                        $"firstPcm={(firstPcmAt >= 0f ? firstPcmAt - requestStart : -1f):F2}s " +
+                        $"bufferReady={bufferReadyAt - requestStart:F2}s " +
+                        $"playbackGate={Time.realtimeSinceStartup - bufferReadyAt:F2}s total={Time.realtimeSinceStartup - requestStart:F2}s");
                     Debug.Log($"[TTS流式] 首批PCM开始播放，等待 {Time.realtimeSinceStartup - requestStart:F2}s，缓冲 {pcmHandler.BufferedSeconds:F2}s");
                 }
             }
@@ -547,8 +591,9 @@ public class GPTSoVITSFASTAPI : TTS
             long drainTargetFrames = -1;
             bool pausedForRebuffer = false;
             float rebufferStartedAt = 0f;
+            float rebufferWaitSeconds = 0f;
             int streamUnderruns = 0;
-            while (started && !m_StreamCancelled)
+            while (started && IsCurrent())
             {
                 if (operation.isDone) pcmHandler.MarkInputComplete();
 
@@ -571,6 +616,7 @@ public class GPTSoVITSFASTAPI : TTS
                         pcmHandler.BufferedSeconds >= Mathf.Max(m_StreamingResumeBufferSeconds, m_StreamingPrebufferSeconds);
                     if (canResume && output != null)
                     {
+                        rebufferWaitSeconds += Time.realtimeSinceStartup - rebufferStartedAt;
                         output.UnPause();
                         pausedForRebuffer = false;
                         Debug.Log($"[TTS stream] playback resumed after {Time.realtimeSinceStartup - rebufferStartedAt:F2}s, " +
@@ -593,35 +639,48 @@ public class GPTSoVITSFASTAPI : TTS
                 yield return null;
             }
 
-            if (streamUnderruns > 0)
+            if (started && IsCurrent() && streamUnderruns > 0)
             {
+                //一次流里连续饿死说明网络抖动不止一个尖峰；按次数更快抬高下一句的
+                //预缓冲。成功时慢慢回落，避免 0.5↔0.7 秒锯齿造成每隔一句又欠载。
+                float adaptiveIncrease = 0.15f +
+                    0.05f * Mathf.Min(streamUnderruns, 4);
                 m_AdaptivePrebufferSeconds = Mathf.Min(
                     m_MaxAdaptivePrebufferSeconds,
-                    Mathf.Max(m_StreamingPrebufferSeconds, m_AdaptivePrebufferSeconds) + 0.2f);
+                    Mathf.Max(m_StreamingPrebufferSeconds, m_AdaptivePrebufferSeconds) +
+                    adaptiveIncrease);
                 Debug.LogWarning($"[TTS stream] underruns={streamUnderruns}, insertedSilence={pcmHandler.InsertedSilenceSeconds:F3}s, " +
+                                 $"rebufferWait={rebufferWaitSeconds:F3}s, " +
                                  $"nextPrebuffer={m_AdaptivePrebufferSeconds:F2}s");
             }
-            else
+            else if (started && IsCurrent())
             {
                 m_AdaptivePrebufferSeconds = Mathf.MoveTowards(
                     Mathf.Max(m_StreamingPrebufferSeconds, m_AdaptivePrebufferSeconds),
                     m_StreamingPrebufferSeconds,
-                    0.05f);
+                    0.02f);
             }
 
-            success = !m_StreamCancelled
+            success = IsCurrent()
                 && request.result == UnityWebRequest.Result.Success
                 && started
                 && !pcmHandler.FormatError;
 
-            if (!success && !m_StreamCancelled)
+            if (!IsCurrent() && !operation.isDone) request.Abort();
+            if (!success && IsCurrent())
             {
                 Debug.LogError($"[TTS流式] 失败(code={request.responseCode}): {request.error}; {pcmHandler.FormatErrorMessage}");
             }
         }
 
         float audioDuration = pcmHandler.AudioDuration;
-        if (output != null) output.Stop();
+        // An obsolete buffered request must never stop or clear a newer stream/opener.
+        if (streamingClip != null && output != null && output.clip == streamingClip) output.Stop();
+        if (generation == m_StreamGeneration)
+        {
+            m_ActiveStreamingRequest = null;
+            m_ActiveStreamingOutput = null;
+        }
         onCompleted?.Invoke(success, text, audioDuration);
 
         if (streamingClip != null)
@@ -629,8 +688,6 @@ public class GPTSoVITSFASTAPI : TTS
             if (output != null && output.clip == streamingClip) output.clip = null;
             Destroy(streamingClip);
         }
-        m_ActiveStreamingRequest = null;
-        m_ActiveStreamingOutput = null;
     }
 
     private sealed class LatencyFillerEntry
