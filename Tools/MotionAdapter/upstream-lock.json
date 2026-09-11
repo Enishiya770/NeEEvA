@@ -1,0 +1,7 @@
+﻿{
+    "ardy":  "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+    "llama_cpp":  "dc80c5252a6d49301726e5987cc1fa006b69d93e",
+    "llama_tag":  "b8919",
+    "ardy_core_repo": "nvidia/ARDY-Core-RP-20FPS-Horizon40",
+    "ardy_core_revision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76"
+}

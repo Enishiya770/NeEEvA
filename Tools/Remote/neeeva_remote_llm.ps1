@@ -7,7 +7,7 @@ reaches them through an SSH local-forward tunnel.
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('start', 'start-llm', 'start-embed', 'stop', 'status', 'restart', 'restart-llm')]
+    [ValidateSet('start', 'start-llm', 'start-llm-feature', 'llm-info', 'start-embed', 'stop', 'status', 'restart', 'restart-llm')]
     [string]$Action = 'status'
 )
 
@@ -18,6 +18,8 @@ $LlamaRoot = 'D:\NeEEvA\llamacpp-b8919-cuda131-sm120'
 $LogRoot = 'D:\NeEEvA\logs'
 $ServerExe = Join-Path $LlamaRoot 'llama-server.exe'
 $ChatTemplate = 'D:\NeEEvA\services\qwen36_chat_template.jinja'
+$FeatureExe = 'D:\NeEEvA\motion-feature-server\llama-server.exe'
+$FeatureLauncher = 'D:\NeEEvA\motion-feature-server\remote_server.ps1'
 
 $Services = [ordered]@{
     llm = @{
@@ -69,6 +71,34 @@ function Get-PortPid([int]$Port) {
     return $null
 }
 
+function Get-LlmInfo {
+    $processes = @(Get-CimInstance Win32_Process | Where-Object {
+        $_.Name -eq 'qwen_feature_probe.exe' -or
+        ($_.Name -like 'llama*.exe' -and $_.CommandLine -match 'qwen36|Qwen3.6')
+    })
+    if ($processes.Count -gt 1) { throw 'Multiple Qwen processes detected; no automatic process changes are allowed.' }
+    if (-not $processes.Count) { return [pscustomobject]@{mode='stopped';port=8080;process_id=$null} }
+    $process = $processes[0]
+    $mode = if ($process.ExecutablePath -ieq $FeatureExe) { 'feature' } elseif ($process.ExecutablePath -ieq $ServerExe) { 'legacy' } else { 'unknown' }
+    $port = $null
+    if ($process.CommandLine -match '--port\s+"?(\d+)') { $port = [int]$Matches[1] }
+    if ($mode -eq 'unknown' -or $port -notin 8080,8082) { throw 'An unmanaged Qwen process is running; refusing another model load.' }
+    return [pscustomobject]@{mode=$mode;port=$port;process_id=$process.ProcessId;executable=$process.ExecutablePath}
+}
+
+function Start-FeatureService {
+    $info = Get-LlmInfo
+    if ($info.mode -eq 'feature') {
+        Write-Output "[llm] reusing shared-model feature server PID $($info.process_id), remote port $($info.port)"
+        return
+    }
+    if ($info.mode -ne 'stopped') {
+        throw 'The legacy Qwen service is already running. Feature mode does not stop or replace it; perform an explicit idle maintenance switch first.'
+    }
+    if (-not (Test-Path -LiteralPath $FeatureLauncher)) { throw 'Stage the verified shared-model server before selecting feature mode.' }
+    & $FeatureLauncher -Action start -Port 8080
+}
+
 function Assert-ServiceFiles($Service) {
     if (-not (Test-Path -LiteralPath $ServerExe)) {
         throw "Missing llama-server: $ServerExe"
@@ -84,6 +114,22 @@ function Assert-ServiceFiles($Service) {
 }
 
 function Start-ServiceProcess([string]$Key, $Service) {
+    # Both launchers use this cross-session mutex. A competing startup must
+    # become visible in CIM before the lock is released; otherwise two scripts
+    # could both observe an idle GPU while a feature startup hashes its model.
+    $startMutex = $null
+    if ($Key -eq 'llm') {
+        $startMutex = New-Object Threading.Mutex($false, 'Global\NeEEvA-Qwen-model-start')
+        if (-not $startMutex.WaitOne(30000)) { $startMutex.Dispose(); throw 'Another Qwen startup is in progress; retry after it finishes.' }
+    }
+    try {
+    if ($Key -eq 'llm') {
+        $info = Get-LlmInfo
+        if ($info.mode -ne 'stopped') {
+            Write-Output "[llm] reusing $($info.mode) Qwen PID $($info.process_id), remote port $($info.port); no second model loaded"
+            return
+        }
+    }
     $existing = Get-PortPid $Service.Port
     if ($existing) {
         $process = Get-CimInstance Win32_Process -Filter "ProcessId = $existing"
@@ -108,9 +154,24 @@ function Start-ServiceProcess([string]$Key, $Service) {
         throw "Win32_Process.Create failed for $Key, code $($result.ReturnValue)"
     }
     Write-Output "[$Key] started PID $($result.ProcessId), port $($Service.Port)"
+    if ($Key -eq 'llm') {
+        $deadline = (Get-Date).AddSeconds(8)
+        do {
+            if ((Get-LlmInfo).mode -ne 'stopped') { break }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        if ((Get-LlmInfo).mode -eq 'stopped') { throw 'The Qwen launcher did not create its server process; inspect the service logs.' }
+    }
+    } finally {
+        if ($startMutex) { $startMutex.ReleaseMutex(); $startMutex.Dispose() }
+    }
 }
 
 function Stop-ServiceProcess([string]$Key, $Service) {
+    if ($Key -eq 'llm') {
+        $info = Get-LlmInfo
+        if ($info.mode -eq 'feature') { & $FeatureLauncher -Action stop; return }
+    }
     $processId = Get-PortPid $Service.Port
     if (-not $processId) {
         Write-Output "[$Key] not running"
@@ -137,6 +198,8 @@ function Stop-ServiceProcess([string]$Key, $Service) {
 }
 
 function Show-Status {
+    $info = Get-LlmInfo
+    Write-Output "[qwen-mode] $($info.mode), actual remote port $($info.port), PID $($info.process_id)"
     foreach ($entry in $Services.GetEnumerator()) {
         $processId = Get-PortPid $entry.Value.Port
         $state = if ($processId) { "listening PID $processId" } else { 'stopped' }
@@ -154,18 +217,20 @@ switch ($Action) {
         Show-Status
     }
     'start-llm' { Start-ServiceProcess 'llm' $Services.llm }
+    'start-llm-feature' { Start-FeatureService }
+    'llm-info' { Get-LlmInfo | ConvertTo-Json -Compress }
     'start-embed' { Start-ServiceProcess 'embed' $Services.embed }
     'restart-llm' {
-        $processId = Get-PortPid $Services.llm.Port
-        if ($processId) {
-            $slots = Invoke-RestMethod 'http://127.0.0.1:8080/slots' -TimeoutSec 5
+        $info = Get-LlmInfo
+        if ($info.mode -ne 'stopped') {
+            $slots = Invoke-RestMethod "http://127.0.0.1:$($info.port)/slots" -TimeoutSec 5
             if ($slots.Count -eq 0 -or @($slots | Where-Object { $_.is_processing }).Count -gt 0) {
                 throw 'LLM has active requests or no verifiable idle slots; retry after the conversation finishes.'
             }
         }
         Stop-ServiceProcess 'llm' $Services.llm
         Start-Sleep -Seconds 1
-        Start-ServiceProcess 'llm' $Services.llm
+        if ($info.mode -eq 'feature') { Start-FeatureService } else { Start-ServiceProcess 'llm' $Services.llm }
         Show-Status
     }
     'stop' {

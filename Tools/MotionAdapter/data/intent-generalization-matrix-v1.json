@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "matrixId": "intent-generalization-native-v1",
+  "frozenAtUtc": "2026-09-10T12:17:40.503246+00:00",
+  "harnessSha256": "a88d6c3384fd5f18ca0a8f7990d384db66a0496db13b1bf5701e76ce50de8d72",
+  "matrixSignature": "intent-generalization-native-v1\nnear-head|Bring both hands beside the head, keeping the body facing forward.\nforward|Extend both arms forward at shoulder height, then hold them there.\nhistories=idle-Animator,left-wave-at-0.7s\nseeds=0,1\nconditioning=16\nstableSeconds=0.2\navatar=NEVA\n",
+  "matrixSignatureSha256": "734eec6869611b442890af6c978590c27da65b90da684ffab899f572b1c408d4",
+  "rows": [
+    {
+      "id": "near-head-idle-seed0",
+      "description": "Bring both hands beside the head, keeping the body facing forward.",
+      "history": "idle-Animator",
+      "seed": 0,
+      "goal": {
+        "leftGoal": "near-head",
+        "rightGoal": "near-head",
+        "requiredStableSeconds": 0.2
+      }
+    },
+    {
+      "id": "near-head-idle-seed1",
+      "description": "Bring both hands beside the head, keeping the body facing forward.",
+      "history": "idle-Animator",
+      "seed": 1,
+      "goal": {
+        "leftGoal": "near-head",
+        "rightGoal": "near-head",
+        "requiredStableSeconds": 0.2
+      }
+    },
+    {
+      "id": "near-head-wave-seed0",
+      "description": "Bring both hands beside the head, keeping the body facing forward.",
+      "history": "left-wave-at-0.7s",
+      "seed": 0,
+      "goal": {
+        "leftGoal": "near-head",
+        "rightGoal": "near-head",
+        "requiredStableSeconds": 0.2
+      }
+    },
+    {
+      "id": "near-head-wave-seed1",
+      "description": "Bring both hands beside the head, keeping the body facing forward.",
+      "history": "left-wave-at-0.7s",
+      "seed": 1,
+      "goal": {
+        "leftGoal": "near-head",
+        "rightGoal": "near-head",
+        "requiredStableSeconds": 0.2
+      }
+    },
+    {
+      "id": "forward-idle-seed0",
+      "description": "Extend both arms forward at shoulder height, then hold them there.",
+      "history": "idle-Animator",
+      "seed": 0,
+      "goal": {
+        "leftGoal": "forward",
+        "rightGoal": "forward",
+        "requiredStableSeconds": 0.2
+      }
+    },
+    {
+      "id": "forward-idle-seed1",
+      "description": "Extend both arms forward at shoulder height, then hold them there.",
+      "history": "idle-Animator",
+      "seed": 1,
+      "goal": {
+        "leftGoal": "forward",
+        "rightGoal": "forward",
+        "requiredStableSeconds": 0.2
+      }
+    },
+    {
+      "id": "forward-wave-seed0",
+      "description": "Extend both arms forward at shoulder height, then hold them there.",
+      "history": "left-wave-at-0.7s",
+      "seed": 0,
+      "goal": {
+        "leftGoal": "forward",
+        "rightGoal": "forward",
+        "requiredStableSeconds": 0.2
+      }
+    },
+    {
+      "id": "forward-wave-seed1",
+      "description": "Extend both arms forward at shoulder height, then hold them there.",
+      "history": "left-wave-at-0.7s",
+      "seed": 1,
+      "goal": {
+        "leftGoal": "forward",
+        "rightGoal": "forward",
+        "requiredStableSeconds": 0.2
+      }
+    }
+  ],
+  "modelChatRequests": 0,
+  "motionExecutionsAtFreeze": 0,
+  "naturalness": null,
+  "scope": "Eight fixed real generations; no new chat request, no retries or selected best seed; existing8093+shared Qwen feature. Necessary wrist regions only."
+}

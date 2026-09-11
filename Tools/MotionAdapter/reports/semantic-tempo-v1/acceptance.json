@@ -1,0 +1,827 @@
+{
+  "createdUtc": "2026-09-10T10:40:02.655686+00:00",
+  "status": "execution_verified_semantic_planning_experimental_opt_in_only",
+  "naturalnessAccepted": false,
+  "generalizationAccepted": false,
+  "defaultBehavior": "Previous GeneratedOutputContract and accepted basic gestures; plan requires explicit experimental opt-in.",
+  "modelChange": "No model or adapter training/replacement; existing shared Qwen and ARDY service were reused.",
+  "unity": {
+    "tempoCases": 48,
+    "fixtures": 4,
+    "completedCurves": 40,
+    "checks": 3461163,
+    "frames": 6441,
+    "nativePngFrames": 430,
+    "semanticChecks": 322,
+    "dialogueChecks": 1306,
+    "legacyPlaybackChecks": 724204,
+    "liveHttpChecks": 43180,
+    "liveFirstWindowSeconds": 0.860116720199585,
+    "liveAllWindowsSeconds": 1.2828013896942139,
+    "liveTimelineFrames": 120
+  },
+  "planning": {
+    "developmentMatched": 13,
+    "developmentCount": 20,
+    "developmentSourceCoverage": [
+      3,
+      14
+    ],
+    "holdoutMatched": 4,
+    "holdoutCount": 6,
+    "holdoutSourceCoverage": [
+      0,
+      4
+    ],
+    "holdoutRuns": 1,
+    "modelPlanningRequests": 46,
+    "meaning": "Small public diagnostics, not an estimated generalization rate. Syntax, source coverage, execution and naturalness are separate outcomes."
+  },
+  "publicReplay": {
+    "rawTagUnedited": true,
+    "caseId": "zh-forward-greeting",
+    "source": "development v2",
+    "endIdleHonoredOnAllFixtures": true,
+    "limitation": "Correctly retains forward arms and selects natural tempo, but model overlocks inferred partner palms; quote membership does not prove explicit user intent."
+  },
+  "remaining": [
+    "Model can omit explicit elbows/current-pose goals or confuse palm direction.",
+    "A matched quote does not prove semantic entailment; missing or excessive locks remain an observed failure.",
+    "ARDY free motion remains the existing six-second route, not improved by this procedural timing layer.",
+    "Perceived naturalness and practical scene interactions need human review."
+  ],
+  "validationSequence": "Full tempo and original-tag playback preceded an Inspector synchronization fix. Final real Chat/HTTP checks cover that fix; timing/player/session/plan hashes remain identical to the full tempo run.",
+  "measured": [
+    {
+      "name": "legacy-slow-wrists",
+      "seconds": 3.200000047683716,
+      "preparationSeconds": 1.2000000476837158,
+      "completed": true,
+      "joints": [
+        {
+          "joint": "left",
+          "points": 76,
+          "directionChanges": 3,
+          "minimumAngle": -9.999490737915039,
+          "maximumAngle": 9.99953842163086,
+          "maximumGap": 0.05198079999999905,
+          "minimumGap": 0.013616299999998915,
+          "firstCrossing": 3.151783052850799,
+          "lastCrossing": 4.7517711293380716,
+          "measuredFrequencyHz": 0.6250046576568689,
+          "peakVelocity": 39.234622869803715,
+          "peakAcceleration": 372.57425742272375,
+          "velocityP95": 38.99135084538907,
+          "accelerationP95": 315.34450654681007,
+          "startAngle": -5.238030553300632e-06,
+          "endAngle": -0.008370226249098778,
+          "firstVelocity": 1.0809905048666846,
+          "lastVelocity": 3.124730134337861,
+          "angleStepAtStart": 5.238030553300632e-06,
+          "angleStepAtEnd": 0.008367281217715572,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        },
+        {
+          "joint": "right",
+          "points": 76,
+          "directionChanges": 3,
+          "minimumAngle": -9.999515533447266,
+          "maximumAngle": 9.99951171875,
+          "maximumGap": 0.05198079999999905,
+          "minimumGap": 0.013616299999998915,
+          "firstCrossing": 3.1517827143549106,
+          "lastCrossing": 4.7517707546334025,
+          "measuredFrequencyHz": 0.6250046718011351,
+          "peakVelocity": 39.234904205504584,
+          "peakAcceleration": 372.5674745808423,
+          "velocityP95": 38.991546492391635,
+          "accelerationP95": 315.3678167396547,
+          "startAngle": -1.0256560017296579e-05,
+          "endAngle": -0.008389418944716454,
+          "firstVelocity": 1.0808245453885204,
+          "lastVelocity": 3.1244019596572508,
+          "angleStepAtStart": 1.0256560017296579e-05,
+          "angleStepAtEnd": 0.008362852049685898,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    },
+    {
+      "name": "adaptive-gentle-wrists",
+      "seconds": 3.076930046081543,
+      "preparationSeconds": 0.9363200068473816,
+      "completed": true,
+      "joints": [
+        {
+          "joint": "left",
+          "points": 215,
+          "directionChanges": 3,
+          "minimumAngle": -9.999516487121582,
+          "maximumAngle": 9.99807071685791,
+          "maximumGap": 0.01831980000000044,
+          "minimumGap": 0.012511299999999892,
+          "firstCrossing": 8.13562135197996,
+          "lastCrossing": 9.674082813323196,
+          "measuredFrequencyHz": 0.6500000325824846,
+          "peakVelocity": 46.59886239567267,
+          "peakAcceleration": 421.0087032319632,
+          "velocityP95": 42.38740886477722,
+          "accelerationP95": 356.2663827712408,
+          "startAngle": -5.76707634536433e-06,
+          "endAngle": -3.710871169460006e-05,
+          "firstVelocity": 0.009354716925690038,
+          "lastVelocity": 0.07436045630708035,
+          "angleStepAtStart": 5.76707634536433e-06,
+          "angleStepAtEnd": 2.342864900128916e-05,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        },
+        {
+          "joint": "right",
+          "points": 215,
+          "directionChanges": 3,
+          "minimumAngle": -9.999513626098633,
+          "maximumAngle": 9.99804401397705,
+          "maximumGap": 0.01831980000000044,
+          "minimumGap": 0.012511299999999892,
+          "firstCrossing": 8.135620980317935,
+          "lastCrossing": 9.6740827223828,
+          "measuredFrequencyHz": 0.6499999139776061,
+          "peakVelocity": 46.59879365792994,
+          "peakAcceleration": 421.0108248991289,
+          "velocityP95": 42.38556404903658,
+          "accelerationP95": 356.2541182446503,
+          "startAngle": -2.658790890563978e-06,
+          "endAngle": -3.580512566259131e-05,
+          "firstVelocity": 0.009302762448330964,
+          "lastVelocity": 0.0750867919694548,
+          "angleStepAtStart": 2.658790890563978e-06,
+          "angleStepAtEnd": 3.478108396848256e-05,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    },
+    {
+      "name": "adaptive-natural-wrists",
+      "seconds": 1.904770016670227,
+      "preparationSeconds": 0.9436100125312805,
+      "completed": true,
+      "joints": [
+        {
+          "joint": "left",
+          "points": 45,
+          "directionChanges": 3,
+          "minimumAngle": -9.975337982177734,
+          "maximumAngle": 9.996359825134277,
+          "maximumGap": 0.058122399999998464,
+          "minimumGap": 0.03791869999999875,
+          "firstCrossing": 12.982344489200342,
+          "lastCrossing": 13.934696324755013,
+          "measuredFrequencyHz": 1.0500321022824277,
+          "peakVelocity": 72.34080340965656,
+          "peakAcceleration": 994.1732207965729,
+          "velocityP95": 67.5869254462034,
+          "accelerationP95": 891.2090969970304,
+          "startAngle": 8.209766747313552e-06,
+          "endAngle": -0.05372713506221771,
+          "firstVelocity": 2.102969106927264,
+          "lastVelocity": 17.05111313394973,
+          "angleStepAtStart": 8.209766747313552e-06,
+          "angleStepAtEnd": 0.05374484683488845,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        },
+        {
+          "joint": "right",
+          "points": 45,
+          "directionChanges": 3,
+          "minimumAngle": -9.975362777709961,
+          "maximumAngle": 9.996356964111328,
+          "maximumGap": 0.058122399999998464,
+          "minimumGap": 0.03791869999999875,
+          "firstCrossing": 12.982344184620803,
+          "lastCrossing": 13.93469609368285,
+          "measuredFrequencyHz": 1.050032021235596,
+          "peakVelocity": 72.34035213388619,
+          "peakAcceleration": 994.1673019309909,
+          "velocityP95": 67.58748797858749,
+          "accelerationP95": 891.201773065107,
+          "startAngle": -8.844574949762318e-06,
+          "endAngle": -0.05375358834862709,
+          "firstVelocity": 2.1031527901547036,
+          "lastVelocity": 17.051162804264433,
+          "angleStepAtStart": 8.844574949762318e-06,
+          "angleStepAtEnd": 0.05374376290183136,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    },
+    {
+      "name": "adaptive-brisk-wrists",
+      "seconds": 1.6345402002334595,
+      "preparationSeconds": 0.9438499808311462,
+      "completed": true,
+      "joints": [
+        {
+          "joint": "left",
+          "points": 38,
+          "directionChanges": 3,
+          "minimumAngle": -9.897772789001465,
+          "maximumAngle": 9.92583179473877,
+          "maximumGap": 0.06353440000000177,
+          "minimumGap": 0.037381200000002224,
+          "firstCrossing": 16.90371721114697,
+          "lastCrossing": 17.72093497776822,
+          "measuredFrequencyHz": 1.2236640475089686,
+          "peakVelocity": 82.90660250870062,
+          "peakAcceleration": 1291.7561882254226,
+          "velocityP95": 81.48836213322517,
+          "accelerationP95": 1211.858409248074,
+          "startAngle": 1.1320144949422684e-05,
+          "endAngle": -0.004199596121907234,
+          "firstVelocity": 3.0083956675257126,
+          "lastVelocity": 10.423051739296765,
+          "angleStepAtStart": 1.1320144949422684e-05,
+          "angleStepAtEnd": 0.004197887801524303,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        },
+        {
+          "joint": "right",
+          "points": 38,
+          "directionChanges": 3,
+          "minimumAngle": -9.89775276184082,
+          "maximumAngle": 9.925848960876465,
+          "maximumGap": 0.06353440000000177,
+          "minimumGap": 0.037381200000002224,
+          "firstCrossing": 16.903716860649027,
+          "lastCrossing": 17.720935162507192,
+          "measuredFrequencyHz": 1.2236632460705188,
+          "peakVelocity": 82.90676822561305,
+          "peakAcceleration": 1291.7634235213407,
+          "velocityP95": 81.48839232051091,
+          "accelerationP95": 1211.8648131110251,
+          "startAngle": 1.8067971723212395e-06,
+          "endAngle": -0.0041961693204939365,
+          "firstVelocity": 3.0082001324032754,
+          "lastVelocity": 10.422816711253859,
+          "angleStepAtStart": 1.8067971723212395e-06,
+          "angleStepAtEnd": 0.004186492536973674,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    },
+    {
+      "name": "adaptive-gentle-head",
+      "seconds": 2.2222301959991455,
+      "preparationSeconds": 0.9412199854850769,
+      "completed": true,
+      "joints": [
+        {
+          "joint": "head",
+          "points": 53,
+          "directionChanges": 1,
+          "minimumAngle": -7.456984996795654,
+          "maximumAngle": 8.540271759033203,
+          "maximumGap": 0.060841400000001045,
+          "minimumGap": 0.03729969999999838,
+          "firstCrossing": 0.0,
+          "lastCrossing": 0.0,
+          "measuredFrequencyHz": -1.0,
+          "peakVelocity": 35.76751307294787,
+          "peakAcceleration": 279.18240999671593,
+          "velocityP95": 32.967887230728735,
+          "accelerationP95": 252.80843451488073,
+          "startAngle": 0.0428871214389801,
+          "endAngle": -0.4341368079185486,
+          "firstVelocity": 1.4065239029307088,
+          "lastVelocity": -1.4054993306574262,
+          "angleStepAtStart": 0.0428871214389801,
+          "angleStepAtEnd": 0.08830386400222778,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    },
+    {
+      "name": "adaptive-explicit-duration-wrists",
+      "seconds": 3.200000047683716,
+      "preparationSeconds": 0.9423900246620178,
+      "completed": true,
+      "joints": [
+        {
+          "joint": "left",
+          "points": 223,
+          "directionChanges": 3,
+          "minimumAngle": -9.998514175415039,
+          "maximumAngle": 9.99484634399414,
+          "maximumGap": 0.01827169999999967,
+          "minimumGap": 0.012536099999998385,
+          "firstCrossing": 25.331286827222314,
+          "lastCrossing": 26.931285252685623,
+          "measuredFrequencyHz": 0.6250006150540004,
+          "peakVelocity": 44.80914440743361,
+          "peakAcceleration": 388.9888626738298,
+          "velocityP95": 41.44284400147334,
+          "accelerationP95": 334.73466281049224,
+          "startAngle": 9.282330211135559e-06,
+          "endAngle": 1.6159247024916112e-05,
+          "firstVelocity": 0.01246467635833094,
+          "lastVelocity": 0.016926779887491004,
+          "angleStepAtStart": 9.282330211135559e-06,
+          "angleStepAtEnd": 3.398607987037394e-06,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        },
+        {
+          "joint": "right",
+          "points": 223,
+          "directionChanges": 3,
+          "minimumAngle": -9.998531341552734,
+          "maximumAngle": 9.994857788085938,
+          "maximumGap": 0.01827169999999967,
+          "minimumGap": 0.012536099999998385,
+          "firstCrossing": 25.331286831706752,
+          "lastCrossing": 26.931285346141824,
+          "measuredFrequencyHz": 0.6250005802993389,
+          "peakVelocity": 44.80680195136402,
+          "peakAcceleration": 389.1816129712974,
+          "velocityP95": 41.44316550807527,
+          "accelerationP95": 334.4904402450847,
+          "startAngle": -6.415703523998673e-07,
+          "endAngle": -4.381180588097777e-06,
+          "firstVelocity": 0.012184880052534328,
+          "lastVelocity": 0.016836571068497,
+          "angleStepAtStart": 6.415703523998673e-07,
+          "angleStepAtEnd": 1.1001015536749037e-05,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    },
+    {
+      "name": "adaptive-hold-source",
+      "seconds": 1.904770016670227,
+      "preparationSeconds": 0.9370700120925903,
+      "completed": true,
+      "joints": [
+        {
+          "joint": "left",
+          "points": 134,
+          "directionChanges": 3,
+          "minimumAngle": -9.996253967285156,
+          "maximumAngle": 9.992350578308105,
+          "maximumGap": 0.01720629999999801,
+          "minimumGap": 0.012518699999993999,
+          "firstCrossing": 30.27040895106223,
+          "lastCrossing": 31.222797922948264,
+          "measuredFrequencyHz": 1.0499911585700967,
+          "peakVelocity": 75.01532363007156,
+          "peakAcceleration": 1086.0108153014348,
+          "velocityP95": 70.38203138198234,
+          "accelerationP95": 963.9116605743676,
+          "startAngle": -7.140065918065375e-06,
+          "endAngle": -1.1896546311618295e-05,
+          "firstVelocity": 0.0953090952754368,
+          "lastVelocity": 0.07983442535800976,
+          "angleStepAtStart": 7.140065918065375e-06,
+          "angleStepAtEnd": 1.0209826200480165e-05,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        },
+        {
+          "joint": "right",
+          "points": 134,
+          "directionChanges": 3,
+          "minimumAngle": -9.996253967285156,
+          "maximumAngle": 9.992341041564941,
+          "maximumGap": 0.01720629999999801,
+          "minimumGap": 0.012518699999993999,
+          "firstCrossing": 30.270408982847027,
+          "lastCrossing": 31.2227980911427,
+          "measuredFrequencyHz": 1.0499910081810238,
+          "peakVelocity": 75.01656089185992,
+          "peakAcceleration": 1086.3073239180508,
+          "velocityP95": 70.38444890877231,
+          "accelerationP95": 963.8731695472509,
+          "startAngle": -7.925232239358593e-06,
+          "endAngle": -3.993086465925444e-06,
+          "firstVelocity": 0.09455372597522553,
+          "lastVelocity": 0.07967898570823392,
+          "angleStepAtStart": 7.925232239358593e-06,
+          "angleStepAtEnd": 8.609838005213533e-06,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    },
+    {
+      "name": "held-pose-to-brisk-current",
+      "seconds": 1.6345402002334595,
+      "preparationSeconds": 0.20000000298023224,
+      "completed": true,
+      "joints": [
+        {
+          "joint": "left",
+          "points": 114,
+          "directionChanges": 3,
+          "minimumAngle": -9.991165161132812,
+          "maximumAngle": 9.988398551940918,
+          "maximumGap": 0.017811400000006472,
+          "minimumGap": 0.012537600000001703,
+          "firstCrossing": 32.77323783303556,
+          "lastCrossing": 33.590516283757125,
+          "measuredFrequencyHz": 1.223573188693658,
+          "peakVelocity": 87.47156179687907,
+          "peakAcceleration": 1505.8187596196003,
+          "velocityP95": 81.22831107326991,
+          "accelerationP95": 1302.476286262734,
+          "startAngle": 2.625918023113627e-05,
+          "endAngle": 0.0001637868699617684,
+          "firstVelocity": 0.13697151761067955,
+          "lastVelocity": 0.7600986204754886,
+          "angleStepAtStart": 2.625918023113627e-05,
+          "angleStepAtEnd": 0.00022250093752518296,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        },
+        {
+          "joint": "right",
+          "points": 114,
+          "directionChanges": 3,
+          "minimumAngle": -9.990986824035645,
+          "maximumAngle": 9.988202095031738,
+          "maximumGap": 0.017811400000006472,
+          "minimumGap": 0.012537600000001703,
+          "firstCrossing": 32.773238975143876,
+          "lastCrossing": 33.59051726382462,
+          "measuredFrequencyHz": 1.2235734312900972,
+          "peakVelocity": 87.44100760401761,
+          "peakAcceleration": 1483.1581022113578,
+          "velocityP95": 81.22678094554448,
+          "accelerationP95": 1363.511513345033,
+          "startAngle": 6.220427894731984e-05,
+          "endAngle": -0.00010602344991639256,
+          "firstVelocity": 0.13643838037121891,
+          "lastVelocity": 0.7599029249135324,
+          "angleStepAtStart": 6.220427894731984e-05,
+          "angleStepAtEnd": 0.00022890006948728114,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    },
+    {
+      "name": "adaptive-interrupt-source",
+      "seconds": 1.904770016670227,
+      "preparationSeconds": 0.9257599711418152,
+      "completed": false,
+      "joints": [
+        {
+          "joint": "left",
+          "points": 52,
+          "directionChanges": 1,
+          "minimumAngle": -9.998963356018066,
+          "maximumAngle": 9.836254119873047,
+          "maximumGap": 0.016194200000001047,
+          "minimumGap": 0.012544400000003009,
+          "firstCrossing": 0.0,
+          "lastCrossing": 0.0,
+          "measuredFrequencyHz": -1.0,
+          "peakVelocity": 74.987561903744,
+          "peakAcceleration": 1086.7663139389313,
+          "velocityP95": 71.19125677305689,
+          "accelerationP95": 997.7614423096286,
+          "startAngle": 3.336263262099237e-06,
+          "endAngle": -9.962108612060547,
+          "firstVelocity": 0.06716360931323795,
+          "lastVelocity": 2.390789926729783,
+          "angleStepAtStart": 3.336263262099237e-06,
+          "angleStepAtEnd": 0.0,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        },
+        {
+          "joint": "right",
+          "points": 52,
+          "directionChanges": 1,
+          "minimumAngle": -9.99892807006836,
+          "maximumAngle": 9.836259841918945,
+          "maximumGap": 0.016194200000001047,
+          "minimumGap": 0.012544400000003009,
+          "firstCrossing": 0.0,
+          "lastCrossing": 0.0,
+          "measuredFrequencyHz": -1.0,
+          "peakVelocity": 74.98706133985758,
+          "peakAcceleration": 1086.7518617682804,
+          "velocityP95": 71.19110206831027,
+          "accelerationP95": 997.8890270810267,
+          "startAngle": 1.3935042488810723e-06,
+          "endAngle": -9.962108612060547,
+          "firstVelocity": 0.06769758777489178,
+          "lastVelocity": 2.388500905451765,
+          "angleStepAtStart": 1.3935042488810723e-06,
+          "angleStepAtEnd": 0.0,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    },
+    {
+      "name": "active-replaced-by-brisk-current",
+      "seconds": 1.6345402002334595,
+      "preparationSeconds": 0.20000000298023224,
+      "completed": true,
+      "joints": [
+        {
+          "joint": "left",
+          "points": 116,
+          "directionChanges": 3,
+          "minimumAngle": -9.998479843139648,
+          "maximumAngle": 9.991493225097656,
+          "maximumGap": 0.019441600000000392,
+          "minimumGap": 0.012540299999997728,
+          "firstCrossing": 37.307646701202884,
+          "lastCrossing": 38.12491547104889,
+          "measuredFrequencyHz": 1.2235876824076242,
+          "peakVelocity": 87.29770826047697,
+          "peakAcceleration": 1492.6084952384522,
+          "velocityP95": 81.43594078884198,
+          "accelerationP95": 1291.1433039171159,
+          "startAngle": 0.002177820773795247,
+          "endAngle": -0.00016613957996014506,
+          "firstVelocity": -0.003094561450161704,
+          "lastVelocity": 1.1859306921999966,
+          "angleStepAtStart": 0.002177820773795247,
+          "angleStepAtEnd": 0.001206020257086493,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        },
+        {
+          "joint": "right",
+          "points": 116,
+          "directionChanges": 3,
+          "minimumAngle": -9.998821258544922,
+          "maximumAngle": 9.991469383239746,
+          "maximumGap": 0.019441600000000392,
+          "minimumGap": 0.012540299999997728,
+          "firstCrossing": 37.30764064616731,
+          "lastCrossing": 38.12491146303772,
+          "measuredFrequencyHz": 1.2235846176782819,
+          "peakVelocity": 87.29789402188806,
+          "peakAcceleration": 1492.560014896966,
+          "velocityP95": 81.43631809597254,
+          "accelerationP95": 1290.862280928554,
+          "startAngle": 0.00217251293361187,
+          "endAngle": -1.8010630810749717e-05,
+          "firstVelocity": -0.0026488005034898507,
+          "lastVelocity": 1.1860378848689432,
+          "angleStepAtStart": 0.00217251293361187,
+          "angleStepAtEnd": 0.0011830367311631562,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    },
+    {
+      "name": "public-qwen-original-tag-adaptive",
+      "seconds": 1.904770016670227,
+      "preparationSeconds": 0.9305800199508667,
+      "completed": true,
+      "joints": [
+        {
+          "joint": "left",
+          "points": 46,
+          "directionChanges": 3,
+          "minimumAngle": -9.999706268310547,
+          "maximumAngle": 9.982450485229492,
+          "maximumGap": 0.056045599999997364,
+          "minimumGap": 0.03718740000000054,
+          "firstCrossing": 40.79837991627668,
+          "lastCrossing": 41.750686909629536,
+          "measuredFrequencyHz": 1.0500815461611048,
+          "peakVelocity": 73.82314159928565,
+          "peakAcceleration": 991.6809867250585,
+          "velocityP95": 65.61829453517801,
+          "accelerationP95": 859.3042342852444,
+          "startAngle": 3.6505816751741804e-06,
+          "endAngle": -0.0004723947204183787,
+          "firstVelocity": 2.1515263993328,
+          "lastVelocity": 4.276302007760446,
+          "angleStepAtStart": 3.6505816751741804e-06,
+          "angleStepAtEnd": 0.00046974643305475183,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        },
+        {
+          "joint": "right",
+          "points": 46,
+          "directionChanges": 3,
+          "minimumAngle": -9.99972152709961,
+          "maximumAngle": 9.982446670532227,
+          "maximumGap": 0.056045599999997364,
+          "minimumGap": 0.03718740000000054,
+          "firstCrossing": 40.798379844405304,
+          "lastCrossing": 41.75068687530648,
+          "measuredFrequencyHz": 1.0500815047576553,
+          "peakVelocity": 73.82250128624047,
+          "peakAcceleration": 991.691861851636,
+          "velocityP95": 65.61767190753976,
+          "accelerationP95": 859.2842119467907,
+          "startAngle": 1.338598735856067e-06,
+          "endAngle": -0.0004751318192575127,
+          "firstVelocity": 2.1511390606606016,
+          "lastVelocity": 4.276508106617697,
+          "angleStepAtStart": 1.338598735856067e-06,
+          "angleStepAtEnd": 0.00045034622780804057,
+          "derivativeScope": "Signed actual hand-relative-forearm/head-relative-neck angle; finite differences on nonuniform saved game-time intervals. External whole-parent motion excluded; mapping/Animator local residuals remain measured."
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlan.cs",
+      "sha256": "319df0e62bfee4687d55ed85a7b1f921a32c245fef665bcada41cabfde674f0e",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlanCompiler.cs",
+      "sha256": "8195ee630d5161eb422fb0127e2970bf3e28e3058e2c18e005aa473dfb3c8209",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyActionConstraintLedger.cs",
+      "sha256": "40e25d318d59ab08cf7d77629f2f7386d8d9152aec2d34e186b2661169998e2a",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyAdaptiveTiming.cs",
+      "sha256": "79aa8926926531f7370693c98454a09d7f32a5965d6f4050f66e4fa4fd8a6f72",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs",
+      "sha256": "82b4a83ce6ccb73ee1ccc81a9e5e46e9d8b23b71f4161e54a5a1e4cdd95a14cc",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyConstraintSession.cs",
+      "sha256": "15dade49424443bd2b50fd40af91df19c914ffb194a08ec43bf366c4cbe05792",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs",
+      "sha256": "708a6bf1e7f6650eb77c3f55f2b37424cdefbaf85f5670e1d5c6c6bd3f993344",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyPalmGeometry.cs",
+      "sha256": "e78ac5872c58bce4e65ea36e77b95ff12845aefbffa963456b8e5af795410764",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.cs",
+      "sha256": "a4d6decb91e85385dc010b0c44ac7ecf0c24c15ec226c614dd852eb18a565d66",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyConstraintObserver.cs",
+      "sha256": "b4bc0f114a5063e6f96077a32cc1ecc0b468a162ccec9b8dbc0bf9c0a5dbc446",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.cs",
+      "sha256": "953724a8b7d6e4d64b77fab5e791cbe603e9e3a36b44a4992b55bc03fdcf3e6a",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs",
+      "sha256": "101e1b1f19e78cf15e2f26fb4882e5f672a30d868c08092f1898793fbe025d0c",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.ActionPlanning.cs",
+      "sha256": "8844260149b5ac8c6369f798e39bf8a3f8baf5f4f803199b6e2cc73f2d0647fd",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs",
+      "sha256": "01fbb5448d8acc2debbe4b2a5ee5a6bf6da0765a16be4023cec6e9927a861f79",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ArdyDialogueMotionBridge.cs",
+      "sha256": "72116744e4c005e9ef145acd5c58c2a20d6e6cb09fee375290fb3b57caba20c2",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/RoleOutputChannels.cs",
+      "sha256": "6c434e2c73cbdb805cc9fe798b8579436e3266ac393432fa557a8387bac8a0f4",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdyConstraintRegression.cs",
+      "sha256": "dd0afce7093f1eaba99f50d12cddc13dca9e5182a4ec75d19998b6d7cfe0f32d",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdyConstraintTempoRegression.cs",
+      "sha256": "62f8c077acf4e9830e46a9ed1d007a006fc8ab2850ab87cb88cc51f1898eb3f6",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdySemanticMotionRegression.cs",
+      "sha256": "b1e1d1346774eb5c27d38e3c0ddb3101cbe4773b51a7be9323bdc9eaa1021587",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdyDialogueMotionRegression.cs",
+      "sha256": "b5938154f347fb7d59eb913c2c6a10bcb4bd0b17f10ade7bed948d521af8d8bd",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdyConstraintPreviewWindow.cs",
+      "sha256": "e7dc8bc7724d8a8d13c53a444801123042784ce2effd5eeff9470abb24c24a42",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdyDialogueMotionWindow.cs",
+      "sha256": "39a6cfb3ac6630cc59f3f1cca871e6140240c5c0fc152b5de8a011e5da432591",
+      "matchesIsolated": true
+    }
+  ],
+  "unchangedAssets": [
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/left-wave.json",
+      "sha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d"
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/right-wave.json",
+      "sha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd"
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/nod.json",
+      "sha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77"
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/shake-head.json",
+      "sha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946"
+    },
+    {
+      "path": "Server/ARDY/runtime/active-adapter-release.json",
+      "sha256": "8e2df4f825a62e1fbfd097691d55115cc8923807ea078c8124bf3d966127fb0e"
+    },
+    {
+      "path": "Tools/MotionAdapter/runtime/generalization-v1/candidates/finetune-seed0.pt",
+      "sha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab"
+    }
+  ],
+  "reports": [
+    {
+      "path": "Server/ARDY/runtime/semantic-tempo-v1/tempo-pass-v2/tempo-regression.json",
+      "sha256": "4a899ddea4c7f7a08e7f6fcc5b6af273b889b9d9011519c778171eab56411b23"
+    },
+    {
+      "path": "Server/ARDY/runtime/semantic-tempo-v1/tempo-pass-v2/constraint-regression.json",
+      "sha256": "929a3cbb338acd84b5de0124369809641e069eb0527e542f2625d6ea24092bcc"
+    },
+    {
+      "path": "Server/ARDY/runtime/semantic-tempo-v1/final-semantic-motion-regression.json",
+      "sha256": "f2a7843a29c67589cc9fb48f6062fe6b19868d5760be633b7e2fe47fd71d6b48"
+    },
+    {
+      "path": "Server/ARDY/runtime/semantic-tempo-v1/final-dialogue-motion-regression.json",
+      "sha256": "f4d338c53194d7fd2c13c332a752163640ba7e322ce5ac4027b644a4ddf5f1ec"
+    },
+    {
+      "path": "Server/ARDY/runtime/semantic-tempo-v1/final-live-http.json",
+      "sha256": "5909128e17246041d40707ceedf360e0a4dda413e5619fda7beea8801050e587"
+    },
+    {
+      "path": "Server/ARDY/runtime/semantic-tempo-v1/first-unity-pass/playmode-regression.json",
+      "sha256": "2cfdecc5adc3a2f8395f1f2e9ab087053af927c29066be53bdcc21e2f678ba47"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/semantic-tempo-v1/previews/preview-manifest.json",
+      "sha256": "375fea07835e6e6f64d6f160bda4022d6acbeb4394e6dc3b7ba75cac441892ac"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/semantic-motion-planning-v1.json",
+      "sha256": "aea87ad2e1edde59b4df249e82c0d2d4c0ffdd3b67a5129a7564adcf0f3e9006"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/semantic-motion-planning-v2.json",
+      "sha256": "3bb0d6f0473f47372334f6a262ec954a752917514398027f992973754577c817"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/semantic-motion-planning-holdout-v2.json",
+      "sha256": "ddd41e4b36f36aba7d3fa25b2d2e15403c9d20edf8c802f3946be901f57fa9ba"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/semantic-motion-planning-v2-source-audit.json",
+      "sha256": "b625336639494b0e5e31fbf6625e8b1479d444c08e71959e5cd07f2efcb76fe4"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/semantic-motion-planning-holdout-v2-source-audit.json",
+      "sha256": "da96cb4478a6484448283e0b8be750daf09ee006a39055760e199eec99c45616"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/semantic-motion-protocol-freeze-v2.json",
+      "sha256": "38f697a821b86551674e36626d8d90f75295fd8191c125ab6778e94a6bdbdef7"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/adaptive-timing-math-v1.json",
+      "sha256": "798866eb0fe0ad63eecbf4cdb82d5bc6901c30ab3a597487c16dd4b3b0dfbc62"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/tempo-execution-v1/measurement-basis-diagnosis-v1.json",
+      "sha256": "d84a9a46e666d7a629ffbf682172968bd0f9785b65bed5398c30cd5cc4ba214e"
+    }
+  ]
+}

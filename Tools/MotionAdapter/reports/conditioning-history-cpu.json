@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "passed": true,
+  "utc": "2026-09-10T06:11:51.022904+00:00",
+  "scope": "CPU protocol and captured motion_rep input-boundary tests; no actual ARDY weights/GPU/Unity",
+  "new_test_methods": 4,
+  "existing_service_test_methods": 11,
+  "default_16_input_tensors_exact": true,
+  "prechange_reference_sha256": "fdc4fdaa9b012fcef1dbf59db051b6b8afb6d2f18c96b6714e049060f63e3170",
+  "reference_cases_supplied_frames": [
+    1,
+    5,
+    16
+  ],
+  "short_length_cases": {
+    "supplied": [
+      1,
+      5,
+      16
+    ],
+    "conditioning": [
+      4,
+      8,
+      16
+    ]
+  },
+  "unity_editor_regression": "prepared, not executed by this CPU task",
+  "default_scene_modified": false,
+  "source_sha256": {
+    "Server/ARDY/motion_service/protocol.py": "21af0aa29ad1dcfcb01f45ee09a3adf39660bd9a401c4a7a74a4475c86663e7a",
+    "Server/ARDY/motion_service/backend.py": "293136b337ac5602fc9b78dd0d941e2fadfa82fce046c881485d1b7b80db97a7",
+    "Server/ARDY/test_conditioning_history.py": "0a59d1d7e31b6e339bbbebec4fc6fc62a02726d16fb36a0159e8555fae205543",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyLiveProtocol.cs": "b3bb9ead21d30d3afcb277a46d2ebdf69d6c0edd8696c836c5b708672fee244d",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.cs": "4312c81366e5393c71dd4c14f00e761c76b044b46c16af082a9b3d2cb69288c4",
+    "Assets/Editor/ArdyStreamRegression.cs": "058a2b34d364d7a5f72c56a206fdbe20ea4186cbfc8b2e500b6a7e0ed26bc282"
+  }
+}

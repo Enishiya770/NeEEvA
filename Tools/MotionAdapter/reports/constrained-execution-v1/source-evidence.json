@@ -1,0 +1,132 @@
+{
+  "status": "passed",
+  "createdUtc": "2026-09-10T08:28:48.534598+00:00",
+  "source": "procedural-constraints-v1",
+  "sources": [
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs",
+      "sha256": "96f9132756143e815fab9d5fd02bcaa85f3cb86e1324058ff057b73eab5367df"
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyConstraintSession.cs",
+      "sha256": "733939dcfe6c0b9868fd06a54430ca8c620c254a272d9eaf82908a62aea88a71"
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs",
+      "sha256": "c7073a09dcc54f96a07b3fe536c25772c309ad23da80a46d4d1516115c7f00b5"
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.cs",
+      "sha256": "38e3e78f1cf1174fabe19bfdaa25a78db78cee6aa6a71e438949e715878e554b"
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyConstraintObserver.cs",
+      "sha256": "b4bc0f114a5063e6f96077a32cc1ecc0b468a162ccec9b8dbc0bf9c0a5dbc446"
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyControlTrace.cs",
+      "sha256": "a1db5a4f105bf92fbbc9f710581275061e4538d810918fd23e04147afcee9136"
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs",
+      "sha256": "e111c93e13c7b84238e76ec445a7f0eb0777fefa4a498ef8f045aed284ab1374"
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs",
+      "sha256": "a60bbd0c334974bdd46d4137f0689f1d1c75e6509fc6252dafb0bd354ea2bc47"
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ArdyDialogueMotionBridge.cs",
+      "sha256": "e8980793028fc3f9815491b7d12f8d0705e3b71d2fd2cdc096dd3c335f2cc55b"
+    },
+    {
+      "path": "Assets/Editor/ArdyConstraintRegression.cs",
+      "sha256": "94b54008532106adbab30f967a6c57308d78a03177a6b48ff5712be8be6d9604"
+    },
+    {
+      "path": "Assets/Editor/ArdyConstraintPreviewWindow.cs",
+      "sha256": "f8598c9eaea91872f37caf26e989f1d44ba0c5f60ff49519c442eeecc022ac1a"
+    },
+    {
+      "path": "Assets/Editor/ArdyDialogueMotionRegression.cs",
+      "sha256": "c5947d507de3cf89d662d8b9a78f4dceefcf620a274e9e2bd01af58ea7e9999c"
+    }
+  ],
+  "acceptedResourcesUnchanged": {
+    "left-wave": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d",
+    "right-wave": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+    "nod": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+    "shake-head": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946"
+  },
+  "activeReleaseSha256": "8e2df4f825a62e1fbfd097691d55115cc8923807ea078c8124bf3d966127fb0e",
+  "adapterCheckpointSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+  "nativeGenerateNaturalnessAccepted": false,
+  "tests": [
+    {
+      "path": "Tools/MotionAdapter/reports/constrained-legacy-anchor-v1.json",
+      "sha256": "903c665f74680805062ec7bfd27e3af3196416935ea8e664a173ce3e9a29b523"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/constrained-legacy-stream-v1.json",
+      "sha256": "01a04765ae034f259d4dd514fd30738deb0627fdde3277b6341d83746cbcc711"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/constrained-legacy-dialogue-v1.json",
+      "sha256": "2fe18edf4ddf3544fa3f2bfcb3e9efd09ce4360e3c503355db88a02b1e1fc133"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/constrained-legacy-playmode-v1.json",
+      "sha256": "c6072468f60f7799515da19368407717d6aecd3d6afecfa0c530e61b76a6b232"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/constrained-legacy-http-v1.json",
+      "sha256": "b876a8ccc853208ecf99597e08d71df527a02a7a836be03595e9f8a434db36b9"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/composition-diagnosis-v1-compose-protocol-review.json",
+      "sha256": "e11db65d8fe390da19eefdf102a3d938c9851cfc4c67d8dc2b2b7088dc3a3140"
+    },
+    {
+      "path": "Server/ARDY/runtime/constrained-execution-v1/full-pass-v1/constraint-regression.json",
+      "sha256": "ea455e98cea8fd87561f7ee0dcea71677c7e5276621311257e24329426c46412"
+    }
+  ],
+  "diagnostics": [
+    {
+      "path": "Server/ARDY/runtime/constrained-execution-v1/control-traces/ardy-control-20260910T082433712-1c3b7abdce1c43b3b76c5c0138ad8b29.json",
+      "sha256": "926d91b55058f3b1a19df3705c79d0fcd7eb3ed7334d41e0359b53c7196da72b"
+    },
+    {
+      "path": "Server/ARDY/runtime/constrained-execution-v1/control-traces/ardy-control-20260910T082433718-f7b8344bc8514fbcb9f7f4b94264a4e5.json",
+      "sha256": "f9e46de56f9eb65052e798796b6e2e2b0de441133942b73bbae7378d7142085c"
+    },
+    {
+      "path": "Server/ARDY/runtime/constrained-execution-v1/control-traces/ardy-control-20260910T082433725-3839e57f5c254a23938de1fa0988f577.json",
+      "sha256": "adabc5386beb319459ccdd5e66d66bc21cd646d5e3b41c7841bc288925c23953"
+    },
+    {
+      "path": "Server/ARDY/runtime/constrained-execution-v1/control-traces/ardy-control-20260910T082433731-6a1b0b873ded421881dc5f462868a8c2.json",
+      "sha256": "9236c9f0c399184d5a83b1e094e498186aabb0528e38f46cc7280ad807531641"
+    },
+    {
+      "path": "Server/ARDY/runtime/constrained-execution-v1/control-traces/ardy-control-20260910T082450587-287d4173f371426e94a66d63c2a8bf5b.json",
+      "sha256": "37339b2aa707eefb44a2311173977eebd0aad06baef4b51f96e8cd32be1c311d"
+    },
+    {
+      "path": "Server/ARDY/runtime/constrained-execution-v1/control-traces/ardy-control-20260910T082450589-0590dd78e7cf4b7ea9ba46089fdf3fec.json",
+      "sha256": "8e2f18c89f1b33e766917bffae8e5f23d4162c3ae71f7dd8bdc7bc5abe04b6c2"
+    },
+    {
+      "path": "Server/ARDY/runtime/constrained-execution-v1/control-traces/ardy-control-20260910T082450590-f639279c7b174f95a8412cfb075707f2.json",
+      "sha256": "26f2ab4ff62ffc0db01fb63f51d747259f13a3d5f0f618dc254714bfbb9a3196"
+    },
+    {
+      "path": "Server/ARDY/runtime/constrained-execution-v1/control-traces/ardy-control-20260910T082450592-e9cc55bb10354075b667f13e13af1e15.json",
+      "sha256": "57a22fd800e3fb4d2242f6f4ef6cbe755dbb2188ccdbcbaa0770b843f54f5dfa"
+    },
+    {
+      "path": "Server/ARDY/runtime/constrained-execution-v1/legacy-http-completed-trace.json",
+      "sha256": "3f1dac644ad0aa5aba188829bae59673da0ded3e4449388a4b6fb1f5880c73a1"
+    }
+  ]
+}

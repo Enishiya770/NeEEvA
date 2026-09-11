@@ -1,0 +1,2207 @@
+{
+  "schema": 1,
+  "status": "complete",
+  "explicit_final_test": true,
+  "used_for_selection": false,
+  "approved_for_runtime": false,
+  "action_success_rate": null,
+  "plan": {
+    "schema": 1,
+    "suite": "generalization-eval-v1",
+    "datasetRecordsSha256": "63787f2291839047708dc290aee9f246ba80d86e29ef82f04692781608fa97db",
+    "files": {
+      "suite": {
+        "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\data\\generalization-eval-v1.jsonl",
+        "sha256": "bad7ec319c961c077b8ab92eb39eb8482e847c2ff67d6c39e5a8434b3e197889"
+      },
+      "selection": {
+        "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\generalization-v1\\candidates\\selection.json",
+        "sha256": "0e3592520ffcc4cd3572cf556893f69ba034d010738ec80f17f7989b19287bd3"
+      },
+      "mergedManifest": {
+        "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\generalization-v1\\merged\\merge.json",
+        "sha256": "e7f998bb637dc8116ed94fd2c240ac86f52f3c2ebf92e9346fef6423d00229e8"
+      },
+      "oldCheckpoint": {
+        "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\mlp-seed1.pt",
+        "sha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa"
+      },
+      "candidateCheckpoint": {
+        "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\generalization-v1\\candidates\\finetune-seed0.pt",
+        "sha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab"
+      },
+      "qwenBundle": {
+        "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\generalization-v1\\qwen-eval.npz",
+        "sha256": "0d964482ac1962f5151cf9f758d0f5bcd8ef0ea92dda02d5cbbfc28a5072b403"
+      },
+      "teacherBundle": {
+        "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\generalization-v1\\teacher-eval.npz",
+        "sha256": "865f140eec1a4161e0784aab8d4f4e63de675932e8781c03f13229dec065b7e5"
+      },
+      "nativeValidationReport": {
+        "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generalization-validation-v1\\report.json",
+        "sha256": "0f12dce5710e031617dc4a3c2584a87476911e5e9e3a99928d20caff9658396d"
+      }
+    },
+    "selectionSha256": "0e3592520ffcc4cd3572cf556893f69ba034d010738ec80f17f7989b19287bd3",
+    "lockedCandidateSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+    "trainingTeacherContract": "4931fa72fb55a5e633e8dedc2fbac8d3bf15f8a8baa2cb4130ef0072845b474a",
+    "trainingDatasetRecordsSha256": "76b3da47f1c2400372a5a594e5f496fa0bda4ac8970d4d055519896c462b6091",
+    "evaluationTeacherContract": "bf2ac7b795dd36370a4b330b01c01930110d574db421a825de656643f69080be",
+    "qwenContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+    "teacherCompatibility": {
+      "method": "Two current-model control encodings exactly equal the immutable old cached vectors",
+      "old_contract": "5179f91dcafe261730bd9adf2bc5f1d3fe77b7befe28b2c6ced6987d81ba8a30",
+      "new_contract": "bf2ac7b795dd36370a4b330b01c01930110d574db421a825de656643f69080be",
+      "controls": [
+        {
+          "cosine": 1.0000001192092896,
+          "id": "motion-00004",
+          "max_abs_error": 0.0,
+          "relative_l2": 0.0,
+          "text": "While standing in place, a standing person waves the right hand with moderate movements at a moderate pace."
+        },
+        {
+          "cosine": 1.0,
+          "id": "motion-00053",
+          "max_abs_error": 0.0,
+          "relative_l2": 0.0,
+          "text": "While standing in place, a person who is standing waves the left hand with moderate movements at a moderate pace."
+        }
+      ],
+      "scope": "Numerical teacher feature compatibility; not proof of downstream motion quality"
+    },
+    "normalization": "Both old and locked candidate use the exact old checkpoint target_mean/target_std; all MSE uses old target_std.",
+    "tracks": {
+      "supported_upper_body": {
+        "rows": 64,
+        "groups": 32
+      },
+      "capability_boundary": {
+        "rows": 16,
+        "groups": 8
+      }
+    },
+    "policy": "Final descriptive feature audit only; no model ranking, eligibility gate, tuning or automatic action-success claim.",
+    "nativeValidationScope": "The linked report establishes that independent native validation ran. Manual acceptance is the operator's prerequisite for invoking --final-test; this tool does not infer naturalness from its metrics.",
+    "implementationSha256": "5f7f63b3419a51df7282fb425bc16ee3664310a74f1928fd4d3b067bbe2bc070"
+  },
+  "environment": "CPU-only old/locked-adapter inference on cached real Qwen/teacher features; no language model, ARDY generator, Unity, service or network calls.",
+  "limitations": [
+    "This measures feature alignment, not motion success, naturalness, precise palm/finger control or spontaneous conversational action choice.",
+    "The 32 supported and 8 boundary groups are always separate; no combined success denominator exists.",
+    "Held-out configurations and expressions can share action atoms and broad legacy priors with training.",
+    "Once inspected, these final results must not drive further tuning of this evaluation version."
+  ],
+  "tracks": {
+    "supported_upper_body": {
+      "rows": 64,
+      "semantic_groups": 32,
+      "include_in_supported_success_summary": true,
+      "action_success_rate": null,
+      "group_macro_metrics": {
+        "old": {
+          "standardized_mse": 1.8192210565458817,
+          "cosine": 0.7402745286361612,
+          "norm_ratio": 0.941582189659274
+        },
+        "locked_candidate": {
+          "standardized_mse": 1.0303899441145616,
+          "cosine": 0.8515527517264321,
+          "norm_ratio": 0.906739793653898
+        }
+      },
+      "descriptive_paired_group_interval": {
+        "mean_group_mse_improvement": 0.7888311124313202,
+        "lower": 0.7400387099710002,
+        "upper": 0.8441589697239085,
+        "semantic_groups": 32,
+        "resamples": 2000,
+        "confidence": 0.95,
+        "seed": 910,
+        "scope": "Final descriptive paired semantic-group bootstrap for the already locked model. Correlated paraphrases are grouped. This is not selection evidence, an eligibility gate, or proof of population-wide motion quality."
+      },
+      "groups": [
+        {
+          "semantic_group": "generalization-v1/asymmetric-left-shoulder-right-chest",
+          "record_ids": [
+            "generalization-v1-24-1",
+            "generalization-v1-24-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.8208041883793014,
+              "cosine": 0.7334436749258142,
+              "norm_ratio": 0.9043934377778633
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.0762959889806798,
+              "cosine": 0.8440502259008411,
+              "norm_ratio": 0.8778643599061563
+            }
+          },
+          "mse_improvement": 0.7445081993986216
+        },
+        {
+          "semantic_group": "generalization-v1/both-chest-approach-no-contact",
+          "record_ids": [
+            "generalization-v1-10-1",
+            "generalization-v1-10-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.9510435954479672,
+              "cosine": 0.7127690549149304,
+              "norm_ratio": 0.9069441228849537
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.1713137472879973,
+              "cosine": 0.8303437957008655,
+              "norm_ratio": 0.9019559767689953
+            }
+          },
+          "mse_improvement": 0.7797298481599699
+        },
+        {
+          "semantic_group": "generalization-v1/both-low-forward-palms-down",
+          "record_ids": [
+            "generalization-v1-04-1",
+            "generalization-v1-04-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 2.188212496103745,
+              "cosine": 0.6808495124528804,
+              "norm_ratio": 0.8848686193764412
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.0266418451279562,
+              "cosine": 0.854402885453428,
+              "norm_ratio": 0.8930142965684629
+            }
+          },
+          "mse_improvement": 1.1615706509757886
+        },
+        {
+          "semantic_group": "generalization-v1/both-low-out-in-twice",
+          "record_ids": [
+            "generalization-v1-31-1",
+            "generalization-v1-31-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.8143768112322767,
+              "cosine": 0.7367098057051586,
+              "norm_ratio": 0.8788430488494965
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.912171503206776,
+              "cosine": 0.8710858506525965,
+              "norm_ratio": 0.9018953666775611
+            }
+          },
+          "mse_improvement": 0.9022053080255007
+        },
+        {
+          "semantic_group": "generalization-v1/both-shoulder-wave-two",
+          "record_ids": [
+            "generalization-v1-09-1",
+            "generalization-v1-09-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.8186782956246306,
+              "cosine": 0.7443119981347983,
+              "norm_ratio": 0.9426165329568861
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.9396907061946322,
+              "cosine": 0.8677612081730212,
+              "norm_ratio": 0.9154681949464276
+            }
+          },
+          "mse_improvement": 0.8789875894299983
+        },
+        {
+          "semantic_group": "generalization-v1/both-side-t-shape",
+          "record_ids": [
+            "generalization-v1-03-1",
+            "generalization-v1-03-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.9813607819793213,
+              "cosine": 0.7160769126136712,
+              "norm_ratio": 0.9821640076341105
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.9722775944133402,
+              "cosine": 0.8590764231589623,
+              "norm_ratio": 0.9400921705005412
+            }
+          },
+          "mse_improvement": 1.0090831875659811
+        },
+        {
+          "semantic_group": "generalization-v1/bow-small-arms-down",
+          "record_ids": [
+            "generalization-v1-18-1",
+            "generalization-v1-18-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.553155906381298,
+              "cosine": 0.7871450582676521,
+              "norm_ratio": 0.9523540059792692
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.8974667958248506,
+              "cosine": 0.8767673103803416,
+              "norm_ratio": 0.9257262101577162
+            }
+          },
+          "mse_improvement": 0.6556891105564475
+        },
+        {
+          "semantic_group": "generalization-v1/forward-lean-right-hand-reach",
+          "record_ids": [
+            "generalization-v1-23-1",
+            "generalization-v1-23-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.600135075672086,
+              "cosine": 0.7581253349001422,
+              "norm_ratio": 0.9314959286805624
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.9387399677294157,
+              "cosine": 0.8608801133382535,
+              "norm_ratio": 0.9131289123325046
+            }
+          },
+          "mse_improvement": 0.6613951079426703
+        },
+        {
+          "semantic_group": "generalization-v1/head-right-left-arm-side",
+          "record_ids": [
+            "generalization-v1-26-1",
+            "generalization-v1-26-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.5431100544643706,
+              "cosine": 0.767454499601991,
+              "norm_ratio": 0.9156858203092482
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.9036235194907077,
+              "cosine": 0.8631190091354116,
+              "norm_ratio": 0.8807641838168452
+            }
+          },
+          "mse_improvement": 0.6394865349736628
+        },
+        {
+          "semantic_group": "generalization-v1/left-forward-shoulder-hold",
+          "record_ids": [
+            "generalization-v1-01-1",
+            "generalization-v1-01-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.8981296966315147,
+              "cosine": 0.7286908859092567,
+              "norm_ratio": 0.962519727920367
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.9864627645273445,
+              "cosine": 0.8565748606853254,
+              "norm_ratio": 0.9193130675722244
+            }
+          },
+          "mse_improvement": 0.9116669321041702
+        },
+        {
+          "semantic_group": "generalization-v1/left-overhead-other-rest",
+          "record_ids": [
+            "generalization-v1-05-1",
+            "generalization-v1-05-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.6888055215811775,
+              "cosine": 0.7624233494533206,
+              "norm_ratio": 0.9494378343747397
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.8752023755558581,
+              "cosine": 0.8750352881975745,
+              "norm_ratio": 0.8979641056457827
+            }
+          },
+          "mse_improvement": 0.8136031460253194
+        },
+        {
+          "semantic_group": "generalization-v1/left-temple-wave-two",
+          "record_ids": [
+            "generalization-v1-07-1",
+            "generalization-v1-07-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.921557767433085,
+              "cosine": 0.7223640901344512,
+              "norm_ratio": 0.9359276982333551
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.2024734115592084,
+              "cosine": 0.8228058200451598,
+              "norm_ratio": 0.9092516122985085
+            }
+          },
+          "mse_improvement": 0.7190843558738766
+        },
+        {
+          "semantic_group": "generalization-v1/left-then-right-no-overlap",
+          "record_ids": [
+            "generalization-v1-27-1",
+            "generalization-v1-27-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.77991718490886,
+              "cosine": 0.7558896724629218,
+              "norm_ratio": 0.9213358142762171
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.0995948927492458,
+              "cosine": 0.8477330819623853,
+              "norm_ratio": 0.8874411875065435
+            }
+          },
+          "mse_improvement": 0.6803222921596142
+        },
+        {
+          "semantic_group": "generalization-v1/left-waist-outward-semicircle",
+          "record_ids": [
+            "generalization-v1-12-1",
+            "generalization-v1-12-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.718304516029745,
+              "cosine": 0.7540381284516453,
+              "norm_ratio": 0.9220792171026504
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.0143390563355625,
+              "cosine": 0.854488305363044,
+              "norm_ratio": 0.8761002611780137
+            }
+          },
+          "mse_improvement": 0.7039654596941824
+        },
+        {
+          "semantic_group": "generalization-v1/look-left-pause-forward",
+          "record_ids": [
+            "generalization-v1-17-1",
+            "generalization-v1-17-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.7686858305652566,
+              "cosine": 0.743326383514888,
+              "norm_ratio": 0.9622729171717823
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.8906921738577676,
+              "cosine": 0.8701422345639223,
+              "norm_ratio": 0.9246396693576828
+            }
+          },
+          "mse_improvement": 0.8779936567074891
+        },
+        {
+          "semantic_group": "generalization-v1/look-left-then-right-forward",
+          "record_ids": [
+            "generalization-v1-30-1",
+            "generalization-v1-30-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.9927849687070973,
+              "cosine": 0.7118925215942851,
+              "norm_ratio": 0.941997020450478
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.1328758586023349,
+              "cosine": 0.8308574059890976,
+              "norm_ratio": 0.8872695435630091
+            }
+          },
+          "mse_improvement": 0.8599091101047625
+        },
+        {
+          "semantic_group": "generalization-v1/nod-and-left-chest-raise",
+          "record_ids": [
+            "generalization-v1-21-1",
+            "generalization-v1-21-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.7742339950227914,
+              "cosine": 0.7418897391107278,
+              "norm_ratio": 0.9700829770752917
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.7785124440032408,
+              "cosine": 0.8844743886565416,
+              "norm_ratio": 0.9060851559092209
+            }
+          },
+          "mse_improvement": 0.9957215510195506
+        },
+        {
+          "semantic_group": "generalization-v1/nod-twice-torso-quiet",
+          "record_ids": [
+            "generalization-v1-14-1",
+            "generalization-v1-14-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.9582679129552787,
+              "cosine": 0.7289612209493277,
+              "norm_ratio": 0.9568763525461828
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.4348921620950184,
+              "cosine": 0.796770555484948,
+              "norm_ratio": 0.9256261777058332
+            }
+          },
+          "mse_improvement": 0.5233757508602603
+        },
+        {
+          "semantic_group": "generalization-v1/right-chest-stop-left-rest",
+          "record_ids": [
+            "generalization-v1-11-1",
+            "generalization-v1-11-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.885795180543763,
+              "cosine": 0.7288952107314154,
+              "norm_ratio": 0.9546276789581137
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.1594755979896196,
+              "cosine": 0.8294067348025642,
+              "norm_ratio": 0.9094342591130377
+            }
+          },
+          "mse_improvement": 0.7263195825541433
+        },
+        {
+          "semantic_group": "generalization-v1/right-hold-lower-then-nod",
+          "record_ids": [
+            "generalization-v1-32-1",
+            "generalization-v1-32-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.757980689462321,
+              "cosine": 0.7475595416393428,
+              "norm_ratio": 0.9493253095903553
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.0180577245015536,
+              "cosine": 0.8494531611351257,
+              "norm_ratio": 0.9132901294949383
+            }
+          },
+          "mse_improvement": 0.7399229649607673
+        },
+        {
+          "semantic_group": "generalization-v1/right-overhead-other-rest",
+          "record_ids": [
+            "generalization-v1-06-1",
+            "generalization-v1-06-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.5765133512099012,
+              "cosine": 0.7766388859367577,
+              "norm_ratio": 0.9236079969459857
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.8246626157321533,
+              "cosine": 0.8828968090569018,
+              "norm_ratio": 0.8968053521321342
+            }
+          },
+          "mse_improvement": 0.751850735477748
+        },
+        {
+          "semantic_group": "generalization-v1/right-shoulder-wave-three",
+          "record_ids": [
+            "generalization-v1-08-1",
+            "generalization-v1-08-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.876022584756426,
+              "cosine": 0.7445976407497086,
+              "norm_ratio": 0.948777486217482
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.0285579286778483,
+              "cosine": 0.8566454621508892,
+              "norm_ratio": 0.9098706233350734
+            }
+          },
+          "mse_improvement": 0.8474646560785777
+        },
+        {
+          "semantic_group": "generalization-v1/right-side-shoulder-hold",
+          "record_ids": [
+            "generalization-v1-02-1",
+            "generalization-v1-02-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.6521332867899408,
+              "cosine": 0.7662857538552115,
+              "norm_ratio": 0.9914724453632757
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.8233451449562808,
+              "cosine": 0.8786695154982445,
+              "norm_ratio": 0.9260570293916663
+            }
+          },
+          "mse_improvement": 0.82878814183366
+        },
+        {
+          "semantic_group": "generalization-v1/right-wave-then-two-nods",
+          "record_ids": [
+            "generalization-v1-28-1",
+            "generalization-v1-28-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.7446505754401087,
+              "cosine": 0.7557178944619813,
+              "norm_ratio": 0.9174521705210441
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.9753993100571872,
+              "cosine": 0.8644533168949544,
+              "norm_ratio": 0.8851615626574605
+            }
+          },
+          "mse_improvement": 0.7692512653829215
+        },
+        {
+          "semantic_group": "generalization-v1/shake-and-low-hands-apart",
+          "record_ids": [
+            "generalization-v1-22-1",
+            "generalization-v1-22-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.8187199247701673,
+              "cosine": 0.7455232696511904,
+              "norm_ratio": 0.9461237469342225
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.126815948176769,
+              "cosine": 0.8419489261237862,
+              "norm_ratio": 0.9159732391576989
+            }
+          },
+          "mse_improvement": 0.6919039765933983
+        },
+        {
+          "semantic_group": "generalization-v1/shake-once-shoulders-quiet",
+          "record_ids": [
+            "generalization-v1-15-1",
+            "generalization-v1-15-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.8762399817849915,
+              "cosine": 0.7295902761538041,
+              "norm_ratio": 0.8957637260290737
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.280606060551109,
+              "cosine": 0.8138076340520362,
+              "norm_ratio": 0.8847880666050711
+            }
+          },
+          "mse_improvement": 0.5956339212338826
+        },
+        {
+          "semantic_group": "generalization-v1/shake-then-facing-palms-chest",
+          "record_ids": [
+            "generalization-v1-29-1",
+            "generalization-v1-29-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 2.109188355438018,
+              "cosine": 0.6945084246978621,
+              "norm_ratio": 0.9125286298400817
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.0720071831606708,
+              "cosine": 0.8453705640197771,
+              "norm_ratio": 0.8868980837958456
+            }
+          },
+          "mse_improvement": 1.0371811722773474
+        },
+        {
+          "semantic_group": "generalization-v1/shrug-and-left-head-tilt",
+          "record_ids": [
+            "generalization-v1-25-1",
+            "generalization-v1-25-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.803466953514377,
+              "cosine": 0.7411590978330047,
+              "norm_ratio": 0.9579031416579465
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.2071799821710973,
+              "cosine": 0.8226414407313112,
+              "norm_ratio": 0.9105806978398584
+            }
+          },
+          "mse_improvement": 0.5962869713432797
+        },
+        {
+          "semantic_group": "generalization-v1/shrug-once-head-level",
+          "record_ids": [
+            "generalization-v1-13-1",
+            "generalization-v1-13-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 2.0419472215900156,
+              "cosine": 0.715714979227366,
+              "norm_ratio": 0.9784867793493732
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.4413587637583474,
+              "cosine": 0.7935921723561866,
+              "norm_ratio": 0.9295475316417221
+            }
+          },
+          "mse_improvement": 0.6005884578316683
+        },
+        {
+          "semantic_group": "generalization-v1/tilt-head-right-return",
+          "record_ids": [
+            "generalization-v1-16-1",
+            "generalization-v1-16-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.9327969481481388,
+              "cosine": 0.7199837142655772,
+              "norm_ratio": 0.9829904038822852
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.9162597922177981,
+              "cosine": 0.8665471663290889,
+              "norm_ratio": 0.9434931476043952
+            }
+          },
+          "mse_improvement": 1.0165371559303407
+        },
+        {
+          "semantic_group": "generalization-v1/torso-turn-right-hips-forward",
+          "record_ids": [
+            "generalization-v1-19-1",
+            "generalization-v1-19-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.4494484079396341,
+              "cosine": 0.7973646503241607,
+              "norm_ratio": 0.9765835171812394
+            },
+            "locked_candidate": {
+              "standardized_mse": 0.8433647255290979,
+              "cosine": 0.8778071322110645,
+              "norm_ratio": 0.9124033360120152
+            }
+          },
+          "mse_improvement": 0.6060836824105362
+        },
+        {
+          "semantic_group": "generalization-v1/upper-body-lean-left-return",
+          "record_ids": [
+            "generalization-v1-20-1",
+            "generalization-v1-20-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.9186057489606108,
+              "cosine": 0.7388837337319094,
+              "norm_ratio": 0.9730919530263926
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.0021206266445004,
+              "cosine": 0.8600792570421768,
+              "norm_ratio": 0.907769885731791
+            }
+          },
+          "mse_improvement": 0.9164851223161103
+        }
+      ],
+      "interpretation": "Feature similarity only; actual requested motion remains unmeasured."
+    },
+    "capability_boundary": {
+      "rows": 16,
+      "semantic_groups": 8,
+      "include_in_supported_success_summary": false,
+      "action_success_rate": null,
+      "group_macro_metrics": {
+        "old": {
+          "standardized_mse": 2.3747474559249855,
+          "cosine": 0.664590442397088,
+          "norm_ratio": 0.9108691997030822
+        },
+        "locked_candidate": {
+          "standardized_mse": 1.8582096134489285,
+          "cosine": 0.7324119749669007,
+          "norm_ratio": 0.8665662670986878
+        }
+      },
+      "descriptive_paired_group_interval": {
+        "mean_group_mse_improvement": 0.5165378424760569,
+        "lower": 0.3907707350202257,
+        "upper": 0.6766117053425819,
+        "semantic_groups": 8,
+        "resamples": 2000,
+        "confidence": 0.95,
+        "seed": 910,
+        "scope": "Final descriptive paired semantic-group bootstrap for the already locked model. Correlated paraphrases are grouped. This is not selection evidence, an eligibility gate, or proof of population-wide motion quality."
+      },
+      "groups": [
+        {
+          "semantic_group": "generalization-v1/ball-toss-catch",
+          "record_ids": [
+            "generalization-v1-40-1",
+            "generalization-v1-40-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 2.431108059191593,
+              "cosine": 0.64668229138574,
+              "norm_ratio": 0.86748768636287
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.9352557440157363,
+              "cosine": 0.7166342501326809,
+              "norm_ratio": 0.8204190596157072
+            }
+          },
+          "mse_improvement": 0.4958523151758567
+        },
+        {
+          "semantic_group": "generalization-v1/chair-sit-stand",
+          "record_ids": [
+            "generalization-v1-38-1",
+            "generalization-v1-38-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 2.4342066298431853,
+              "cosine": 0.6511792762961768,
+              "norm_ratio": 0.9112700953123767
+            },
+            "locked_candidate": {
+              "standardized_mse": 2.124975466127943,
+              "cosine": 0.6879866199117741,
+              "norm_ratio": 0.8621474424050888
+            }
+          },
+          "mse_improvement": 0.3092311637152423
+        },
+        {
+          "semantic_group": "generalization-v1/coin-pinch",
+          "record_ids": [
+            "generalization-v1-36-1",
+            "generalization-v1-36-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 2.6195252618905007,
+              "cosine": 0.6228192411627806,
+              "norm_ratio": 0.9057625846853207
+            },
+            "locked_candidate": {
+              "standardized_mse": 2.284636184544982,
+              "cosine": 0.6667028331885012,
+              "norm_ratio": 0.8781528623344306
+            }
+          },
+          "mse_improvement": 0.33488907734551887
+        },
+        {
+          "semantic_group": "generalization-v1/left-hand-right-shoulder-contact",
+          "record_ids": [
+            "generalization-v1-39-1",
+            "generalization-v1-39-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.9946158114472041,
+              "cosine": 0.7161922348149061,
+              "norm_ratio": 0.9035305575355168
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.413774520787698,
+              "cosine": 0.7984786882293163,
+              "norm_ratio": 0.8566223355240379
+            }
+          },
+          "mse_improvement": 0.5808412906595062
+        },
+        {
+          "semantic_group": "generalization-v1/object-cup-drink",
+          "record_ids": [
+            "generalization-v1-33-1",
+            "generalization-v1-33-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 3.037091253646887,
+              "cosine": 0.5738925381678643,
+              "norm_ratio": 0.9186507643006272
+            },
+            "locked_candidate": {
+              "standardized_mse": 2.7155476180944875,
+              "cosine": 0.6056334711287048,
+              "norm_ratio": 0.8647891301828687
+            }
+          },
+          "mse_improvement": 0.3215436355523993
+        },
+        {
+          "semantic_group": "generalization-v1/palm-clap-contact",
+          "record_ids": [
+            "generalization-v1-34-1",
+            "generalization-v1-34-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 2.4888430426219013,
+              "cosine": 0.6467049428579318,
+              "norm_ratio": 0.8969315369164876
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.8365952900124343,
+              "cosine": 0.7358716942006591,
+              "norm_ratio": 0.8506560098205529
+            }
+          },
+          "mse_improvement": 0.652247752609467
+        },
+        {
+          "semantic_group": "generalization-v1/right-three-fingers",
+          "record_ids": [
+            "generalization-v1-35-1",
+            "generalization-v1-35-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 2.417615173301046,
+              "cosine": 0.6750611038028842,
+              "norm_ratio": 0.9450553284955073
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.419631649452001,
+              "cosine": 0.8065641789478104,
+              "norm_ratio": 0.9097269894052797
+            }
+          },
+          "mse_improvement": 0.9979835238490451
+        },
+        {
+          "semantic_group": "generalization-v1/two-steps-left-wave",
+          "record_ids": [
+            "generalization-v1-37-1",
+            "generalization-v1-37-2"
+          ],
+          "rows": 2,
+          "metrics": {
+            "old": {
+              "standardized_mse": 1.5749744154575667,
+              "cosine": 0.7841919106884201,
+              "norm_ratio": 0.9382650440159519
+            },
+            "locked_candidate": {
+              "standardized_mse": 1.1352604345561466,
+              "cosine": 0.8414240639957582,
+              "norm_ratio": 0.8900163075015362
+            }
+          },
+          "mse_improvement": 0.4397139809014201
+        }
+      ],
+      "interpretation": "Boundary feature diagnostics only; neither high similarity nor improvement shows supported execution or correct refusal. Excluded from supported success summaries."
+    }
+  },
+  "per_record": [
+    {
+      "id": "generalization-v1-01-1",
+      "semantic_group": "generalization-v1/left-forward-shoulder-hold",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.8881210505013795,
+        "cosine": 0.7354327629601674,
+        "norm_ratio": 0.9664548227021497
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.730085850664858,
+        "cosine": 0.8988196845330649,
+        "norm_ratio": 0.9369470848890876
+      }
+    },
+    {
+      "id": "generalization-v1-01-2",
+      "semantic_group": "generalization-v1/left-forward-shoulder-hold",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.9081383427616498,
+        "cosine": 0.721949008858346,
+        "norm_ratio": 0.9585846331385844
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.242839678389831,
+        "cosine": 0.8143300368375858,
+        "norm_ratio": 0.9016790502553612
+      }
+    },
+    {
+      "id": "generalization-v1-02-1",
+      "semantic_group": "generalization-v1/right-side-shoulder-hold",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.1772303976857783,
+        "cosine": 0.6947078046441373,
+        "norm_ratio": 1.0150332791952497
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8836985841042287,
+        "cosine": 0.8692905657369884,
+        "norm_ratio": 0.9512030448844606
+      }
+    },
+    {
+      "id": "generalization-v1-02-2",
+      "semantic_group": "generalization-v1/right-side-shoulder-hold",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.127036175894103,
+        "cosine": 0.8378637030662858,
+        "norm_ratio": 0.9679116115313018
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.7629917058083326,
+        "cosine": 0.8880484652595007,
+        "norm_ratio": 0.900911013898872
+      }
+    },
+    {
+      "id": "generalization-v1-03-1",
+      "semantic_group": "generalization-v1/both-side-t-shape",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.2207970798014003,
+        "cosine": 0.6765503836724647,
+        "norm_ratio": 0.9692347414837161
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8911010759317317,
+        "cosine": 0.8683074603898303,
+        "norm_ratio": 0.9589332336096592
+      }
+    },
+    {
+      "id": "generalization-v1-03-2",
+      "semantic_group": "generalization-v1/both-side-t-shape",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.7419244841572425,
+        "cosine": 0.7556034415548778,
+        "norm_ratio": 0.9950932737845047
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.0534541128949486,
+        "cosine": 0.8498453859280941,
+        "norm_ratio": 0.9212511073914231
+      }
+    },
+    {
+      "id": "generalization-v1-04-1",
+      "semantic_group": "generalization-v1/both-low-forward-palms-down",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.896455246492021,
+        "cosine": 0.7247878008526553,
+        "norm_ratio": 0.8877237311560173
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.682088280055308,
+        "cosine": 0.9030062608467019,
+        "norm_ratio": 0.9049764296974605
+      }
+    },
+    {
+      "id": "generalization-v1-04-2",
+      "semantic_group": "generalization-v1/both-low-forward-palms-down",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.4799697457154686,
+        "cosine": 0.6369112240531055,
+        "norm_ratio": 0.8820135075968653
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.3711954102006045,
+        "cosine": 0.8057995100601542,
+        "norm_ratio": 0.8810521634394654
+      }
+    },
+    {
+      "id": "generalization-v1-05-1",
+      "semantic_group": "generalization-v1/left-overhead-other-rest",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.9515094139287363,
+        "cosine": 0.7298189166516869,
+        "norm_ratio": 0.9406684248395789
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.9341245177200383,
+        "cosine": 0.868476957760038,
+        "norm_ratio": 0.9089791864870288
+      }
+    },
+    {
+      "id": "generalization-v1-05-2",
+      "semantic_group": "generalization-v1/left-overhead-other-rest",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.4261016292336186,
+        "cosine": 0.7950277822549543,
+        "norm_ratio": 0.9582072439099005
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8162802333916779,
+        "cosine": 0.881593618635111,
+        "norm_ratio": 0.8869490248045365
+      }
+    },
+    {
+      "id": "generalization-v1-06-1",
+      "semantic_group": "generalization-v1/right-overhead-other-rest",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.9931574880491563,
+        "cosine": 0.7187363197197991,
+        "norm_ratio": 0.9105281226081091
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.9000386000962474,
+        "cosine": 0.8722245378258163,
+        "norm_ratio": 0.9167394865139422
+      }
+    },
+    {
+      "id": "generalization-v1-06-2",
+      "semantic_group": "generalization-v1/right-overhead-other-rest",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.1598692143706462,
+        "cosine": 0.8345414521537163,
+        "norm_ratio": 0.9366878712838623
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.7492866313680592,
+        "cosine": 0.8935690802879872,
+        "norm_ratio": 0.8768712177503263
+      }
+    },
+    {
+      "id": "generalization-v1-07-1",
+      "semantic_group": "generalization-v1/left-temple-wave-two",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.199821891774987,
+        "cosine": 0.6790423412692124,
+        "norm_ratio": 0.9242383350137303
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.3563866917153495,
+        "cosine": 0.7972081354592022,
+        "norm_ratio": 0.902194428042064
+      }
+    },
+    {
+      "id": "generalization-v1-07-2",
+      "semantic_group": "generalization-v1/left-temple-wave-two",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.6432936430911829,
+        "cosine": 0.7656858389996902,
+        "norm_ratio": 0.9476170614529797
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.048560131403067,
+        "cosine": 0.8484035046311172,
+        "norm_ratio": 0.916308796554953
+      }
+    },
+    {
+      "id": "generalization-v1-08-1",
+      "semantic_group": "generalization-v1/right-shoulder-wave-three",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.5462059230835004,
+        "cosine": 0.7810119152560506,
+        "norm_ratio": 0.9400904891034769
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.872008206967423,
+        "cosine": 0.8747546069858599,
+        "norm_ratio": 0.9201128883870148
+      }
+    },
+    {
+      "id": "generalization-v1-08-2",
+      "semantic_group": "generalization-v1/right-shoulder-wave-three",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.2058392464293517,
+        "cosine": 0.7081833662433664,
+        "norm_ratio": 0.9574644833314871
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.1851076503882738,
+        "cosine": 0.8385363173159185,
+        "norm_ratio": 0.899628358283132
+      }
+    },
+    {
+      "id": "generalization-v1-09-1",
+      "semantic_group": "generalization-v1/both-shoulder-wave-two",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.7475663312461407,
+        "cosine": 0.7452153405676619,
+        "norm_ratio": 0.9324657044439688
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.7504685575900082,
+        "cosine": 0.890471580337607,
+        "norm_ratio": 0.9126847747079054
+      }
+    },
+    {
+      "id": "generalization-v1-09-2",
+      "semantic_group": "generalization-v1/both-shoulder-wave-two",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.8897902600031204,
+        "cosine": 0.7434086557019346,
+        "norm_ratio": 0.9527673614698033
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.1289128547992564,
+        "cosine": 0.8450508360084353,
+        "norm_ratio": 0.9182516151849498
+      }
+    },
+    {
+      "id": "generalization-v1-10-1",
+      "semantic_group": "generalization-v1/both-chest-approach-no-contact",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.135780305812301,
+        "cosine": 0.6838839717511664,
+        "norm_ratio": 0.8887222693082222
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.046293035336069,
+        "cosine": 0.8492533887650087,
+        "norm_ratio": 0.8829636625192397
+      }
+    },
+    {
+      "id": "generalization-v1-10-2",
+      "semantic_group": "generalization-v1/both-chest-approach-no-contact",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.7663068850836339,
+        "cosine": 0.7416541380786942,
+        "norm_ratio": 0.9251659764616854
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.2963344592399255,
+        "cosine": 0.8114342026367222,
+        "norm_ratio": 0.920948291018751
+      }
+    },
+    {
+      "id": "generalization-v1-11-1",
+      "semantic_group": "generalization-v1/right-chest-stop-left-rest",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.055260309072984,
+        "cosine": 0.7026169982026699,
+        "norm_ratio": 0.9651257234500028
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.0311304358710043,
+        "cosine": 0.8469688503346782,
+        "norm_ratio": 0.9081542878926714
+      }
+    },
+    {
+      "id": "generalization-v1-11-2",
+      "semantic_group": "generalization-v1/right-chest-stop-left-rest",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.716330052014542,
+        "cosine": 0.7551734232601609,
+        "norm_ratio": 0.9441296344662247
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.287820760108235,
+        "cosine": 0.8118446192704504,
+        "norm_ratio": 0.9107142303334039
+      }
+    },
+    {
+      "id": "generalization-v1-12-1",
+      "semantic_group": "generalization-v1/left-waist-outward-semicircle",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.7828024642896037,
+        "cosine": 0.7389299638324043,
+        "norm_ratio": 0.906110673886462
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8847737550217438,
+        "cosine": 0.871356016861912,
+        "norm_ratio": 0.8578029519774305
+      }
+    },
+    {
+      "id": "generalization-v1-12-2",
+      "semantic_group": "generalization-v1/left-waist-outward-semicircle",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.653806567769886,
+        "cosine": 0.7691462930708863,
+        "norm_ratio": 0.9380477603188387
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.1439043576493813,
+        "cosine": 0.837620593864176,
+        "norm_ratio": 0.8943975703785968
+      }
+    },
+    {
+      "id": "generalization-v1-13-1",
+      "semantic_group": "generalization-v1/shrug-once-head-level",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.9721133616336177,
+        "cosine": 0.7227928778977916,
+        "norm_ratio": 0.9708452260008702
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.1768773510486041,
+        "cosine": 0.8281512179415824,
+        "norm_ratio": 0.9140332306063389
+      }
+    },
+    {
+      "id": "generalization-v1-13-2",
+      "semantic_group": "generalization-v1/shrug-once-head-level",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.1117810815464138,
+        "cosine": 0.7086370805569405,
+        "norm_ratio": 0.9861283326978763
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.7058401764680908,
+        "cosine": 0.7590331267707908,
+        "norm_ratio": 0.9450618326771053
+      }
+    },
+    {
+      "id": "generalization-v1-14-1",
+      "semantic_group": "generalization-v1/nod-twice-torso-quiet",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.56891248811416,
+        "cosine": 0.7826095049100903,
+        "norm_ratio": 0.9386506816560145
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.0358562056568785,
+        "cosine": 0.8543154358123504,
+        "norm_ratio": 0.9160315037239848
+      }
+    },
+    {
+      "id": "generalization-v1-14-2",
+      "semantic_group": "generalization-v1/nod-twice-torso-quiet",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.3476233377963975,
+        "cosine": 0.6753129369885651,
+        "norm_ratio": 0.9751020234363511
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.8339281185331582,
+        "cosine": 0.7392256751575457,
+        "norm_ratio": 0.9352208516876818
+      }
+    },
+    {
+      "id": "generalization-v1-15-1",
+      "semantic_group": "generalization-v1/shake-once-shoulders-quiet",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.52223112940497,
+        "cosine": 0.781592677950145,
+        "norm_ratio": 0.9319388594866279
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.7992935889113925,
+        "cosine": 0.885279013280336,
+        "norm_ratio": 0.9254653548740286
+      }
+    },
+    {
+      "id": "generalization-v1-15-2",
+      "semantic_group": "generalization-v1/shake-once-shoulders-quiet",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.230248834165013,
+        "cosine": 0.6775878743574633,
+        "norm_ratio": 0.8595885925715195
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.7619185321908253,
+        "cosine": 0.7423362548237363,
+        "norm_ratio": 0.8441107783361136
+      }
+    },
+    {
+      "id": "generalization-v1-16-1",
+      "semantic_group": "generalization-v1/tilt-head-right-return",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.2794386486946494,
+        "cosine": 0.6695391099512485,
+        "norm_ratio": 0.9901813191516293
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.6609829154723739,
+        "cosine": 0.9043395639350806,
+        "norm_ratio": 0.9444449126360759
+      }
+    },
+    {
+      "id": "generalization-v1-16-2",
+      "semantic_group": "generalization-v1/tilt-head-right-return",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.5861552476016283,
+        "cosine": 0.7704283185799057,
+        "norm_ratio": 0.9757994886129412
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.1715366689632223,
+        "cosine": 0.8287547687230971,
+        "norm_ratio": 0.9425413825727145
+      }
+    },
+    {
+      "id": "generalization-v1-17-1",
+      "semantic_group": "generalization-v1/look-left-pause-forward",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.9761190677399496,
+        "cosine": 0.7184641292605956,
+        "norm_ratio": 0.9575905606755362
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8231468297005763,
+        "cosine": 0.8839963980676347,
+        "norm_ratio": 0.9042057548076174
+      }
+    },
+    {
+      "id": "generalization-v1-17-2",
+      "semantic_group": "generalization-v1/look-left-pause-forward",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.5612525933905639,
+        "cosine": 0.7681886377691803,
+        "norm_ratio": 0.9669552736680286
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.9582375180149587,
+        "cosine": 0.8562880710602099,
+        "norm_ratio": 0.9450735839077483
+      }
+    },
+    {
+      "id": "generalization-v1-18-1",
+      "semantic_group": "generalization-v1/bow-small-arms-down",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.5717021711441115,
+        "cosine": 0.7824987536514533,
+        "norm_ratio": 0.9652721256096761
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.6980133077753705,
+        "cosine": 0.9022417667162604,
+        "norm_ratio": 0.9352717631550499
+      }
+    },
+    {
+      "id": "generalization-v1-18-2",
+      "semantic_group": "generalization-v1/bow-small-arms-down",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.5346096416184847,
+        "cosine": 0.791791362883851,
+        "norm_ratio": 0.9394358863488623
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.0969202838743306,
+        "cosine": 0.8512928540444228,
+        "norm_ratio": 0.9161806571603824
+      }
+    },
+    {
+      "id": "generalization-v1-19-1",
+      "semantic_group": "generalization-v1/torso-turn-right-hips-forward",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.7208064343140501,
+        "cosine": 0.7631323884971993,
+        "norm_ratio": 0.9691534943603647
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.9200452845715504,
+        "cosine": 0.8696912400051231,
+        "norm_ratio": 0.8931245344335873
+      }
+    },
+    {
+      "id": "generalization-v1-19-2",
+      "semantic_group": "generalization-v1/torso-turn-right-hips-forward",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.1780903815652182,
+        "cosine": 0.8315969121511222,
+        "norm_ratio": 0.984013540002114
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.7666841664866455,
+        "cosine": 0.8859230244170059,
+        "norm_ratio": 0.9316821375904432
+      }
+    },
+    {
+      "id": "generalization-v1-20-1",
+      "semantic_group": "generalization-v1/upper-body-lean-left-return",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.7685047191464243,
+        "cosine": 0.7625391200602879,
+        "norm_ratio": 0.9629459020212571
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.7305466154888313,
+        "cosine": 0.9017582119082156,
+        "norm_ratio": 0.9155034993732288
+      }
+    },
+    {
+      "id": "generalization-v1-20-2",
+      "semantic_group": "generalization-v1/upper-body-lean-left-return",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.0687067787747973,
+        "cosine": 0.715228347403531,
+        "norm_ratio": 0.9832380040315283
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.2736946378001694,
+        "cosine": 0.818400302176138,
+        "norm_ratio": 0.9000362720903531
+      }
+    },
+    {
+      "id": "generalization-v1-21-1",
+      "semantic_group": "generalization-v1/nod-and-left-chest-raise",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.8929618344917871,
+        "cosine": 0.7247125661725652,
+        "norm_ratio": 0.9682691769187359
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.5183218904990448,
+        "cosine": 0.9246437266479052,
+        "norm_ratio": 0.9086896047382808
+      }
+    },
+    {
+      "id": "generalization-v1-21-2",
+      "semantic_group": "generalization-v1/nod-and-left-chest-raise",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.655506155553796,
+        "cosine": 0.7590669120488904,
+        "norm_ratio": 0.9718967772318475
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.0387029975074369,
+        "cosine": 0.8443050506651779,
+        "norm_ratio": 0.9034807070801609
+      }
+    },
+    {
+      "id": "generalization-v1-22-1",
+      "semantic_group": "generalization-v1/shake-and-low-hands-apart",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.4783819698222098,
+        "cosine": 0.785032735421733,
+        "norm_ratio": 0.9499097407969455
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8276293474257445,
+        "cosine": 0.8798569221888133,
+        "norm_ratio": 0.922405581247429
+      }
+    },
+    {
+      "id": "generalization-v1-22-2",
+      "semantic_group": "generalization-v1/shake-and-low-hands-apart",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.159057879718125,
+        "cosine": 0.7060138038806478,
+        "norm_ratio": 0.9423377530714997
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.4260025489277934,
+        "cosine": 0.8040409300587593,
+        "norm_ratio": 0.9095408970679689
+      }
+    },
+    {
+      "id": "generalization-v1-23-1",
+      "semantic_group": "generalization-v1/forward-lean-right-hand-reach",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.0193082716832995,
+        "cosine": 0.688433467533682,
+        "norm_ratio": 0.9416513491311594
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.9612673999063795,
+        "cosine": 0.8537765411594557,
+        "norm_ratio": 0.9071175206362975
+      }
+    },
+    {
+      "id": "generalization-v1-23-2",
+      "semantic_group": "generalization-v1/forward-lean-right-hand-reach",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.1809618796608725,
+        "cosine": 0.8278172022666025,
+        "norm_ratio": 0.9213405082299654
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.916212535552452,
+        "cosine": 0.8679836855170515,
+        "norm_ratio": 0.9191403040287117
+      }
+    },
+    {
+      "id": "generalization-v1-24-1",
+      "semantic_group": "generalization-v1/asymmetric-left-shoulder-right-chest",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.048151476204012,
+        "cosine": 0.7084349502425549,
+        "norm_ratio": 0.9052201336058376
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.9815090458908633,
+        "cosine": 0.8611944239392206,
+        "norm_ratio": 0.8894377845789597
+      }
+    },
+    {
+      "id": "generalization-v1-24-2",
+      "semantic_group": "generalization-v1/asymmetric-left-shoulder-right-chest",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.5934569005545907,
+        "cosine": 0.7584523996090735,
+        "norm_ratio": 0.9035667419498891
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.1710829320704963,
+        "cosine": 0.8269060278624616,
+        "norm_ratio": 0.8662909352333529
+      }
+    },
+    {
+      "id": "generalization-v1-25-1",
+      "semantic_group": "generalization-v1/shrug-and-left-head-tilt",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.0428318004123707,
+        "cosine": 0.6989176518422171,
+        "norm_ratio": 0.9441264955939889
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.1996836604001024,
+        "cosine": 0.8192562549058106,
+        "norm_ratio": 0.8925501825204935
+      }
+    },
+    {
+      "id": "generalization-v1-25-2",
+      "semantic_group": "generalization-v1/shrug-and-left-head-tilt",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.5641021066163834,
+        "cosine": 0.7834005438237922,
+        "norm_ratio": 0.9716797877219042
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.2146763039420923,
+        "cosine": 0.8260266265568117,
+        "norm_ratio": 0.9286112131592233
+      }
+    },
+    {
+      "id": "generalization-v1-26-1",
+      "semantic_group": "generalization-v1/head-right-left-arm-side",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.7490076696944925,
+        "cosine": 0.737955691948895,
+        "norm_ratio": 0.9208660744903328
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8464874487459408,
+        "cosine": 0.8722923904545669,
+        "norm_ratio": 0.879546605017113
+      }
+    },
+    {
+      "id": "generalization-v1-26-2",
+      "semantic_group": "generalization-v1/head-right-left-arm-side",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.3372124392342486,
+        "cosine": 0.7969533072550868,
+        "norm_ratio": 0.9105055661281636
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.9607595902354746,
+        "cosine": 0.8539456278162564,
+        "norm_ratio": 0.8819817626165775
+      }
+    },
+    {
+      "id": "generalization-v1-27-1",
+      "semantic_group": "generalization-v1/left-then-right-no-overlap",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.0341510662785653,
+        "cosine": 0.7216052919462871,
+        "norm_ratio": 0.9013332866445799
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8863329667840716,
+        "cosine": 0.8812734714681678,
+        "norm_ratio": 0.9079226116228216
+      }
+    },
+    {
+      "id": "generalization-v1-27-2",
+      "semantic_group": "generalization-v1/left-then-right-no-overlap",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.5256833035391544,
+        "cosine": 0.7901740529795565,
+        "norm_ratio": 0.9413383419078545
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.3128568187144198,
+        "cosine": 0.8141926924566028,
+        "norm_ratio": 0.8669597633902656
+      }
+    },
+    {
+      "id": "generalization-v1-28-1",
+      "semantic_group": "generalization-v1/right-wave-then-two-nods",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.69522658419926,
+        "cosine": 0.7650810285931148,
+        "norm_ratio": 0.9155277224532
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8057655581712023,
+        "cosine": 0.8893845007933217,
+        "norm_ratio": 0.880167890739346
+      }
+    },
+    {
+      "id": "generalization-v1-28-2",
+      "semantic_group": "generalization-v1/right-wave-then-two-nods",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.7940745666809574,
+        "cosine": 0.746354760330848,
+        "norm_ratio": 0.9193766185888882
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.1450330619431721,
+        "cosine": 0.8395221329965873,
+        "norm_ratio": 0.890155234575575
+      }
+    },
+    {
+      "id": "generalization-v1-29-1",
+      "semantic_group": "generalization-v1/shake-then-facing-palms-chest",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.264165273837887,
+        "cosine": 0.6726767787958686,
+        "norm_ratio": 0.9421191442847536
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8418996619434209,
+        "cosine": 0.8794342753391555,
+        "norm_ratio": 0.9128655971949948
+      }
+    },
+    {
+      "id": "generalization-v1-29-2",
+      "semantic_group": "generalization-v1/shake-then-facing-palms-chest",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.9542114370381496,
+        "cosine": 0.7163400705998556,
+        "norm_ratio": 0.8829381153954096
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.3021147043779209,
+        "cosine": 0.8113068527003985,
+        "norm_ratio": 0.8609305703966962
+      }
+    },
+    {
+      "id": "generalization-v1-30-1",
+      "semantic_group": "generalization-v1/look-left-then-right-forward",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.1917025332395825,
+        "cosine": 0.6902976991223031,
+        "norm_ratio": 0.9821250974787027
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.0790933003536392,
+        "cosine": 0.8404641148318652,
+        "norm_ratio": 0.9230739213336582
+      }
+    },
+    {
+      "id": "generalization-v1-30-2",
+      "semantic_group": "generalization-v1/look-left-then-right-forward",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.793867404174612,
+        "cosine": 0.733487344066267,
+        "norm_ratio": 0.9018689434222531
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.1866584168510306,
+        "cosine": 0.82125069714633,
+        "norm_ratio": 0.85146516579236
+      }
+    },
+    {
+      "id": "generalization-v1-31-1",
+      "semantic_group": "generalization-v1/both-low-out-in-twice",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.8991590194479544,
+        "cosine": 0.7252099216742776,
+        "norm_ratio": 0.8850089491415946
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8469405209113892,
+        "cosine": 0.8801587137154462,
+        "norm_ratio": 0.9265725516465152
+      }
+    },
+    {
+      "id": "generalization-v1-31-2",
+      "semantic_group": "generalization-v1/both-low-out-in-twice",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.7295946030165992,
+        "cosine": 0.7482096897360396,
+        "norm_ratio": 0.8726771485573985
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.9774024855021628,
+        "cosine": 0.8620129875897468,
+        "norm_ratio": 0.8772181817086071
+      }
+    },
+    {
+      "id": "generalization-v1-32-1",
+      "semantic_group": "generalization-v1/right-hold-lower-then-nod",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 2.081075876854448,
+        "cosine": 0.7082359687756559,
+        "norm_ratio": 0.980296977543614
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8903341885367717,
+        "cosine": 0.8712193744784189,
+        "norm_ratio": 0.9405373817257563
+      }
+    },
+    {
+      "id": "generalization-v1-32-2",
+      "semantic_group": "generalization-v1/right-hold-lower-then-nod",
+      "track": "supported_upper_body",
+      "old": {
+        "standardized_mse": 1.4348855020701938,
+        "cosine": 0.7868831145030298,
+        "norm_ratio": 0.9183536416370967
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.1457812604663355,
+        "cosine": 0.8276869477918324,
+        "norm_ratio": 0.8860428772641201
+      }
+    },
+    {
+      "id": "generalization-v1-33-1",
+      "semantic_group": "generalization-v1/object-cup-drink",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.966886361405863,
+        "cosine": 0.5909565324071868,
+        "norm_ratio": 0.9615221802853129
+      },
+      "locked_candidate": {
+        "standardized_mse": 2.6252191456952954,
+        "cosine": 0.6205460755722967,
+        "norm_ratio": 0.8947568083526147
+      }
+    },
+    {
+      "id": "generalization-v1-33-2",
+      "semantic_group": "generalization-v1/object-cup-drink",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 3.1072961458879105,
+        "cosine": 0.556828543928542,
+        "norm_ratio": 0.8757793483159415
+      },
+      "locked_candidate": {
+        "standardized_mse": 2.8058760904936793,
+        "cosine": 0.5907208666851129,
+        "norm_ratio": 0.8348214520131229
+      }
+    },
+    {
+      "id": "generalization-v1-34-1",
+      "semantic_group": "generalization-v1/palm-clap-contact",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.6324697021113903,
+        "cosine": 0.6288410554555265,
+        "norm_ratio": 0.892276831529079
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.7405101751642524,
+        "cosine": 0.7515871069847886,
+        "norm_ratio": 0.8503609358866056
+      }
+    },
+    {
+      "id": "generalization-v1-34-2",
+      "semantic_group": "generalization-v1/palm-clap-contact",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.345216383132412,
+        "cosine": 0.6645688302603371,
+        "norm_ratio": 0.9015862423038964
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.932680404860616,
+        "cosine": 0.7201562814165298,
+        "norm_ratio": 0.8509510837545001
+      }
+    },
+    {
+      "id": "generalization-v1-35-1",
+      "semantic_group": "generalization-v1/right-three-fingers",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.381032509551769,
+        "cosine": 0.6787383501357976,
+        "norm_ratio": 0.9508839180216623
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.4000514900141767,
+        "cosine": 0.8087170000737135,
+        "norm_ratio": 0.9486695427283982
+      }
+    },
+    {
+      "id": "generalization-v1-35-2",
+      "semantic_group": "generalization-v1/right-three-fingers",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.4541978370503226,
+        "cosine": 0.6713838574699706,
+        "norm_ratio": 0.9392267389693524
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.4392118088898251,
+        "cosine": 0.8044113578219073,
+        "norm_ratio": 0.8707844360821613
+      }
+    },
+    {
+      "id": "generalization-v1-36-1",
+      "semantic_group": "generalization-v1/coin-pinch",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.604523290445931,
+        "cosine": 0.6213401172046533,
+        "norm_ratio": 0.9448214343663245
+      },
+      "locked_candidate": {
+        "standardized_mse": 2.02850903666779,
+        "cosine": 0.6978776642920427,
+        "norm_ratio": 0.8998763723414352
+      }
+    },
+    {
+      "id": "generalization-v1-36-2",
+      "semantic_group": "generalization-v1/coin-pinch",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.634527233335071,
+        "cosine": 0.6242983651209079,
+        "norm_ratio": 0.8667037350043169
+      },
+      "locked_candidate": {
+        "standardized_mse": 2.5407633324221734,
+        "cosine": 0.6355280020849599,
+        "norm_ratio": 0.856429352327426
+      }
+    },
+    {
+      "id": "generalization-v1-37-1",
+      "semantic_group": "generalization-v1/two-steps-left-wave",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 1.4277388892848517,
+        "cosine": 0.8080406396368928,
+        "norm_ratio": 0.930586075580182
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.0493101140442471,
+        "cosine": 0.8565107881931883,
+        "norm_ratio": 0.8942005165548479
+      }
+    },
+    {
+      "id": "generalization-v1-37-2",
+      "semantic_group": "generalization-v1/two-steps-left-wave",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 1.7222099416302818,
+        "cosine": 0.7603431817399475,
+        "norm_ratio": 0.9459440124517217
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.221210755068046,
+        "cosine": 0.8263373397983282,
+        "norm_ratio": 0.8858320984482244
+      }
+    },
+    {
+      "id": "generalization-v1-38-1",
+      "semantic_group": "generalization-v1/chair-sit-stand",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.6037893642950367,
+        "cosine": 0.6208214099500187,
+        "norm_ratio": 0.890952603717852
+      },
+      "locked_candidate": {
+        "standardized_mse": 2.008133297204909,
+        "cosine": 0.6959527253241811,
+        "norm_ratio": 0.8224403729616384
+      }
+    },
+    {
+      "id": "generalization-v1-38-2",
+      "semantic_group": "generalization-v1/chair-sit-stand",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.264623895391334,
+        "cosine": 0.681537142642335,
+        "norm_ratio": 0.9315875869069015
+      },
+      "locked_candidate": {
+        "standardized_mse": 2.241817635050977,
+        "cosine": 0.6800205144993671,
+        "norm_ratio": 0.9018545118485393
+      }
+    },
+    {
+      "id": "generalization-v1-39-1",
+      "semantic_group": "generalization-v1/left-hand-right-shoulder-contact",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 1.8254933396929813,
+        "cosine": 0.7385473315810113,
+        "norm_ratio": 0.8915012475236186
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.0448268934466154,
+        "cosine": 0.8548141838067228,
+        "norm_ratio": 0.851330438758054
+      }
+    },
+    {
+      "id": "generalization-v1-39-2",
+      "semantic_group": "generalization-v1/left-hand-right-shoulder-contact",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.1637382832014267,
+        "cosine": 0.6938371380488009,
+        "norm_ratio": 0.9155598675474151
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.7827221481287805,
+        "cosine": 0.7421431926519099,
+        "norm_ratio": 0.8619142322900217
+      }
+    },
+    {
+      "id": "generalization-v1-40-1",
+      "semantic_group": "generalization-v1/ball-toss-catch",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.5213708589943016,
+        "cosine": 0.6333350343429001,
+        "norm_ratio": 0.8571438544739743
+      },
+      "locked_candidate": {
+        "standardized_mse": 1.8225357425076076,
+        "cosine": 0.736909126583468,
+        "norm_ratio": 0.8187292053722819
+      }
+    },
+    {
+      "id": "generalization-v1-40-2",
+      "semantic_group": "generalization-v1/ball-toss-catch",
+      "track": "capability_boundary",
+      "old": {
+        "standardized_mse": 2.3408452593888844,
+        "cosine": 0.6600295484285797,
+        "norm_ratio": 0.8778315182517658
+      },
+      "locked_candidate": {
+        "standardized_mse": 2.047975745523865,
+        "cosine": 0.6963593736818938,
+        "norm_ratio": 0.8221089138591324
+      }
+    }
+  ],
+  "predictionSha256": {
+    "old": "b0504a5715142d87be89c56f4c64dc030450a05db80ff162193be247a92e5687",
+    "locked_candidate": "8295a2883911e1dbffd4392342bb19de88cbcdd4f6b055f401f46163b1af89ec"
+  },
+  "finishedUtc": "2026-09-10T06:16:51.500386+00:00"
+}

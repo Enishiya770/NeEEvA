@@ -391,6 +391,15 @@ public class LLM:MonoBehaviour
         }, imageDataUrl);
     }
 
+    /// <summary>Continue after a completed assistant action with new execution facts.
+    /// Providers with native history control place feedback after that action's reply.
+    /// Other providers retain their existing continuation transport.</summary>
+    public virtual void PostSpeechFeedbackStream(string context, string feedback, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl = null)
+    {
+        PostSpeechContinuationStream((context ?? "") + "\n\n" + (feedback ?? ""), onSpeech, onComplete, imageDataUrl);
+    }
+
     /// <summary>
     /// 临时推理：给“用户仍在说话”的可撤销草稿使用。
     /// 实现必须保证请求和回答都不写入 m_DataList；不支持的 provider 返回空结果。
@@ -398,6 +407,16 @@ public class LLM:MonoBehaviour
     public virtual void PostEphemeralMsg(string prompt, System.Action<string> callback)
     {
         if (callback != null) callback("");
+    }
+
+    /// <summary>
+    /// Review outstanding user work without writing dialogue history. Providers may use
+    /// a separate structured-output budget; CancelEphemeralMsg also cancels this review.
+    /// The fallback preserves existing providers and test doubles.
+    /// </summary>
+    public virtual void PostWorkReviewMsg(string prompt, System.Action<string> callback)
+    {
+        PostEphemeralMsg(prompt, callback);
     }
 
     /// <summary>用户继续说或 EOU 到达时撤销在飞的临时推理，正式回复拥有最高优先级。</summary>

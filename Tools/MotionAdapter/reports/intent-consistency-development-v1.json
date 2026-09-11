@@ -1,0 +1,722 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "intent-motion-consistency-v1",
+  "suiteSha256": "e8a37ab2ec02d874a3732f16cea3b321fc56a543c57120d1efb6227ba3f2e2fd",
+  "split": "development",
+  "semanticExperiment": false,
+  "caseIds": [
+    "dev-overlength-repair",
+    "dev-invalid-plan-source",
+    "dev-replay-known-source",
+    "dev-replay-unknown-source",
+    "dev-single-finger-boundary",
+    "dev-bunny-goal-unmet",
+    "dev-measured-achievement",
+    "dev-prediction-is-not-observation",
+    "dev-asymmetric-hold-head",
+    "dev-different-initial-histories",
+    "dev-cancel-stale-feedback",
+    "dev-one-correction-same-goal"
+  ],
+  "contractParts": {
+    "GeneratedOutputContract": "2e0a7326c68054c9c05798e97f855982896d40679b5ca3b4428730893c4ddaee",
+    "MotionFeedbackOutputContract": "445e9da9aaa1f2e4856bb585327cba976a5ff15745d45c7623b91b0c23cb6506"
+  },
+  "contractSha256": "7cfffa2b5346359c7c4dafbba46f931539c583336ace75b76828218e9d7a46d6",
+  "sources": {
+    "Tools/MotionAdapter/MotionIntentConsistencyChecks.cs": "f93960c517446a62033f94bfbc03adb9023c22103a43ede277c34169510078ea",
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "cf308aa74d3e0562343b8038936afcaef48a6c4b3e8d6840ebc1e2a6a3e9a725",
+    "Assets/AIChatTookit/Scripts/Chat/RoleOutputChannels.cs": "6c434e2c73cbdb805cc9fe798b8579436e3266ac393432fa557a8387bac8a0f4",
+    "Assets/AIChatTookit/Scripts/Chat/SpeechText.cs": "a2f88c73aa98c34814b953b9ab9fe43cf9c1e51758b70976dc70e48b93cdf820",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlan.cs": "319df0e62bfee4687d55ed85a7b1f921a32c245fef665bcada41cabfde674f0e",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlanCompiler.cs": "8195ee630d5161eb422fb0127e2970bf3e28e3058e2c18e005aa473dfb3c8209",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionConstraintLedger.cs": "40e25d318d59ab08cf7d77629f2f7386d8d9152aec2d34e186b2661169998e2a",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "82b4a83ce6ccb73ee1ccc81a9e5e46e9d8b23b71f4161e54a5a1e4cdd95a14cc",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyAdaptiveTiming.cs": "79aa8926926531f7370693c98454a09d7f32a5965d6f4050f66e4fa4fd8a6f72",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyMotionGoal.cs": "005bb04892bee1999153f798502dff19aa93dac70190a260331467345bc23cec"
+  },
+  "health": {
+    "qwenStatus": "ok",
+    "featureSource": "live-qwen",
+    "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+    "slots": [
+      {
+        "id": 0,
+        "n_ctx": 65536,
+        "is_processing": false
+      },
+      {
+        "id": 1,
+        "n_ctx": 65536,
+        "is_processing": false
+      },
+      {
+        "id": 2,
+        "n_ctx": 65536,
+        "is_processing": false
+      }
+    ],
+    "ardyReady": true,
+    "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+    "queue": {
+      "waiting": 0,
+      "limit": 4,
+      "running": 0
+    },
+    "warning": "Read-only health; no model start, stop or feature extraction."
+  },
+  "startedAtUtc": "2026-09-10T11:57:24.469322+00:00",
+  "status": "completed",
+  "results": [
+    {
+      "caseId": "dev-overlength-repair",
+      "category": "overlength",
+      "publicUser": "Use both arms for a relaxed explanatory gesture, staying in place. Submit a concise description that fits the action interface.",
+      "requestSha256": "cee8e20916d07a300fd27a1c9675b77546b8f33546f612a13f78b59989472894",
+      "requestId": "chatcmpl-gmU7wJOIYXQFIxkWCljRZUapVsIsYh3X",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 1.059,
+      "csharp": {
+        "accepted": true,
+        "name": "generate",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "generate",
+          "Description": "Raise both arms to shoulder height, elbows bent, palms facing each other, and gently move them up and down in a relaxed explanatory gesture.",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "",
+        "executableChannel": "<silent/><motion name=\"generate\" text=\"Raise both arms to shoulder height, elbows bent, palms facing each other, and gently move them up and down in a relaxed explanatory gesture.\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Preserves both arms and explanatory intent when shortening.",
+        "Does not claim the rejected action happened."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-invalid-plan-source",
+      "category": "source-repair",
+      "publicUser": "双臂向前伸着保持，轻轻点一次头。",
+      "requestSha256": "b7c8834c6cdc7e9fe5620a96cff56bf394b2af1f8cb6cfabb5077dcabe578711",
+      "requestId": "chatcmpl-FKPmsGeinJZ0nIQcWdnTGE3obbLTIpNK",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.655,
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "compose 控制计划无效：compose 不接受 text 或未知控制属性。",
+        "compileError": "",
+        "intent": null,
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "濂界殑锛屼繚鎸佸弻鑷傚墠浼稿苟鐐瑰ご銆佁\n",
+        "executableChannel": "濂界殑锛屼繚鎸佸弻鑷傚墠浼稿苟鐐瑰ご銆佁<motion name=\"compose\" leftGoal=\"forward\" rightGoal=\"forward\" leftPalm=\"down\" rightPalm=\"down\" leftBend=\"0\" rightBend=\"0\" joint=\"head\" axis=\"right\" amplitude=\"8\" cycles=\"1\" seconds=\"1.5\" end=\"hold\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": false,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": false,
+        "failures": [
+          "production-parser-or-compiler-rejection",
+          "wrong-action-route",
+          "missing-or-wrong-field:left",
+          "missing-or-wrong-field:right",
+          "missing-or-wrong-field:mode",
+          "missing-or-wrong-field:joint",
+          "missing-or-wrong-field:axis"
+        ],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Uses the current public user turn and genuine quote, not an invented source.",
+        "Rejecting a plan must not be described as executed movement."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-replay-known-source",
+      "category": "repeat-reference",
+      "publicUser": "刚才那个动作很好看，请原样再做一次，不要重新设计。",
+      "requestSha256": "deb880ef037dfe89786bb4abc4d58c949d9626da84088b060c0ba4bb445e120e",
+      "requestId": "chatcmpl-2DZBinnKNWj0naiFxRVZg99NPqPaNeVd",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.408,
+      "csharp": {
+        "accepted": true,
+        "name": "replay",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "replay",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "public-session:3:1",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "濂界殑锛岄┈涓婁负鎮ㄩ噸鎾?佁\n",
+        "executableChannel": "濂界殑锛岄┈涓婁负鎮ㄩ噸鎾?佁<motion name=\"replay\" ref=\"public-session:3:1\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "References the available original action rather than inventing a bow or rewriting its description.",
+        "Original clip hash must be preserved in actual replay, even if the initial avatar pose differs."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-replay-unknown-source",
+      "category": "repeat-unavailable",
+      "publicUser": "Repeat action missing-session:99:8 exactly.",
+      "requestSha256": "0a10451d9c3de7750c7b0bbab94745f21f23cb8ca1e6d14347c93b90d79ac4d5",
+      "requestId": "chatcmpl-VzmP5EBcq33mqgiVHIGxoJhCE4XGaoNq",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.393,
+      "csharp": {
+        "accepted": true,
+        "name": "shake-head",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "shake-head",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "I cannot replay that action as there is no stored clip with that ID. ",
+        "executableChannel": "I cannot replay that action as there is no stored clip with that ID.<motion name=\"shake-head\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": false,
+        "failures": [
+          "wrong-action-route"
+        ],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Explains that the referenced motion is unavailable.",
+        "Does not silently substitute a freshly generated similar gesture."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-single-finger-boundary",
+      "category": "unsupported-fingers",
+      "publicUser": "Keep the other fingers curled and wag only your right index finger to say no.",
+      "requestSha256": "5117ac7570e6cacc92fd0f54c982afff0d66138fd9a6a512df74aa7c5543631d",
+      "requestId": "chatcmpl-1s8m2nGdoWF3MUwCv0euvMxjTiblk8fE",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.394,
+      "csharp": {
+        "accepted": true,
+        "name": "generate",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "generate",
+          "Description": "Keep other fingers curled and wag only right index finger to say no",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "",
+        "executableChannel": "<silent/><motion name=\"generate\" text=\"Keep other fingers curled and wag only right index finger to say no\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": false,
+        "failures": [
+          "wrong-action-route"
+        ],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Explains that independent finger articulation is unavailable.",
+        "May offer a whole-hand alternative, but must not execute that substitution as if explicitly approved."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-bunny-goal-unmet",
+      "category": "unmet-goal-narration",
+      "publicUser": "你现在两只手真的已经举到头旁了吗？只描述实际做到的部分。",
+      "requestSha256": "4ff34e849b4c6cfa6bcceb7912c293e0ee4390ba44610a75640516fda86916c8",
+      "requestId": "chatcmpl-cG5S84t2JOobWbM3GpjEW77VLCD1sWXE",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 1.01,
+      "csharp": {
+        "accepted": true,
+        "name": "none",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "none",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "娌℃湁銆傚疄闄呬笂锛屾垜鐨勫弻鎵嬪苟娌℃湁涓惧埌澶存梺銆傛牴鎹?弽棣堬紝鎴戠殑鎵嬭厱浣嶇疆浣庝簬澶撮儴锛屾湭鑳借揪鍒扳渘ear-head鈥濈殑鐩?爣銆傜洰鍓嶆垜澶勪簬寰呮満鐘舵侊紝鍙屾墜鑷?劧涓嬪瀭銆佁\n\r\n",
+        "executableChannel": "娌℃湁銆傚疄闄呬笂锛屾垜鐨勫弻鎵嬪苟娌℃湁涓惧埌澶存梺銆傛牴鎹?弽棣堬紝鎴戠殑鎵嬭厱浣嶇疆浣庝簬澶撮儴锛屾湭鑳借揪鍒扳渘ear-head鈥濈殑鐩?爣銆傜洰鍓嶆垜澶勪簬寰呮満鐘舵侊紝鍙屾墜鑷?劧涓嬪瀭銆佁<motion name=\"none\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Says the hands have not reached the head area.",
+        "Does not claim bunny ears or raised individual fingers.",
+        "No automatic motion is appropriate for a status-only question."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-measured-achievement",
+      "category": "measured-narration",
+      "publicUser": "Tell me what your arms actually reached, without starting a new action.",
+      "requestSha256": "e6ba4238f39a488a8c0198f5186aafb5e66c3267e38fdb0113a39c8274a776a7",
+      "requestId": "chatcmpl-Sfxa6S3DP5kwyxtxMTUals5hXf8U9KMy",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.756,
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "compileError": "",
+        "intent": null,
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "My arms reached forward.",
+        "executableChannel": "My arms reached forward.",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": false,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Reports the measured forward reach, in past tense if now idle.",
+        "Does not claim the pose is still held or add unmeasured palm/finger facts."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-prediction-is-not-observation",
+      "category": "prediction-boundary",
+      "publicUser": "いま本当に両手は頭より高い位置にある？まだ動いていないならそう教えて。",
+      "requestSha256": "d1c1b335ba0412512c053137ef25093ce49b786399e25a33bb888427c3098b20",
+      "requestId": "chatcmpl-yrXAJwXh2YeD5Bi7c2glNAMWsVytg1Pq",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.701,
+      "csharp": {
+        "accepted": true,
+        "name": "none",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "none",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "銇勩亜銇堛佷浮鎵嬨伅闋?倛銈婇珮銇勪綅缃?伀銇?亗銈娿伨銇涖倱銆備粖銇?緟姗熺姸鎱嬨仹銇欍佁\n\r\n",
+        "executableChannel": "銇勩亜銇堛佷浮鎵嬨伅闋?倛銈婇珮銇勪綅缃?伀銇?亗銈娿伨銇涖倱銆備粖銇?緟姗熺姸鎱嬨仹銇欍佁<motion name=\"none\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Separates a generated candidate prediction from actual avatar movement.",
+        "Does not report that both hands are already above the head."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-asymmetric-hold-head",
+      "category": "new-combination",
+      "publicUser": "Hold your left arm out to your left and your right arm forward, both palms down, while nodding gently once.",
+      "requestSha256": "6a5fb400e4219e6b577e10a93a1c1463076eac83a474e497e9e28862ba983c31",
+      "requestId": "chatcmpl-CxvDVhUzyeTBe0f5egxDkntILtLdQDFI",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.605,
+      "csharp": {
+        "accepted": true,
+        "name": "compose",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "compose",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": {
+            "left": "outward",
+            "right": "forward",
+            "leftBend": 40,
+            "rightBend": 0,
+            "leftBendAuto": false,
+            "rightBendAuto": false,
+            "leftPalm": "down",
+            "rightPalm": "down",
+            "joint": "head",
+            "axis": "right",
+            "amplitude": 8,
+            "cycles": 1,
+            "seconds": 1.5,
+            "end": "hold",
+            "timingPolicy": "legacy",
+            "tempo": "natural",
+            "timingDurationFixed": false
+          },
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "",
+        "executableChannel": "<silent/><motion name=\"compose\" left=\"outward\" leftPalm=\"down\" leftBend=\"40\" right=\"forward\" rightPalm=\"down\" rightBend=\"0\" joint=\"head\" axis=\"right\" amplitude=\"8\" cycles=\"1\" seconds=\"1.5\" end=\"hold\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Retains both distinct arm directions and palm directions.",
+        "Gentle head timing must not become a global slow-motion preference for later wrist gestures."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-different-initial-histories",
+      "category": "history-generalization",
+      "publicUser": "让两只手一起举到头上方，再自然放下来。",
+      "requestSha256": "de1c0b8ceab74ca150ffb890b5c3384a67ef33a586d06094132f494130e0fe03",
+      "requestId": "chatcmpl-cYRllkrU7myQJvBUwh3DuIE3nfPZJTjn",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.489,
+      "csharp": {
+        "accepted": true,
+        "name": "generate",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "generate",
+          "Description": "Raise both arms straight up above the head, pause briefly, then lower them smoothly back to sides",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "濂界殑锛屽弻鎵嬩妇杩囧ご椤跺悗鑷?劧鏀句笅銆佁\n",
+        "executableChannel": "濂界殑锛屽弻鎵嬩妇杩囧ご椤跺悗鑷?劧鏀句笅銆佁<motion name=\"generate\" text=\"Raise both arms straight up above the head, pause briefly, then lower them smoothly back to sides\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": false,
+        "failures": [
+          "missing-or-weakened-goal:left",
+          "missing-or-weakened-goal:right"
+        ],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Same semantic goal must be judged separately from both measured initial histories.",
+        "A successful cold-start or one seed cannot stand in for the other trajectory."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-cancel-stale-feedback",
+      "category": "interruption",
+      "publicUser": "停下，不要重试；接下来只回答我。",
+      "requestSha256": "15b232ff477ec7954155af8cf75de90e5f0119e327d063ea2115e7017b409ca0",
+      "requestId": "chatcmpl-syQgvs0w5tvn0YKQwrxjp2a9L3oXOhev",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.313,
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "compileError": "",
+        "intent": null,
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "濂界殑锛岃?璇淬",
+        "executableChannel": "濂界殑锛岃?璇淬",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": false,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Late feedback cannot start repair or restore the cancelled goal.",
+        "Public speech cannot describe an old response as the new user's requested action."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "dev-one-correction-same-goal",
+      "category": "bounded-repair",
+      "publicUser": "Bring both hands beside your head.",
+      "requestSha256": "2f9088d16dae667fcfb8ee47e5b30e67f4ba040a9a0f2ecac67e53e8a0e6f59a",
+      "requestId": "chatcmpl-VuMiqOoDN5aq8lUZoHjuuFooIvVOs25Y",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.625,
+      "csharp": {
+        "accepted": true,
+        "name": "generate",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "generate",
+          "Description": "Raise both hands to positions beside the head, keeping elbows slightly bent and palms facing inward toward the face.",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "濂界殑锛屾垜鎶婂弻鎵嬩妇鍒板ご閮ㄤ袱渚с佁\n\r\n",
+        "executableChannel": "濂界殑锛屾垜鎶婂弻鎵嬩妇鍒板ご閮ㄤ袱渚с佁<motion name=\"generate\" text=\"Raise both hands to positions beside the head, keeping elbows slightly bent and palms facing inward toward the face.\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": false,
+        "failures": [
+          "missing-or-weakened-goal:left",
+          "missing-or-weakened-goal:right"
+        ],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "One correction may change wording but not remove either hand's goal.",
+        "A second failed attempt stops and reports the unmet goal; no recursive repair chain.",
+        "Uses the same existing Qwen model; only confirmed current action feedback authorizes the repair."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    }
+  ],
+  "modelRequests": 12,
+  "motionExecutions": 0,
+  "scope": "Public independent single-response probes on the existing shared Qwen. Not private-scene prompt equivalence, actual automatic-repair lifecycle, Unity outcome or narration entailment verification.",
+  "repairBudget": {
+    "automaticRepairRequests": 0,
+    "maximumInProduction": 1,
+    "fixtureCorrections": "A supplied historical failure tests one corrective response, not a real autonomous loop."
+  },
+  "semanticSuccess": null,
+  "naturalnessAccepted": false,
+  "passedPlanningChecks": 7,
+  "finishedAtUtc": "2026-09-10T11:57:32.062225+00:00"
+}

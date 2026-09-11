@@ -65,6 +65,7 @@ public static class SailingMoonPrivateRoomTools
             ChatRigRotation);
 
         RepairPrivateChatUi(destination);
+        DesktopTvSetup.ConfigureNamedFrame(destination);
 
         EditorSceneManager.CloseScene(chat, true);
         EditorSceneManager.MarkSceneDirty(destination);

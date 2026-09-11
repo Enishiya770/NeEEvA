@@ -148,3 +148,9 @@ Server/RVC/*_headers.txt
 /Assets/Private/
 /Assets/Private.meta
 /LocalPrivate/
+# Motion adapter experiments: downloaded upstream code, environments and model data.
+/Tools/MotionAdapter/runtime/
+/Server/ARDY/vendor/
+/Server/ARDY/.venv/
+/Server/ARDY/models/
+/Server/ARDY/runtime/

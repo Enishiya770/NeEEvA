@@ -1,0 +1,49 @@
+{
+  "date": "2026-09-10",
+  "rows": 2000,
+  "teacher_shape": [
+    2000,
+    4096
+  ],
+  "qwen_shape": [
+    2000,
+    2048
+  ],
+  "teacher_contract": "5179f91dcafe261730bd9adf2bc5f1d3fe77b7befe28b2c6ced6987d81ba8a30",
+  "teacher_provenance": {
+    "ardy_revision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+    "device": "cuda",
+    "effective_model_name": "meta-llama/Meta-Llama-3-8B-Instruct",
+    "max_length": 512,
+    "output_scale": "raw",
+    "packages": {
+      "peft": "0.19.1",
+      "torch": "2.11.0+cu128",
+      "transformers": "5.8.1"
+    },
+    "pooling": "official-wrapper",
+    "pooling_mode": "mean",
+    "preset": {
+      "kwargs": {
+        "base_model_name_or_path": "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp",
+        "device": "auto",
+        "dtype": "bfloat16",
+        "llm_dim": 4096,
+        "peft_model_name_or_path": "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised"
+      },
+      "target": "ardy.model.LLM2VecEncoder"
+    },
+    "repos": {
+      "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp": "31474e395ada192e8ed1586db6be79fb3b70c9c0",
+      "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised": "baa8ebf04a1c2500e61288e7dad65e8ae42601a7",
+      "meta-llama/Meta-Llama-3-8B-Instruct": "8afb486c1db24fe5011ec46dfbe5b5dccdb575c2"
+    }
+  },
+  "teacher_norm": {
+    "min": 128.00259399414062,
+    "median": 132.13449096679688,
+    "max": 135.8430633544922
+  },
+  "dataset_sha256": "f137cc3b104a339350accf185b33bb739b55dc9c53b8af2f992a7cce977b7967",
+  "qwen_contract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0"
+}

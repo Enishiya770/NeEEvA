@@ -1,0 +1,6 @@
+{
+  "field": "maxChunks",
+  "attempt": "activation-first-window",
+  "reason": "Verification client sent 1; fixed protocol requires 3. No generation occurred.",
+  "result": "HTTP 400"
+}

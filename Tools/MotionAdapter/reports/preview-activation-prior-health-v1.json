@@ -1,0 +1,45 @@
+{
+  "service": "neeeva-ardy-motion",
+  "ready": true,
+  "backend": {
+    "ready": true,
+    "languageModelsLoaded": false,
+    "adapter": "mlp-seed1",
+    "adapterSha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa",
+    "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+    "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+    "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+    "fps": 20,
+    "newFrames": 40,
+    "historyFrames": 16,
+    "gpuPreflight": {
+      "freeMiB": 23036.0,
+      "totalMiB": 24563.5
+    }
+  },
+  "features": {
+    "source": "live-qwen",
+    "verified": true,
+    "baseUrl": "http://127.0.0.1:8080",
+    "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+    "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4"
+  },
+  "queue": {
+    "waiting": 0,
+    "limit": 4,
+    "running": 0
+  },
+  "characters": {
+    "count": 1,
+    "limit": 64
+  },
+  "counters": {
+    "submitted": 1,
+    "completed": 1,
+    "cancelled": 0,
+    "failed": 0,
+    "staleResultsDiscarded": 0,
+    "queueRejected": 0
+  },
+  "baselineResourcesModified": false
+}

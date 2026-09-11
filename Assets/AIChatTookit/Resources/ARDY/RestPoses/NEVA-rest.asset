@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5131d89f7c9095640a965973079f691d, type: 3}
+  m_Name: NEVA-rest
+  m_EditorClassIdentifier: 
+  schema: 1
+  avatar: {fileID: 5929401533440927806, guid: 244ba07622b71b74cbc29c11d1dc893a, type: 3}
+  sourcePath: Assets/Model/NEVA.vrm
+  sourceSha256: d02820de92e697d8dd37fea4e993a2127c36684e19ebff8cffbc0b999dd25551
+  sourceDependencyHash: ca921b75426112e53e09d4e2ae42fa13
+  entries:
+  - bone: 7
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 8
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 54
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 9
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 10
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 11
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 13
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 15
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 17
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 12
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 14
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 16
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 18
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}

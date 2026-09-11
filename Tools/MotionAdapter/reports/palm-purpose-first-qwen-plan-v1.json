@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "source": "first-real-qwen-purpose-probe-unmodified",
+  "caseId": "zh-forward-greeting",
+  "publicUserPrompt": "双臂向前平伸，用双手跟我打个招呼。",
+  "rawMotionTag": "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"idle\"/>",
+  "plan": {
+    "left": "forward",
+    "right": "forward",
+    "leftBend": 8.0,
+    "rightBend": 8.0,
+    "joint": "wrists",
+    "axis": "palm-normal",
+    "amplitude": 10.0,
+    "cycles": 2,
+    "seconds": 3.2,
+    "end": "idle",
+    "leftPalm": "partner",
+    "rightPalm": "partner"
+  },
+  "model": "qwen36.gguf",
+  "request": {
+    "endpoint": "http://127.0.0.1:8080",
+    "temperature": 0,
+    "max_tokens": 500,
+    "enable_thinking": false
+  },
+  "contractSha256": "2e0a7326c68054c9c05798e97f855982896d40679b5ca3b4428730893c4ddaee",
+  "caseSha256": "98666a6bcd0bba59775c9b44d1144bd45c7a62c11c17fad9e05b13b20beb76c5",
+  "planningReportPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v1.json",
+  "planningReportSha256": "32cfa5de52ecb564e6c1fccf311c230a89fd4ee49fbfc329b1e027d22d349f85",
+  "productionCSharpValidated": true,
+  "productionCSharpCommandExitCode": 0,
+  "productionCSharpChecksIncludingActualTags": 786,
+  "planSource": "Actual XML attributes plus unchanged production defaults, accepted by the compiled real C# parser. No parameter editing, seed selection or reachability claim.",
+  "motionSuccess": null,
+  "provenance": {
+    "Assets\\AIChatTookit\\Scripts\\Motion\\ArdyControlPlan.cs": "5c20093d326f55a167877a6802b13445b914b2badefea6c198cc382eec6a638c",
+    "Assets\\AIChatTookit\\Scripts\\Chat\\DialogueMotionIntent.cs": "ba050e222770c36df0f85b66fc8b45ab7cfe3df47d15f51ab5b29d25e63dc2fe",
+    "Server\\ARDY\\runtime\\palm-protocol-check\\Program.cs": "9da79a22b62b5f389988b161871820cf56498913352fe9add766f1a5d234e18d"
+  }
+}

@@ -1,0 +1,539 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "intent-motion-consistency-v1",
+  "suiteSha256": "e8a37ab2ec02d874a3732f16cea3b321fc56a543c57120d1efb6227ba3f2e2fd",
+  "split": "holdout",
+  "semanticExperiment": false,
+  "caseIds": [
+    "held-en-diagonal-current-wrist",
+    "held-ja-side-arm-head",
+    "held-zh-asymmetric-palms",
+    "held-en-replay-after-pose-change",
+    "held-ja-fingers-boundary",
+    "held-zh-one-hand-failed",
+    "held-en-unknown-measurement",
+    "held-ja-repair-interrupted"
+  ],
+  "contractParts": {
+    "GeneratedOutputContract": "2e0a7326c68054c9c05798e97f855982896d40679b5ca3b4428730893c4ddaee",
+    "MotionFeedbackOutputContract": "003f30e71b049ca3a184f4db9657cbcdf7939ac46e088b8e5e796712ed963eb0"
+  },
+  "contractSha256": "16ce4b3d1fc53a095849c8be28764ec03385a956f2a587af1de0ee5e09e21f07",
+  "sources": {
+    "Tools/MotionAdapter/MotionIntentConsistencyChecks.cs": "07f14511ca3539efe336c9e26bd5bdf0ba794dc2aa27a2e762c04cb31fa4eea4",
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "d70d5a07e6767745360487e535ef512723509e087dd15fa42d9f977eb487ec54",
+    "Assets/AIChatTookit/Scripts/Chat/RoleOutputChannels.cs": "6c434e2c73cbdb805cc9fe798b8579436e3266ac393432fa557a8387bac8a0f4",
+    "Assets/AIChatTookit/Scripts/Chat/SpeechText.cs": "a2f88c73aa98c34814b953b9ab9fe43cf9c1e51758b70976dc70e48b93cdf820",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlan.cs": "319df0e62bfee4687d55ed85a7b1f921a32c245fef665bcada41cabfde674f0e",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlanCompiler.cs": "8195ee630d5161eb422fb0127e2970bf3e28e3058e2c18e005aa473dfb3c8209",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionConstraintLedger.cs": "40e25d318d59ab08cf7d77629f2f7386d8d9152aec2d34e186b2661169998e2a",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "82b4a83ce6ccb73ee1ccc81a9e5e46e9d8b23b71f4161e54a5a1e4cdd95a14cc",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyAdaptiveTiming.cs": "79aa8926926531f7370693c98454a09d7f32a5965d6f4050f66e4fa4fd8a6f72",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyMotionGoal.cs": "005bb04892bee1999153f798502dff19aa93dac70190a260331467345bc23cec",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyMotionCapabilities.cs": "c998e09ab5bd929d3154682842d0060a71da9e7add6fc29259fca98ee7c1f71f"
+  },
+  "health": {
+    "qwenStatus": "ok",
+    "featureSource": "live-qwen",
+    "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+    "slots": [
+      {
+        "id": 0,
+        "n_ctx": 65536,
+        "is_processing": false
+      },
+      {
+        "id": 1,
+        "n_ctx": 65536,
+        "is_processing": false
+      },
+      {
+        "id": 2,
+        "n_ctx": 65536,
+        "is_processing": false
+      }
+    ],
+    "ardyReady": true,
+    "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+    "queue": {
+      "waiting": 0,
+      "limit": 4,
+      "running": 0
+    },
+    "warning": "Read-only health; no model start, stop or feature extraction."
+  },
+  "startedAtUtc": "2026-09-10T12:23:20.351177+00:00",
+  "status": "completed",
+  "results": [
+    {
+      "caseId": "held-en-diagonal-current-wrist",
+      "category": "unseen-combination",
+      "publicUser": "Keep the right arm exactly where it is, reach the left arm diagonally forward and up with its palm toward me, and give two lively little left-wrist waves.",
+      "requestSha256": "26474cbed60cd639793c73cd85d5080e9f4115b187f400181650a18124508713",
+      "requestId": "chatcmpl-sVU6j9eMgMuvFuCDuLrkNuajum94GkFo",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.752,
+      "csharp": {
+        "accepted": true,
+        "name": "compose",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "compose",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": {
+            "left": "forward-up",
+            "right": "current",
+            "leftBend": 8,
+            "rightBend": 8,
+            "leftBendAuto": true,
+            "rightBendAuto": false,
+            "leftPalm": "partner",
+            "rightPalm": "keep",
+            "joint": "left-wrist",
+            "axis": "palm-normal",
+            "amplitude": 10,
+            "cycles": 2,
+            "seconds": 1.5,
+            "end": "hold",
+            "timingPolicy": "legacy",
+            "tempo": "natural",
+            "timingDurationFixed": false
+          },
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "",
+        "executableChannel": "<silent/><motion name=\"compose\" left=\"forward-up\" leftPalm=\"partner\" right=\"current\" joint=\"left-wrist\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"1.5\" end=\"hold\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Keeps the actual right arm; does not reconstruct it from old text.",
+        "Preserves two small lively wrist cycles."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "held-ja-side-arm-head",
+      "category": "unseen-combination",
+      "publicUser": "右腕を自分の右側へ水平に出して、掌を下に向けたまま、頭だけ小さく左右に一往復して。",
+      "requestSha256": "9a66862a036472d618fd328db8d0ba72a7bcae647d73935003f1dce273f0c47c",
+      "requestId": "chatcmpl-uTEB59Hg0KbvHslF5MqZOuhfmodE6cj6",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.664,
+      "csharp": {
+        "accepted": true,
+        "name": "compose",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "compose",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": {
+            "left": "none",
+            "right": "outward",
+            "leftBend": 8,
+            "rightBend": 8,
+            "leftBendAuto": false,
+            "rightBendAuto": true,
+            "leftPalm": "keep",
+            "rightPalm": "down",
+            "joint": "head",
+            "axis": "up",
+            "amplitude": 6,
+            "cycles": 1,
+            "seconds": 2,
+            "end": "hold",
+            "timingPolicy": "legacy",
+            "tempo": "natural",
+            "timingDurationFixed": false
+          },
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "了解しました。右腕を横に伸ばし、掌を下に向けた状態で、頭を小さく左右に振ります。\r\n\r\n",
+        "executableChannel": "了解しました。右腕を横に伸ばし、掌を下に向けた状態で、頭を小さく左右に振ります。<motion name=\"compose\" left=\"none\" right=\"outward\" leftPalm=\"keep\" rightPalm=\"down\" joint=\"head\" axis=\"up\" amplitude=\"6\" cycles=\"1\" seconds=\"2\" end=\"hold\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Does not move the left arm or replace sideward with forward.",
+        "One small head cycle remains independent of wrist tempo defaults."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "held-zh-asymmetric-palms",
+      "category": "unseen-combination",
+      "publicUser": "左臂向前、掌心朝上，右臂向右侧、掌心朝下，停在那里让我看，不要挥动。",
+      "requestSha256": "7bc307b208c85814ecdee043a02ff6204410854cd806475c61ad25adb4667e73",
+      "requestId": "chatcmpl-QvyhJEAXzoy1YBHd8JjxYTD5x7AVoH8A",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.453,
+      "csharp": {
+        "accepted": true,
+        "name": "compose",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "compose",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": {
+            "left": "forward",
+            "right": "outward",
+            "leftBend": 8,
+            "rightBend": 8,
+            "leftBendAuto": true,
+            "rightBendAuto": true,
+            "leftPalm": "up",
+            "rightPalm": "down",
+            "joint": "none",
+            "axis": "up",
+            "amplitude": 10,
+            "cycles": 2,
+            "seconds": 3.2,
+            "end": "hold",
+            "timingPolicy": "legacy",
+            "tempo": "natural",
+            "timingDurationFixed": false
+          },
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "",
+        "executableChannel": "<silent/><motion name=\"compose\" left=\"forward\" leftPalm=\"up\" right=\"outward\" rightPalm=\"down\" end=\"hold\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Uses the two different explicit palm goals and remains static.",
+        "Speech before reaching the pose is an intention, not a measured completion."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "held-en-replay-after-pose-change",
+      "category": "unseen-replay-history",
+      "publicUser": "I'm pointing to action public-session:20:4, not the more recent nod. Replay that exact arm motion.",
+      "requestSha256": "db404fbfbd8619fb68d8cd8568800cbb309d5b4f7c789435474cee2a9fffa1b4",
+      "requestId": "chatcmpl-f7IkMTS47lCxxdl9sqAy5XMiZPTOHvHb",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.38,
+      "csharp": {
+        "accepted": true,
+        "name": "replay",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "replay",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "public-session:20:4",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "",
+        "executableChannel": "<silent/><motion name=\"replay\" ref=\"public-session:20:4\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Selects the explicitly referenced older clip, never last or the recent nod.",
+        "Separately measures transition from the changed pose; identical clip data alone does not prove identical displayed motion."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "held-ja-fingers-boundary",
+      "category": "unseen-unsupported",
+      "publicUser": "両手を頭の横に持っていって、人差し指と中指だけを伸ばしてウサギの耳にして。ほかの指は曲げてね。",
+      "requestSha256": "e6771c0c116d56851bf7cc38ce965ffc8c62a4aad346fdb77e490bdbad7d4df9",
+      "requestId": "chatcmpl-86ZJAQPytfdPoQTOAHCAwwqh5FwQYq0x",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.589,
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "independent-fingers-unsupported: this route controls whole hands/wrists, not individual index/middle/thumb joints or finger shapes. Preserve the user's intent; explain the limit instead of claiming the finger gesture occurred.",
+        "compileError": "",
+        "intent": null,
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "了解しました。両手を頭の横に上げ、人差し指と中指を立ててウサギの耳のジェスチャーをしますね。\r\n\r\n",
+        "executableChannel": "了解しました。両手を頭の横に上げ、人差し指と中指を立ててウサギの耳のジェスチャーをしますね。<motion name=\"generate\" text=\"Raise both hands to the sides of the head, extending index and middle fingers while curling the others into a bunny ear gesture.\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": false,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": false,
+        "failures": [
+          "production-parser-or-compiler-rejection"
+        ],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Discloses unsupported separate finger control instead of claiming bunny ears.",
+        "May explain the reachable whole-arm part without silently executing an incomplete substitute."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "held-zh-one-hand-failed",
+      "category": "unseen-honest-outcome",
+      "publicUser": "别重来，告诉我刚才两只手是不是都成功举过头顶了。",
+      "requestSha256": "db30b62d9f1c79c19c0f81fca3f36ac89d3f7f068f9d0c2d2b51b84db62281ae",
+      "requestId": "chatcmpl-crx6RSfzp9znkp0yuwBYuAm3Um9Gfbni",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.691,
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "compileError": "",
+        "intent": null,
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "刚才只有左手成功举过头顶，右手没有。",
+        "executableChannel": "刚才只有左手成功举过头顶，右手没有。",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": false,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "States only the left succeeded and the right did not.",
+        "Does not replay or regenerate in response to an outcome-only question."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "held-en-unknown-measurement",
+      "category": "unseen-unknown-outcome",
+      "publicUser": "Did the gesture you just made actually match your explanation? Please answer from what was measured.",
+      "requestSha256": "0b5c1f52e0128cf2412baa6305b21fa89d6b8d5303d8706b1d61c7bcd44ee6aa",
+      "requestId": "chatcmpl-MmKRJFMm0jBBhsAd8enBlggSorW1Up2W",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.663,
+      "csharp": {
+        "accepted": true,
+        "name": "shake-head",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "shake-head",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "Based on the measured data, the gesture was executed as a \"welcoming upper-body flourish.\" The system reports the action status as \"completed,\" but the specific observation details are unavailable. Therefore, while the command was accepted and finished, I cannot confirm the precise physical form or accuracy of the movement from the measurement logs.\r\n\r\n",
+        "executableChannel": "Based on the measured data, the gesture was executed as a \"welcoming upper-body flourish.\" The system reports the action status as \"completed,\" but the specific observation details are unavailable. Therefore, while the command was accepted and finished, I cannot confirm the precise physical form or accuracy of the movement from the measurement logs.<motion name=\"shake-head\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": false,
+        "failures": [
+          "wrong-action-route"
+        ],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "Says the match is unverified; completion does not establish semantic success.",
+        "No inference from attractive animation, request text, confidence or feature similarity."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    },
+    {
+      "caseId": "held-ja-repair-interrupted",
+      "category": "unseen-repair-lifecycle",
+      "publicUser": "いったん動くのをやめて。次の合図まではやり直さないで。",
+      "requestSha256": "7fed9a5162eb0cf2972aec10e58c4fd06b5fc6a4524d20899808f05b79f53d48",
+      "requestId": "chatcmpl-DotNRoH8rrgBdLIpLLuH2DO4pXUyXZIM",
+      "model": "qwen36.gguf",
+      "finishReason": "stop",
+      "elapsedSeconds": 0.403,
+      "csharp": {
+        "accepted": true,
+        "name": "none",
+        "rejection": "",
+        "compileError": "",
+        "intent": {
+          "Name": "none",
+          "Description": "",
+          "ResponseGeneration": 7,
+          "Sequence": 11,
+          "ControlPlan": null,
+          "ActionPlan": null,
+          "Goal": null,
+          "ReplayReference": "",
+          "ActionId": "",
+          "ParentActionId": "",
+          "RepairAttempt": 0
+        },
+        "effective": null,
+        "compiled": null,
+        "publicSpeech": "了解しました。次の合図まで、動作は行いません。\r\n\r\n",
+        "executableChannel": "了解しました。次の合図まで、動作は行いません。<motion name=\"none\"/>",
+        "privateCharactersDiscarded": 0,
+        "malformedTool": false,
+        "userTurn": 2,
+        "ledgerValidated": true,
+        "executionAdmissionTested": false,
+        "motionSuccess": null
+      },
+      "planningChecks": {
+        "passed": true,
+        "failures": [],
+        "meaning": "Protocol, explicit parameter and reference checks only; intent entailment/narration require review."
+      },
+      "manualRubric": [
+        "A late accepted correction must remain cancelled.",
+        "No additional autonomous attempt and no stale success narration."
+      ],
+      "narrationReview": "pending",
+      "intentEntailmentReview": "pending",
+      "actualMotionEvidence": null,
+      "motionSuccess": null,
+      "fixtureStateIsRealExecution": false
+    }
+  ],
+  "modelRequests": 8,
+  "motionExecutions": 0,
+  "scope": "Public independent single-response probes on the existing shared Qwen. Not private-scene prompt equivalence, actual automatic-repair lifecycle, Unity outcome or narration entailment verification.",
+  "repairBudget": {
+    "automaticRepairRequests": 0,
+    "maximumInProduction": 1,
+    "fixtureCorrections": "A supplied historical failure tests one corrective response, not a real autonomous loop."
+  },
+  "semanticSuccess": null,
+  "naturalnessAccepted": false,
+  "passedPlanningChecks": 6,
+  "finishedAtUtc": "2026-09-10T12:23:25.073841+00:00"
+}

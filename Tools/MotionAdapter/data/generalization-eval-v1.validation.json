@@ -1,0 +1,18 @@
+{
+  "status": "static_validation_passed",
+  "scope": "CPU-only records/schema/partition/exact-text-overlap/hash checks. No embedding export, model inference, training, Unity or network request.",
+  "rows": 80,
+  "semantic_groups": 40,
+  "supported_rows": 64,
+  "supported_groups": 32,
+  "capability_boundary_rows": 16,
+  "capability_boundary_groups": 8,
+  "all_split": "test",
+  "legacy_2000_records_sha256": "f137cc3b104a339350accf185b33bb739b55dc9c53b8af2f992a7cce977b7967",
+  "legacy_2000_matches_prior_paired_features": true,
+  "exact_text_overlap_with_legacy_or_seen_diagnostic": 0,
+  "suite_sha256": "bad7ec319c961c077b8ab92eb39eb8482e847c2ff67d6c39e5a8434b3e197889",
+  "group_rules_sha256": "2fc197a38400d26874d2b47695eafa6c3ad5c5f287babb8ba6cc7ca83f6c6848",
+  "diagnostic_file_sha256": "03a6e7c3128417f00c49d015e0d346e9aae555c6cbbee08d1f3b77c9bab6f4c3",
+  "limitation": "Exact-text and signature checks do not prove semantic non-overlap. New training aliases need independent manual configuration review."
+}

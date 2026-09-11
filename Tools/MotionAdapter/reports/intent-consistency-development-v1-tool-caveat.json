@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "sourceReport": "Tools/MotionAdapter/reports/intent-consistency-development-v1.json",
+  "sourceReportSha256": "a9cae39c39548ee99acc5034fd6e0469f6dcc37482a5d295a66361ab0d50a54a",
+  "status": "retained-with-tool-limitation",
+  "issue": "The external Mono inspector used the platform default stdin codepage. UTF-8 Chinese/Japanese public speech was corrupted before output serialization; ASCII action tags were readable. Do not evaluate multilingual narration from this report.",
+  "correction": "The inspector now explicitly sets Console.InputEncoding and Console.OutputEncoding to UTF8Encoding(false). A Chinese/Japanese exact-string regression passed.",
+  "evaluationPolicy": "The first report and its 12 model responses remain untouched. A new development report may rerun after the one authorized feedback-contract revision. No held-out model request has been made.",
+  "modelErrorNotClaimedForCorruptedSpeech": true,
+  "actualMotionSuccess": null
+}

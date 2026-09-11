@@ -1,0 +1,405 @@
+{
+    "status": "passed",
+    "method": "Actual Unity PlayMode, real NEVA.vrm and Animator, disabled full VRM runtime. A synchronized avatar with the same active tail spring verifies all non-eye transforms and expression weights. Eye angles use original edit-mode eye orientation markers attached to the current head frame; the Animator-only avatar's eyes are not a neutral reference because its idle clip also rotates them.",
+    "limitations": "No physical headset, eye-tracking hardware, audio or chat service was used. Camera.main fallback represents the same transform used by a desktop camera or tracked XR camera. PNGs use a separate face observation camera while the gaze target moves; the head-frame test rotates the avatar's hierarchy with an unchanged world target.",
+    "avatarSha256": "d02820de92e697d8dd37fea4e993a2127c36684e19ebff8cffbc0b999dd25551",
+    "runtimeSha256": "9c7cdf5ad95cd543651b3b8596004fe45192a65a98be2c2cd95c20149182ee72",
+    "regressionSha256": "e39a78df19e682aaf419b0f5474f05b18f67541d40a92d7863c7830575e73c48",
+    "sampledFrames": 16405,
+    "checks": 3838818,
+    "enableCycles": 3,
+    "elapsedSeconds": 22.507675170898439,
+    "animatorTimeAdvance": 1.360599398612976,
+    "maximumNonEyeRotationErrorDegrees": 0.0,
+    "maximumNonEyePositionErrorMetres": 4.7321617557827269e-7,
+    "maximumBlendshapeError": 0.0,
+    "maximumHorizontalEyeAngleDegrees": 6.60413932800293,
+    "maximumVerticalEyeAngleDegrees": 3.889348030090332,
+    "maximumAnimatorEyeAngleDegrees": 1.9959840774536133,
+    "maximumDirectionErrorDegrees": 0.003673478728160262,
+    "smoothingIntermediateAngleDegrees": 26.417369842529298,
+    "maximumReenableErrorDegrees": 0.000003946529886889039,
+    "cameraFallbackPassed": true,
+    "movingHeadPassed": true,
+    "captureFrameRate": 12,
+    "animationFrames": 60,
+    "animationFrameTimes": [
+        0.016668319702148439,
+        0.08333396911621094,
+        0.16666793823242188,
+        0.25,
+        0.33333396911621096,
+        0.4166679382324219,
+        0.5,
+        0.5833339691162109,
+        0.6666679382324219,
+        0.75,
+        0.8333339691162109,
+        0.9166679382324219,
+        1.0,
+        1.083333969116211,
+        1.1666679382324219,
+        1.25,
+        1.333333969116211,
+        1.4166679382324219,
+        1.5166683197021485,
+        1.583333969116211,
+        1.6666679382324219,
+        1.7666683197021485,
+        1.833333969116211,
+        1.9166679382324219,
+        2.0166683197021486,
+        2.083333969116211,
+        2.166667938232422,
+        2.25,
+        2.333333969116211,
+        2.416667938232422,
+        2.5,
+        2.583333969116211,
+        2.666667938232422,
+        2.75,
+        2.833333969116211,
+        2.916667938232422,
+        3.0,
+        3.083333969116211,
+        3.166667938232422,
+        3.25,
+        3.333333969116211,
+        3.416667938232422,
+        3.5,
+        3.583333969116211,
+        3.666667938232422,
+        3.75,
+        3.833333969116211,
+        3.916667938232422,
+        4.0,
+        4.083333969116211,
+        4.166667938232422,
+        4.25,
+        4.333333969116211,
+        4.416667938232422,
+        4.5,
+        4.583333969116211,
+        4.666667938232422,
+        4.750001907348633,
+        4.833333969116211,
+        4.916667938232422
+    ],
+    "directions": [
+        {
+            "name": "front",
+            "targetAngles": {
+                "x": 0.0007280970457941294,
+                "y": 0.0023782982025295498
+            },
+            "smoothedAngles": {
+                "x": 0.0011063148267567158,
+                "y": 0.004019516054540873
+            },
+            "leftEyeAngles": {
+                "x": 0.00009616136230761185,
+                "y": 0.00044593075290322304
+            },
+            "rightEyeAngles": {
+                "x": 0.00014788781118113548,
+                "y": 0.0004458441981114447
+            }
+        },
+        {
+            "name": "right",
+            "targetAngles": {
+                "x": 44.99919891357422,
+                "y": -0.006720494478940964
+            },
+            "smoothedAngles": {
+                "x": 44.99837875366211,
+                "y": -0.005720098968595266
+            },
+            "leftEyeAngles": {
+                "x": 3.999864339828491,
+                "y": -0.0006359400576911867
+            },
+            "rightEyeAngles": {
+                "x": 5.999798774719238,
+                "y": -0.0006356656667776406
+            }
+        },
+        {
+            "name": "left",
+            "targetAngles": {
+                "x": -45.00019836425781,
+                "y": 0.0022469584364444019
+            },
+            "smoothedAngles": {
+                "x": -44.99852752685547,
+                "y": 0.0023867290001362564
+            },
+            "leftEyeAngles": {
+                "x": -5.999814510345459,
+                "y": 0.0002650588867254555
+            },
+            "rightEyeAngles": {
+                "x": -3.99987530708313,
+                "y": 0.00026521249674260616
+            }
+        },
+        {
+            "name": "up",
+            "targetAngles": {
+                "x": -0.0057814582251012329,
+                "y": 35.00322723388672
+            },
+            "smoothedAngles": {
+                "x": -0.009358680807054043,
+                "y": 35.00406265258789
+            },
+            "leftEyeAngles": {
+                "x": -0.0012466524494811893,
+                "y": 3.88934588432312
+            },
+            "rightEyeAngles": {
+                "x": -0.0008333641453646123,
+                "y": 3.88934588432312
+            }
+        },
+        {
+            "name": "down",
+            "targetAngles": {
+                "x": -0.0030761719681322576,
+                "y": -35.001590728759769
+            },
+            "smoothedAngles": {
+                "x": -0.0030208455864340069,
+                "y": -35.000389099121097
+            },
+            "leftEyeAngles": {
+                "x": -0.0004025856906082481,
+                "y": -3.8889408111572267
+            },
+            "rightEyeAngles": {
+                "x": -0.0002682489575818181,
+                "y": -3.8889389038085939
+            }
+        },
+        {
+            "name": "behind",
+            "targetAngles": {
+                "x": 0.0,
+                "y": 0.0
+            },
+            "smoothedAngles": {
+                "x": -5.914533574014058e-8,
+                "y": -0.0006852737860754132
+            },
+            "leftEyeAngles": {
+                "x": -7.25053837413725e-7,
+                "y": -0.00007636065129190683
+            },
+            "rightEyeAngles": {
+                "x": -7.25053837413725e-7,
+                "y": -0.00007636065129190683
+            }
+        },
+        {
+            "name": "near",
+            "targetAngles": {
+                "x": 0.0,
+                "y": 0.0
+            },
+            "smoothedAngles": {
+                "x": -1.1641535175091478e-12,
+                "y": -1.3488214101187168e-8
+            },
+            "leftEyeAngles": {
+                "x": 1.4038623596945854e-8,
+                "y": 1.0112227499803339e-7
+            },
+            "rightEyeAngles": {
+                "x": 1.4038623596945854e-8,
+                "y": 1.0112227499803339e-7
+            }
+        },
+        {
+            "name": "camera-fallback",
+            "targetAngles": {
+                "x": 29.99940299987793,
+                "y": -20.001789093017579
+            },
+            "smoothedAngles": {
+                "x": 29.999197006225587,
+                "y": -20.000768661499025
+            },
+            "leftEyeAngles": {
+                "x": 2.6666033267974855,
+                "y": -2.2223148345947267
+            },
+            "rightEyeAngles": {
+                "x": 3.9999005794525148,
+                "y": -2.2223141193389894
+            }
+        },
+        {
+            "name": "missing",
+            "targetAngles": {
+                "x": 0.0,
+                "y": 0.0
+            },
+            "smoothedAngles": {
+                "x": 0.0005911409971304238,
+                "y": -0.00039411833859048784
+            },
+            "leftEyeAngles": {
+                "x": 0.000054770462156739086,
+                "y": -0.000043983345676679164
+            },
+            "rightEyeAngles": {
+                "x": 0.0000781134731369093,
+                "y": -0.00004360498860478401
+            }
+        },
+        {
+            "name": "head-turned",
+            "targetAngles": {
+                "x": 33.56098175048828,
+                "y": 31.1799259185791
+            },
+            "smoothedAngles": {
+                "x": 33.56028366088867,
+                "y": 31.179304122924806
+            },
+            "leftEyeAngles": {
+                "x": 2.983144998550415,
+                "y": 3.4643776416778566
+            },
+            "rightEyeAngles": {
+                "x": 4.474713325500488,
+                "y": 3.4643771648406984
+            }
+        },
+        {
+            "name": "reenable-0",
+            "targetAngles": {
+                "x": 33.56098175048828,
+                "y": 31.1799259185791
+            },
+            "smoothedAngles": {
+                "x": 33.560302734375,
+                "y": 31.179304122924806
+            },
+            "leftEyeAngles": {
+                "x": 2.9831480979919435,
+                "y": 3.4643776416778566
+            },
+            "rightEyeAngles": {
+                "x": 4.474713325500488,
+                "y": 3.464376926422119
+            }
+        },
+        {
+            "name": "reenable-1",
+            "targetAngles": {
+                "x": 33.56098175048828,
+                "y": 31.1799259185791
+            },
+            "smoothedAngles": {
+                "x": 33.560302734375,
+                "y": 31.17930030822754
+            },
+            "leftEyeAngles": {
+                "x": 2.9831480979919435,
+                "y": 3.4643778800964357
+            },
+            "rightEyeAngles": {
+                "x": 4.4747185707092289,
+                "y": 3.46437668800354
+            }
+        },
+        {
+            "name": "reenable-2",
+            "targetAngles": {
+                "x": 33.56098175048828,
+                "y": 31.1799259185791
+            },
+            "smoothedAngles": {
+                "x": 33.5602912902832,
+                "y": 31.17930793762207
+            },
+            "leftEyeAngles": {
+                "x": 2.9831485748291017,
+                "y": 3.46437931060791
+            },
+            "rightEyeAngles": {
+                "x": 4.474713325500488,
+                "y": 3.464376926422119
+            }
+        }
+    ],
+    "captures": [
+        "eyes-front.png",
+        "eyes-right.png",
+        "eyes-left.png",
+        "eyes-up.png",
+        "eyes-down.png",
+        "motion-frames/eyes-000.png",
+        "motion-frames/eyes-001.png",
+        "motion-frames/eyes-002.png",
+        "motion-frames/eyes-003.png",
+        "motion-frames/eyes-004.png",
+        "motion-frames/eyes-005.png",
+        "motion-frames/eyes-006.png",
+        "motion-frames/eyes-007.png",
+        "motion-frames/eyes-008.png",
+        "motion-frames/eyes-009.png",
+        "motion-frames/eyes-010.png",
+        "motion-frames/eyes-011.png",
+        "motion-frames/eyes-012.png",
+        "motion-frames/eyes-013.png",
+        "motion-frames/eyes-014.png",
+        "motion-frames/eyes-015.png",
+        "motion-frames/eyes-016.png",
+        "motion-frames/eyes-017.png",
+        "motion-frames/eyes-018.png",
+        "motion-frames/eyes-019.png",
+        "motion-frames/eyes-020.png",
+        "motion-frames/eyes-021.png",
+        "motion-frames/eyes-022.png",
+        "motion-frames/eyes-023.png",
+        "motion-frames/eyes-024.png",
+        "motion-frames/eyes-025.png",
+        "motion-frames/eyes-026.png",
+        "motion-frames/eyes-027.png",
+        "motion-frames/eyes-028.png",
+        "motion-frames/eyes-029.png",
+        "motion-frames/eyes-030.png",
+        "motion-frames/eyes-031.png",
+        "motion-frames/eyes-032.png",
+        "motion-frames/eyes-033.png",
+        "motion-frames/eyes-034.png",
+        "motion-frames/eyes-035.png",
+        "motion-frames/eyes-036.png",
+        "motion-frames/eyes-037.png",
+        "motion-frames/eyes-038.png",
+        "motion-frames/eyes-039.png",
+        "motion-frames/eyes-040.png",
+        "motion-frames/eyes-041.png",
+        "motion-frames/eyes-042.png",
+        "motion-frames/eyes-043.png",
+        "motion-frames/eyes-044.png",
+        "motion-frames/eyes-045.png",
+        "motion-frames/eyes-046.png",
+        "motion-frames/eyes-047.png",
+        "motion-frames/eyes-048.png",
+        "motion-frames/eyes-049.png",
+        "motion-frames/eyes-050.png",
+        "motion-frames/eyes-051.png",
+        "motion-frames/eyes-052.png",
+        "motion-frames/eyes-053.png",
+        "motion-frames/eyes-054.png",
+        "motion-frames/eyes-055.png",
+        "motion-frames/eyes-056.png",
+        "motion-frames/eyes-057.png",
+        "motion-frames/eyes-058.png",
+        "motion-frames/eyes-059.png"
+    ],
+    "errorLogs": []
+}

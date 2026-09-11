@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "route": "Explicit geometric arm IK plus bounded local rotation curve; not an ARDY prediction or adapter-training test.",
+  "entry": "ArdyConstraintRegression.RunBatch",
+  "isolatedProjectOnly": true,
+  "execution": "Real Animator and Unity player loop; constraint observer at LateUpdate12000; independent harness sampling at12500. No manual Tick, Animator.Update or VRM Process.",
+  "fixtures": [
+    {
+      "avatar": "NEVA.vrm",
+      "branch": "Humanoid with disabled VRM and live Animator",
+      "yaw": 25,
+      "scale": 1.0
+    },
+    {
+      "avatar": "NeEEvA.vrm",
+      "branch": "Humanoid with disabled VRM and live Animator",
+      "yaw": 65,
+      "scale": 0.8
+    },
+    {
+      "avatar": "NEVA.vrm",
+      "branch": "Real ControlRig with live Animator",
+      "yaw": 65,
+      "scale": 1.2
+    },
+    {
+      "avatar": "NeEEvA.vrm",
+      "branch": "Real ControlRig constructed before root yaw; live Animator",
+      "yaw": 65,
+      "scale": 1.0
+    }
+  ],
+  "pairedAnimatorControls": true,
+  "cases": [
+    "forward both arms, bend8deg, wrists character-up10deg two cycles3.2s, endhold",
+    "stop held pose and return to synchronized continuing Animator",
+    "outward both arms plus head character-right8deg one cycle1.6s, endhold",
+    "leftcurrent/rightforward while keeping held left posture, then left-wrist local curve",
+    "disable/rebind while holding restores Animator and clears constraint",
+    "holding expires at30seconds and returns to continuing Animator",
+    "late11900 test override prevents preparation reaching goals: no acting, failure by3seconds plus update tolerance",
+    "stop during active wrist motion and return to Animator",
+    "forward/outward/up/down/forward-up/outward-up with 0 and 110 degree elbow boundary combinations",
+    "actual Chat cancellation event via Bridge and Controller preserves settled hold for user-speaking/barge-in/new-user-turn",
+    "pure hold with seconds6 enters holding immediately after measured preparation, without empty acting wait",
+    "held-pose current wrist continuation via actual Chat dispatch event",
+    "Controller hold TTL30 and explicit stop restore continuing Animator",
+    "disabled Player and Controller reject constraints; re-enable does not execute rejected request",
+    "disable real observer in settled hold: timeout0.5s, no stale goals/hold; restoring observer cannot revive failure",
+    "actual Chat user-speaking event interrupts active local curve"
+  ],
+  "thresholds": {
+    "directionDegrees": 5,
+    "elbowBendErrorDegrees": 4,
+    "shoulderPositionVariationCharacterMeters": 0.005,
+    "elbowPositionVariationCharacterMeters": 0.008,
+    "armRotationVariationDuringLocalCurveDegrees": 2,
+    "wristPeakAmplitudeToleranceDegrees": 1.5,
+    "wristHalfWaveSignChanges": 3,
+    "phaseSampleCountMinimum": 20,
+    "returnToAnimatorQuaternionErrorDegrees": 0.4,
+    "untouchedBlendshapeError": 0.0001,
+    "shoulderPositionBasis": "actual shoulder root-local position minus synchronized Animator-control shoulder root-local position",
+    "elbowPositionBasis": "shoulder-to-elbow vector; character frame for fixed directions, chest frame for current",
+    "absoluteRootTravel": "reported separately; common preserved Animator motion is not constraint drift"
+  },
+  "render": "Per-case real meshes at approximately20Hz; main forward, outward/head, current and bridge-current combinations. Camera framed from actual head/hips and arm length. No pose alteration.",
+  "output": "Logs/ardy-constraints/constraint-regression.json and per-fixture PNG/frame measurements",
+  "successMeaning": "Geometric execution and lifecycle checks only; visual naturalness still requires review.",
+  "unityStarted": false
+}

@@ -1,0 +1,45 @@
+{
+  "passed": true,
+  "utc": "2026-09-10T07:35:47.4758433Z",
+  "sourceFiles": [
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs",
+      "sha256": "ab137567761a793708fef10aa2d8407fd494783330b642d1cc13f9504848e245",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs",
+      "sha256": "031bef94346fe3d309b5724d0cc21286d385f9cba3e7341241e8765baf71aa21",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ArdyDialogueMotionBridge.cs",
+      "sha256": "e58cd4182cdf0cfd12d8fd1b174dd24cb29153522f25e78a374d92b439e5b080",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.cs",
+      "sha256": "a2476b8d4f0357206d0afcca8b339bfba5d2b8040bf82223e96729a2e4b53394",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/Editor/ArdyLivePlayModeRegression.cs",
+      "sha256": "d2f000e507f2a1c9e0f33ac4ba194a56b2e29945b8150f26cc60be593f2212a9",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/Editor/ArdyDialogueMotionRegression.cs",
+      "sha256": "f47d2ddd5a7158a511fcd93b3c506272f1c69eadb0ef6bf5b49ca5278a840409",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs",
+      "sha256": "444b9d8fb00ed8055e2a82c6bdc5344544642182783c4dfdbb4f7abae0049654",
+      "isolatedMatches": true
+    }
+  ],
+  "completedTraceSource": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\ardy-live\\ardy-motion-20260910T073407527-3ff3c50c14d440c1a4df47e0dd87b876.json",
+  "completedTraceArchive": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\unity-evidence/completed-trace.json",
+  "traceSha256": "73926bcd3f6b404a7fd768942d3351c6bc8f7d29442fd36e50f1d0ea63b8ccfa",
+  "scope": "Production source matches isolated Unity; lifecycle facts and existing three-window playback/cancellation passed. No wrist-motion semantic or naturalness acceptance."
+}

@@ -1,0 +1,449 @@
+{
+  "schema": 1,
+  "purpose": "Unity demonstrations: native ARDY left-wave, explicitly mirrored right-wave, and controlled conversational head curves; not a model benchmark",
+  "curated_demo_selection": true,
+  "condition_and_model_sources": {
+    "dataset_sha256": "f137cc3b104a339350accf185b33bb739b55dc9c53b8af2f992a7cce977b7967",
+    "qwen_contract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+    "adapter": "mlp-seed1.pt",
+    "adapter_sha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa",
+    "teacher_space_contract": "5179f91dcafe261730bd9adf2bc5f1d3fe77b7befe28b2c6ced6987d81ba8a30",
+    "ardy_revision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+    "core_repo": "nvidia/ARDY-Core-RP-20FPS-Horizon40",
+    "core_revision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76"
+  },
+  "condition_and_model_sources_role": "Provenance of the raw ARDY audit clips only; the replacement head curves do not use model conditioning",
+  "head_motion_origin": "Explicit controlled curves; not raw model output or evidence of improved ARDY head generation",
+  "right_motion_origin": "Left-conditioned ARDY source mirrored for the reviewed avatar demonstration; not native right-condition generation success",
+  "qwen_model_provenance": {
+    "input_context": "512 tokens; reset recurrent/KV state per prompt",
+    "llama_dll_sha256": "DEE469CE5C79CCFF1830FA37E3ABACE5254A02E89218C64C56624F073B7C6162",
+    "model": "Qwen3.6-35B-A3B",
+    "model_sha256": "071EE2A008EC51372F990D8EFBEA92EC9DD0137974110EF68FBFDE429C8C6DD4",
+    "pooling": "last_input_token_raw",
+    "probe_exe_sha256": "2078320cde36c4119e15de7f1eb9769cda5d6eb7c262e307713e5ed8044d541c",
+    "runtime": "b8919-cuda131-sm120",
+    "template": "Motion description: {text}\nRepresentation:"
+  },
+  "qwen_feature_bundle_sha256": "c791c4ac01d4352e1a377713c1d12c117c608774ad30ba1c1b5d602a4fe72f29",
+  "generation": {
+    "history_source": "ARDY self-history; no common idle and no live Unity body pose supplied",
+    "history_frames": 16,
+    "windows_per_clip": 3,
+    "new_frames_per_window": 40,
+    "text_encoder_loaded": false,
+    "qwen_model_loaded": false,
+    "postprocessing": false,
+    "rng_reset": "once per clip, never between windows"
+  },
+  "export_language_models_loaded": false,
+  "validated_generation_clips": 13,
+  "right_candidate_screen": {
+    "purpose": "Bounded native ARDY demonstration screening; not an unscreened instruction success rate",
+    "condition_record": "motion-00004",
+    "split": "val",
+    "additional_candidate_count": 3,
+    "candidate_names": [
+      "right-wave-seed1",
+      "right-wave-seed2",
+      "right-wave-seed3"
+    ],
+    "candidate_seeds": [
+      1,
+      2,
+      3
+    ],
+    "baseline": {
+      "name": "right-wave",
+      "seed": 0,
+      "status": "rejected",
+      "reason": "Right hand crossed the face/midline on the actual avatar even after chest anchoring"
+    },
+    "selected": null,
+    "final_playback": {
+      "kind": "derived-mirrored-left",
+      "source_record": "motion-00053",
+      "source_split": "test",
+      "source_seed": 0,
+      "native_right_condition_output": false,
+      "reason": "Reviewed mirror kept the hand on the right side, avoiding face occlusion and the native seed-3 salute-like pose",
+      "reviewed_unity_frames": [
+        16,
+        25,
+        40,
+        55,
+        85,
+        115
+      ]
+    },
+    "limitation": "Source chest-local geometry and chosen playback do not establish instruction-compliance or naturalness rates; all candidates remain in the audit report"
+  },
+  "head_candidate_screen": {
+    "total": 6,
+    "failed_count": 4,
+    "failed": [
+      "nod-seed0",
+      "nod-seed2",
+      "shake-head-seed0",
+      "shake-head-seed1"
+    ],
+    "status": "Historical visibility screen only; both previously selected raw head candidates were subsequently rejected as unnatural",
+    "passed_count": 2,
+    "passed": [
+      "nod-seed1",
+      "shake-head-seed2"
+    ],
+    "criteria": {
+      "nod": "pitch peak-to-peak >= 8 degrees and pitch >= yaw",
+      "shake_head": "yaw peak-to-peak >= 10 degrees and yaw >= pitch"
+    }
+  },
+  "baseline_head_visibility": {
+    "nod": false,
+    "shake-head": false
+  },
+  "generation_reports": {
+    "unity-preview-generation.json": {
+      "source": "Server/ARDY/runtime/unity-preview/report.json",
+      "sha256": "25a21dcb7fcda57e1b789a504b325d997adf9aecfc5d7953a059307ed8092c97"
+    },
+    "unity-head-candidates.json": {
+      "source": "Server/ARDY/runtime/unity-head-candidates/report.json",
+      "sha256": "c70b6a7022554135cc93e1509103854df98ce956d34382fc081d79986af60e14"
+    },
+    "unity-right-candidates.json": {
+      "source": "Server/ARDY/runtime/unity-right-candidates/unity-right-candidates.json",
+      "sha256": "bf9868acbcddad703e14e0891f24da94d0b79bdf7c9b79a816587af1522f2da0"
+    }
+  },
+  "assets": [
+    {
+      "id": "left-wave",
+      "resource": "Assets/AIChatTookit/Resources/ARDY/left-wave.json",
+      "sha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d",
+      "bytes": 222441,
+      "source_npz": "Server/ARDY/runtime/unity-preview/left-wave.npz",
+      "source_npz_sha256": "19945afaf4b96909c22374198fd1f70476c28cffd46bfa9a78ab9dca2e4332f5",
+      "source_report": "unity-preview-generation.json",
+      "record": {
+        "id": "motion-00053",
+        "semantic_group": "wave/left/moderate/at a moderate pace",
+        "family": "wave",
+        "text": "While standing in place, a person who is standing waves the left hand with moderate movements at a moderate pace.",
+        "split": "test",
+        "source": "synthetic_template_v1"
+      },
+      "seed": 0,
+      "frames": 120,
+      "fps": 20.0,
+      "selection": "Fixed ARDY preview baseline",
+      "record_role": "Original ARDY motion condition",
+      "motion_origin": "raw-ARDY-motion",
+      "rotation_application": "retarget-global",
+      "display_intent": "While standing in place, a person who is standing waves the left hand with moderate movements at a moderate pace.",
+      "raw_source_metrics": {
+        "label": "Raw ARDY source geometry; not target-avatar visual acceptance",
+        "pitch_peak_to_peak_degrees": 11.985376693702158,
+        "yaw_peak_to_peak_degrees": 17.989687005909424,
+        "historical_visibility_candidate": null,
+        "visibility_is_not_naturalness": true
+      },
+      "processing": null,
+      "profile_statistics": null,
+      "neutral_joints_sha256": "5e1d60cb1935c2ea50c6978848697d83efde5621cbbc287891ddae3ba55dde61"
+    },
+    {
+      "id": "right-wave",
+      "resource": "Assets/AIChatTookit/Resources/ARDY/right-wave.json",
+      "sha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+      "bytes": 225306,
+      "source_npz": "Server/ARDY/runtime/unity-preview/left-wave.npz",
+      "source_npz_sha256": "19945afaf4b96909c22374198fd1f70476c28cffd46bfa9a78ab9dca2e4332f5",
+      "source_report": "unity-preview-generation.json",
+      "record": {
+        "id": "motion-00053",
+        "semantic_group": "wave/left/moderate/at a moderate pace",
+        "family": "wave",
+        "text": "While standing in place, a person who is standing waves the left hand with moderate movements at a moderate pace.",
+        "split": "test",
+        "source": "synthetic_template_v1"
+      },
+      "seed": 0,
+      "frames": 120,
+      "fps": 20.0,
+      "selection": "Reviewed left-wave mirrored to the right; native right-condition baseline and all three candidates were not selected",
+      "record_role": "Original left-hand generation condition; used as the source of a mirrored right-hand demonstration, not a right-hand training or generation record",
+      "motion_origin": "derived-mirrored-left, not native right-condition output",
+      "rotation_application": "retarget-global",
+      "display_intent": "Derived right-hand wave: mirrored reviewed left-hand wave; not a native right-hand-condition sample.",
+      "raw_source_metrics": {
+        "label": "Original left-conditioned ARDY source only; mirrored playback is derived, not a right-condition generation result",
+        "pitch_peak_to_peak_degrees": 11.985376693702158,
+        "yaw_peak_to_peak_degrees": 17.989687005909424,
+        "historical_visibility_candidate": null,
+        "visibility_is_not_naturalness": true
+      },
+      "processing": null,
+      "profile_statistics": null,
+      "neutral_joints_sha256": "5e1d60cb1935c2ea50c6978848697d83efde5621cbbc287891ddae3ba55dde61",
+      "derivation": {
+        "type": "left-right-mirror",
+        "reflectionAxisInUnity": "x",
+        "formula": "R_new[j] = Cx * R_old[swapLeftRight(j)] * Cx; same transform for rest rotations.",
+        "jointPermutation": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          23,
+          24,
+          25,
+          26,
+          19,
+          20,
+          21,
+          22
+        ],
+        "jointNamesAndParents": "Kept in canonical Core27 order; permutation verified to preserve the hierarchy.",
+        "scope": "All 27 global rotations and rest rotations. No root translation is exported.",
+        "selectionStatus": "Selected derived demonstration; not native right-condition instruction success",
+        "selectionReason": "Selected for the current avatar demonstration after inspecting Unity frames 16, 25, 40, 55, 85 and 115: the hand waves on the body's right side without covering the face or taking a salute-like pose. The native right-condition seed-0 baseline and seeds 1/2/3 remain audit inputs and were not selected.",
+        "reviewedUnityFrames": [
+          16,
+          25,
+          40,
+          55,
+          85,
+          115
+        ],
+        "verification": {
+          "analysisScript": "Tools/MotionAdapter/mirror_unity_candidate.py",
+          "analysisScriptSha256": "7376e516b298505a1933cbe9a027170fa9c40ac8591ef2ddc2c3ad8ab6bcee64",
+          "frameCount": 120,
+          "fps": 20.0,
+          "jointCount": 27,
+          "jointPermutationInvolution": true,
+          "hierarchyPreserved": true,
+          "jointNamesAndParentsUnchanged": true,
+          "doubleMirrorFrameMaximumMatrixError": 0.0,
+          "doubleMirrorRestMaximumMatrixError": 0.0,
+          "serializedFrameMaximumMatrixError": 1.3640527041225425e-09,
+          "sourceUnchanged": true
+        }
+      }
+    },
+    {
+      "id": "nod",
+      "resource": "Assets/AIChatTookit/Resources/ARDY/nod.json",
+      "sha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+      "bytes": 42458,
+      "source_npz": "Server/ARDY/runtime/unity-head-candidates/nod-seed1.npz",
+      "source_npz_sha256": "b2b273271afb13fdaadb35d2693c0baf2587b717f0b88cc9ce67a04d4e8fd3b7",
+      "source_report": "unity-head-candidates.json",
+      "record": {
+        "id": "motion-00010",
+        "semantic_group": "nod/both/large/at a moderate pace",
+        "family": "nod",
+        "text": "A person who is standing nods the head with large movements at a moderate pace.",
+        "split": "train",
+        "source": "synthetic_template_v1"
+      },
+      "seed": 1,
+      "frames": 37,
+      "fps": 20.0,
+      "selection": "Explicit controlled conversational curve replacing a rejected raw head trajectory",
+      "record_role": "Raw audit provenance only; the controlled curve is not conditioned by this record",
+      "motion_origin": "controlled-conversational-envelope, not native ARDY",
+      "rotation_application": "additive-local",
+      "display_intent": "Controlled conversational preview: one gentle 8-degree nod, then return to the current neutral pose.",
+      "raw_source_metrics": {
+        "label": "Raw ARDY source only; not measurements of the controlled head curve",
+        "pitch_peak_to_peak_degrees": 44.400650660259714,
+        "yaw_peak_to_peak_degrees": 6.298705298272481,
+        "historical_visibility_candidate": true,
+        "visibility_is_not_naturalness": true,
+        "roll_peak_to_peak_degrees": 14.032558716984582,
+        "rotation_measurement": "Head relative to Spine3, YXZ Euler axes, unwrapped",
+        "human_review": "Rejected as unnatural; the raw trajectory is not used for playback"
+      },
+      "processing": {
+        "kind": "controlled-conversational-envelope",
+        "version": 1,
+        "notNativeArdyMotion": true,
+        "rawMotionRotationsUsed": false,
+        "rawSourceStatus": "Raw ARDY head candidate rejected as unnatural; retained only for audit provenance",
+        "curve": "Piecewise quintic minimum jerk, C2 continuous; zero velocity and acceleration at every knot",
+        "durationSeconds": 1.8,
+        "amplitudeDegrees": 8.0,
+        "axis": "canonical Unity +X: pitch down",
+        "neckShare": 0.2,
+        "headLocalShare": 0.8,
+        "globalOffsetConvention": "Neck = 20% total, Head = total; all other joints and rest offsets are identity",
+        "application": "Add the local rotational offsets to the current animated head/neck pose; do not replace the body pose",
+        "knots": [
+          {
+            "timeSeconds": 0.0,
+            "totalAngleDegrees": 0.0
+          },
+          {
+            "timeSeconds": 0.7,
+            "totalAngleDegrees": 8.0
+          },
+          {
+            "timeSeconds": 1.8,
+            "totalAngleDegrees": 0.0
+          }
+        ]
+      },
+      "profile_statistics": {
+        "frameCount": 37,
+        "fps": 20.0,
+        "sampleSpanSeconds": 1.8,
+        "playbackDurationSeconds": 1.85,
+        "totalAngleMinimumDegrees": 0.0,
+        "totalAngleMaximumDegrees": 8.0,
+        "neckGlobalPeakDegrees": 1.6,
+        "headLocalPeakDegrees": 6.4,
+        "maximumFrameStepDegrees": 1.0569405604807525,
+        "maximumAngularSpeedDegreesPerSecond": 21.4285679300293,
+        "maximumAngularAccelerationDegreesPerSecond2": 94.26124768941514,
+        "maximumAngularJerkDegreesPerSecond3": 1399.4169096209916,
+        "startEndAnglesDegrees": [
+          0.0,
+          0.0
+        ],
+        "startEndVelocityDegreesPerSecond": [
+          0.0,
+          -0.0
+        ],
+        "startEndAccelerationDegreesPerSecond2": [
+          0.0,
+          0.0
+        ],
+        "statisticsMethod": "Analytic piecewise quintic derivatives; maxima sampled at 4001 times, not empirical model-motion measurements"
+      },
+      "neutral_joints_sha256": "5e1d60cb1935c2ea50c6978848697d83efde5621cbbc287891ddae3ba55dde61"
+    },
+    {
+      "id": "shake-head",
+      "resource": "Assets/AIChatTookit/Resources/ARDY/shake-head.json",
+      "sha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+      "bytes": 46747,
+      "source_npz": "Server/ARDY/runtime/unity-head-candidates/shake-head-seed2.npz",
+      "source_npz_sha256": "fe8dde13b1bf36e5b7077fdd076d8fd1615771146137809f9306b5017f46ef7e",
+      "source_report": "unity-head-candidates.json",
+      "record": {
+        "id": "motion-00048",
+        "semantic_group": "shake_head/both/large/at a moderate pace",
+        "family": "shake_head",
+        "text": "While standing in place, a person standing on the floor shakes the head from side to side with large movements at a moderate pace.",
+        "split": "test",
+        "source": "synthetic_template_v1"
+      },
+      "seed": 2,
+      "frames": 41,
+      "fps": 20.0,
+      "selection": "Explicit controlled conversational curve replacing a rejected raw head trajectory",
+      "record_role": "Raw audit provenance only; the controlled curve is not conditioned by this record",
+      "motion_origin": "controlled-conversational-envelope, not native ARDY",
+      "rotation_application": "additive-local",
+      "display_intent": "Controlled conversational preview: one gentle left-right head shake, 6 degrees each way, then return to the current neutral pose.",
+      "raw_source_metrics": {
+        "label": "Raw ARDY source only; not measurements of the controlled head curve",
+        "pitch_peak_to_peak_degrees": 6.278232816466793,
+        "yaw_peak_to_peak_degrees": 12.20765419181149,
+        "historical_visibility_candidate": true,
+        "visibility_is_not_naturalness": true,
+        "roll_peak_to_peak_degrees": 30.490033067046046,
+        "rotation_measurement": "Head relative to Spine3, YXZ Euler axes, unwrapped",
+        "human_review": "Rejected as unnatural; the raw trajectory is not used for playback"
+      },
+      "processing": {
+        "kind": "controlled-conversational-envelope",
+        "version": 1,
+        "notNativeArdyMotion": true,
+        "rawMotionRotationsUsed": false,
+        "rawSourceStatus": "Raw ARDY head candidate rejected as unnatural; retained only for audit provenance",
+        "curve": "Piecewise quintic minimum jerk, C2 continuous; zero velocity and acceleration at every knot",
+        "durationSeconds": 2.0,
+        "amplitudeDegrees": 6.0,
+        "axis": "canonical Unity +Y: yaw",
+        "neckShare": 0.2,
+        "headLocalShare": 0.8,
+        "globalOffsetConvention": "Neck = 20% total, Head = total; all other joints and rest offsets are identity",
+        "application": "Add the local rotational offsets to the current animated head/neck pose; do not replace the body pose",
+        "knots": [
+          {
+            "timeSeconds": 0.0,
+            "totalAngleDegrees": 0.0
+          },
+          {
+            "timeSeconds": 0.5,
+            "totalAngleDegrees": 6.0
+          },
+          {
+            "timeSeconds": 1.25,
+            "totalAngleDegrees": -6.0
+          },
+          {
+            "timeSeconds": 2.0,
+            "totalAngleDegrees": 0.0
+          }
+        ]
+      },
+      "profile_statistics": {
+        "frameCount": 41,
+        "fps": 20.0,
+        "sampleSpanSeconds": 2.0,
+        "playbackDurationSeconds": 2.05,
+        "totalAngleMinimumDegrees": -6.0,
+        "totalAngleMaximumDegrees": 6.0,
+        "neckGlobalPeakDegrees": 1.2000000000000002,
+        "headLocalPeakDegrees": 4.800000000000001,
+        "maximumFrameStepDegrees": 1.4955614814814808,
+        "maximumAngularSpeedDegreesPerSecond": 30.0,
+        "maximumAngularAccelerationDegreesPerSecond2": 138.56380128,
+        "maximumAngularJerkDegreesPerSecond3": 2880.0,
+        "startEndAnglesDegrees": [
+          0.0,
+          0.0
+        ],
+        "startEndVelocityDegreesPerSecond": [
+          0.0,
+          0.0
+        ],
+        "startEndAccelerationDegreesPerSecond2": [
+          0.0,
+          -0.0
+        ],
+        "statisticsMethod": "Analytic piecewise quintic derivatives; maxima sampled at 4001 times, not empirical model-motion measurements"
+      },
+      "neutral_joints_sha256": "5e1d60cb1935c2ea50c6978848697d83efde5621cbbc287891ddae3ba55dde61"
+    }
+  ],
+  "limitations": [
+    "Raw nod provenance refers to a training description; the controlled nod curve is not generated from that description. Native right-condition audit clips belong to validation; final right playback mirrors a test-split left-condition clip.",
+    "The final right-wave is explicitly derived by reflection and a left/right joint permutation. It does not establish successful right-hand instruction following by Qwen, the adapter or ARDY.",
+    "Both previously curated raw head candidates were rejected during human review. Their motion rotations are not played; all raw candidates and reports remain intact.",
+    "Raw head activity statistics and historical visibility results do not describe the replacement controlled curves.",
+    "The short head curves have explicit amplitudes and C2 timing. They require visual review with the current avatar and do not establish improved model instruction compliance.",
+    "Wave clips start without a common idle or Unity pose and continue with ARDY self-history. Controlled head curves add offsets to the current pose and do not replace its body motion.",
+    "The left-wave first seam has a 22.97-degree maximum joint rotation step; review its wrist transition.",
+    "The exporter omits root translation. JSON assets do not establish successful live service or avatar integration."
+  ]
+}

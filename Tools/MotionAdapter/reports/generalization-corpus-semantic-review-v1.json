@@ -1,0 +1,176 @@
+{
+  "status": "changes_recommended_before_feature_export",
+  "review_mode": "CPU-only independent manual semantic/configuration review plus static record checks; no generated test outputs viewed or used.",
+  "corpus_path": "Tools\\MotionAdapter\\runtime\\generalization-v1\\extension-reviewed.jsonl",
+  "corpus_sha256": "3d564dc0e1b13a54ad6bfb6e6f3950542ebad711798cf4238861f7108ab1bd0a",
+  "records_sha256": "2c7d4e72e3460cb883a85072deab583b905b747bef630c001d7ef92a0570d749",
+  "rows": 1992,
+  "groups": 249,
+  "families": {
+    "raise": 28,
+    "wave": 27,
+    "point": 30,
+    "circle": 24,
+    "elbow_bend": 12,
+    "forearm_rotation": 9,
+    "beckon": 3,
+    "dismiss": 3,
+    "present": 3,
+    "offer": 3,
+    "stop": 3,
+    "low-sweep": 3,
+    "figure-eight": 3,
+    "emphasize": 3,
+    "self-indicate": 3,
+    "relax": 3,
+    "bilateral_spread": 6,
+    "alternating_arms": 4,
+    "nod": 9,
+    "shake": 6,
+    "head_tilt": 5,
+    "head_look": 6,
+    "torso_lean": 10,
+    "torso_twist": 4,
+    "bow": 4,
+    "shrug": 3,
+    "shoulder_roll": 4,
+    "combination": 14,
+    "sequence": 14
+  },
+  "frozen_suite_sha256": "bad7ec319c961c077b8ab92eb39eb8482e847c2ff67d6c39e5a8434b3e197889",
+  "literal_eval_overlap": 0,
+  "candidate_exclusion_keys": [
+    "raise/both/forward/chest/hold"
+  ],
+  "findings": [
+    {
+      "id": "near-semantic-overlap-chest-hold",
+      "priority": "blocking_review",
+      "keys": [
+        "raise/both/forward/chest/hold"
+      ],
+      "frozen_groups": [
+        "generalization-v1/both-chest-approach-no-contact"
+      ],
+      "finding": "Both hands raised forward to chest level, inward/facing palms, brief hold and lowering are near-equivalent to the held-out facing-palms chest pose. Convergence distance is not sufficiently explicit to establish separation.",
+      "recommendation": "Conservatively exclude this one configuration and all eight surface variants before export. Do not alter the frozen test.",
+      "evidence": [
+        "Lift both arms forward until both hands reach chest level, with palms turned inward; hold briefly, and return to rest.",
+        "Bring both hands toward one another in front of the chest, palms facing each other, but leave a visible gap. Pause for one second and lower them."
+      ]
+    },
+    {
+      "id": "ambiguous-total-repetitions",
+      "priority": "revise_before_export",
+      "keys": [
+        "raise/left/forward/chest/repeat",
+        "raise/left/forward/face/repeat",
+        "raise/left/diagonal/chest/repeat",
+        "raise/left/diagonal/face/repeat",
+        "raise/right/forward/chest/repeat",
+        "raise/right/forward/face/repeat",
+        "raise/right/diagonal/chest/repeat",
+        "raise/right/diagonal/face/repeat",
+        "raise/both/forward/chest/repeat",
+        "raise/both/forward/face/repeat",
+        "raise/both/forward/overhead/repeat",
+        "raise/both/diagonal/chest/repeat",
+        "raise/both/diagonal/face/repeat",
+        "raise/both/diagonal/overhead/repeat"
+      ],
+      "finding": "An initial lift followed by repeat the lift three times can mean four lifts, while the intended repeated configuration appears to be three.",
+      "recommendation": "State three complete lifts in total, each followed by lowering. Add explicit total count=3 metadata.",
+      "example": "Lift the left arm forward until the left hand reaches chest level, with the palm turned inward; lower again and repeat the lift three times."
+    },
+    {
+      "id": "singular-nod-grammar",
+      "priority": "revise_before_export",
+      "keys": [
+        "head/nod/1/slow",
+        "head/nod/1/gentle",
+        "head/nod/1/quick"
+      ],
+      "finding": "Descriptions use make 1 slow/gentle/quick nods.",
+      "recommendation": "Use make one slow/gentle/quick nod, or nod once with the specified pace.",
+      "example": "Make 1 slow nods of the head and then look forward again."
+    },
+    {
+      "id": "single-arm-outward-direction",
+      "priority": "revise_before_export",
+      "keys": [
+        "point/left/outward/slowly",
+        "point/left/outward/briskly",
+        "point/right/outward/slowly",
+        "point/right/outward/briskly"
+      ],
+      "finding": "A single arm is asked to indicate a direction out to the sides (plural), without specifying its own side.",
+      "recommendation": "Use out to the left side for the left arm and out to the right side for the right arm; both arms may use out to the sides.",
+      "example": "Slowly extend the left arm to indicate a direction out to the sides, pause, and bring the left hand back."
+    },
+    {
+      "id": "underspecified-point-pose",
+      "priority": "clarify_or_document_overlap",
+      "keys": [
+        "point/left/up/slowly",
+        "point/left/up/briskly",
+        "point/left/down/slowly",
+        "point/left/down/briskly",
+        "point/left/forward/slowly",
+        "point/left/forward/briskly",
+        "point/left/outward/slowly",
+        "point/left/outward/briskly",
+        "point/left/across/slowly",
+        "point/left/across/briskly",
+        "point/right/up/slowly",
+        "point/right/up/briskly",
+        "point/right/down/slowly",
+        "point/right/down/briskly",
+        "point/right/forward/slowly",
+        "point/right/forward/briskly",
+        "point/right/outward/slowly",
+        "point/right/outward/briskly",
+        "point/right/across/slowly",
+        "point/right/across/briskly",
+        "point/both/up/slowly",
+        "point/both/up/briskly",
+        "point/both/down/slowly",
+        "point/both/down/briskly",
+        "point/both/forward/slowly",
+        "point/both/forward/briskly",
+        "point/both/outward/slowly",
+        "point/both/outward/briskly",
+        "point/both/across/slowly",
+        "point/both/across/briskly"
+      ],
+      "finding": "Point configurations give direction and tempo but omit hand height, elbow/palm orientation and total count. Some valid realizations can coincide with reserved shoulder-level arm poses.",
+      "recommendation": "Specify a deliberate non-reserved endpoint/height and palm/arm shape for forward/outward configurations, or explicitly document that these are broad atomic-action overlaps rather than claiming strict full-semantic disjointness."
+    },
+    {
+      "id": "manifest-description-not-rendered-text",
+      "priority": "metadata_note",
+      "finding": "Manifest configurations.description retains the pre-normalization grammar while exported rows include singular-palm/verb corrections.",
+      "recommendation": "Treat row text as the feature input and record its hash; consider exposing resolved_description in manifest for review."
+    },
+    {
+      "id": "one-arm-overhead-policy-scope",
+      "priority": "claim_scope_note",
+      "keys": [
+        "wave/left/high/1",
+        "wave/left/high/3",
+        "wave/left/high/4",
+        "wave/right/high/1",
+        "wave/right/high/3",
+        "wave/right/high/4"
+      ],
+      "finding": "Pure one-arm overhead raises are skipped, but high one-handed waves and some combinations still contain the overhead primitive. They are not complete equivalents of the frozen raise-and-lower-only cases.",
+      "recommendation": "Keep them if primitive sharing is intended, but do not claim all single-arm-overhead motion is unseen in training."
+    }
+  ],
+  "clear_distinctions_preserved": [
+    "Nod counts 1/3/4 versus held-out 2; shake counts 2/3/4 versus held-out 1.",
+    "Torso repeated cycles and head tilt side/amplitude/count differ from the reserved configurations.",
+    "Right-then-left head sequence differs explicitly in order from held-out left-then-right; this is shared-primitives compositional generalization.",
+    "Waist/face alternating arm sequences and repeated rounds differ from held-out left-then-right single shoulder-level raises."
+  ],
+  "limitation": "No broad automated signature check can establish semantic disjointness for continuous/fuzzy targets. Eight templates are eight surface forms of one configuration, not eight independent actions. This review does not establish observed motion quality."
+}

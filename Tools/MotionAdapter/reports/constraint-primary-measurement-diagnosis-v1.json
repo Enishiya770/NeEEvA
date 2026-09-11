@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "source": "Server/ARDY/runtime/constrained-execution-v1/primary-failure-v1.json",
+  "sourceSha256": "97c3e936faa05a486773c9b43258a55479aff21a017b28b123dd5214afd5c282",
+  "conclusion": "Original Animator common shoulder/elbow translation exceeded absolute shoulder gate; relative chain remained stable. Keep original failure evidence and use paired-control shoulder residual / shoulder-relative elbow vector for acceptance. No solver modification justified by this failure.",
+  "fixtures": [
+    {
+      "id": "fixture-0",
+      "absoluteShoulderTravelM": 0.0048082806169986725,
+      "absoluteElbowTravelM": 0.004808277357369661,
+      "shoulderRelativeElbowTravelM": 1.3422681558278553e-07,
+      "armRotationVariationDeg": 0.0,
+      "untouchedAnimatorRotationErrorDeg": 0.0
+    },
+    {
+      "id": "fixture-1",
+      "absoluteShoulderTravelM": 0.004870156291872263,
+      "absoluteElbowTravelM": 0.004869954660534859,
+      "shoulderRelativeElbowTravelM": 6.359842230074534e-07,
+      "armRotationVariationDeg": 0.0,
+      "untouchedAnimatorRotationErrorDeg": 0.0
+    },
+    {
+      "id": "fixture-2",
+      "absoluteShoulderTravelM": 0.005075943190604448,
+      "absoluteElbowTravelM": 0.00507612619549036,
+      "shoulderRelativeElbowTravelM": 9.045017119089813e-07,
+      "armRotationVariationDeg": 0.0,
+      "untouchedAnimatorRotationErrorDeg": 0.0
+    },
+    {
+      "id": "fixture-3",
+      "absoluteShoulderTravelM": 0.004787667654454708,
+      "absoluteElbowTravelM": 0.004787876270711422,
+      "shoulderRelativeElbowTravelM": 9.898412483926442e-07,
+      "armRotationVariationDeg": 0.0,
+      "untouchedAnimatorRotationErrorDeg": 0.0
+    }
+  ]
+}

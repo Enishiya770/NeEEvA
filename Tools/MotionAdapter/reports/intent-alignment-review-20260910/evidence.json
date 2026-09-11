@@ -1,0 +1,2487 @@
+{
+  "schema": 1,
+  "scope": "Eight exact motion-only traces started2026-09-10 20:17-20:22JST. No private chat transcript read.",
+  "archiveManifest": {
+    "path": "Server/ARDY/runtime/intent-alignment-review-20260910/archive-manifest.json",
+    "sha256": "201ec6ceaae0625cebc14a1b24eb5ed208dc3ea4ee611afe828eec8e94fdaa43",
+    "bytes": 3916
+  },
+  "modelsLoaded": false,
+  "gpuInference": false,
+  "unityStarted": false,
+  "servicesStarted": false,
+  "requestsSent": 0,
+  "regeneratedMotion": false,
+  "sourceScripts": {
+    "Server/ARDY/review_intent_alignment_traces.py": "78d5b4daa56f2912581f133643e6e80c3eec5ebfc3156aae3322a717984e9424",
+    "Server/ARDY/diagnose_composition_traces.py": "ae880055fae2d58a52263b106fecdb9a2d05de659d9588932a2d7f9970f841e2",
+    "Tools/MotionAdapter/export_unity.py": "5c4cece55e75e022638212cab661644c3a0bfcad6139f0f13bcf40c26adcc8bc",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs": "708a6bf1e7f6650eb77c3f55f2b37424cdefbaf85f5670e1d5c6c6bd3f993344"
+  },
+  "coreSkeletonSha256": "5e1d60cb1935c2ea50c6978848697d83efde5621cbbc287891ddae3ba55dde61",
+  "jointNames": [
+    "Hips",
+    "Spine",
+    "Spine1",
+    "Spine2",
+    "Spine3",
+    "Neck",
+    "Head",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "RightHandEnd",
+    "RightHandThumb1",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "LeftHandEnd",
+    "LeftHandThumb1",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase"
+  ],
+  "fingerCapability": {
+    "frameFields": [
+      "globalRotations"
+    ],
+    "jointCount": 27,
+    "handRelatedJoints": [
+      "RightHand",
+      "RightHandEnd",
+      "RightHandThumb1",
+      "LeftHand",
+      "LeftHandEnd",
+      "LeftHandThumb1"
+    ],
+    "independentIndexFinger": false,
+    "independentMiddleFinger": false,
+    "currentPlayerDrivenUpperBodyJoints": [
+      "Spine",
+      "Spine2",
+      "Spine3",
+      "Neck",
+      "Head",
+      "LeftShoulder",
+      "LeftArm",
+      "LeftForeArm",
+      "LeftHand",
+      "RightShoulder",
+      "RightArm",
+      "RightForeArm",
+      "RightHand"
+    ],
+    "finding": "Packets contain Hand,HandEnd,HandThumb1 but no independent Index/Middle finger chain. The current UpperBody player maps13 torso/head/arm/hand bones and applies no generated finger joints. Thus index-finger wagging and an index+middle V shape are not controllable through this returned/action route."
+  },
+  "traces": [
+    {
+      "trace": {
+        "path": "Server/ARDY/runtime/intent-alignment-review-20260910/traces/ardy-motion-20260910T111712498-510a85814f244812af9c8a99ea4fdbc9.json",
+        "sha256": "a26d62f15e13e0c21c8d6cc2d76215751c191b4e400fc67877f2e7bc967bf58e",
+        "bytes": 298107
+      },
+      "startedUtc": "2026-09-10T11:17:12.4980206Z",
+      "startedJst": "2026-09-10T20:17:12.498020+09:00",
+      "turnId": "response-5",
+      "revision": 11,
+      "description": "Antonia bows deeply and gracefully, holding the bow for a moment before rising back up.",
+      "seed": 0,
+      "derivedSeed": 0,
+      "finishReason": "completed",
+      "finishedElapsedSeconds": 6.859790802001953,
+      "firstResponseElapsedSeconds": 0.56024169921875,
+      "allResponsesElapsedSeconds": 1.1661758422851562,
+      "firstRequestToFirstResponseSeconds": 0.5519142150878906,
+      "firstRequestToAllResponsesSeconds": 1.1578483581542969,
+      "returnedFrames": 120,
+      "fps": 20,
+      "returnedDurationSeconds": 6.0,
+      "initialHistoryFrames": 16,
+      "initialHistoryKind": "unity-upper-body-projection-v1",
+      "initialHistoryCanonicalSha256": "6ab0b514fd251fc2517cc181d6f96e1228a88a1300dabf49c5e2e1f6ee467919",
+      "returnedFrameCanonicalSha256": "029d91a4f035454383e1a25142624c84f0a045fe9fc91d871de2b8bedb733889",
+      "mask": "UpperBody",
+      "windows": [
+        {
+          "chunkIndex": 0,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.008327484130859375,
+          "responseElapsedSeconds": 0.56024169921875,
+          "requestToResponseSeconds": 0.5519142150878906,
+          "startFrame": 0,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 280.99999998812564,
+            "generationMs": 208.61269999295473,
+            "totalMs": 516.0000000032596
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-qwen",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "unity-upper-body-projection-v1",
+            "conditionReusedWithinRevision": false,
+            "featureRequestId": "96883a6099844beebf01c09b829781fc",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 2.473565089422536e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "unity-upper-body-projection-v1",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 2.473565089422536e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "f2e5341df34c5b79853d80407f505030e051a981dc68f099f9eb7f6260fb4b54"
+        },
+        {
+          "chunkIndex": 1,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.5643196105957031,
+          "responseElapsedSeconds": 0.7931594848632812,
+          "requestToResponseSeconds": 0.22883987426757812,
+          "startFrame": 40,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 201.1593999923207,
+            "totalMs": 203.00000000861473
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "96883a6099844beebf01c09b829781fc",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "48448dc0812be3dc4a08b9a8ca2759cd5c904e38cd53fc6a6768051bf7c2168c"
+        },
+        {
+          "chunkIndex": 2,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.79644775390625,
+          "responseElapsedSeconds": 1.1661758422851562,
+          "requestToResponseSeconds": 0.36972808837890625,
+          "startFrame": 80,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": true,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 310.2690000087023,
+            "totalMs": 328.00000000861473
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "96883a6099844beebf01c09b829781fc",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "cc7ae93143195e46e840aeaeb8e8dcbe693aeee2db7d5df917835ff68452c6a1"
+        }
+      ]
+    },
+    {
+      "trace": {
+        "path": "Server/ARDY/runtime/intent-alignment-review-20260910/traces/ardy-motion-20260910T111736808-a43d046398694c4bb17458dee6884d05.json",
+        "sha256": "89d7b57758966659ad5914cfc640f2336463c357b7e249853270564a7b56e104",
+        "bytes": 298223
+      },
+      "startedUtc": "2026-09-10T11:17:36.8084527Z",
+      "startedJst": "2026-09-10T20:17:36.808452+09:00",
+      "turnId": "response-7",
+      "revision": 15,
+      "description": "Antonia bows deeply and gracefully, holding the bow for a moment before rising back up.",
+      "seed": 0,
+      "derivedSeed": 0,
+      "finishReason": "completed",
+      "finishedElapsedSeconds": 6.8400115966796875,
+      "firstResponseElapsedSeconds": 0.5394363403320312,
+      "allResponsesElapsedSeconds": 0.969482421875,
+      "firstRequestToFirstResponseSeconds": 0.5380630493164062,
+      "firstRequestToAllResponsesSeconds": 0.968109130859375,
+      "returnedFrames": 120,
+      "fps": 20,
+      "returnedDurationSeconds": 6.0,
+      "initialHistoryFrames": 16,
+      "initialHistoryKind": "unity-upper-body-projection-v1",
+      "initialHistoryCanonicalSha256": "095603b4ed9945bb254e0f943f7cd4af4ead0d9280cbe1be26a213fe915a569a",
+      "returnedFrameCanonicalSha256": "d1ef7fdcb1daf77190623413c0d8546b96575f2f9d6483076843ef1bd76130d9",
+      "mask": "UpperBody",
+      "windows": [
+        {
+          "chunkIndex": 0,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.001373291015625,
+          "responseElapsedSeconds": 0.5394363403320312,
+          "requestToResponseSeconds": 0.5380630493164062,
+          "startFrame": 0,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 312.0000000053551,
+            "generationMs": 189.72290001693182,
+            "totalMs": 516.0000000032596
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-qwen",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "unity-upper-body-projection-v1",
+            "conditionReusedWithinRevision": false,
+            "featureRequestId": "234e7ba90e3145e3958158c809c7acfd",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 1.962933605659245e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "unity-upper-body-projection-v1",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 1.962933605659245e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "18434d0d575a7a34b52f12b1479a0b1b04b6d329816b607c8cf13cadcd17648e"
+        },
+        {
+          "chunkIndex": 1,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.5417938232421875,
+          "responseElapsedSeconds": 0.756103515625,
+          "requestToResponseSeconds": 0.2143096923828125,
+          "startFrame": 40,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 188.5552000021562,
+            "totalMs": 202.9999999795109
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "234e7ba90e3145e3958158c809c7acfd",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "9c4958cec731996175454bfb0ff142dd2ce3caad9e0627ffc321c3f25d894876"
+        },
+        {
+          "chunkIndex": 2,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.759063720703125,
+          "responseElapsedSeconds": 0.969482421875,
+          "requestToResponseSeconds": 0.210418701171875,
+          "startFrame": 80,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": true,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 182.71589998039417,
+            "totalMs": 187.0000000053551
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "234e7ba90e3145e3958158c809c7acfd",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "e4bde5c448e50816b05c80d5bb41470bb058125480972793abc082053a962045"
+        }
+      ]
+    },
+    {
+      "trace": {
+        "path": "Server/ARDY/runtime/intent-alignment-review-20260910/traces/ardy-motion-20260910T111935315-95affd06cf3a4cd88fd679462d32b863.json",
+        "sha256": "c25700611056be807537bbfd002a1927f33a7fabe8b5f6f9ed77e1a73cf9073a",
+        "bytes": 299051
+      },
+      "startedUtc": "2026-09-10T11:19:35.3157432Z",
+      "startedJst": "2026-09-10T20:19:35.315743+09:00",
+      "turnId": "response-17",
+      "revision": 32,
+      "description": "Antonia gently brings her hands together in front of her lower abdomen, pauses for a moment, and then performs a slow, deep, and graceful bow, holding the position briefly before rising back to a neutral standing posture.",
+      "seed": 0,
+      "derivedSeed": 0,
+      "finishReason": "completed",
+      "finishedElapsedSeconds": 6.882843017578125,
+      "firstResponseElapsedSeconds": 0.5803680419921875,
+      "allResponsesElapsedSeconds": 1.06243896484375,
+      "firstRequestToFirstResponseSeconds": 0.5778961181640625,
+      "firstRequestToAllResponsesSeconds": 1.059967041015625,
+      "returnedFrames": 120,
+      "fps": 20,
+      "returnedDurationSeconds": 6.0,
+      "initialHistoryFrames": 16,
+      "initialHistoryKind": "unity-upper-body-projection-v1",
+      "initialHistoryCanonicalSha256": "a5ec560ec0a3a47c4f623f423792623d218d26de36ed600f808cb2de58ea9266",
+      "returnedFrameCanonicalSha256": "5ab2e460287e7d8c4070861509b74acabd7aafe9abac3bbb023651c280cf1151",
+      "mask": "UpperBody",
+      "windows": [
+        {
+          "chunkIndex": 0,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.002471923828125,
+          "responseElapsedSeconds": 0.5803680419921875,
+          "requestToResponseSeconds": 0.5778961181640625,
+          "startFrame": 0,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 312.0000000053551,
+            "generationMs": 199.61300000431947,
+            "totalMs": 546.0000000020955
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-qwen",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "unity-upper-body-projection-v1",
+            "conditionReusedWithinRevision": false,
+            "featureRequestId": "5c9e974a141e469a97254d36fa23f16b",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 1.9602956624620305e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "unity-upper-body-projection-v1",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 1.9602956624620305e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "ddbadd7ec0503c1a1fbd12049bd5b4b6871af83419b4a21be105faf02bf73825"
+        },
+        {
+          "chunkIndex": 1,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.5827178955078125,
+          "responseElapsedSeconds": 0.8331756591796875,
+          "requestToResponseSeconds": 0.250457763671875,
+          "startFrame": 40,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 221.2805000017397,
+            "totalMs": 233.99999999674037
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "5c9e974a141e469a97254d36fa23f16b",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "0a20a340d100ebac10214540a5fd735dc1c1fa025474d18ccb68a10b84602a78"
+        },
+        {
+          "chunkIndex": 2,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.836212158203125,
+          "responseElapsedSeconds": 1.06243896484375,
+          "requestToResponseSeconds": 0.226226806640625,
+          "startFrame": 80,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": true,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 185.33320000278763,
+            "totalMs": 202.9999999795109
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "5c9e974a141e469a97254d36fa23f16b",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "c32f42b5b3ce51b90923a53472cec14fc84e70a3951d120c65e2f9aafa016cab"
+        }
+      ]
+    },
+    {
+      "trace": {
+        "path": "Server/ARDY/runtime/intent-alignment-review-20260910/traces/ardy-motion-20260910T112021300-6482762b2e8444c49e0ec3557a4b5b34.json",
+        "sha256": "8c9ddff8cf697b5848c69aab2fe624b94da3d2645aa01255e778d2a522429c44",
+        "bytes": 299566
+      },
+      "startedUtc": "2026-09-10T11:20:21.3009023Z",
+      "startedJst": "2026-09-10T20:20:21.300902+09:00",
+      "turnId": "response-19",
+      "revision": 36,
+      "description": "Antonia playfully wags her index finger side to side in a 'no-no' gesture, then raises both hands to make bunny ears above her head, smiling. She holds the pose briefly before lowering her arms back to a neutral standing posture.",
+      "seed": 0,
+      "derivedSeed": 0,
+      "finishReason": "completed",
+      "finishedElapsedSeconds": 6.8961334228515625,
+      "firstResponseElapsedSeconds": 0.594818115234375,
+      "allResponsesElapsedSeconds": 1.125,
+      "firstRequestToFirstResponseSeconds": 0.5933685302734375,
+      "firstRequestToAllResponsesSeconds": 1.1235504150390625,
+      "returnedFrames": 120,
+      "fps": 20,
+      "returnedDurationSeconds": 6.0,
+      "initialHistoryFrames": 16,
+      "initialHistoryKind": "unity-upper-body-projection-v1",
+      "initialHistoryCanonicalSha256": "1e460312b16377d73233f95053829fac96dc3b8229bd7b2e7b9a215f46b8e1e7",
+      "returnedFrameCanonicalSha256": "8a3a1a906a4ec4d2346d89a2bad95c00145058b465743a967b7be3da4ff896d1",
+      "mask": "UpperBody",
+      "windows": [
+        {
+          "chunkIndex": 0,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.0014495849609375,
+          "responseElapsedSeconds": 0.594818115234375,
+          "requestToResponseSeconds": 0.5933685302734375,
+          "startFrame": 0,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 312.9999999946449,
+            "generationMs": 214.71240001847036,
+            "totalMs": 562.9999999946449
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-qwen",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "unity-upper-body-projection-v1",
+            "conditionReusedWithinRevision": false,
+            "featureRequestId": "b4499191928743f2b80824a94126dbcd",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 2.2751970440992864e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "unity-upper-body-projection-v1",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 2.2751970440992864e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "dc9e634c420cdd3f5e3463833457d1e6af48d91bbeba5547cfbab3cb06aea549"
+        },
+        {
+          "chunkIndex": 1,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.6063232421875,
+          "responseElapsedSeconds": 0.886077880859375,
+          "requestToResponseSeconds": 0.279754638671875,
+          "startFrame": 40,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 237.71260000648908,
+            "totalMs": 250.0
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "b4499191928743f2b80824a94126dbcd",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "ae9e50a212a869b1f5b8a3003257965951046783873ae04153c0dabe65579fa8"
+        },
+        {
+          "chunkIndex": 2,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.900787353515625,
+          "responseElapsedSeconds": 1.125,
+          "requestToResponseSeconds": 0.224212646484375,
+          "startFrame": 80,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": true,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 187.81269999453798,
+            "totalMs": 203.00000000861473
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "b4499191928743f2b80824a94126dbcd",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "04290e41897d0c8268eaa5d8ac6562efaa507de7c269c59bdbaa9f352a332631"
+        }
+      ],
+      "bunnySourceFK": {
+        "method": "CPU FK of exact returned Core27 global rotations and pinned source bone lengths. Unity canonical +Y up,+Z forward,+X character-right. Head is the Core27 Head joint, not scalp surface. No target VRM, blending or user video is reconstructed.",
+        "leftRightWristMinusHeadXYZMeters": {
+          "minimum": [
+            [
+              -0.18915884719955062,
+              -0.722952388714408,
+              0.13072778390029632
+            ],
+            [
+              0.1413071998252181,
+              -0.7265241854235464,
+              0.1288578035764358
+            ]
+          ],
+          "maximum": [
+            [
+              -0.04835924104787285,
+              -0.2123710108021687,
+              0.32898192806493254
+            ],
+            [
+              0.22446034062535172,
+              -0.6743269655207854,
+              0.2339472631025492
+            ]
+          ],
+          "mean": [
+            [
+              -0.1304163077702521,
+              -0.5601286720197182,
+              0.20840993043111905
+            ],
+            [
+              0.19575816746955343,
+              -0.7111196930444144,
+              0.16097933533397732
+            ]
+          ]
+        },
+        "leftRightWristMinusShoulderYMeters": {
+          "minimum": [
+            -0.5059438315089204,
+            -0.5116104103681601
+          ],
+          "maximum": [
+            -0.003940675635766611,
+            -0.4801882177761816
+          ],
+          "mean": [
+            -0.34831211347469254,
+            -0.5018658693039033
+          ]
+        },
+        "highestSimultaneousWristFrame": {
+          "frame": 0,
+          "seconds": 0.0,
+          "leftRightWristMinusHeadXYZMeters": [
+            [
+              -0.09745005427294658,
+              -0.6638429005149304,
+              0.25184616556168465
+            ],
+            [
+              0.14748011681758122,
+              -0.6743269655207854,
+              0.2339472631025492
+            ]
+          ],
+          "leftRightWristMinusShoulderYMeters": [
+            -0.46475242685502216,
+            -0.48060131857625055
+          ],
+          "leftRightDistanceToHeadJointMeters": [
+            0.7166661710657198,
+            0.7288337006465682
+          ]
+        },
+        "nearestSimultaneousWristFrame": {
+          "frame": 3,
+          "seconds": 0.15,
+          "leftRightWristMinusHeadXYZMeters": [
+            [
+              -0.10039606884505287,
+              -0.665507525019127,
+              0.24692373664698963
+            ],
+            [
+              0.14469526808614064,
+              -0.6750676973933234,
+              0.23040347266541067
+            ]
+          ],
+          "leftRightWristMinusShoulderYMeters": [
+            -0.4667770645916577,
+            -0.4801882177761816
+          ],
+          "leftRightDistanceToHeadJointMeters": [
+            0.7169037370640053,
+            0.7278316267425622
+          ]
+        },
+        "bestSimultaneousLowerWristHeightRelativeToHeadMeters": -0.6743269655207854,
+        "minimumAcrossTimeOfFartherWristHeadDistanceMeters": 0.7278316267425622,
+        "bothWristsAtOrAboveHeadJointFrameCount": 0,
+        "interpretation": "All sampled paired wrists remain well below the head joint; these returned trajectories do not put both wrists at the sides of the head. Individual finger shapes are not represented by this packet. This is a source-trajectory finding, not a claim about recorded actual VRM frames.",
+        "allFrameEvidence": {
+          "path": "Server/ARDY/runtime/intent-alignment-review-20260910/response-19-source-fk.json",
+          "sha256": "0d6a8ed6fdb7882227b1d4890c2a2bbcef3658d6740bd3908b3645078a411247",
+          "bytes": 72313
+        }
+      }
+    },
+    {
+      "trace": {
+        "path": "Server/ARDY/runtime/intent-alignment-review-20260910/traces/ardy-motion-20260910T112057803-fd8b754939214725a69a409ed9a1d10b.json",
+        "sha256": "138154d0e7903e26d7b2163f6ecd9dab6a3db3f55e50b7dd91321d586c1d2d12",
+        "bytes": 299082
+      },
+      "startedUtc": "2026-09-10T11:20:57.8039242Z",
+      "startedJst": "2026-09-10T20:20:57.803924+09:00",
+      "turnId": "response-21",
+      "revision": 40,
+      "description": "Antonia gently brings her hands together in front of her lower abdomen, pauses for a moment, and then performs a slow, deep, and graceful bow, holding the position briefly before rising back to a neutral standing posture.",
+      "seed": 0,
+      "derivedSeed": 0,
+      "finishReason": "completed",
+      "finishedElapsedSeconds": 6.875823974609375,
+      "firstResponseElapsedSeconds": 0.5804443359375,
+      "allResponsesElapsedSeconds": 1.0787353515625,
+      "firstRequestToFirstResponseSeconds": 0.578948974609375,
+      "firstRequestToAllResponsesSeconds": 1.077239990234375,
+      "returnedFrames": 120,
+      "fps": 20,
+      "returnedDurationSeconds": 6.0,
+      "initialHistoryFrames": 16,
+      "initialHistoryKind": "unity-upper-body-projection-v1",
+      "initialHistoryCanonicalSha256": "efd2516e34ea64070387a28e8acfd4fe2531aea80e523094c240ea3250d58dd6",
+      "returnedFrameCanonicalSha256": "9124c93c705f7853ac3f77efbd19b5fd1760e8aa8edeb80933806693e403fd11",
+      "mask": "UpperBody",
+      "windows": [
+        {
+          "chunkIndex": 0,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.001495361328125,
+          "responseElapsedSeconds": 0.5804443359375,
+          "requestToResponseSeconds": 0.578948974609375,
+          "startFrame": 0,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 281.00000001722947,
+            "generationMs": 234.55280001508072,
+            "totalMs": 546.9999999913853
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-qwen",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "unity-upper-body-projection-v1",
+            "conditionReusedWithinRevision": false,
+            "featureRequestId": "6e3e2c83a02648c68130672112c32c20",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 2.2803543708871388e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "unity-upper-body-projection-v1",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 2.2803543708871388e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "ac5daac7dadb81d3f9b3836956a10f21cc4ba69c76a0146028f669fbf1aaa0a3"
+        },
+        {
+          "chunkIndex": 1,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.588653564453125,
+          "responseElapsedSeconds": 0.828216552734375,
+          "requestToResponseSeconds": 0.23956298828125,
+          "startFrame": 40,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 204.84680001391098,
+            "totalMs": 218.99999998277053
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "6e3e2c83a02648c68130672112c32c20",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "b4bae811c433adfe4c61a803605e1d5e28e006e8b3bd4f40fbde1793e1262530"
+        },
+        {
+          "chunkIndex": 2,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.83123779296875,
+          "responseElapsedSeconds": 1.0787353515625,
+          "requestToResponseSeconds": 0.24749755859375,
+          "startFrame": 80,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": true,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 209.39929998712614,
+            "totalMs": 218.99999998277053
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "6e3e2c83a02648c68130672112c32c20",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "b90370895d47c93ac7a66f006833782e398b83b48db5e8991f00302462b7bfb1"
+        }
+      ]
+    },
+    {
+      "trace": {
+        "path": "Server/ARDY/runtime/intent-alignment-review-20260910/traces/ardy-motion-20260910T112117383-3c0a518e0c284626bd76a41aede4e7c1.json",
+        "sha256": "682a96dd9cb0b2ad09e1101c99ad555045b99064dcc8a7115bab2aa82cbe6d3f",
+        "bytes": 298959
+      },
+      "startedUtc": "2026-09-10T11:21:17.3837886Z",
+      "startedJst": "2026-09-10T20:21:17.383788+09:00",
+      "turnId": "response-23",
+      "revision": 44,
+      "description": "Antonia raises both arms, bends elbows, and holds index and middle fingers up in bunny ears above head, smiling. She holds this pose briefly, then lowers arms back to neutral standing posture.",
+      "seed": 0,
+      "derivedSeed": 0,
+      "finishReason": "completed",
+      "finishedElapsedSeconds": 6.896453857421875,
+      "firstResponseElapsedSeconds": 0.5963134765625,
+      "allResponsesElapsedSeconds": 1.054107666015625,
+      "firstRequestToFirstResponseSeconds": 0.595001220703125,
+      "firstRequestToAllResponsesSeconds": 1.05279541015625,
+      "returnedFrames": 120,
+      "fps": 20,
+      "returnedDurationSeconds": 6.0,
+      "initialHistoryFrames": 16,
+      "initialHistoryKind": "unity-upper-body-projection-v1",
+      "initialHistoryCanonicalSha256": "4b2c3bd1e2ac08da559b8c8c61f3c8e782b3b62512873da3a446dd6889187c35",
+      "returnedFrameCanonicalSha256": "160b76963358997c26834e2b3d3468c996db81e7797eacf5234b8c9f2119d3e1",
+      "mask": "UpperBody",
+      "windows": [
+        {
+          "chunkIndex": 0,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.001312255859375,
+          "responseElapsedSeconds": 0.5963134765625,
+          "requestToResponseSeconds": 0.595001220703125,
+          "startFrame": 0,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 280.99999998812564,
+            "generationMs": 229.5553000003565,
+            "totalMs": 530.9999999881256
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-qwen",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "unity-upper-body-projection-v1",
+            "conditionReusedWithinRevision": false,
+            "featureRequestId": "804e568743904ea5a5479dc587d92692",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 1.745391101648508e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "unity-upper-body-projection-v1",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 1.745391101648508e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "0e7a7960695ab086efb8726e70d4cf31dc7eb49e61046fd920d4ad7453c78ce4"
+        },
+        {
+          "chunkIndex": 1,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.59869384765625,
+          "responseElapsedSeconds": 0.82696533203125,
+          "requestToResponseSeconds": 0.228271484375,
+          "startFrame": 40,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 187.26389997755177,
+            "totalMs": 203.00000000861473
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "804e568743904ea5a5479dc587d92692",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "58817b107737f41735a7f3e8ed3199b50653699fbaee52e89300a7fa9984c3cd"
+        },
+        {
+          "chunkIndex": 2,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.830047607421875,
+          "responseElapsedSeconds": 1.054107666015625,
+          "requestToResponseSeconds": 0.22406005859375,
+          "startFrame": 80,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": true,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 186.4128999877721,
+            "totalMs": 187.9999999946449
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "804e568743904ea5a5479dc587d92692",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "a8991bb048521544c12dab1eafcd6238b95227b7d84dcc9dcc4a3f35425aa887"
+        }
+      ],
+      "bunnySourceFK": {
+        "method": "CPU FK of exact returned Core27 global rotations and pinned source bone lengths. Unity canonical +Y up,+Z forward,+X character-right. Head is the Core27 Head joint, not scalp surface. No target VRM, blending or user video is reconstructed.",
+        "leftRightWristMinusHeadXYZMeters": {
+          "minimum": [
+            [
+              -0.2311858628359745,
+              -0.7246887971434169,
+              0.11562313314743267
+            ],
+            [
+              0.14004343805471015,
+              -0.7343308812524838,
+              0.10616953866711958
+            ]
+          ],
+          "maximum": [
+            [
+              -0.10365207040067372,
+              -0.6622448883451892,
+              0.2529810690627146
+            ],
+            [
+              0.26213075786863854,
+              -0.6769491157412796,
+              0.23382705251746416
+            ]
+          ],
+          "mean": [
+            [
+              -0.19442446640712258,
+              -0.7043692861403307,
+              0.16456271708792242
+            ],
+            [
+              0.22371042445321423,
+              -0.7137946867160936,
+              0.14366575314548713
+            ]
+          ]
+        },
+        "leftRightWristMinusShoulderYMeters": {
+          "minimum": [
+            -0.5117883185866969,
+            -0.5165032270546379
+          ],
+          "maximum": [
+            -0.4665592350396144,
+            -0.4800046151542693
+          ],
+          "mean": [
+            -0.4938054296534083,
+            -0.5043775944444698
+          ]
+        },
+        "highestSimultaneousWristFrame": {
+          "frame": 0,
+          "seconds": 0.0,
+          "leftRightWristMinusHeadXYZMeters": [
+            [
+              -0.1048710891543344,
+              -0.6622448883451892,
+              0.2529810690627146
+            ],
+            [
+              0.14004343805471015,
+              -0.6769491157412796,
+              0.23382705251746416
+            ]
+          ],
+          "leftRightWristMinusShoulderYMeters": [
+            -0.4665592350396144,
+            -0.4800046151542693
+          ],
+          "leftRightDistanceToHeadJointMeters": [
+            0.7166349550390788,
+            0.7297584260110251
+          ]
+        },
+        "nearestSimultaneousWristFrame": {
+          "frame": 2,
+          "seconds": 0.1,
+          "leftRightWristMinusHeadXYZMeters": [
+            [
+              -0.10371481865529415,
+              -0.663223703008535,
+              0.25103015513192334
+            ],
+            [
+              0.14149847782320082,
+              -0.6770563882546139,
+              0.23202951816154652
+            ]
+          ],
+          "leftRightWristMinusShoulderYMeters": [
+            -0.4675409493469621,
+            -0.48069650668617825
+          ],
+          "leftRightDistanceToHeadJointMeters": [
+            0.7166858325839931,
+            0.7295648493457897
+          ]
+        },
+        "bestSimultaneousLowerWristHeightRelativeToHeadMeters": -0.6769491157412796,
+        "minimumAcrossTimeOfFartherWristHeadDistanceMeters": 0.7295648493457897,
+        "bothWristsAtOrAboveHeadJointFrameCount": 0,
+        "interpretation": "All sampled paired wrists remain well below the head joint; these returned trajectories do not put both wrists at the sides of the head. Individual finger shapes are not represented by this packet. This is a source-trajectory finding, not a claim about recorded actual VRM frames.",
+        "allFrameEvidence": {
+          "path": "Server/ARDY/runtime/intent-alignment-review-20260910/response-23-source-fk.json",
+          "sha256": "4b9a54246b7664ff7b7affc344aa3decd1d00d0b833f9fab8d5c79a6b8e4c3ab",
+          "bytes": 72216
+        }
+      }
+    },
+    {
+      "trace": {
+        "path": "Server/ARDY/runtime/intent-alignment-review-20260910/traces/ardy-motion-20260910T112142309-ce9170c79d994122856898c98ca860cf.json",
+        "sha256": "7b1f5d40c46f17fb2e7d1502bfe54ed4abb57c3c4028b3c35dcfdc726dce1dd5",
+        "bytes": 298781
+      },
+      "startedUtc": "2026-09-10T11:21:42.3093032Z",
+      "startedJst": "2026-09-10T20:21:42.309303+09:00",
+      "turnId": "response-25",
+      "revision": 48,
+      "description": "Antonia raises both arms, bends elbows, and holds index and middle fingers up in bunny ears above head, smiling. She holds this pose briefly, then lowers arms back to neutral standing posture.",
+      "seed": 0,
+      "derivedSeed": 0,
+      "finishReason": "completed",
+      "finishedElapsedSeconds": 6.868743896484375,
+      "firstResponseElapsedSeconds": 0.56890869140625,
+      "allResponsesElapsedSeconds": 1.069610595703125,
+      "firstRequestToFirstResponseSeconds": 0.567596435546875,
+      "firstRequestToAllResponsesSeconds": 1.06829833984375,
+      "returnedFrames": 120,
+      "fps": 20,
+      "returnedDurationSeconds": 6.0,
+      "initialHistoryFrames": 16,
+      "initialHistoryKind": "unity-upper-body-projection-v1",
+      "initialHistoryCanonicalSha256": "fcd9857316fc532f1b0d3b21bce57b14886fd97ebda872863e96fd7a6802d925",
+      "returnedFrameCanonicalSha256": "c16f67dbf333beb7e04f3f1e18e6fcb1a9969a8a95ede40fea74ec8bfd639fde",
+      "mask": "UpperBody",
+      "windows": [
+        {
+          "chunkIndex": 0,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.001312255859375,
+          "responseElapsedSeconds": 0.56890869140625,
+          "requestToResponseSeconds": 0.567596435546875,
+          "startFrame": 0,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 265.00000001396984,
+            "generationMs": 220.53540000342764,
+            "totalMs": 515.0000000139698
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-qwen",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "unity-upper-body-projection-v1",
+            "conditionReusedWithinRevision": false,
+            "featureRequestId": "8ec1863662b74f8786c5b7eb555ea442",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 2.0354819091350507e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "unity-upper-body-projection-v1",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 2.0354819091350507e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "4fa115610edbee235c322a808df463877b764dc85bcd1c0a28dd7411ccb929f3"
+        },
+        {
+          "chunkIndex": 1,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.571258544921875,
+          "responseElapsedSeconds": 0.818115234375,
+          "requestToResponseSeconds": 0.246856689453125,
+          "startFrame": 40,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 207.8003000060562,
+            "totalMs": 219.00000001187436
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "8ec1863662b74f8786c5b7eb555ea442",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "333c70c27f812acabe388533917a869ebf3443fbc5e4293316b34c111eaa302f"
+        },
+        {
+          "chunkIndex": 2,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.82110595703125,
+          "responseElapsedSeconds": 1.069610595703125,
+          "requestToResponseSeconds": 0.248504638671875,
+          "startFrame": 80,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": true,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 212.90689997840673,
+            "totalMs": 219.00000001187436
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "8ec1863662b74f8786c5b7eb555ea442",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "70ded14cc7a98c969927793631a34862c7f1bcc093d27d8ffb4fcd006e6ec85a"
+        }
+      ],
+      "bunnySourceFK": {
+        "method": "CPU FK of exact returned Core27 global rotations and pinned source bone lengths. Unity canonical +Y up,+Z forward,+X character-right. Head is the Core27 Head joint, not scalp surface. No target VRM, blending or user video is reconstructed.",
+        "leftRightWristMinusHeadXYZMeters": {
+          "minimum": [
+            [
+              -0.23476050099635357,
+              -0.7244286939978324,
+              0.11487278656948204
+            ],
+            [
+              0.13860373052655853,
+              -0.7338333026456177,
+              0.10775055562423295
+            ]
+          ],
+          "maximum": [
+            [
+              -0.10549824219795306,
+              -0.6615230886320802,
+              0.25300253832004854
+            ],
+            [
+              0.25648153639744414,
+              -0.6783112710474963,
+              0.23140274421363316
+            ]
+          ],
+          "mean": [
+            [
+              -0.20046887901414934,
+              -0.7029975650697076,
+              0.16175233463402522
+            ],
+            [
+              0.22287074005176702,
+              -0.7136798812687434,
+              0.1431197432443203
+            ]
+          ]
+        },
+        "leftRightWristMinusShoulderYMeters": {
+          "minimum": [
+            -0.5121706498122814,
+            -0.516186461609939
+          ],
+          "maximum": [
+            -0.46658643792515,
+            -0.4810620964492353
+          ],
+          "mean": [
+            -0.493749716861024,
+            -0.5045334083154545
+          ]
+        },
+        "highestSimultaneousWristFrame": {
+          "frame": 2,
+          "seconds": 0.1,
+          "leftRightWristMinusHeadXYZMeters": [
+            [
+              -0.10562519588869032,
+              -0.6625738881328476,
+              0.2510018380493142
+            ],
+            [
+              0.14069385812367988,
+              -0.6783112710474963,
+              0.22970251701180178
+            ]
+          ],
+          "leftRightWristMinusShoulderYMeters": [
+            -0.4676811489652628,
+            -0.4813289702857365
+          ],
+          "leftRightDistanceToHeadJointMeters": [
+            0.7163537966299457,
+            0.7298384673784695
+          ]
+        },
+        "nearestSimultaneousWristFrame": {
+          "frame": 2,
+          "seconds": 0.1,
+          "leftRightWristMinusHeadXYZMeters": [
+            [
+              -0.10562519588869032,
+              -0.6625738881328476,
+              0.2510018380493142
+            ],
+            [
+              0.14069385812367988,
+              -0.6783112710474963,
+              0.22970251701180178
+            ]
+          ],
+          "leftRightWristMinusShoulderYMeters": [
+            -0.4676811489652628,
+            -0.4813289702857365
+          ],
+          "leftRightDistanceToHeadJointMeters": [
+            0.7163537966299457,
+            0.7298384673784695
+          ]
+        },
+        "bestSimultaneousLowerWristHeightRelativeToHeadMeters": -0.6783112710474963,
+        "minimumAcrossTimeOfFartherWristHeadDistanceMeters": 0.7298384673784695,
+        "bothWristsAtOrAboveHeadJointFrameCount": 0,
+        "interpretation": "All sampled paired wrists remain well below the head joint; these returned trajectories do not put both wrists at the sides of the head. Individual finger shapes are not represented by this packet. This is a source-trajectory finding, not a claim about recorded actual VRM frames.",
+        "allFrameEvidence": {
+          "path": "Server/ARDY/runtime/intent-alignment-review-20260910/response-25-source-fk.json",
+          "sha256": "2a0cfcbf10c78cd496e5b389d1b29d260a82f25db30c902f3d0c63d190b0b43b",
+          "bytes": 72227
+        }
+      }
+    },
+    {
+      "trace": {
+        "path": "Server/ARDY/runtime/intent-alignment-review-20260910/traces/ardy-motion-20260910T112210097-5880951b5b8148fdba6c2ffc4e41d3ff.json",
+        "sha256": "0276313192aa5bcfa8eff80d8814153783261daf112f756ff3f0ddd39098eb75",
+        "bytes": 299000
+      },
+      "startedUtc": "2026-09-10T11:22:10.0977933Z",
+      "startedJst": "2026-09-10T20:22:10.097793+09:00",
+      "turnId": "response-27",
+      "revision": 52,
+      "description": "Antonia playfully raises both hands to the sides of her head, forming bunny ears with her index and middle fingers, and tilts her head slightly with a gentle smile.",
+      "seed": 0,
+      "derivedSeed": 0,
+      "finishReason": "completed",
+      "finishedElapsedSeconds": 6.910614013671875,
+      "firstResponseElapsedSeconds": 0.61614990234375,
+      "allResponsesElapsedSeconds": 1.14373779296875,
+      "firstRequestToFirstResponseSeconds": 0.61505126953125,
+      "firstRequestToAllResponsesSeconds": 1.14263916015625,
+      "returnedFrames": 120,
+      "fps": 20,
+      "returnedDurationSeconds": 6.0,
+      "initialHistoryFrames": 16,
+      "initialHistoryKind": "unity-upper-body-projection-v1",
+      "initialHistoryCanonicalSha256": "dfdcd28cd289f3acc9394f9ed79f0e54716686574b7c40fabc40c75e7ae48f5a",
+      "returnedFrameCanonicalSha256": "34857e5bcc62deb438568226a3069b2e418bcd04abfc091d7e2b061e2f4bcba8",
+      "mask": "UpperBody",
+      "windows": [
+        {
+          "chunkIndex": 0,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.0010986328125,
+          "responseElapsedSeconds": 0.61614990234375,
+          "requestToResponseSeconds": 0.61505126953125,
+          "startFrame": 0,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 265.9999999741558,
+            "generationMs": 274.2052999965381,
+            "totalMs": 593.9999999827705
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-qwen",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "unity-upper-body-projection-v1",
+            "conditionReusedWithinRevision": false,
+            "featureRequestId": "b2ff43d8610441fd855dc98df39c92c8",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 1.9725404898363053e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "unity-upper-body-projection-v1",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": {
+              "suppliedFrames": 16,
+              "usedFrames": 16,
+              "discardedFrames": 0,
+              "paddedFrames": 0,
+              "conditioningFrames": 16,
+              "rotationRoundtripMaxAbs": 1.9725404898363053e-07,
+              "rootPositionMeters": [
+                0.0,
+                0.9544128252334833,
+                0.0
+              ],
+              "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+              "projectedFootWorldY": {
+                "LeftFoot": 0.05847492523348319,
+                "LeftToeBase": 0.0,
+                "RightFoot": 0.0584749252334833,
+                "RightToeBase": 0.0
+              },
+              "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+              "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+            },
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "9c14afa92a372045c339e4279f450ea9791668488c251f591ea0d065f59ac573"
+        },
+        {
+          "chunkIndex": 1,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.631927490234375,
+          "responseElapsedSeconds": 0.866729736328125,
+          "requestToResponseSeconds": 0.23480224609375,
+          "startFrame": 40,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": false,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 198.5055000113789,
+            "totalMs": 203.00000000861473
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "b2ff43d8610441fd855dc98df39c92c8",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "5499aceb106a39b11a07cae7b8e0aa6514a90670f128ac62e5efa56f2b967260"
+        },
+        {
+          "chunkIndex": 2,
+          "httpStatus": 200,
+          "requestElapsedSeconds": 0.86962890625,
+          "responseElapsedSeconds": 1.14373779296875,
+          "requestToResponseSeconds": 0.27410888671875,
+          "startFrame": 80,
+          "newFrames": 40,
+          "historyFrames": 16,
+          "final": true,
+          "timings": {
+            "queueMs": 0.0,
+            "featureMs": 0.0,
+            "generationMs": 233.06130000855774,
+            "totalMs": 234.99999998603016
+          },
+          "provenance": {
+            "mode": "dynamic-ardy-native",
+            "featureSource": "live-condition-reused",
+            "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+            "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+            "historySource": "ardy-self-history-last-16",
+            "conditionReusedWithinRevision": true,
+            "featureRequestId": "b2ff43d8610441fd855dc98df39c92c8",
+            "initialHistoryProjection": null,
+            "derivedSeed": 0,
+            "languageModelsLoaded": false
+          },
+          "clipSource": {
+            "mode": "dynamic-ardy-native",
+            "languageModelsLoaded": false,
+            "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+            "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+            "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+            "historySource": "ardy-self-history-last-16",
+            "seedPolicy": "explicit seed initializes each private revision RNG stream",
+            "initialHistoryProjection": null,
+            "stationaryApplication": "Unity UpperBody mask; root translation and legs not applied",
+            "generationConstraints": "none; mask is Unity application scope, not ARDY inpainting",
+            "naturalnessAccepted": false,
+            "sourceCoordinateSystem": "ardy-rh-y-up-z-forward",
+            "coordinateSystem": "unity-lh-y-up-z-forward",
+            "reflectionAxis": "x",
+            "quaternionOrder": "xyzw",
+            "rotationSpace": "character-global",
+            "restConvention": "Core27 motion-space neutral T-pose; identity global rotations",
+            "rootTranslationApplied": false,
+            "frameCount": 40,
+            "coordinateEvidence": "ardy/exports/mujoco.py; cskel27/joints.p left-hand +X and toes +Z",
+            "restEvidence": "ardy/skeleton/kinematics.py; ardy/postprocess.py; ardy/viz/viser_utils.py"
+          },
+          "canonicalFramesSha256": "55f75e0a461b339bc7def2f31487e7a1a67551ff10dabcc5acb60217204b6aa6"
+        }
+      ],
+      "bunnySourceFK": {
+        "method": "CPU FK of exact returned Core27 global rotations and pinned source bone lengths. Unity canonical +Y up,+Z forward,+X character-right. Head is the Core27 Head joint, not scalp surface. No target VRM, blending or user video is reconstructed.",
+        "leftRightWristMinusHeadXYZMeters": {
+          "minimum": [
+            [
+              -0.20670887285294107,
+              -0.7255708959577176,
+              0.12087140111882942
+            ],
+            [
+              0.13162795263445312,
+              -0.7308628083461413,
+              0.1148204091873862
+            ]
+          ],
+          "maximum": [
+            [
+              -0.11086577892601801,
+              -0.3569600005301379,
+              0.2539160193453802
+            ],
+            [
+              0.24340027364776917,
+              -0.3769310862816202,
+              0.23656449642048466
+            ]
+          ],
+          "mean": [
+            [
+              -0.16422644238878395,
+              -0.6063473943352596,
+              0.19513892325201931
+            ],
+            [
+              0.20021306724193763,
+              -0.6243683873617876,
+              0.1733117442569982
+            ]
+          ]
+        },
+        "leftRightWristMinusShoulderYMeters": {
+          "minimum": [
+            -0.5091767055146081,
+            -0.5141480065377452
+          ],
+          "maximum": [
+            -0.14259408355746417,
+            -0.17109273493334953
+          ],
+          "mean": [
+            -0.3940859872951864,
+            -0.41563425950492033
+          ]
+        },
+        "highestSimultaneousWristFrame": {
+          "frame": 111,
+          "seconds": 5.55,
+          "leftRightWristMinusHeadXYZMeters": [
+            [
+              -0.1512342199059986,
+              -0.37029578475401626,
+              0.25286637859295635
+            ],
+            [
+              0.24216258677000327,
+              -0.3769310862816202,
+              0.2182157562169136
+            ]
+          ],
+          "leftRightWristMinusShoulderYMeters": [
+            -0.15601679546561686,
+            -0.17109273493334953
+          ],
+          "leftRightDistanceToHeadJointMeters": [
+            0.47321471120399994,
+            0.49833510662796077
+          ]
+        },
+        "nearestSimultaneousWristFrame": {
+          "frame": 113,
+          "seconds": 5.65,
+          "leftRightWristMinusHeadXYZMeters": [
+            [
+              -0.15457590477295952,
+              -0.37116707953727235,
+              0.25030223471192115
+            ],
+            [
+              0.23589970945065333,
+              -0.37891385728415106,
+              0.21094346424041988
+            ]
+          ],
+          "leftRightWristMinusShoulderYMeters": [
+            -0.15618912678490482,
+            -0.17192462549725596
+          ],
+          "leftRightDistanceToHeadJointMeters": [
+            0.4736136822035324,
+            0.49368160717876247
+          ]
+        },
+        "bestSimultaneousLowerWristHeightRelativeToHeadMeters": -0.3769310862816202,
+        "minimumAcrossTimeOfFartherWristHeadDistanceMeters": 0.49368160717876247,
+        "bothWristsAtOrAboveHeadJointFrameCount": 0,
+        "interpretation": "All sampled paired wrists remain well below the head joint; these returned trajectories do not put both wrists at the sides of the head. Individual finger shapes are not represented by this packet. This is a source-trajectory finding, not a claim about recorded actual VRM frames.",
+        "allFrameEvidence": {
+          "path": "Server/ARDY/runtime/intent-alignment-review-20260910/response-27-source-fk.json",
+          "sha256": "8db0130634e6658727170c1106ba1f844f4402539b73f26efff76122335bffdb",
+          "bytes": 72349
+        }
+      }
+    }
+  ],
+  "repeatedDescriptions": [
+    {
+      "turnIds": [
+        "response-5",
+        "response-7"
+      ],
+      "description": "Antonia bows deeply and gracefully, holding the bow for a moment before rising back up.",
+      "seeds": [
+        0,
+        0
+      ],
+      "sameNonIdentityRequestFieldsExceptHistory": true,
+      "initialHistoryExactlyEqual": false,
+      "returnedFramesExactlyEqual": false,
+      "initialHistory13MappedBoneDifference": {
+        "meanDegrees": 1.9035459659528995,
+        "maxDegrees": 4.979335029684877,
+        "lastFrameMeanDegrees": 1.9090062951293847,
+        "lastFrameMaxDegrees": 4.645385316496347
+      },
+      "returned120Frame13MappedBoneDifference": {
+        "meanDegrees": 1.5745142771384069,
+        "maxDegrees": 6.460129411110275,
+        "lastFrameMeanDegrees": 1.2139834819798434,
+        "lastFrameMaxDegrees": 3.211739008514586
+      },
+      "sameRecordedModelFeatureContractAndAdapter": true
+    },
+    {
+      "turnIds": [
+        "response-17",
+        "response-21"
+      ],
+      "description": "Antonia gently brings her hands together in front of her lower abdomen, pauses for a moment, and then performs a slow, deep, and graceful bow, holding the position briefly before rising back to a neutral standing posture.",
+      "seeds": [
+        0,
+        0
+      ],
+      "sameNonIdentityRequestFieldsExceptHistory": true,
+      "initialHistoryExactlyEqual": false,
+      "returnedFramesExactlyEqual": false,
+      "initialHistory13MappedBoneDifference": {
+        "meanDegrees": 0.8699367762119591,
+        "maxDegrees": 4.527303009844595,
+        "lastFrameMeanDegrees": 1.0762614822681806,
+        "lastFrameMaxDegrees": 4.527303009844595
+      },
+      "returned120Frame13MappedBoneDifference": {
+        "meanDegrees": 1.9834383437457455,
+        "maxDegrees": 12.217918334885043,
+        "lastFrameMeanDegrees": 2.07723759494999,
+        "lastFrameMaxDegrees": 4.354886882160344
+      },
+      "sameRecordedModelFeatureContractAndAdapter": true
+    },
+    {
+      "turnIds": [
+        "response-23",
+        "response-25"
+      ],
+      "description": "Antonia raises both arms, bends elbows, and holds index and middle fingers up in bunny ears above head, smiling. She holds this pose briefly, then lowers arms back to neutral standing posture.",
+      "seeds": [
+        0,
+        0
+      ],
+      "sameNonIdentityRequestFieldsExceptHistory": true,
+      "initialHistoryExactlyEqual": false,
+      "returnedFramesExactlyEqual": false,
+      "initialHistory13MappedBoneDifference": {
+        "meanDegrees": 0.169014391799907,
+        "maxDegrees": 0.7788493385216924,
+        "lastFrameMeanDegrees": 0.280109631685127,
+        "lastFrameMaxDegrees": 0.7788493385216924
+      },
+      "returned120Frame13MappedBoneDifference": {
+        "meanDegrees": 1.1377748608136946,
+        "maxDegrees": 5.671154919940939,
+        "lastFrameMeanDegrees": 1.007123101212821,
+        "lastFrameMaxDegrees": 3.707376223826398
+      },
+      "sameRecordedModelFeatureContractAndAdapter": true
+    }
+  ],
+  "limitations": [
+    "These are requests, generated response frames and client completion events, not a recording of actual VRM rendered motion.",
+    "CPU FK uses pinned source Core27 proportions and no root translation. No current scene avatar identity/proportions/Animator pose are assumed.",
+    "No overall semantic success or naturalness rate is computed from eight selected user trials.",
+    "Identical text and seed do not make identical input when actual initialHistory differs. Different history is a measured input difference, not proof it is the sole cause of output variation; exact feature vectors/kernel nondeterminism are not logged."
+  ],
+  "summary": {
+    "traces": 8,
+    "http200Responses": 24,
+    "allClientCompleted": true,
+    "totalReturnedFrames": 960,
+    "firstResponseSecondsRange": [
+      0.5394363403320312,
+      0.61614990234375
+    ],
+    "allResponsesSecondsRange": [
+      0.969482421875,
+      1.1661758422851562
+    ],
+    "repeatedDescriptionPairs": 3,
+    "allRepeatedPairsHaveDifferentActualHistory": true,
+    "allRepeatedPairsHaveDifferentReturnedFrames": true
+  }
+}

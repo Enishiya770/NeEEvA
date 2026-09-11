@@ -1,0 +1,2405 @@
+{
+  "schema": 1,
+  "status": "fixed-development-validation-plan-before-new-motion-generation",
+  "recordedUtc": "2026-09-10T05:44:07.141899+00:00",
+  "source": {
+    "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\generalization-v1\\extension-v1.jsonl",
+    "fileSha256": "874b3e21067cfd2003f0de3012b17f70a91ba142ef963a0cd2dee71e82f9eb78",
+    "recordsSha256": "484a4c8b7d493e763ba26f4070caa3541c4232ae38c7ad8de50fe4b29e03d291"
+  },
+  "selection": {
+    "split": "val",
+    "rule": "Every validation semantic group, template_id == 0; no selection by outputs or feature scores.",
+    "validationRows": 320,
+    "semanticGroups": 40,
+    "families": 29,
+    "selectedDescriptions": 40,
+    "recordIds": [
+      "expanded-v1-00040",
+      "expanded-v1-00064",
+      "expanded-v1-00128",
+      "expanded-v1-00272",
+      "expanded-v1-00320",
+      "expanded-v1-00336",
+      "expanded-v1-00360",
+      "expanded-v1-00368",
+      "expanded-v1-00408",
+      "expanded-v1-00520",
+      "expanded-v1-00592",
+      "expanded-v1-00624",
+      "expanded-v1-00632",
+      "expanded-v1-00648",
+      "expanded-v1-00800",
+      "expanded-v1-00808",
+      "expanded-v1-00832",
+      "expanded-v1-00904",
+      "expanded-v1-01048",
+      "expanded-v1-01064",
+      "expanded-v1-01136",
+      "expanded-v1-01200",
+      "expanded-v1-01208",
+      "expanded-v1-01232",
+      "expanded-v1-01256",
+      "expanded-v1-01288",
+      "expanded-v1-01344",
+      "expanded-v1-01376",
+      "expanded-v1-01424",
+      "expanded-v1-01472",
+      "expanded-v1-01528",
+      "expanded-v1-01624",
+      "expanded-v1-01648",
+      "expanded-v1-01688",
+      "expanded-v1-01704",
+      "expanded-v1-01728",
+      "expanded-v1-01832",
+      "expanded-v1-01856",
+      "expanded-v1-01888",
+      "expanded-v1-01928"
+    ],
+    "recordIdsArgument": "expanded-v1-00040,expanded-v1-00064,expanded-v1-00128,expanded-v1-00272,expanded-v1-00320,expanded-v1-00336,expanded-v1-00360,expanded-v1-00368,expanded-v1-00408,expanded-v1-00520,expanded-v1-00592,expanded-v1-00624,expanded-v1-00632,expanded-v1-00648,expanded-v1-00800,expanded-v1-00808,expanded-v1-00832,expanded-v1-00904,expanded-v1-01048,expanded-v1-01064,expanded-v1-01136,expanded-v1-01200,expanded-v1-01208,expanded-v1-01232,expanded-v1-01256,expanded-v1-01288,expanded-v1-01344,expanded-v1-01376,expanded-v1-01424,expanded-v1-01472,expanded-v1-01528,expanded-v1-01624,expanded-v1-01648,expanded-v1-01688,expanded-v1-01704,expanded-v1-01728,expanded-v1-01832,expanded-v1-01856,expanded-v1-01888,expanded-v1-01928"
+  },
+  "seeds": [
+    0,
+    1
+  ],
+  "histories": {
+    "cold": null,
+    "grounded": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\animator-idle-history.json",
+      "sha256": "2815e5942f498b5a98cfd4a05762bdaae48be6655192c4683fff86d3ab73bd77",
+      "source": "Actual Unity Animator upper-body capture at 20 Hz; synthetic stationary source legs/support plane supplied by project_history."
+    }
+  },
+  "generation": {
+    "fps": 20,
+    "windows": 3,
+    "newFramesPerWindow": 40,
+    "continuationHistoryFrames": 16,
+    "trajectoriesPerCondition": 160,
+    "teacherOldNewTrajectories": 480,
+    "pairing": "Identical records, explicit seeds, initial histories, pinned ARDY, sampler settings and horizon for every condition."
+  },
+  "conditions": {
+    "teacher": {
+      "source": "verified offline original teacher feature bundle matching this full manifest"
+    },
+    "old": {
+      "adapter": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\mlp-seed1.pt",
+      "sha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa"
+    },
+    "candidate": {
+      "status": "pending independent training and feature-validation selection",
+      "requirement": "Name and SHA256 every evaluated checkpoint before its native validation run; do not use frozen final-test motion results for candidate selection."
+    }
+  },
+  "judgmentPolicy": {
+    "automaticSemanticPass": false,
+    "automaticOverallSuccessRate": null,
+    "geometricObservations": "Only explicit implemented height bands/thresholds are gates. Report per-family/side/configuration; any-frame necessary observation never proves a complete gesture or hold.",
+    "bilateral": "Both must satisfy simultaneous labeled height criteria in the same frame. Alternating-raise targets are evaluated separately by side and their ordering remains manual.",
+    "headTorso": "Pitch/yaw/roll excursion, cross-axis activity and sampled speed are report-only. No unvalidated anatomical or naturalness thresholds.",
+    "manual": [
+      "Actual forward/diagonal/outward/across direction and limb selection",
+      "Palm orientation, elbow/finger shape and exact contact",
+      "Repetition, temporal order, simultaneity, holds and return to rest",
+      "Naturalness, clipping and face clearance in real target-avatar playback"
+    ],
+    "candidateSelection": "Use this validation set, including all fixed seeds and failed cases. Preserve per-family results and manual judgments; no best-seed selection or final-test feedback.",
+    "finalTest": "Frozen generalization-eval-v1 is excluded. Perform its one audit only after candidate selection. Earlier four-text examples remain seen diagnostics."
+  },
+  "familyCoverage": {
+    "alternating_arms": 1,
+    "beckon": 1,
+    "bilateral_spread": 1,
+    "bow": 1,
+    "circle": 3,
+    "combination": 2,
+    "dismiss": 1,
+    "elbow_bend": 1,
+    "emphasize": 1,
+    "figure-eight": 1,
+    "forearm_rotation": 1,
+    "head_look": 1,
+    "head_tilt": 1,
+    "low-sweep": 1,
+    "nod": 1,
+    "offer": 1,
+    "point": 4,
+    "present": 1,
+    "raise": 3,
+    "relax": 1,
+    "self-indicate": 1,
+    "sequence": 2,
+    "shake": 1,
+    "shoulder_roll": 1,
+    "shrug": 1,
+    "stop": 1,
+    "torso_lean": 1,
+    "torso_twist": 1,
+    "wave": 3
+  },
+  "records": [
+    {
+      "id": "expanded-v1-00040",
+      "semantic_group": "expanded-v1/raise/left/diagonal/chest/repeat",
+      "family": "raise",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "raise",
+        "target": "chest",
+        "direction": "diagonal",
+        "ending": "repeat"
+      },
+      "text": "Lift the left arm diagonally outward until the left hand reaches chest level, with the palm turned inward; return to rest; perform three full lifts in total.",
+      "textSha256": "81734a0805072bda7c8e250640eb953fda28c41d1d95ac8ca8cebc990a42b1f7",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "chest",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "The explicit target-height gate does not verify forward/diagonal/outward/across direction, arm extension or the palm orientation; verify those separately.",
+          "The repeat ending has no numeric count in the structured configuration; read the requested count during manual review rather than inventing one."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00064",
+      "semantic_group": "expanded-v1/wave/left/waist/1",
+      "family": "wave",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "wave",
+        "target": "waist",
+        "count": 1
+      },
+      "text": "Wave the left hand near the waist once in a friendly greeting, then relax the left arm.",
+      "textSha256": "dba3b31335bd79890dac0f168d2ff06d91fa90049f59fdf696191749bfb10e5e",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "chest",
+            "expectation": "below",
+            "threshold_m": 0.0
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "wave",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "Below-chest height is a weaker necessary observation for the waist/below-waist target; the evaluator has no waist landmark and does not certify the exact level."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00128",
+      "semantic_group": "expanded-v1/wave/left/high/4",
+      "family": "wave",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "wave",
+        "target": "high",
+        "count": 4
+      },
+      "text": "Wave the left hand high above the head 4 times in a friendly greeting, then relax the left arm.",
+      "textSha256": "f513010431f26c7825a317e0fd623d144bb5639acaf553097f9923c349900b0a",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "head",
+            "expectation": "above",
+            "threshold_m": 0.05
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "wave",
+            "expected": 4,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "Verify the hand remains above the head as requested; one threshold frame does not establish a hold or complete action."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00272",
+      "semantic_group": "expanded-v1/circle/left/outward/3",
+      "family": "circle",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "circle",
+        "direction": "outward",
+        "count": 3
+      },
+      "text": "Make 3 wide outward circles with the left arm, keeping the movement controlled and then returning to rest.",
+      "textSha256": "26644a06ae463a5c4a997e4fce628e41fe3c4795f7bf015d730ee18689feb5a1",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "circle",
+            "expected": 3,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00320",
+      "semantic_group": "expanded-v1/wrist/left/down",
+      "family": "forearm_rotation",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "forearm_rotation",
+        "orientation": "down"
+      },
+      "text": "Hold the left hand in front of the chest and turn the palm downward by rotating the forearm, then lower the left arm.",
+      "textSha256": "a41739891bd4e9b4603f6aef4738b6acf3002a18362ea3fdf94187600f7a2023",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00336",
+      "semantic_group": "expanded-v1/gesture/left/beckon",
+      "family": "beckon",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "beckon",
+        "target": "gesture_specific"
+      },
+      "text": "Beckon toward the body with the left hand, using three gentle inward sweeps.",
+      "textSha256": "a222a6de5d2d7c861864cb294bbaa27f8a85c91ce35c41ad6e185a8153fbab43",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00360",
+      "semantic_group": "expanded-v1/gesture/left/offer",
+      "family": "offer",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "offer",
+        "target": "gesture_specific"
+      },
+      "text": "Offer the left hand forward with the palm facing up and elbows bent, then draw back.",
+      "textSha256": "d83c833951ec6d672e596f068bc5278227432ecec2565f92b86726b6d40410a5",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00368",
+      "semantic_group": "expanded-v1/gesture/left/stop",
+      "family": "stop",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "stop",
+        "target": "gesture_specific"
+      },
+      "text": "Push the left hand forward twice at face height with the palm facing away.",
+      "textSha256": "64cbe904593735ac94ac540bed021da1f19412efcb2ab5ce94f47624c191eaae",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00408",
+      "semantic_group": "expanded-v1/gesture/left/relax",
+      "family": "relax",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "relax",
+        "target": "gesture_specific"
+      },
+      "text": "Lower the left arm from a raised position to rest alongside the body in a smooth motion.",
+      "textSha256": "d0f7309159d44a511f4bd9fc0a759607a0542aa8cc7e438ee71e4ed419755335",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00520",
+      "semantic_group": "expanded-v1/wave/right/chest/4",
+      "family": "wave",
+      "side": "right",
+      "template_id": 0,
+      "configuration": {
+        "action": "wave",
+        "target": "chest",
+        "count": 4
+      },
+      "text": "Wave the right hand in front of the chest 4 times in a friendly greeting, then relax the right arm.",
+      "textSha256": "1bcd9d8a361a8385535884e6df6bb6666628ae83263589c8f9399a087f8da1a4",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "wave",
+            "expected": 4,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00592",
+      "semantic_group": "expanded-v1/point/right/forward/briskly",
+      "family": "point",
+      "side": "right",
+      "template_id": 0,
+      "configuration": {
+        "action": "point",
+        "direction": "forward",
+        "tempo": "briskly",
+        "target": "chest"
+      },
+      "text": "Briskly extend the right arm straight ahead at chest height with the palm facing up, pause, and bring the right hand back.",
+      "textSha256": "1c48be26fba4fa6f021c0e4f5f6db557c03f1324b63e05cf3527aaf83f5dc858",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "The explicit target-height gate does not verify forward/diagonal/outward/across direction, arm extension or the palm orientation; verify those separately."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00624",
+      "semantic_group": "expanded-v1/point/right/across/briskly",
+      "family": "point",
+      "side": "right",
+      "template_id": 0,
+      "configuration": {
+        "action": "point",
+        "direction": "across",
+        "tempo": "briskly",
+        "target": "chest"
+      },
+      "text": "Briskly extend the right arm across the front of the body at chest height with the palm facing up, pause, and bring the right hand back.",
+      "textSha256": "a6b2dced58a760de4edd2a73ab29142c2c7caa6605a3ea21b2245d70921251fe",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "The explicit target-height gate does not verify forward/diagonal/outward/across direction, arm extension or the palm orientation; verify those separately."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00632",
+      "semantic_group": "expanded-v1/circle/right/forward/2",
+      "family": "circle",
+      "side": "right",
+      "template_id": 0,
+      "configuration": {
+        "action": "circle",
+        "direction": "forward",
+        "count": 2
+      },
+      "text": "Make 2 forward circles with the right arm, keeping the movement controlled and then returning to rest.",
+      "textSha256": "2d7e80e256d7a28e1f4151c13efb656e880299978821b6609f1823d8ee445bac",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "circle",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00648",
+      "semantic_group": "expanded-v1/circle/right/backward/2",
+      "family": "circle",
+      "side": "right",
+      "template_id": 0,
+      "configuration": {
+        "action": "circle",
+        "direction": "backward",
+        "count": 2
+      },
+      "text": "Make 2 backward circles with the right arm, keeping the movement controlled and then returning to rest.",
+      "textSha256": "e13c2aed1fecca0ca6dac623ada89db32a557869a67222d1b8c6779cf7e60d75",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "circle",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00800",
+      "semantic_group": "expanded-v1/gesture/right/figure-eight",
+      "family": "figure-eight",
+      "side": "right",
+      "template_id": 0,
+      "configuration": {
+        "action": "figure-eight",
+        "target": "gesture_specific"
+      },
+      "text": "Trace a small figure-eight shape in the air with the right hand in front of the chest.",
+      "textSha256": "66b3fbaf8789ba8b667edc1f0b4bcd7bb8981a31628e32961d1863f7ea329802",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00808",
+      "semantic_group": "expanded-v1/gesture/right/emphasize",
+      "family": "emphasize",
+      "side": "right",
+      "template_id": 0,
+      "configuration": {
+        "action": "emphasize",
+        "target": "gesture_specific"
+      },
+      "text": "Make three short downward emphasis gestures with the right hand while explaining.",
+      "textSha256": "c4a49e5a4c6a549a96a12830004b75cb9482b609dd60ead71620738cf6a54ca1",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00832",
+      "semantic_group": "expanded-v1/raise/both/forward/chest/repeat",
+      "family": "raise",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "raise",
+        "target": "chest",
+        "direction": "forward",
+        "ending": "repeat"
+      },
+      "text": "Lift both arms forward until both hands reach chest level, with palms turned inward; return to rest; perform three full lifts in total.",
+      "textSha256": "7bd9c5132e5fdc02586accd76c78886cbf7782a27ccf84e8297aaca74d4b70a5",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "The explicit target-height gate does not verify forward/diagonal/outward/across direction, arm extension or the palm orientation; verify those separately.",
+          "The repeat ending has no numeric count in the structured configuration; read the requested count during manual review rather than inventing one."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-00904",
+      "semantic_group": "expanded-v1/raise/both/diagonal/overhead/hold",
+      "family": "raise",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "raise",
+        "target": "overhead",
+        "direction": "diagonal",
+        "ending": "hold"
+      },
+      "text": "Lift both arms diagonally outward until both hands reach above the head, with palms turned inward; hold briefly, and return to rest.",
+      "textSha256": "403bf91459a4e02dce43a59fee697d9f9c4788c21ad8824ebf73d25ecdb20e8a",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "head",
+            "expectation": "above",
+            "threshold_m": 0.05
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "Verify the hand remains above the head as requested; one threshold frame does not establish a hold or complete action.",
+          "The explicit target-height gate does not verify forward/diagonal/outward/across direction, arm extension or the palm orientation; verify those separately."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01048",
+      "semantic_group": "expanded-v1/point/both/outward/briskly",
+      "family": "point",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "point",
+        "direction": "outward",
+        "tempo": "briskly",
+        "target": "chest"
+      },
+      "text": "Briskly extend both arms out to the sides at chest height with palms facing up, pause, and bring both hands back.",
+      "textSha256": "6bda70ad23182a3daa72703813c54647c002cc466b7fed138c4d35bb4a1bc052",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "The explicit target-height gate does not verify forward/diagonal/outward/across direction, arm extension or the palm orientation; verify those separately."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01064",
+      "semantic_group": "expanded-v1/point/both/across/briskly",
+      "family": "point",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "point",
+        "direction": "across",
+        "tempo": "briskly",
+        "target": "chest"
+      },
+      "text": "Briskly extend both arms across the front of the body at chest height with palms facing up, pause, and bring both hands back.",
+      "textSha256": "60da32aa6f84b86727330548807be715efc2c5d267a0219eeba7ebcbc2f06241",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "The explicit target-height gate does not verify forward/diagonal/outward/across direction, arm extension or the palm orientation; verify those separately."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01136",
+      "semantic_group": "expanded-v1/elbow/both/waist/2",
+      "family": "elbow_bend",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "elbow_bend",
+        "target": "waist",
+        "count": 2
+      },
+      "text": "Bend and straighten the elbows 2 times with both hands at waist level and the upper arms relaxed.",
+      "textSha256": "5f2eed341a4a3454eefdc2c1b4f8bfbdc5025f72253a7b9b1adb8c6588627b23",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "below",
+            "threshold_m": 0.0
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "elbow_bend",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "Below-chest height is a weaker necessary observation for the waist/below-waist target; the evaluator has no waist landmark and does not certify the exact level."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01200",
+      "semantic_group": "expanded-v1/gesture/both/dismiss",
+      "family": "dismiss",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "dismiss",
+        "target": "gesture_specific"
+      },
+      "text": "Make two outward dismissive gestures with both hands at chest height.",
+      "textSha256": "264a2bb138e0d8293774f44e9d518f8f6c48548582cc2d38faff48e90fd3f492",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01208",
+      "semantic_group": "expanded-v1/gesture/both/present",
+      "family": "present",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "present",
+        "target": "gesture_specific"
+      },
+      "text": "Present an idea by sweeping both hands outward at chest height with palms up.",
+      "textSha256": "3520cec04cfbeaea8135f23cc2ecc81d8c0fd7bd9d240143c095f7cf93bba4b8",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01232",
+      "semantic_group": "expanded-v1/gesture/both/low-sweep",
+      "family": "low-sweep",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "low-sweep",
+        "target": "gesture_specific"
+      },
+      "text": "Sweep both hands from one side to the other twice in front of the abdomen.",
+      "textSha256": "0ddafb5792f3b9abc40cce40bc1bd2faa692f150d2c11614c05b2ca9aaba2294",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01256",
+      "semantic_group": "expanded-v1/gesture/both/self-indicate",
+      "family": "self-indicate",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "self-indicate",
+        "target": "gesture_specific"
+      },
+      "text": "Bring both hands toward the upper chest to indicate oneself, without touching.",
+      "textSha256": "f8dea2b358ab4c13f463ba39480cb7cc5aceae53e3a62ebc38c918f51f8b9ed8",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01288",
+      "semantic_group": "expanded-v1/bilateral/spread/low/1",
+      "family": "bilateral_spread",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "spread",
+        "target": "low",
+        "count": 1
+      },
+      "text": "Open both arms out to the sides below the waist with palms facing up, then bring them back; do this once.",
+      "textSha256": "5d9db5282e3697d5838d30d4153252a737447df7f3307b869e0eb2741d9295c1",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "below",
+            "threshold_m": 0.0
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "spread",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "Below-chest height is a weaker necessary observation for the waist/below-waist target; the evaluator has no waist landmark and does not certify the exact level."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01344",
+      "semantic_group": "expanded-v1/alternate/right-first/face",
+      "family": "alternating_arms",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "alternating_raise",
+        "target": "face",
+        "count": 3,
+        "order": "right-first"
+      },
+      "text": "Alternate lifting the right hand and the left hand to face height for three rounds.",
+      "textSha256": "948fece427de286854f756fe92d83d269cc85d083fbc9f9d99eb6f3b84809372",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "head",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "head",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "event_order",
+            "expectation": "report_only",
+            "events": [],
+            "requested_order": "right-first",
+            "note": "Alternating order requires manual review; side-height reach is evaluated independently, not simultaneously."
+          },
+          {
+            "metric": "repetition_count",
+            "event": "alternating_raise",
+            "expected": 3,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "Head-joint height is only a proxy for face level; verify the actual face-relative target visually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01376",
+      "semantic_group": "expanded-v1/head/nod/3/slow",
+      "family": "nod",
+      "side": "none",
+      "template_id": 0,
+      "configuration": {
+        "action": "nod",
+        "count": 3,
+        "pace": "slow"
+      },
+      "text": "Make 3 slow nods of the head and then look forward again.",
+      "textSha256": "7bbd3af9b15d055877a9e22826b621b41b59765ee77f811ebe719d7957df72bf",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "nod",
+            "expected": 3,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01424",
+      "semantic_group": "expanded-v1/head/shake/2/small",
+      "family": "shake",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "shake",
+        "count": 2,
+        "amplitude": "small"
+      },
+      "text": "Shake the head from side to side for 2 small cycles, then face forward.",
+      "textSha256": "66c9bea1b4835abdc0f0c1bfcb73e9df715971609c60b0ddabfd51fe686b920a",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "shake",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01472",
+      "semantic_group": "expanded-v1/head/tilt/left/small/1",
+      "family": "head_tilt",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "tilt",
+        "count": 1,
+        "amplitude": "small"
+      },
+      "text": "Tilt the head toward the left shoulder and return upright once with small movements.",
+      "textSha256": "a8e50b722865fd31f0beabf63c9ae5ea7698d48802c460cd513a787266a816e7",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "tilt",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01528",
+      "semantic_group": "expanded-v1/head/look/up/hold",
+      "family": "head_look",
+      "side": "up",
+      "template_id": 0,
+      "configuration": {
+        "action": "look",
+        "ending": "hold"
+      },
+      "text": "Look up by turning the head, pause briefly and look ahead again.",
+      "textSha256": "d6ee787d017c63187f7d5078d3f4f14dd32fe1b7c37911e3d9b475eb80c1fe6a",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01624",
+      "semantic_group": "expanded-v1/torso/lean/backward/small/2",
+      "family": "torso_lean",
+      "side": "backward",
+      "template_id": 0,
+      "configuration": {
+        "action": "lean",
+        "count": 2,
+        "amplitude": "small"
+      },
+      "text": "Lean the upper body backward and return upright 2 times with small movements.",
+      "textSha256": "2417a40d4dd2c1abf2a805cdec3381d2a1287e8ac0fd51ee54a9ac33e4cd8065",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "lean",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01648",
+      "semantic_group": "expanded-v1/torso/twist/left/3",
+      "family": "torso_twist",
+      "side": "left",
+      "template_id": 0,
+      "configuration": {
+        "action": "twist",
+        "count": 3
+      },
+      "text": "Rotate the upper torso toward the left and back 3 times while the pelvis stays forward.",
+      "textSha256": "f3079d6b1011b7a3930ad7370d699c7013f78969e34c4a919835525bc545c6b8",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "twist",
+            "expected": 3,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01688",
+      "semantic_group": "expanded-v1/bow/deep/hands-near-the-abdomen",
+      "family": "bow",
+      "side": "none",
+      "template_id": 0,
+      "configuration": {
+        "action": "bow",
+        "amplitude": "deep"
+      },
+      "text": "Make a deep bow with hands near the abdomen, and slowly straighten the back.",
+      "textSha256": "082541152a75e601ce82a208ae945c6d86937f095ae5d1a8376be9ce49b0054b",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01704",
+      "semantic_group": "expanded-v1/shoulders/shrug/2",
+      "family": "shrug",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "shrug",
+        "count": 2
+      },
+      "text": "Shrug both shoulders 2 times to express uncertainty and then relax them.",
+      "textSha256": "f27ecefc4311b3ba5553ece194b3b463274ced90672ba720b76f9ede05de16b1",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "shoulder_height_change_m",
+            "side": "both",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "shrug",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01728",
+      "semantic_group": "expanded-v1/shoulders/roll/forward/2",
+      "family": "shoulder_roll",
+      "side": "both",
+      "template_id": 0,
+      "configuration": {
+        "action": "roll",
+        "count": 2,
+        "direction": "forward"
+      },
+      "text": "Roll both shoulders forward for 2 slow circles.",
+      "textSha256": "dd7fc1960988f035e3ff0a516dde564b1176d3c7bb6c4dcf48ab2c76ad0b21ea",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "shoulder_height_change_m",
+            "side": "both",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "roll",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01832",
+      "semantic_group": "expanded-v1/combine/right-wave-left-offer",
+      "family": "combination",
+      "side": "mixed",
+      "template_id": 0,
+      "configuration": {
+        "action": "combination",
+        "temporal": "simultaneous",
+        "configuration": "right-wave-left-offer"
+      },
+      "text": "Wave the right hand at chest height while holding the left palm upward near the waist.",
+      "textSha256": "0d7a6201ccb6722f363c191261eae72e20a273526f8e139111cd0ed2d1f31415",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "event_order",
+            "expectation": "report_only",
+            "events": [],
+            "configuration_id": "right-wave-left-offer",
+            "temporal": "simultaneous",
+            "note": "Constituent actions and temporal relationship remain manual unless separately structured and implemented."
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01856",
+      "semantic_group": "expanded-v1/combine/both-elbows-head-up",
+      "family": "combination",
+      "side": "mixed",
+      "template_id": 0,
+      "configuration": {
+        "action": "combination",
+        "temporal": "simultaneous",
+        "configuration": "both-elbows-head-up"
+      },
+      "text": "Bend both elbows twice while looking slightly upward.",
+      "textSha256": "853e4b6b822c783a4567ada55af02a470a20967e9bdc3fa48db650bbdba2e0f9",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "event_order",
+            "expectation": "report_only",
+            "events": [],
+            "configuration_id": "both-elbows-head-up",
+            "temporal": "simultaneous",
+            "note": "Constituent actions and temporal relationship remain manual unless separately structured and implemented."
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01888",
+      "semantic_group": "expanded-v1/sequence/shrug-then-right-offer",
+      "family": "sequence",
+      "side": "mixed",
+      "template_id": 0,
+      "configuration": {
+        "action": "sequence",
+        "temporal": "ordered_sequence",
+        "configuration": "shrug-then-right-offer"
+      },
+      "text": "Shrug twice, relax the shoulders, then offer the right palm forward.",
+      "textSha256": "1bc2ceebe3213c0770e977013d9492f916a451d1f7aa40fe78f05a08b6f8977f",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "event_order",
+            "expectation": "report_only",
+            "events": [],
+            "configuration_id": "shrug-then-right-offer",
+            "temporal": "ordered_sequence",
+            "note": "Constituent actions and temporal relationship remain manual unless separately structured and implemented."
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    },
+    {
+      "id": "expanded-v1-01928",
+      "semantic_group": "expanded-v1/sequence/left-offer-then-right",
+      "family": "sequence",
+      "side": "mixed",
+      "template_id": 0,
+      "configuration": {
+        "action": "sequence",
+        "temporal": "ordered_sequence",
+        "configuration": "left-offer-then-right"
+      },
+      "text": "Offer the left palm forward, draw it back, then offer the right palm forward.",
+      "textSha256": "be19b8b858b9d006fccb6f8c6c3046cc143eea815daec252f422e45ae777d8b4",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "event_order",
+            "expectation": "report_only",
+            "events": [],
+            "configuration_id": "left-offer-then-right",
+            "temporal": "ordered_sequence",
+            "note": "Constituent actions and temporal relationship remain manual unless separately structured and implemented."
+          }
+        ],
+        "manual_checks": [
+          "Verify the requested side, direction, target and intended complete gesture in real avatar playback.",
+          "Check every stated palm orientation, finger/forearm shape and precise contact visually; these are not automatically evaluated.",
+          "Check repetition count, ordering, simultaneity, pauses, endpoint return and duration against the description.",
+          "Review naturalness, smoothness, body stability, unintended limb motion and target-avatar clipping.",
+          "No explicit supported height target is encoded; evaluate the intended target manually."
+        ],
+        "metric_policy": "Explicit geometric observations are necessary evidence only. Any-frame reach is not a hold, direction, palm, repetition, temporal or naturalness pass. Overall semanticPass remains unknown.",
+        "label_source": "generalization_labels.assessment_for structured config only",
+        "height_coordinates": "World +Y wrist minus Core27 reference; shoulder is Arm humeral pivot; head proxy and waist limitations are stated in manual checks."
+      }
+    }
+  ],
+  "cpuVerification": {
+    "unittestCommand": "python -m unittest Tools.MotionAdapter.test_generalization_labels Server.ARDY.test_native_motion_eval -v",
+    "testCount": 15,
+    "status": "passed",
+    "exportedAssessmentMatchesFunctionForEverySelectedRecord": true
+  },
+  "sourceCodeSha256": {
+    "Tools/MotionAdapter/generalization_labels.py": "5bdc7c4e613346c63a596fef27ddca5116e254ba3c377af30eeae183aadd575b",
+    "Tools/MotionAdapter/test_generalization_labels.py": "7e777570eeb346a3d83b5335d07fd2ad5e6410d16ba23e50c6526365460a0712",
+    "Server/ARDY/native_motion_measurements.py": "b953229ea92054b108774c3e7efd7ab4d56d44defaddf17fef1fb78adbb59b9d",
+    "Server/ARDY/evaluate_native_motion.py": "9a846e11bbaccf83267d63235d958bfacb69e69049f673c0cebf71ab662f4daf"
+  },
+  "execution": {
+    "gpuUsed": false,
+    "motionGenerationPerformed": false,
+    "testRecordsInspectedForSelection": false,
+    "servicesStarted": false
+  }
+}

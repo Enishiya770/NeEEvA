@@ -1,0 +1,50 @@
+{
+  "schema": 2,
+  "source": "first-real-qwen-purpose-probe-reinterpreted-by-new-production-parser",
+  "caseId": "zh-forward-greeting",
+  "publicUserPrompt": "双臂向前平伸，用双手跟我打个招呼。",
+  "rawMotionTag": "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"idle\"/>",
+  "plan": {
+    "left": "forward",
+    "right": "forward",
+    "leftBend": 8,
+    "rightBend": 8,
+    "leftBendAuto": true,
+    "rightBendAuto": true,
+    "leftPalm": "partner",
+    "rightPalm": "partner",
+    "joint": "wrists",
+    "axis": "palm-normal",
+    "amplitude": 10,
+    "cycles": 2,
+    "seconds": 3.2,
+    "end": "idle"
+  },
+  "model": "qwen36.gguf",
+  "request": {
+    "endpoint": "http://127.0.0.1:8080",
+    "temperature": 0,
+    "max_tokens": 500,
+    "enable_thinking": false
+  },
+  "contractSha256": "2e0a7326c68054c9c05798e97f855982896d40679b5ca3b4428730893c4ddaee",
+  "caseSha256": "98666a6bcd0bba59775c9b44d1144bd45c7a62c11c17fad9e05b13b20beb76c5",
+  "planningReportPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v1.json",
+  "planningReportSha256": "32cfa5de52ecb564e6c1fccf311c230a89fd4ee49fbfc329b1e027d22d349f85",
+  "productionCSharpValidated": true,
+  "productionCSharpCommandExitCode": 0,
+  "planSource": "Direct JSON export by the compiled production C# DialogueMotionProtocol + ArdyControlPlan; no fields edited after export.",
+  "motionSuccess": null,
+  "provenance": {
+    "Assets\\AIChatTookit\\Scripts\\Motion\\ArdyControlPlan.cs": "b66004fee7c13d01ce43d614a2c1e19b43e29839dc059b33cde443af5c87f90f",
+    "Assets\\AIChatTookit\\Scripts\\Chat\\DialogueMotionIntent.cs": "add468db62e50e8d34af2c575fe63128f615b34c48fe5c05fee9aa8a10ce6fdf",
+    "Server\\ARDY\\runtime\\palm-protocol-check\\Program.cs": "d205470d2700f626437d39789839ee144bccb419832d9eeda0e8bbc1f70e6d47"
+  },
+  "firstAttemptFixturePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-first-qwen-plan-v1.json",
+  "firstAttemptFixtureSha256": "30f97e0cffa1fbf27ccbe893abc182a9096f15ff095bc65beff9b8e20be164ed",
+  "interpretationChange": "The original model tag is unchanged. New production parser derives automatic elbow-solving flags when an explicit palm goal omits elbow angles. This is a new execution interpretation, not a rerun or replacement of the previous fixed-default interpretation.",
+  "productionPlanPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\palm-protocol-check\\first-qwen-production-plan-v2.json",
+  "productionPlanSha256": "eefd9b0b27051ebaaa731efe6752ddba63d6f5870e032642f2768dd227a0103a",
+  "productionCSharpPureChecks": 783,
+  "newParserContractSha256": "b1c8ed0c6158b890709ceeac73958dbc315d8bfb159058581d5a1f2f53a0ec02"
+}

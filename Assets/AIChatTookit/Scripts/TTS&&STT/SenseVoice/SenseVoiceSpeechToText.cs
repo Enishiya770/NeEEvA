@@ -194,6 +194,12 @@ public partial class SenseVoiceSpeechToText : STT
     private string m_LastSegmentedPrimaryText = "";
     public bool HasTimeOrderedTranscript => m_LastTurnSegments != null &&
         m_LastTurnSegments.Length > 0 && LastText == m_LastSegmentedPrimaryText;
+    // Relevance only: a measured singing island can survive a spoken tail. Its text,
+    // including any tail request, is still supplied in full to the formal role.
+    public bool HasTimeOrderedSingingObservation => HasTimeOrderedTranscript &&
+        m_LastTurnSegments.Any(segment => segment != null &&
+            string.Equals(segment.type, "singing_candidate", StringComparison.OrdinalIgnoreCase) &&
+            segment.end_seconds > segment.start_seconds);
     //本轮响应给出的头部裁剪量。每份响应都会重写，所以不会串轮。
     private float m_LastResponseAudioCropSeconds = 0f;
     //岛结束之后被丢掉的那段音频有多长。快速回唱播的是**整条录音**，
@@ -2366,7 +2372,7 @@ public partial class SenseVoiceSpeechToText : STT
                $"可信度:{LastSpeakerConfidence:F2}{status}] ";
     }
 
-    private string BuildSingingPrefix()
+    private string BuildSingingPrefix(bool confirmed = true)
     {
         string range = (!string.IsNullOrEmpty(LastPitchLowNote) && !string.IsNullOrEmpty(LastPitchHighNote))
             ? LastPitchLowNote + "～" + LastPitchHighNote
@@ -2374,7 +2380,8 @@ public partial class SenseVoiceSpeechToText : STT
         string melody = string.IsNullOrEmpty(LastNoteSequence)
             ? "不足以形成音符序列"
             : LastNoteSequence;
-        return $"[演唱片段; 歌唱概率:{LastSingingProbability:F2}; 语言:{LastLanguage}; " +
+        return (confirmed ? "[演唱片段; " : "[听觉测量（不是整轮模态或行动结论）; ") +
+               $"歌唱概率:{LastSingingProbability:F2}; 语言:{LastLanguage}; " +
                $"音域:{range}; 音高稳定度:{LastPitchStability:F2}; 旋律:{melody}; " +
                "歌词是ASR推测，长音与一字多音处可能不准确" +
                BuildSongRecallClause() + "] ";
@@ -2439,7 +2446,8 @@ public partial class SenseVoiceSpeechToText : STT
             : LastText;
         return (m_InjectSpeakerPrefix ? BuildSpeakerPrefix() : "")
             + (m_InjectMetaPrefix ? BuildMetaPrefix() : "")
-            + (includeSingingConclusion && LastIsSinging ? BuildSingingPrefix() : "")
+            + (LastSingingProbability > 0f || !string.IsNullOrEmpty(LastNoteSequence)
+                ? BuildSingingPrefix(includeSingingConclusion && LastIsSinging) : "")
             + perceivedText
             + (HasTimeOrderedTranscript ? " " + BuildLastMixedTurnEvidence() : "");
     }

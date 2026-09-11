@@ -694,7 +694,7 @@ public static class NeEEvARoomBuilder
         nps.transform.position = new Vector3(-1.6f, 0.6f, 0.0f);
         nps.transform.rotation = Quaternion.Euler(0, 135f, 0);
 
-        // Add a Camera for non-VR preview. VR rig will replace this later.
+        // One camera supports desktop flight and OpenXR head tracking.
         var camGO = new GameObject("Main Camera");
         camGO.tag = "MainCamera";
         camGO.transform.position = new Vector3(0.5f, 1.65f, -1.5f);
@@ -703,6 +703,8 @@ public static class NeEEvARoomBuilder
         cam.clearFlags = CameraClearFlags.SolidColor;
         cam.backgroundColor = new Color(0.9f, 0.7f, 0.65f);
         camGO.AddComponent<AudioListener>();
+        cam.nearClipPlane = 0.03f;
+        camGO.AddComponent<NeEEvA.Player.PlayerCameraController>();
     }
 
     // ============================================================ Helpers ====

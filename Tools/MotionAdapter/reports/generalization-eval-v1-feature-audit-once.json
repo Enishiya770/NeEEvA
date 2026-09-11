@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "status": "complete",
+  "selectionSha256": "0e3592520ffcc4cd3572cf556893f69ba034d010738ec80f17f7989b19287bd3",
+  "suiteSha256": "bad7ec319c961c077b8ab92eb39eb8482e847c2ff67d6c39e5a8434b3e197889",
+  "candidateSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+  "output": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\generalization-final-feature-audit-v1.json",
+  "reservedUtc": "2026-09-10T06:16:51.264262+00:00",
+  "reportSha256": "6f6940476e0ae6cbceb3b53723fe0d9811cd02ead0e70b1214f278c7de522846",
+  "finishedUtc": "2026-09-10T06:16:51.500386+00:00"
+}

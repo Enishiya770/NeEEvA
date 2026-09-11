@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "text_encoder_loaded": false,
+  "postprocessing": false,
+  "seed": 0,
+  "ardy_revision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+  "core_repo": "nvidia/ARDY-Core-RP-20FPS-Horizon40",
+  "core_revision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+  "fps": 20,
+  "num_denoising_steps": 10,
+  "parameter_count": 191253304,
+  "peak_torch_allocated_mib": 883.81640625,
+  "smoke_only": true,
+  "results": [
+    {
+      "id": "unconditioned-smoke",
+      "condition": "unconditioned",
+      "milliseconds": 734.7708000161219,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    }
+  ],
+  "limitation": "Unconditioned smoke proves runtime only.",
+  "date": "2026-09-10"
+}

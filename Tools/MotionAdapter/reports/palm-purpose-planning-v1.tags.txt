@@ -1,0 +1,14 @@
+<motion name="right-wave"/>
+<motion name="left-wave"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" joint="wrists" axis="palm-normal" amplitude="10" cycles="2" seconds="3.2" end="idle"/>
+<motion name="right-wave"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" leftBend="0" rightBend="0" joint="wrists" axis="palm-normal" amplitude="15" cycles="2" seconds="3" end="hold"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" leftBend="0" rightBend="0" end="hold"/>
+<motion name="compose" left="forward" right="forward" leftPalm="down" rightPalm="down" leftBend="0" rightBend="0" joint="none" end="hold"/>
+<motion name="compose" left="forward" right="forward" leftPalm="down" rightPalm="down" leftBend="0" rightBend="0" joint="wrists" axis="up" amplitude="10" cycles="2" seconds="3.2" end="hold"/>
+<motion name="compose" left="forward" right="forward" leftBend="40" rightBend="40" leftPalm="down" rightPalm="down" joint="wrists" axis="up" amplitude="10" cycles="2" seconds="3.2" end="hold"/>
+<motion name="compose" left="forward" leftPalm="partner" leftBend="0" joint="left-wrist" axis="palm-normal" amplitude="10" cycles="1" seconds="2" end="hold"/>
+<motion name="nod"/>
+<motion name="generate" text="Stand still with feet planted, gently sway torso and swing arms in loose, alternating arcs to the rhythm, keeping movements fluid and relaxed."/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" joint="wrists" axis="palm-normal" amplitude="10" cycles="2" seconds="3.2" end="idle"/>
+<motion name="shake-head"/>

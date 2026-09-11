@@ -1,0 +1,6 @@
+{
+    "name": "NeEEvA.Motion",
+    "rootNamespace": "NeEEvA.Motion",
+    "references": ["VRM10", "UniHumanoid", "UniGLTF", "UniGLTF.Utils", "SpringBoneJobs"],
+    "autoReferenced": true
+}

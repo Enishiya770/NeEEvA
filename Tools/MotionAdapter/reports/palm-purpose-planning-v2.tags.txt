@@ -1,0 +1,14 @@
+<motion name="right-wave"/>
+<motion name="left-wave"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" joint="wrists" axis="palm-normal" amplitude="10" cycles="2" seconds="3.2" end="idle"/>
+<motion name="right-wave"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" joint="wrists" axis="palm-normal" amplitude="10" cycles="3" seconds="3"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" leftBend="0" rightBend="0" joint="none" axis="up" amplitude="0" cycles="0" seconds="0" end="hold"/>
+<motion name="compose" left="forward" right="forward" leftPalm="down" rightPalm="down" leftBend="0" rightBend="0" joint="none" end="hold"/>
+<motion name="compose" left="forward" right="forward" leftPalm="down" rightPalm="down" joint="wrists" axis="up" amplitude="10" cycles="2" seconds="3.2" end="idle"/>
+<motion name="compose" left="forward" right="forward" leftBend="40" rightBend="40" leftPalm="partner" rightPalm="partner" joint="wrists" axis="palm-normal" amplitude="10" cycles="2" seconds="3.2" end="hold"/>
+<motion name="compose" left="forward" right="none" leftPalm="partner" rightPalm="keep" joint="left-wrist" axis="palm-normal" amplitude="10" cycles="1" seconds="2" end="hold"/>
+<motion name="nod"/>
+<motion name="compose" left="outward" right="outward" leftBend="45" rightBend="45" leftPalm="inward" rightPalm="inward" joint="head" axis="right" amplitude="8" cycles="4" seconds="6" end="hold"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" joint="wrists" axis="palm-normal" amplitude="10" cycles="2" seconds="3.2" end="idle"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" joint="none" end="hold"/>

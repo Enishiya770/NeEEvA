@@ -223,6 +223,7 @@ public partial class ChatSample : MonoBehaviour
 
     private void OnDestroy()
     {
+        CancelDialogueMotion("chat-destroyed");
         if (m_ChatSettings != null && m_ChatSettings.m_ChatModel != null)
         {
             m_ChatSettings.m_ChatModel.OnSystemNotice -= HandleSystemNotice;
@@ -395,6 +396,7 @@ public partial class ChatSample : MonoBehaviour
     {
         if (_postWord.Equals(""))
             return;
+        CancelDialogueMotion("new-user-turn");
 
         //来源确认现在由正式角色在看过完整转写、上下文与边界证据后，通过
         //<practice_confirm/> 明确表达。同轮不再串行跑一个看不到正式角色想法的辅助
@@ -402,7 +404,10 @@ public partial class ChatSample : MonoBehaviour
 
         if (m_CreateVoiceMode)//合成输入为语音
         {
-            CallBack(_postWord);
+            // This branch reads USER text; quoted action syntax cannot become a role command.
+            m_ReadingUserInput = true;
+            try { CallBack(_postWord); }
+            finally { m_ReadingUserInput = false; }
             m_InputWord.text = "";
             return;
         }
@@ -411,6 +416,7 @@ public partial class ChatSample : MonoBehaviour
         string userUtterance = rawUserText ?? _postWord;
         m_ChatHistory.Add(userUtterance);
         SetCurrentUserInput(userUtterance, _postWord);
+        RecordAcceptedMotionUserTurn(userUtterance);
 
         //歌曲工具不能依赖 Agent Loop 才知道“用户刚说了什么”。直接对话模式也维护
         //当前用户轮次，供明确保存请求兜底、歌名提取和成功确认使用。
@@ -442,11 +448,12 @@ public partial class ChatSample : MonoBehaviour
         //为再下一轮续上。这里只改变听觉先验，不触发任何歌唱动作。
         UpdateUpcomingUserSingingExpectation(userUtterance);
 
-        //agent loop 启用时：把感知帧拼到用户文本前面，让 LLM 也能"感受"时间
-        //(返回的字符串才是真正喂给 LLM 的——含 [感知帧 ...] + 用户原话)
-        PrepareActiveSkillsForRound(_postWord, "user-spoke");
+        //技能只按原话和本轮独立声音证据路由；完整听觉输入保留在用户消息中。
+        //当前程序感知单独暂存，正式请求时注入一次临时上下文。
+        PrepareSkillsForAcceptedUserInput(userUtterance,
+            ConsumeSkillInputObservation(userUtterance, rawUserText != null));
         CommitConfirmedSingingBeforePerception();
-        string llmInput = (m_AgentRunning) ? PrepareUserTurn(_postWord, userUtterance) : _postWord;
+        string llmInput = (m_AgentRunning) ? PrepareAcceptedUserTurn(_postWord, userUtterance) : _postWord;
         // Prepared thoughts belong to this request only, not persisted user history.
 
         // A previously armed sing-along is deterministic once final ASR confirms a
@@ -482,8 +489,9 @@ public partial class ChatSample : MonoBehaviour
             m_HoldSpeechForSongMemoryResult = false;
             m_HoldSpeechForHumBackResult = ShouldHoldSpeechForExplicitHumBack();
             PublishSpokenPrefixToLlm();
-            m_ChatSettings.m_ChatModel.RequestContext = speculativeHint ?? "";
-            m_ChatSettings.m_ChatModel.PostSpeechMessage(llmInput, CallBackWithSpeech);
+            m_ChatSettings.m_ChatModel.RequestContext = BuildMotionRequestContext(BuildFormalObservationContext(speculativeHint));
+            m_FormalResponseInFlight = true;
+            m_ChatSettings.m_ChatModel.PostSpeechMessage(llmInput, CaptureMotionResponseCallback());
         }
     }
 
@@ -1019,15 +1027,27 @@ public partial class ChatSample : MonoBehaviour
 
     private void CallBackWithSpeech(List<SpeechText> speech, string _response)
     {
+        if (!m_ReadingUserInput) m_CurrentSpeechRoundId = ++m_SpeechRoundSequence;
         _response = (_response ?? "").Trim();
+        if (!m_ReadingUserInput)
+        {
+            if (speech != null)
+                foreach (SpeechText part in speech) ObserveSingingSpeechPhase(part);
+            ObserveSingingSpeechCompletion(ref _response);
+        }
         // Markdown code spans quote protocol syntax for explanation; they are not
         // actions. Remove quoted known tags before every non-streaming extractor so
         // an example such as `<hum_back/>` cannot outrank the real tag that follows.
         _response = RemoveQuotedAgentActionTags(_response);
-        int subtitleGeneration = ++m_FormalResponseGeneration;
+        if (!m_ReadingUserInput) RecordWorkResponse(_response);
+        ExtractSelfInspection(ref _response, !m_ReadingUserInput && !m_UserSpeechActiveForAutonomy);
+        ExtractSingingGoalTags(ref _response, !m_ReadingUserInput && !m_UserSpeechActiveForAutonomy);
+        int subtitleGeneration = BeginFormalResponseGeneration();
+        DialogueMotionIntent? pendingMotion = ExtractDialogueMotion(ref _response);
         EnsureSubtitleOverlay();
         if (m_SubtitleOverlay != null) m_SubtitleOverlay.BeginUtterance(subtitleGeneration);
-        if (_response.Length == 0)
+        if (CurrentMotionResponseRejected) return;
+        if (_response.Length == 0 && !pendingMotion.HasValue)
         {
             HandleSystemNotice(new SystemNotice(
                 "llm_response_failed",
@@ -1036,6 +1056,15 @@ public partial class ChatSample : MonoBehaviour
                 "non-streaming response was empty",
                 "ChatSample",
                 true));
+            m_TextBack.text = "";
+            return;
+        }
+        if (pendingMotion.HasValue && (_response.Length == 0 || _response == "<silent/>"))
+        {
+            // RoleOutputChannels prefixes action-only replies with exactly <silent/>.
+            // Both that projection and a bare motion are valid nonverbal replies;
+            // do not create empty TTS/history entries or skip any other tool tags.
+            DispatchDialogueMotion(pendingMotion, false);
             m_TextBack.text = "";
             return;
         }
@@ -1051,6 +1080,8 @@ public partial class ChatSample : MonoBehaviour
         AgentSingingPolicyRequest singingPolicy = ExtractSingingPolicyTag(ref afterMem);
         bool selfRepeat = IsVerbatimSelfRepeat(
             StripAgentTagsForTTS(afterMem), out string selfRepeatReason);
+        DispatchDialogueMotion(pendingMotion, selfRepeat);
+        if (CurrentMotionResponseRejected) return;
         bool singingPolicyAccepted = false;
         string singingPolicyResult = "";
         if (!selfRepeat && singingPolicy != null)
@@ -1193,6 +1224,17 @@ public partial class ChatSample : MonoBehaviour
         m_HoldSpeechForHumBackResult = false;
         _response = StripAgentTagsForTTS(afterMem);
         m_TextBack.text = "";
+        if (!m_ReadingUserInput)
+        {
+            ResolveSingingSpeech(ref _response);
+            if (string.IsNullOrWhiteSpace(_response))
+            {
+                ClearUserTurnAwaitingReply("decision-held-for-validation");
+                OnAgentRoundComplete();
+                if (OnAISpeakDone != null) OnAISpeakDone();
+                return;
+            }
+        }
 
         if (heldForSongMemory || heldForHumBack)
         {
@@ -2184,6 +2226,7 @@ public partial class ChatSample : MonoBehaviour
             "\"confidence\":0.0,\"observed_mode\":\"speech|singing|uncertain\"," +
             "\"mode_confidence\":0.0}";
 
+        int draftInputRevision = m_InputAudioRevision, draftAudioMs = m_StreamingLatestAudioMs;
         m_ChatSettings.m_ChatModel.PostEphemeralMsg(prompt, response =>
         {
             if (requestVersion != m_SpeculativeRequestVersion) return;
@@ -2198,6 +2241,7 @@ public partial class ChatSample : MonoBehaviour
             if (parsed != null)
             {
                 parsed.sourceTranscript = transcript;
+                parsed.sourceInputRevision = draftInputRevision; parsed.sourceAudioMs = draftAudioMs;
                 StoreStreamingObservedMode(parsed, transcript);
                 if (IsStrongSpeculativeSpeechVeto(parsed) &&
                     OnStableUserSpeechObserved != null)
@@ -2270,6 +2314,7 @@ public partial class ChatSample : MonoBehaviour
         if (string.IsNullOrEmpty(evidence)) yield break;
         if (evidence == m_LastDraftTranscript) yield break;
         string sourceTranscript = m_StreamingTranscript;
+        int singingInputRevision = m_InputAudioRevision, singingAudioMs = m_StreamingLatestAudioMs;
 
         m_LastDraftTranscript = evidence;
         m_LastSingingSpeculativeRequestTime = Time.realtimeSinceStartup;
@@ -2308,6 +2353,7 @@ public partial class ChatSample : MonoBehaviour
             if (parsed != null)
             {
                 parsed.sourceTranscript = sourceTranscript;
+                parsed.sourceInputRevision = singingInputRevision; parsed.sourceAudioMs = singingAudioMs;
                 //歌唱草稿也要刷新这份判定，否则切进歌唱模式之后就没有新判定了——
                 //退出将只能依赖切换之前的旧值，那等于只有一次机会。
                 StoreStreamingObservedMode(parsed, m_StreamingTranscript);
@@ -2464,6 +2510,7 @@ public partial class ChatSample : MonoBehaviour
         AcousticUncertain,
         ConflictSemanticSinging,
         ConflictSemanticSpeech,
+        ConflictStreamingEvidence,
     }
 
     /// <summary>
@@ -2485,6 +2532,9 @@ public partial class ChatSample : MonoBehaviour
             : streamingSemanticSinging != streamingSemanticSpeech
                 ? (streamingSemanticSinging ? "singing" : "speech")
                 : "uncertain";
+
+        if (!finalModeWasExplicit && streamingSemanticSinging && streamingSemanticSpeech)
+            return SingingModeFusion.ConflictStreamingEvidence;
 
         if (acousticIsUncertain)
         {
@@ -2512,31 +2562,16 @@ public partial class ChatSample : MonoBehaviour
     }
 
     /// <summary>
-    /// 最终证据是否足以推翻心里话的"这是说话"。
-    ///
-    /// 心里话是在**流式途中**、拿着残缺转写下的判断；最终模态判定拿的是完整转写
-    /// (必要时还附了片段歌词)，信息严格更多。两者冲突时不该让先下的那个赢——
-    /// 8/10 实测两轮被这么杀掉：岛正确(77% / 67%)、最终判定都说 singing、声学
-    /// 0.63 / 0.71，仍被回滚，用户当场说「我刚才已经唱了呀」。
-    ///
-    /// 但心里话那道闸本身有用(见 HasStrongSpeechModeJudgment：正常说话声学稳在
-    /// 0.58~0.64，单看声学挡不住)，所以不是取消它，而是要求**声学与最终文字同时
-    /// 判唱**才能推翻——两票对一票，且那两票信息更全。
-    ///
-    /// 两处心里话闸必须用同一条规则：DealingTextCallback 里的 cognitiveSpeechVeto，
-    /// 以及 TryHandleDirectSingAlongTurn 开头那道。8/10 只改了前者，结果 28214 行
-    /// 日志里"不否决"已经打出来，28256 行仍被后者拦下，回哼照样没发生。
+    /// 完整录音已有时序转写和歌唱证据时，局部 speech 判断不能否定整轮。
+    /// 此规则只撤销旧草稿的否决权；融合冲突和实际动作的独立边界仍须通过。
     /// </summary>
     private bool FinalEvidenceOverridesSpeculation()
     {
-        if (m_FinalModeVerdict != "singing") return false;
         SenseVoiceSpeechToText senseVoice = m_ChatSettings != null
             ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
             : null;
-        //0.52~0.58 的声学仍是不确定证据，不足以确认歌唱；但完整转写 LLM 已判
-        //singing 时，足以推翻更早、信息更少的流式 speech 草稿。自动回唱仍由
-        //m_FinalModeSoftDowngrade 在 uncertain 状态下拦住。
-        return senseVoice != null && senseVoice.LastSingingProbability >= 0.52f;
+        return senseVoice != null && senseVoice.HasTimeOrderedTranscript &&
+            senseVoice.LastIsSinging && senseVoice.LastSingingProbability >= 0.52f;
     }
 
     private bool HasStrongSpeculativeSpeechVeto()
@@ -3328,6 +3363,7 @@ public partial class ChatSample : MonoBehaviour
         public float turn_confidence = 0f;
         public string source_likelihood = "uncertain";
         [NonSerialized] public string sourceTranscript = "";
+        [NonSerialized] public int sourceInputRevision, sourceAudioMs;
         [NonSerialized] public string sourceEvidence = "";
         [NonSerialized] public bool isSinging = false;
         [NonSerialized] public float sourceSingingProbability = 0f;
@@ -3407,6 +3443,7 @@ public partial class ChatSample : MonoBehaviour
         //FinalizeSpeculativeTurn 会清空这一字段，先保存同轮最后一份稳定流式语义。
         //它不是天然更权威；只在后面确认是 final-ASR 的高连续度扩展时采用。
         string stableStreamingUserText = m_StreamingTranscript ?? "";
+        string scopedListeningObservation = ReconcileListeningDraftWithFinal(rawUserText);
 
         //StartRecording 通常已经取消上一轮歌唱；但外放歌声偶尔会先把录音状态
         //占住，真人随后插话时不会再触发第二次 StartRecording。最终 ASR 已经给出
@@ -3459,7 +3496,8 @@ public partial class ChatSample : MonoBehaviour
             modeFusion == SingingModeFusion.ConflictSemanticSpeech;
         bool modeConflictRequiresConfirmation =
             semanticSingingAcousticSpeechConflict ||
-            semanticSpeechAcousticSingingConflict;
+            semanticSpeechAcousticSingingConflict ||
+            modeFusion == SingingModeFusion.ConflictStreamingEvidence;
         bool roleModeReviewRequested = acousticModeUncertain ||
             modeConflictRequiresConfirmation ||
             (!acousticSaysSinging && strongMelodicReviewEvidence) ||
@@ -3489,7 +3527,9 @@ public partial class ChatSample : MonoBehaviour
             (speculativeVeto || (textSaysSpeech && !acousticIsConfident));
         if (modeConflictRequiresConfirmation && m_LogStreamTimings)
         {
-            string semanticDirection = semanticSingingAcousticSpeechConflict
+            string semanticDirection = modeFusion == SingingModeFusion.ConflictStreamingEvidence
+                ? "同轮流式 speech 与 singing 判断并存"
+                : semanticSingingAcousticSpeechConflict
                 ? "语义=singing / 声学=speech"
                 : "语义=speech / 声学=singing";
             Debug.Log($"[模态判定] 证据冲突：{semanticDirection}，" +
@@ -3537,21 +3577,17 @@ public partial class ChatSample : MonoBehaviour
             ReleasePreparedSingingOnly();
             if (senseVoice != null)
             {
-                if (senseVoice.LastIsSinging)
-                    senseVoice.DowngradeLastSingingToSpeech(
-                        "high-confidence speculative cognition classified ordinary speech");
                 displayMsg = string.IsNullOrWhiteSpace(senseVoice.LastText)
                     ? displayMsg
                     : senseVoice.LastText;
                 _msg =
-                    "[实时倾听辅助判断：本轮是普通说话；此前约定不构成本轮声学事实，" +
-                    "不得复述、转换或保存本轮音频] " +
-                    senseVoice.BuildLastPerceivedText();
+                    "[局部流式判断曾偏向普通说话；仅暂停自动跟唱，未改写最终听觉测量。" +
+                    "这不代表整轮没有歌唱；请按下面已录完的完整时序理解。] " +
+                    senseVoice.BuildLastPerceivedText(false);
             }
             m_EouSingingRejectedByFinal = true;
             if (m_LogSpeculativeListening)
-                Debug.Log("[歌唱流式倾听] 高置信度心里话判定为普通说话；" +
-                          "否决预回唱并交给正式LLM交流");
+                Debug.Log("[歌唱流式倾听] 局部说话判断暂停自动回唱；完整文字与旋律测量保留");
         }
         bool hadSingingEvidence = senseVoice != null &&
             (senseVoice.LastIsSinging || m_EouTurnWasSinging ||
@@ -3911,7 +3947,15 @@ public partial class ChatSample : MonoBehaviour
         //自动发送
         if (m_AutoSend)
         {
+            _msg = "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；" +
+                "用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；" +
+                "自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n" +
+                scopedListeningObservation + _msg;
             string internalHint = string.Join("\n", new[] { boundaryHint ?? "", speculativeHint ?? "" }).Trim();
+            StageSkillInputObservation(rawUserText, acousticSaysSinging || acousticModeUncertain ||
+                strongStreamingSingingJudgment || moderateStreamingSingingJudgment ||
+                strongMelodicReviewEvidence || recordingCandidateRequiresReview ||
+                (senseVoice != null && senseVoice.HasTimeOrderedSingingObservation));
             ResetStreamingSemanticSingingLatch();
             SendDataInternal(_msg, internalHint, rawUserText);
             return;
@@ -4394,13 +4438,14 @@ public partial class ChatSample : MonoBehaviour
         bool holdSpeechForSongMemoryResult = false,
         bool holdSpeechForHumBackResult = false,
         bool continueExistingUserTurn = false,
-        string transientSystemContext = null)
+        string transientSystemContext = null,
+        bool workFeedback = false)
     {
         //防御性保证同一时刻只有一个正式生成。正常语音路径会在用户开口时更早撤销；
         //这里再兜一次，避免按钮输入或其他调用方制造并发回复。
         if (m_ChatSettings != null && m_ChatSettings.m_ChatModel != null)
             m_ChatSettings.m_ChatModel.CancelActiveResponse();
-        int responseGeneration = ++m_FormalResponseGeneration;
+        int responseGeneration = BeginFormalResponseGeneration();
         EnsureSubtitleOverlay();
         if (m_SubtitleOverlay != null) m_SubtitleOverlay.BeginUtterance(responseGeneration);
 
@@ -4488,7 +4533,11 @@ public partial class ChatSample : MonoBehaviour
         //continuation 沿用原用户消息（其中已有当时截图）；没有新的 user 可挂图，也不该
         //在几十秒后的工具确认里偷换成另一张屏幕。
         string imageUrl = continueExistingUserTurn ? null : MaybeCaptureScreenForLLM();
-        if (continueExistingUserTurn)
+        if (workFeedback)
+        {
+            DispatchWorkFeedback(transientSystemContext ?? "", imageUrl, responseGeneration);
+        }
+        else if (continueExistingUserTurn)
         {
             DispatchFormalContinuation(
                 transientSystemContext ?? "",
@@ -4546,18 +4595,24 @@ public partial class ChatSample : MonoBehaviour
         string transientSystemContext = null)
     {
         PublishSpokenPrefixToLlm();
-        m_ChatSettings.m_ChatModel.RequestContext = transientSystemContext ?? "";
+        m_ChatSettings.m_ChatModel.RequestContext = BuildMotionRequestContext(BuildFormalObservationContext(transientSystemContext));
+        ObservationReceipt observations = CaptureObservationReceipt();
+        bool consumed = false;
         m_FormalResponseInFlight = true;
         m_ChatSettings.m_ChatModel.PostSpeechStream(
             prompt,
             delta =>
             {
-                if (responseGeneration != m_FormalResponseGeneration) return;
+                if (consumed || responseGeneration != m_FormalResponseGeneration ||
+                    (observations != null && observations.Epoch != m_WorkEpoch)) return;
                 OnSpeechStreamDelta(delta);
             },
             full =>
             {
-                if (responseGeneration != m_FormalResponseGeneration) return;
+                if (consumed || responseGeneration != m_FormalResponseGeneration ||
+                    (observations != null && observations.Epoch != m_WorkEpoch)) return;
+                consumed = true;
+                AcknowledgeObservations(observations, responseGeneration, full);
                 m_FormalResponseInFlight = false;
                 if ((full ?? "").StartsWith("<silent/>", StringComparison.Ordinal)) OnStreamDelta("<silent/>");
                 OnStreamComplete(full);
@@ -4576,17 +4631,24 @@ public partial class ChatSample : MonoBehaviour
         int responseGeneration)
     {
         PublishSpokenPrefixToLlm();
+        string observationsContext = BuildFormalObservationContext(transientSystemContext);
+        ObservationReceipt observations = CaptureObservationReceipt();
+        bool consumed = false;
         m_FormalResponseInFlight = true;
-        m_ChatSettings.m_ChatModel.PostSpeechContinuationStream(
-            transientSystemContext,
+        m_ChatSettings.m_ChatModel.PostSpeechFeedbackStream(
+            BuildMotionRequestContext(""), observationsContext,
             delta =>
             {
-                if (responseGeneration != m_FormalResponseGeneration) return;
+                if (consumed || responseGeneration != m_FormalResponseGeneration ||
+                    (observations != null && observations.Epoch != m_WorkEpoch)) return;
                 OnSpeechStreamDelta(delta);
             },
             full =>
             {
-                if (responseGeneration != m_FormalResponseGeneration) return;
+                if (consumed || responseGeneration != m_FormalResponseGeneration ||
+                    (observations != null && observations.Epoch != m_WorkEpoch)) return;
+                consumed = true;
+                AcknowledgeObservations(observations, responseGeneration, full);
                 m_FormalResponseInFlight = false;
                 if ((full ?? "").StartsWith("<silent/>", StringComparison.Ordinal)) OnStreamDelta("<silent/>");
                 OnStreamComplete(full);
@@ -4596,6 +4658,8 @@ public partial class ChatSample : MonoBehaviour
 
     private void InvalidateFormalResponse(string reason)
     {
+        ClearStagedFormalObservation();
+        CancelDialogueMotion(reason);
         bool hadActiveRequest = m_FormalResponseInFlight;
         if (m_SubtitleOverlay != null)
             m_SubtitleOverlay.CancelUtterance(m_FormalResponseGeneration, true);
@@ -4931,11 +4995,12 @@ public partial class ChatSample : MonoBehaviour
 
     private void OnSpeechStreamDelta(SpeechText delta)
     {
+        ObserveSingingSpeechPhase(delta);
         if (string.IsNullOrEmpty(delta.Text)) return;
-        if (m_LogStreamTimings && !m_FirstDeltaLogged)
+        if (m_LogStreamTimings && !m_FirstDeltaLogged && !string.IsNullOrWhiteSpace(delta.Text))
         {
             m_FirstDeltaLogged = true;
-            Debug.Log($"[Stream] T+{Elapsed():F2}s LLM首token到达");
+            Debug.Log($"[Stream] T+{Elapsed():F2}s LLM首段正文到达");
         }
         m_SentenceBuffer.Append(delta);
 
@@ -4978,6 +5043,7 @@ public partial class ChatSample : MonoBehaviour
 
         //内心模式：不进 TTS，文本累积在 m_SentenceBuffer 直到 OnStreamComplete
         if (m_RoundIsInner) return;
+        if (HoldSingingSpeechUntilValidation()) return;
 
         //—— 逐字复读不出声 ——
         //8/26 15:25 实测：用户说"先别说话，等我喊你"，她之后每 60 秒说一遍
@@ -5043,6 +5109,7 @@ public partial class ChatSample : MonoBehaviour
     /// </summary>
     private void OnStreamComplete(string full)
     {
+        ObserveSingingSpeechCompletion(ref full);
         // ChatQW 已分离说话/内部文本/动作；这里是执行层输入，不是模型原文。
         // 原文由 HandleRawLLMResponse 单独记录，绝不重新送入 TTS 或工具解析。
         if (m_LogRawLLMOutput)
@@ -5052,6 +5119,10 @@ public partial class ChatSample : MonoBehaviour
         // response remains available in a separate diagnostic log, but quoted protocol tags
         // must never be dispatched as tools or memory writes.
         full = RemoveQuotedAgentActionTags(full ?? "");
+        RecordWorkResponse(full);
+        ExtractSelfInspection(ref full, !m_UserSpeechActiveForAutonomy && !m_RoundSilencedForRepeat);
+        ExtractSingingGoalTags(ref full, !m_UserSpeechActiveForAutonomy && !m_RoundSilencedForRepeat);
+        DialogueMotionIntent? pendingMotion = ExtractDialogueMotion(ref full);
 
         //可靠开场由 ChatQW 合并进 assistant 历史；uncertain/冲突开场只作为
         //可撤销事实出现在本轮输入。两种情况都必须在第一个正式回复完成时消费掉，
@@ -5091,6 +5162,7 @@ public partial class ChatSample : MonoBehaviour
         //否则等发现是复读时那一段已经被删掉了。
         bool selfRepeat = IsVerbatimSelfRepeat(
             StripAgentTagsForTTS(afterMemTags), out string selfRepeatReason);
+        DispatchDialogueMotion(pendingMotion, selfRepeat);
         bool singingPolicyAccepted = false;
         string singingPolicyResult = "";
         if (!selfRepeat && singingPolicy != null)
@@ -5381,6 +5453,11 @@ public partial class ChatSample : MonoBehaviour
             }
             //兜底:引号异形/格式畸变导致 ParseAgentTags 没认出的标签,别让它进历史和感知帧
             cleanFull = StripAgentTagsForTTS(cleanFull);
+            if (CurrentMotionResponseRejected || !string.IsNullOrEmpty(m_PendingSelfInspection) || HasPendingSingingGoalReview())
+            {
+                wantsContinue = false;
+                nextInSec = null;
+            }
             m_RoundNextInSec = nextInSec;
             m_RoundFocus = focus;
             m_RoundContinue = wantsContinue;
@@ -5389,7 +5466,7 @@ public partial class ChatSample : MonoBehaviour
             if (wantsContinue && m_ActiveSkillsThisRound.Contains("singing"))
                 AcquireSkillExecutionLease(
                     "singing", "continue-chain 尚未完成歌唱相关决定");
-            else if (!wantsContinue && !IsSingingRuntimeActivityActive())
+            else if (!wantsContinue && !IsSingingRuntimeActivityActive() && !IsSingingGoalAwaitingExecution())
                 ReleaseSkillExecutionLease("singing", "continue-chain 已自然收口");
 
             //★ 立刻应用视觉状态变化——下一帧(chain or scheduled)就能反映新眼睛状态
@@ -5405,6 +5482,7 @@ public partial class ChatSample : MonoBehaviour
                 }
             }
 
+            ResolveSingingSpeech(ref cleanFull);
             //从 m_SentenceBuffer 尾巴里把标签剥掉(标签按 prompt 规则在末尾，所以这就是它们的位置)。
             //剥完再 flush，保证不会把标签字符送进 TTS。
             string tail = m_SentenceBuffer.ToString();
@@ -5491,7 +5569,7 @@ public partial class ChatSample : MonoBehaviour
             //   不等到 FinishSpeakingNaturally(那里要等所有音频播完，会让 chain 看不到刚说的内容)。
             //   ★ 内心独白用 m_RoundIsInner(OnStreamDelta 检测到的前缀信号) 作为权威判定，
             //     不依赖尾缀 <silent/>——尾缀模式不可靠且会撕裂前轮 spoken 音频。
-            if (m_AgentRoundInFlight)
+            if (m_AgentRoundInFlight && !CurrentMotionResponseRejected)
             {
                 float nowT = Time.realtimeSinceStartup;
                 m_LastAITurnTime = nowT;
@@ -5544,7 +5622,7 @@ public partial class ChatSample : MonoBehaviour
         //尾缀位置的 <silent/> (LLM 写在 round 末尾)不被识别为内心独白——那时文本已经流到
         //pipeline 了，强行回收会触发上述 chain 误杀。LLM 在尾部写 <silent/> 视为"写错位置"，
         //文本照常发声(behavior.txt 已规定 <silent/> 必须写在最前面)。
-        bool isInnerThought = m_AgentRunning && m_AgentRoundInFlight && m_RoundIsInner
+        bool isInnerThought = !CurrentMotionResponseRejected && m_AgentRunning && m_AgentRoundInFlight && m_RoundIsInner
                               && !string.IsNullOrEmpty((cleanFull ?? "").Trim());
 
         if (isInnerThought)
@@ -5574,8 +5652,9 @@ public partial class ChatSample : MonoBehaviour
         //新一轮的 OnStreamDelta/OnStreamComplete 用同一对回调，文本进同一个 m_PendingChunks，
         //AudioPlayer 不会因为"队列空 + 流结束"退出——它会等到新文本来。
         //(内心独白 + continue 同样支持——pipeline 没被关，下一轮的 spoken/inner 都能接上)
-        bool willChain = m_AgentRunning && m_AgentRoundInFlight && m_RoundContinue
+        bool willChain = !CurrentMotionResponseRejected && m_AgentRunning && m_AgentRoundInFlight && m_RoundContinue
                          && m_ConsecutiveAITurns < m_MaxConsecutiveAITurns;
+        if (willChain && !ConsumeWorkChainBudget()) { willChain = false; m_RoundContinue = false; }
         if (willChain)
         {
             m_RoundIsInner = false;          //新一轮 chain round 重新从普通模式开始
@@ -5607,7 +5686,10 @@ public partial class ChatSample : MonoBehaviour
                         : $"[LLM技能] {requestedSkill} 详细规则已加载 → 链接自主执行帧");
             //chain 中段也按当前眼睛状态决定是否附图——LLM 上一节如果 <look/> 了，从这一节起就开始看
             string chainImageUrl = MaybeCaptureScreenForLLM();
-            DispatchFormalStream(frame, chainImageUrl, m_FormalResponseGeneration);
+            // A continuation is still the same real user request. Preserve its goal
+            // and put current observations after the previous assistant response.
+            StageFormalObservationFrame(frame, m_FormalResponseGeneration);
+            DispatchWorkFeedback(BuildWorkContinuationContext(), chainImageUrl, m_FormalResponseGeneration);
             return;
         }
 
@@ -5643,6 +5725,11 @@ public partial class ChatSample : MonoBehaviour
 
         //—— 终止：本轮(或本 chain 的最后一节)真的说完了 ——
         m_StreamComplete = true;
+        if (CurrentMotionResponseRejected)
+        {
+            FinishRejectedMotionStreamRound();
+            return;
+        }
 
         //—— 收尾路径合并 ——
         //pipeline 也空着 = StreamAudioPlayer 不会触发 FinishSpeakingNaturally，需要这里手动收。
@@ -5675,7 +5762,12 @@ public partial class ChatSample : MonoBehaviour
             SetAnimator("state", 0);
             if (TryBeginPendingHumBack()) return;
         }
-        if (m_AgentRunning && m_AgentRoundInFlight && pipelineIdle)
+        // A direct-conversation memory confirmation can also return silent/empty.
+        // No audio player will finish that delivery; release its in-flight state here
+        // without acknowledging the pending storage observation or scheduling a retry.
+        bool silentMemoryAcknowledgement = m_SongMemoryAcknowledgementInFlight &&
+            string.IsNullOrWhiteSpace(cleanFull);
+        if (pipelineIdle && ((m_AgentRunning && m_AgentRoundInFlight) || silentMemoryAcknowledgement))
         {
             bool isTrulySilent = string.IsNullOrEmpty((cleanFull ?? "").Trim());
             string note;
@@ -5726,6 +5818,12 @@ public partial class ChatSample : MonoBehaviour
     /// </summary>
     private void FlushCompleteSentences(bool flushAll)
     {
+        if (HoldSingingSpeechUntilValidation()) return;
+        if (CurrentMotionResponseRejected && m_MotionRejectedSpeechRound == m_CurrentSpeechRoundId)
+        {
+            m_SentenceBuffer.Length = 0;
+            return;
+        }
         while (m_SentenceBuffer.Length > 0)
         {
             string buf = m_SentenceBuffer.ToString();
@@ -5769,7 +5867,7 @@ public partial class ChatSample : MonoBehaviour
             if (!m_FirstChunkFlushed)
             {
                 m_FirstChunkFlushed = true;
-                if (m_LogStreamTimings) Debug.Log($"[Stream] T+{Elapsed():F2}s 首块切出: \"{completed}\" lang={language ?? "auto"}");
+                if (m_LogStreamTimings) Debug.Log($"[Stream] T+{Elapsed():F2}s 首块切出: \"{completed}\" lang={language ?? "auto"} characters={completed.Length}");
             }
         }
         // Any remaining incomplete control tag is deliberately discarded at EOF.
@@ -6388,7 +6486,9 @@ public partial class ChatSample : MonoBehaviour
 
         //正文后面没有真实歌唱动作才算本轮已完整回应。
         //有歌唱时由 FinishHumBack / song_sing 失败收尾路径清除。
-        ClearUserTurnAwaitingReply("回复播完");
+        if (!CurrentMotionResponseRejected) ClearUserTurnAwaitingReply("回复播完");
+        else if (m_PendingMotionRepair == null && m_ActiveMotionRepair == null)
+            EndMotionResponseAsFailure("motion-rejected-after-speech-drained");
 
         //收 agent round——per-round 状态(ring buffer / consec count) OnStreamComplete 已写过；
         //这里只负责按本 chain 最后一节的 <next in/> 排下一拍。
@@ -6406,6 +6506,8 @@ public partial class ChatSample : MonoBehaviour
     /// </summary>
     public void Interrupt()
     {
+        // A silent gesture can outlive speech; it must stop even when the speech work check is empty.
+        CancelDialogueMotion("barge-in");
         //用户接管了这一轮，等待作废；他自己会带来新的一轮
         ClearUserTurnAwaitingReply("被用户打断");
 
@@ -6521,8 +6623,8 @@ public partial class ChatSample : MonoBehaviour
     [Tooltip("打印 agent loop 调度日志")]
     [SerializeField] private bool m_LogAgentLoop = true;
 
-    [Header("待机自主意图 — 正式轮次前先判断有没有新东西值得表达")]
-    [Tooltip("普通待机 tick 先走一次不写入历史的内部判断。只有出现新的想法、观察、记忆整理或动作意图时，才开启正式角色轮次；工具结果与 session-start 等真实新事件直接放行。")]
+    [Header("事项进度与待机意图 — 先完成当前请求，再考虑新表达")]
+    [Tooltip("待机 tick 先核对尚未结束的用户事项；事项已结束后才判断新想法、观察、记忆整理或动作意图。内部判断不写入历史；真实检查结果直接交回角色。")]
     [SerializeField] private bool m_EnableAutonomyIntentProbe = true;
     [Tooltip("内部判断选择保持安静后，最早多久重新给角色一次自主机会。用户开口不受此限制。")]
     [Range(5f, 120f)] [SerializeField] private float m_AutonomyProbeMinRecheckSeconds = 15f;
@@ -6726,6 +6828,11 @@ public partial class ChatSample : MonoBehaviour
     private sealed class AutonomyIntentDecision
     {
         public bool proceed;
+        public string work_evidence;
+        public string work_status;
+        public string singing_goal_status;
+        public string singing_goal_evidence;
+        [NonSerialized] public Newtonsoft.Json.Linq.JObject singing_goal_expected;
         public string intent;
         public string novelty;
         public float wait_seconds;
@@ -6801,6 +6908,8 @@ public partial class ChatSample : MonoBehaviour
         m_InterruptedUserQuestion = null; // a valid new input supersedes the pending recovery
         m_LastUserMsg = utterance ?? "";
         m_LastUserEvidence = evidence ?? "";
+        ResetWorkReview(!string.IsNullOrWhiteSpace(m_LastUserMsg));
+        ResetSingingGoalForUserTurn();
     }
     //—— 按需提示词技能 ——
     //“会不会”“本轮要不要加载详细规则”“这次能不能执行”是三件不同的事：
@@ -7724,16 +7833,19 @@ public partial class ChatSample : MonoBehaviour
 
             bool strongSignal = false;
             string transitionReason = "（短期追问窗口）";
-            bool semanticInspection = intent == SkillUserIntent.Mention;
+            bool observedSinging = isUserTurn && definition.Name == "singing" && m_RoutingSingingObservation;
+            bool semanticInspection = intent == SkillUserIntent.Mention || observedSinging;
             if (semanticInspection)
             {
                 strongSignal = state.Access == SkillAccess.Available;
                 transitionReason = state.Access == SkillAccess.Available
-                    ? "（本轮语境相关；权限方向交给 LLM）"
+                    ? (observedSinging && intent == SkillUserIntent.None
+                        ? "（本轮结构化歌唱观测；不是回唱要求）"
+                        : "（本轮用户话题相关；权限方向交给 LLM）")
                     : "（仅为判定权限语境临时加载）";
             }
 
-            if (intent == SkillUserIntent.None)
+            if (intent == SkillUserIntent.None && !observedSinging)
                 strongSignal = recentFollowup ||
                     (state.Access == SkillAccess.Available && (toolSignal || autonomousGrant));
             if (strongSignal)
@@ -7903,6 +8015,7 @@ public partial class ChatSample : MonoBehaviour
     private string m_LastRememberedSongId = "";
     private float m_LastRememberedSongResultTime = -999f;
     private int m_SongMemoryGeneration = 0;
+    private int m_SongMemoryOriginWorkEpoch = -1;
     private Coroutine m_SongMemoryAcknowledgementCoroutine;
     private bool m_SongMemoryAcknowledgementInFlight = false;
     private bool m_SongSingInFlight = false;
@@ -8209,18 +8322,13 @@ public partial class ChatSample : MonoBehaviour
     {
         if (!m_EnableAgentLoop) return;
         if (m_AgentRunning) return;
+        ResetWorkReviewForLoopBoundary();
         m_AgentGracefulShutdownPending = false;
         m_AgentRunning = true;
         m_SingingRequestSubmittedSinceUserTurn = false;
         m_AgentSessionStartTime = Time.realtimeSinceStartup;
-        m_LastUserTurnTime = -1f;
-        m_LastAITurnTime = -1f;
-        m_LastUserMsg = "";
-        m_LastUserEvidence = "";
-        m_LastAIMsgPlain = "";
-        m_RecentAIUtterances.Clear();
-        m_RepeatWatch.Clear();
-        m_SelfRepeatNote = "";
+        // Re-enabling capture continues the same dialogue. Keep user/heard-speech
+        // and completed-action facts together with the history that already survives.
         //台账和 id 账本**不清**——它们记的是"这台机器上这一场里发生过什么"，
         //和 Loop 的生死无关。练唱会话跨重启保留，这两样同理。
 
@@ -8248,6 +8356,7 @@ public partial class ChatSample : MonoBehaviour
         m_SongCatalogResultPending = false;
         m_LastSongCatalogResult = "";
         m_SongMemoryGeneration++;
+        m_SongMemoryOriginWorkEpoch = -1;
         m_SongMemoryInFlight = false;
         m_SongMemoryResultPending = false;
         m_SongMemoryAcknowledgementRequired = false;
@@ -8328,6 +8437,7 @@ public partial class ChatSample : MonoBehaviour
 
     public void StopAgentLoop()
     {
+        ResetWorkReviewForLoopBoundary();
         m_InterruptedUserQuestion = null;
         ResetSpeculativeTurn();
         ResetStreamingSemanticSingingLatch();
@@ -8341,6 +8451,7 @@ public partial class ChatSample : MonoBehaviour
         m_SongCatalogInFlight = false;
         m_SongCatalogResultPending = false;
         m_SongMemoryGeneration++;
+        m_SongMemoryOriginWorkEpoch = -1;
         m_SongMemoryInFlight = false;
         m_SongMemoryResultPending = false;
         m_SongMemoryAcknowledgementRequired = false;
@@ -8418,6 +8529,7 @@ public partial class ChatSample : MonoBehaviour
     /// </summary>
     public void NotifyUserStartedSpeaking()
     {
+        CancelDialogueMotion("user-started-speaking");
         PreservePendingReplyForInputCandidate();
         m_InputAudioRevision++;
         m_SingingRequestSubmittedSinceUserTurn = false;
@@ -8500,6 +8612,14 @@ public partial class ChatSample : MonoBehaviour
             m_PendingTickCo = null;
         }
 
+        if (reason == "self-inspection-result" || reason == "singing-goal-review")
+        {
+            // Deliver completed work independently of idle novelty/fatigue.
+            m_AutonomyProbeNotBefore = -999f;
+            if (m_Urge != null) m_Urge.ClearPendingTrigger();
+            m_PendingTickCo = StartCoroutine(TickAfterCo(Mathf.Max(.1f, requestedSec)));
+            return;
+        }
         if (m_Urge != null && m_Urge.Enabled)
         {
             m_Urge.SetNextIn(requestedSec, m_ConsecutiveAITurns, m_MinTickSec, m_MaxTickSec);
@@ -8641,7 +8761,7 @@ public partial class ChatSample : MonoBehaviour
     private static bool ShouldBypassAutonomyIntentProbe(string triggerReason)
     {
         string reason = triggerReason ?? "";
-        return reason == "session-start" || reason == "shutdown-cancelled" ||
+        return reason == "session-start" || reason == "shutdown-cancelled" || reason == "self-inspection-result" ||
             reason == "song-search-result" || reason == "song-catalog-result" ||
             reason == "song-memory-result" || reason == "speaker-manage-result" ||
             reason.StartsWith("skill-request:", StringComparison.Ordinal);
@@ -8674,6 +8794,8 @@ public partial class ChatSample : MonoBehaviour
         try
         {
             decision = JsonUtility.FromJson<AutonomyIntentDecision>(json);
+            if (decision != null)
+                decision.singing_goal_expected = Newtonsoft.Json.Linq.JObject.Parse(json)["singing_goal_expected"] as Newtonsoft.Json.Linq.JObject;
             return decision != null;
         }
         catch (Exception)
@@ -8685,6 +8807,7 @@ public partial class ChatSample : MonoBehaviour
 
     private string BuildAutonomyIntentProbePrompt(string triggerReason, string frame)
     {
+        if (ShouldReviewUserWork()) return BuildDedicatedWorkReviewPrompt(frame);
         string situation = m_UserSpeechActiveForAutonomy
             ? "用户此刻仍在表达。你可以在心里形成自己的观察或想法，但本次判断绝不会直接外放；" +
               "稍后必须结合用户完整发言，才能决定采用、修正或放弃。"
@@ -8693,16 +8816,19 @@ public partial class ChatSample : MonoBehaviour
             "[内部自主意图预判；不要把本条写成正式回复，不要调用工具，不要输出控制标签]\n" +
             situation + "触发原因=" +
             (triggerReason ?? "scheduled") + "。\n" +
-            "先判断此刻是否真的出现了一个和你最近发言不同、值得开启正式轮次的新意图。" +
+            "先审查上一用户事项：尚欠实际检查、执行或结果说明时，应继续该事项，不受新意要求限制。" +
+            "仅在上一事项已完成或正等待用户后，判断此刻是否出现了一个和你最近发言不同、值得开启正式轮次的新意图。" +
             "新意图可以来自你自己的新想法、刚浮现的记忆、环境变化、时间流逝后自然想换的话题，" +
             "也可以是只在心里完成的观察或记忆整理；不要求一定说出口。\n" +
             "下面这些不算新意图：重说或改写上一句话、再次回答已经回答过的用户发言、" +
             "重复表示正在等待、重复追问用户尚未回答的问题、为用户没有听见的内部复读道歉。\n" +
             "proceed=true 只表示值得让正式角色再判断一次说话/沉默/动作，不表示必须开口。" +
-            "如果没有新东西，proceed=false，并给出下一次重新考虑的秒数。\n\n" +
-            frame + "\n\n" +
+            "如果既无未完成事项也无新东西，proceed=false，并给出下一次重新考虑的秒数。\n\n" +
+            frame + BuildWorkReviewContext() + "\n\n" +
+            "先在work_evidence用一句话对照用户问题与已完成回复，指出已经给了什么答案或缺哪一步，再选择状态。" +
+            "仅有礼貌回应、点头、承诺稍后检查，没有实际检查或问题答案时必须是continue，不能因回复已播完而closed。\n" +
             "只输出一个紧凑 JSON，不要 Markdown：" +
-            "{\"proceed\":false,\"intent\":\"想做什么；没有则留空\"," +
+            "{\"work_evidence\":\"问题与已完成步骤的简短对照\",\"work_status\":\"continue|waiting_tool|waiting_user|closed|none\",\"proceed\":false,\"intent\":\"下一步具体做什么；没有则留空\"," +
             "\"novelty\":\"它相对最近发言的新信息；没有则留空\"," +
             "\"wait_seconds\":45}";
     }
@@ -8710,7 +8836,8 @@ public partial class ChatSample : MonoBehaviour
     private void DispatchPreparedAgentTick(
         string triggerReason,
         string frame,
-        AutonomyIntentDecision decision = null)
+        AutonomyIntentDecision decision = null,
+        bool workContinuation = false)
     {
         if (!m_AgentRunning || m_AgentGracefulShutdownPending) return;
         if (m_UserSpeechActiveForAutonomy)
@@ -8720,9 +8847,24 @@ public partial class ChatSample : MonoBehaviour
                 Debug.Log("[Agent/自主意图] 用户仍在表达；只保存私人预判，不创建外放轮次");
             return;
         }
-        if (IsAISpeaking || m_AgentRoundInFlight || IsVoiceOutputPlaying) return;
+        if (IsAISpeaking || m_AgentRoundInFlight || m_FormalResponseInFlight || IsVoiceOutputPlaying) return;
 
-        if (decision != null)
+        string workFeedback = "";
+        if (!string.IsNullOrEmpty(m_PendingSelfInspection))
+        {
+            workFeedback = "[只读自检已经执行；新的程序结果]\n" + m_PendingSelfInspection +
+                "\n这是执行后观测，不是新的用户发言。" +
+                (m_WorkReviewOpen ? "请回答原问题或明确说明限制，不要再次只说稍等。" :
+                    "这是自主检查；自行判断是否有值得表达的新观察，可保持沉默，不能重新打开已结束的用户事项。");
+            // Retain until the current formal response acknowledges the result.
+        }
+        else if (workContinuation)
+        {
+            if (m_WorkReviewOpen) ++m_WorkContinuations;
+            else ++m_AutonomousGoalContinuations;
+            workFeedback = BuildWorkContinuationContext();
+        }
+        else if (decision != null)
         {
             string intent = TruncateForFrame((decision.intent ?? "").Trim(), 160);
             string novelty = TruncateForFrame((decision.novelty ?? "").Trim(), 160);
@@ -8736,10 +8878,15 @@ public partial class ChatSample : MonoBehaviour
 
         frame += ConsumeDeferredAutonomyThought();
 
-        m_ListeningLatencyArmed = false; //自主新话题不能冒充上一条未出声回复的首音
-        m_ListeningFormalLatencyArmed = false;
+        if (!workContinuation)
+        {
+            // A user-work continuation still owns the original end-to-audio span.
+            m_ListeningLatencyArmed = false;
+            m_ListeningFormalLatencyArmed = false;
+        }
         HarvestSongIds(frame);
-        m_ChatHistory.Add(frame);
+        const string tickPrompt = "[程序感知 tick；不是新的用户发言。请依据本次临时观测判断下一步。]";
+        m_ChatHistory.Add(tickPrompt);
         m_AgentRoundInFlight = true;
         m_AgentCurrentRoundIsTick = true;
         ClearRoundParsed();
@@ -8747,7 +8894,9 @@ public partial class ChatSample : MonoBehaviour
         if (m_LogAgentLoop) Debug.Log("[Agent] FireTick → " + frame.Replace('\n', ' '));
 
         m_TextBack.text = "";
-        StartStreaming(frame, false);
+        StageFormalObservationFrame(frame, m_FormalResponseGeneration + 1);
+        StartStreaming(tickPrompt, false, continueExistingUserTurn: workFeedback.Length > 0,
+            transientSystemContext: workFeedback, workFeedback: workFeedback.Length > 0);
     }
 
     private void BeginAutonomyIntentProbe(string triggerReason)
@@ -8766,13 +8915,16 @@ public partial class ChatSample : MonoBehaviour
         string frame = BuildPerceptionFrame(triggerReason);
         HarvestSongIds(frame);
         int generation = ++m_AutonomyProbeGeneration;
+        int workEpoch = m_WorkEpoch;
+        bool reviewingWork = ShouldReviewUserWork();
+        bool reviewingAutonomousGoal = !m_WorkReviewOpen && HasAutonomousSingingGoal() && HasPendingSingingGoalReview();
         m_AutonomyProbeInFlight = true;
         m_AutonomyProbeMustRemainPrivate = m_UserSpeechActiveForAutonomy;
         string prompt = BuildAutonomyIntentProbePrompt(triggerReason, frame);
         if (m_LogAgentLoop)
             Debug.Log($"[Agent/自主意图] 开始预判 trigger={triggerReason}");
 
-        m_ChatSettings.m_ChatModel.PostEphemeralMsg(prompt, response =>
+        Action<string> onDecision = response =>
         {
             if (generation != m_AutonomyProbeGeneration) return;
             m_AutonomyProbeInFlight = false;
@@ -8781,7 +8933,8 @@ public partial class ChatSample : MonoBehaviour
             m_AutonomyProbeMustRemainPrivate = false;
             if (!m_AgentRunning || m_AgentGracefulShutdownPending) return;
 
-            if (!TryParseAutonomyIntentDecision(response, out AutonomyIntentDecision decision))
+            if (!TryParseAutonomyIntentDecision(response, out AutonomyIntentDecision decision) ||
+                (reviewingWork && !IsWorkReviewDecision(decision)))
             {
                 if (privateOnly)
                 {
@@ -8791,6 +8944,18 @@ public partial class ChatSample : MonoBehaviour
                 }
                 if (m_AgentRoundInFlight || IsAISpeaking || IsVoiceOutputPlaying)
                     return;
+                if (reviewingWork)
+                {
+                    if (m_LogAgentLoop)
+                        Debug.LogWarning("[Agent/事项进度] 结构化判定无效；使用有界恢复，未确认任务完成或目标已获准。");
+                    var recovery = new AutonomyIntentDecision { work_status = "continue",
+                        intent = "进度判定格式无效；核对原请求与真实结果，推进必要步骤或明确说明限制" };
+                    if (workEpoch != m_WorkEpoch || !(reviewingAutonomousGoal
+                        ? CanContinueAutonomousSingingGoal(recovery) : ApplyWorkReviewDecision(recovery))) return;
+                    PrepareActiveSkillsForRound(null, triggerReason);
+                    DispatchPreparedAgentTick(triggerReason, BuildPerceptionFrame(triggerReason), recovery, true);
+                    return;
+                }
                 if (m_LogAgentLoop)
                     Debug.LogWarning("[Agent/自主意图] 预判输出无法解析，保留角色自主性并放行正式轮次");
                 PrepareActiveSkillsForRound(null, triggerReason);
@@ -8811,14 +8976,26 @@ public partial class ChatSample : MonoBehaviour
             if (m_AgentRoundInFlight || IsAISpeaking || IsVoiceOutputPlaying)
                 return;
 
+            if (workEpoch != m_WorkEpoch) return;
+            if (reviewingWork)
+            {
+                NormalizeSingingGoalReview(decision);
+                ApplySingingGoalReview(decision.singing_goal_status, decision.singing_goal_evidence);
+            }
+            bool workContinuation = reviewingAutonomousGoal
+                ? CanContinueAutonomousSingingGoal(decision) : ApplyWorkReviewDecision(decision);
+            if (reviewingAutonomousGoal) decision.proceed = workContinuation;
+            if (reviewingWork && !workContinuation) decision.proceed = false;
             if (decision.proceed)
             {
+                int cap = (m_Urge != null && m_Urge.Enabled) ? m_MonologueBackstopTurns : m_MaxConsecutiveAITurns;
+                if (!workContinuation && m_ConsecutiveAITurns >= cap) return;
                 m_AutonomyProbeNotBefore = -999f;
                 if (m_LogAgentLoop)
-                    Debug.Log($"[Agent/自主意图] 放行：{TruncateForFrame(decision.intent, 120)} " +
+                    Debug.Log($"[Agent/{(workContinuation ? "未完成事项" : "自主意图")}] 放行：{TruncateForFrame(decision.intent, 120)} " +
                               $"(新意={TruncateForFrame(decision.novelty, 120)})");
                 PrepareActiveSkillsForRound(null, triggerReason);
-                DispatchPreparedAgentTick(triggerReason, frame, decision);
+                DispatchPreparedAgentTick(triggerReason, BuildPerceptionFrame(triggerReason), decision, workContinuation);
                 return;
             }
 
@@ -8830,9 +9007,13 @@ public partial class ChatSample : MonoBehaviour
             float wait = Mathf.Clamp(requested, min, max);
             m_AutonomyProbeNotBefore = Time.realtimeSinceStartup + wait;
             if (m_LogAgentLoop)
-                Debug.Log($"[Agent/自主意图] 没有新表达动机，保持安静；{wait:F0}s 后再考虑");
+                Debug.Log(reviewingWork
+                    ? $"[Agent/事项进度] 状态={m_WorkStatus}，本次不续接；{wait:F0}s 后再考虑自主表达"
+                    : $"[Agent/自主意图] 没有新表达动机，保持安静；{wait:F0}s 后再考虑");
             ScheduleNextTick(wait, "autonomy-no-new-intent");
-        });
+        };
+        if (reviewingWork) m_ChatSettings.m_ChatModel.PostWorkReviewMsg(prompt, onDecision);
+        else m_ChatSettings.m_ChatModel.PostEphemeralMsg(prompt, onDecision);
     }
 
     /// <summary>
@@ -8843,7 +9024,16 @@ public partial class ChatSample : MonoBehaviour
     private void FireTick(string triggerReason)
     {
         if (!m_AgentRunning || m_AgentGracefulShutdownPending) return;
+        if (m_PendingMotionRepair != null || m_ActiveMotionRepair != null)
+        {
+            ScheduleNextTick(m_MinTickSec, "motion-feedback-continuation");
+            return;
+        }
         if (m_AutonomyProbeInFlight) return;
+        if ((!string.IsNullOrEmpty(m_PendingSelfInspection) && m_SelfInspectionDeliveryAttempts >= MaxWorkContinuations) ||
+            (HasPendingSingingGoalReview() && !m_WorkReviewOpen &&
+                (!HasAutonomousSingingGoal() || m_AutonomousGoalContinuations >= MaxWorkContinuations))) return;
+        if (!string.IsNullOrEmpty(m_PendingSelfInspection)) triggerReason = "self-inspection-result";
         if (m_UserSpeechActiveForAutonomy)
         {
             if (m_EnableAutonomyIntentProbe)
@@ -8853,14 +9043,15 @@ public partial class ChatSample : MonoBehaviour
             return;
         }
         //角色还在说话(<continue/>链上一帧还没收尾) → 让流水线走完再排
-        if (IsAISpeaking || m_AgentRoundInFlight)
+        if (IsAISpeaking || m_AgentRoundInFlight || m_FormalResponseInFlight || IsVoiceOutputPlaying)
         {
             if (m_LogAgentLoop) Debug.Log($"[Agent] FireTick 排队等待(speaking={IsAISpeaking}, inflight={m_AgentRoundInFlight})");
             ScheduleNextTick(m_MinTickSec, "still-busy");
             return;
         }
         //连续 AI 轮次上限——工具结果仍允许回到角色手里一次，否则可能“查到了但不说”
-        bool isSongToolResult = string.Equals(triggerReason, "song-search-result", StringComparison.Ordinal) ||
+        bool isSongToolResult = string.Equals(triggerReason, "self-inspection-result", StringComparison.Ordinal) ||
+            string.Equals(triggerReason, "song-search-result", StringComparison.Ordinal) ||
             string.Equals(triggerReason, "song-catalog-result", StringComparison.Ordinal) ||
             string.Equals(triggerReason, "song-memory-result", StringComparison.Ordinal) ||
             string.Equals(triggerReason, "speaker-manage-result", StringComparison.Ordinal);
@@ -8869,13 +9060,19 @@ public partial class ChatSample : MonoBehaviour
         //下一次，于是必须等用户开口才解封——用户走开 30 分钟，她后 22 分钟一声不吭。
         //这里只保留一个远得多的兜底，防冲动模型出 bug 时无限独白。
         int cap = (m_Urge != null && m_Urge.Enabled) ? m_MonologueBackstopTurns : m_MaxConsecutiveAITurns;
-        if (m_ConsecutiveAITurns >= cap && !isSongToolResult)
+        bool canReviewWork = (m_EnableAutonomyIntentProbe || HasPendingSingingGoalReview()) && ShouldReviewUserWork();
+        if (m_ConsecutiveAITurns >= cap && !isSongToolResult && !canReviewWork)
         {
             if (m_LogAgentLoop) Debug.Log($"[Agent] 连续 AI 轮次={m_ConsecutiveAITurns}≥{cap}，停止主动tick，等用户开口");
             return;
         }
 
-        if (m_EnableAutonomyIntentProbe && !ShouldBypassAutonomyIntentProbe(triggerReason))
+        if (m_WorkReviewOpen && HasWorkToolInFlight() && !isSongToolResult)
+        {
+            ScheduleNextTick(Mathf.Max(m_MinTickSec, 5f), "pending-work-wait");
+            return;
+        }
+        if ((m_EnableAutonomyIntentProbe || HasPendingSingingGoalReview()) && !ShouldBypassAutonomyIntentProbe(triggerReason))
         {
             BeginAutonomyIntentProbe(triggerReason);
             return;
@@ -8892,6 +9089,12 @@ public partial class ChatSample : MonoBehaviour
     /// </summary>
     public string PrepareUserTurn(string userText, string rawUserText = null)
     {
+        SetCurrentUserInput(rawUserText ?? userText, userText);
+        return PrepareAcceptedUserTurn(userText, rawUserText);
+    }
+
+    private string PrepareAcceptedUserTurn(string userText, string rawUserText)
+    {
         m_SingingRequestSubmittedSinceUserTurn = false;
         m_NoSingingWorkContinuations = 0;
         m_UserSpeechActiveForAutonomy = false;
@@ -8904,7 +9107,6 @@ public partial class ChatSample : MonoBehaviour
             CancelAutonomyIntentProbe();
         }
         m_LastUserTurnTime = Time.realtimeSinceStartup;
-        SetCurrentUserInput(rawUserText ?? userText, userText);
         //情境召回:提及扫描同步生效(本帧可见),语境嵌入异步、作用于后续帧
         if (m_MemoryHub != null && m_EnableMemoryRecall)
             m_MemoryHub.NotifyUserUtterance(m_LastUserMsg);
@@ -8925,7 +9127,9 @@ public partial class ChatSample : MonoBehaviour
         //她能看到的 id 都要入账，否则出处校验会把合法的调用也拦掉。
         string combined = frame + "\n" + (userText ?? "");
         HarvestSongIds(combined);
-        return combined;
+        bool willStream = m_UseStreaming && m_IsVoiceMode && m_ChatSettings.m_TextToSpeech != null;
+        StageFormalObservationFrame(frame, m_FormalResponseGeneration + (willStream ? 1 : 0));
+        return userText ?? "";
     }
 
     /// <summary>
@@ -8952,6 +9156,30 @@ public partial class ChatSample : MonoBehaviour
             return;
         }
 
+        if (!string.IsNullOrEmpty(m_PendingSelfInspection))
+        {
+            if (m_SelfInspectionDeliveryAttempts >= MaxWorkContinuations)
+            {
+                m_WorkReviewOpen = false;
+                m_WorkStatus = "blocked";
+                ClearScheduledAgentWake();
+                HandleSystemNotice(new SystemNotice("inspection_delivery_exhausted", SystemNoticeSeverity.Error,
+                    "自检结果已保留，但连续生成回复失败，自动交付已停止。", "没有将事项记为完成。", "Agent", false));
+                ClearRoundParsed();
+                return;
+            }
+            ScheduleNextTick(m_MinTickSec, "self-inspection-result");
+            ClearRoundParsed();
+            return;
+        }
+        if (HasPendingSingingGoalReview() && (m_WorkReviewOpen ||
+            (HasAutonomousSingingGoal() && m_AutonomousGoalContinuations < MaxWorkContinuations)))
+        {
+            m_AutonomyProbeNotBefore = -999f;
+            ScheduleNextTick(m_MinTickSec, "singing-goal-review");
+            ClearRoundParsed();
+            return;
+        }
         if (m_RoundWaitForUser)
         {
             if (m_LogAgentLoop)
@@ -9026,6 +9254,7 @@ public partial class ChatSample : MonoBehaviour
         if (m_SingingRequestSubmittedSinceUserTurn || IsSingingRuntimeActivityActive() ||
             GetSkillRouteState("singing").ActiveThisRound || m_NoSingingWorkContinuations > 0)
             sb.Append(BuildSingingExecutionSnapshot());
+        sb.Append(m_WorkProgressFact);
         var pendingCaptureSense = m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText;
         int pendingCaptures = pendingCaptureSense != null
             ? pendingCaptureSense.PendingCompletedCaptureAnalysisCount : 0;
@@ -9036,17 +9265,14 @@ public partial class ChatSample : MonoBehaviour
         if (!string.IsNullOrEmpty(m_PendingSkillStatusFrame))
         {
             sb.Append(m_PendingSkillStatusFrame);
-            m_PendingSkillStatusFrame = "";
         }
         if (!string.IsNullOrEmpty(m_PendingToolCorrectionFrame))
         {
             sb.Append(m_PendingToolCorrectionFrame);
-            m_PendingToolCorrectionFrame = "";
         }
         if (!string.IsNullOrEmpty(m_PendingSingingRoutingFact))
         {
             sb.Append(m_PendingSingingRoutingFact);
-            m_PendingSingingRoutingFact = "";
         }
         if (!string.IsNullOrEmpty(triggerReason) &&
             triggerReason.StartsWith("skill-request:", StringComparison.Ordinal))
@@ -9119,7 +9345,6 @@ public partial class ChatSample : MonoBehaviour
             sb.Append("\n歌曲检索工具结果: ");
             sb.Append(m_LastSongSearchResult);
             sb.Append("（这是工具候选；置信度不足时应明确保留不确定性）");
-            m_SongSearchResultPending = false;
         }
         if (m_SongCatalogInFlight)
         {
@@ -9129,7 +9354,6 @@ public partial class ChatSample : MonoBehaviour
         {
             sb.Append("\n曲库自查工具结果:\n");
             sb.Append(m_LastSongCatalogResult);
-            m_SongCatalogResultPending = false;
         }
         if (m_SongMemoryInFlight)
         {
@@ -9143,9 +9367,7 @@ public partial class ChatSample : MonoBehaviour
             if (!string.IsNullOrEmpty(m_DroppedSongTitleNote))
             {
                 sb.Append(m_DroppedSongTitleNote);
-                m_DroppedSongTitleNote = "";
             }
-            m_SongMemoryResultPending = false;
         }
         if (m_SpeakerManageInFlight)
         {
@@ -9155,7 +9377,6 @@ public partial class ChatSample : MonoBehaviour
         {
             sb.Append("\n声纹管理工具结果:\n");
             sb.Append(m_LastSpeakerManageResult);
-            m_SpeakerManageResultPending = false;
         }
         if (m_SongSingInFlight)
         {
@@ -9165,7 +9386,6 @@ public partial class ChatSample : MonoBehaviour
         if (!string.IsNullOrEmpty(m_StickyToolFailure) &&
             m_StickyToolFailureShown < k_StickyToolFailureMaxFrames)
         {
-            m_StickyToolFailureShown++;
             sb.Append("\n历史失败事件（当时状态，不代表当前仍失败；来源、可播放性与范围以本帧最新素材状态为准）");
             if (m_StickyToolFailureCount > 1)
                 sb.Append($"（同样的调用已经连续失败 {m_StickyToolFailureCount} 次）");
@@ -9177,19 +9397,16 @@ public partial class ChatSample : MonoBehaviour
         {
             sb.Append("\n练唱会话删除工具结果: ");
             sb.Append(m_LastPracticeDropResult);
-            m_PracticeDropResultPending = false;
         }
         if (m_PracticeEditResultPending && !string.IsNullOrEmpty(m_LastPracticeEditResult))
         {
             sb.Append("\n练唱素材来源/修订工具结果: ");
             sb.Append(m_LastPracticeEditResult);
-            m_PracticeEditResultPending = false;
         }
         if (m_HumBackResultPending && !string.IsNullOrEmpty(m_LastHumBackResult))
         {
             sb.Append("\n旋律回哼工具结果: ");
             sb.Append(m_LastHumBackResult);
-            m_HumBackResultPending = false;
         }
         if (m_PostHumBackFeedbackActive)
         {
@@ -9211,7 +9428,6 @@ public partial class ChatSample : MonoBehaviour
                       " —— 没有这个标签，它被整条丢掉了，所以那一步**没有发生**。" +
                       "排下一拍用 <next in=\"Ns\" focus=\"…\"/>；标签名只能用规范里列出的那些，" +
                       "拼错不会有任何报错。如果那一轮你还打算唱/查/记，现在补上对应的标签。");
-            m_LastUnknownTagNote = "";
         }
         SenseVoiceSpeechToText practiceSenseVoice = m_ChatSettings != null
             ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText
@@ -9221,19 +9437,16 @@ public partial class ChatSample : MonoBehaviour
         if (!string.IsNullOrEmpty(m_PracticeSemanticResolutionNote))
         {
             sb.Append(m_PracticeSemanticResolutionNote);
-            m_PracticeSemanticResolutionNote = "";
         }
         if (!string.IsNullOrEmpty(m_SelfRepeatNote))
         {
             sb.Append("\n复读拦截: " + m_SelfRepeatNote);
-            m_SelfRepeatNote = "";
         }
         //必须排在清单前面：清单为空时它是**唯一**的信号。8/25 那次会话被清空后，
         //帧里干脆什么都不写，她只能相信自己笔记里的"第5段"，于是照着撞了两次。
         if (!string.IsNullOrEmpty(m_PracticeSessionCarryNote))
         {
             sb.Append(m_PracticeSessionCarryNote);
-            m_PracticeSessionCarryNote = "";
         }
         // Unified clip facts above include identity, boundaries and measured pitch.
 
@@ -10993,7 +11206,7 @@ public partial class ChatSample : MonoBehaviour
     //两半都是精确的已知标签名时意图毫无歧义，拆开即可；不做任何拼写猜测。
     private static readonly string[] s_GluableTagNames =
     {
-        "silent", "continue", "noop", "look", "unlook", "next", "skill_request", "skill_control",
+        "silent", "continue", "noop", "look", "unlook", "next", "skill_request", "skill_control", "motion",
         "singing_policy", "singing_stop", "singing_intent",
         "note", "memory_add", "memory_update", "memory_link", "speaker_name", "speaker_manage",
         "song_search", "song_catalog", "song_remember", "song_rename", "song_forget", "song_sing",
@@ -12035,6 +12248,8 @@ public partial class ChatSample : MonoBehaviour
 
     private static bool IsKnownAgentTagName(string name)
     {
+        if (string.Equals(name, "body_inspect", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, "sing_goal", StringComparison.OrdinalIgnoreCase)) return true;
         if (string.IsNullOrWhiteSpace(name)) return false;
         foreach (string candidate in s_GluableTagNames)
             if (string.Equals(name, candidate, StringComparison.OrdinalIgnoreCase))
@@ -12533,6 +12748,8 @@ public partial class ChatSample : MonoBehaviour
         m_SongMemoryInFlight = true;
         m_SongMemoryResultPending = false;
         int generation = ++m_SongMemoryGeneration;
+        // Capture ownership before invoking the service: it may finish after another user turn.
+        m_SongMemoryOriginWorkEpoch = m_WorkEpoch;
         if (m_LogAgentLoop)
         {
             Debug.Log($"[SongMemory] 角色调用 action={request.Action} id={request.SongId} " +
@@ -12648,6 +12865,7 @@ public partial class ChatSample : MonoBehaviour
     private void CompleteSongMemoryImmediately(string message, int generation = -1)
     {
         if (generation >= 0 && generation != m_SongMemoryGeneration) return;
+        if (generation < 0) m_SongMemoryOriginWorkEpoch = m_WorkEpoch;
         m_SongMemoryInFlight = false;
         m_LastSongMemoryResult = message;
         m_SongMemoryResultPending = true;
@@ -12666,28 +12884,37 @@ public partial class ChatSample : MonoBehaviour
             m_SongMemoryAcknowledgementCoroutine = null;
         }
         int generation = m_SongMemoryGeneration;
+        int originWorkEpoch = m_SongMemoryOriginWorkEpoch;
+        // The storage fact survives a new user turn, but an old request cannot force its
+        // acknowledgement into the new conversation. Its next formal observation can read it.
+        if (originWorkEpoch != m_WorkEpoch) return;
         string resultText = m_LastSongMemoryResult ?? "";
         m_SongMemoryAcknowledgementCoroutine = StartCoroutine(
-            DeliverSongMemoryAcknowledgementWhenIdle(generation, success, resultText));
+            DeliverSongMemoryAcknowledgementWhenIdle(generation, originWorkEpoch, success, resultText));
     }
 
     private IEnumerator DeliverSongMemoryAcknowledgementWhenIdle(
-        int generation, bool success, string resultText)
+        int generation, int originWorkEpoch, bool success, string resultText)
     {
+        // The service may complete synchronously within OnStreamComplete. Finish that
+        // dispatch before considering a second one, and let Queue retain a live handle.
+        yield return null;
         //首阶段的模型回复可能仍在播放EOU filler或清理空流水线；等它完全结束后再开
         //第二阶段，避免 StartStreaming 抢占/截断当前音频。
-        while (generation == m_SongMemoryGeneration &&
+        while (generation == m_SongMemoryGeneration && originWorkEpoch == m_WorkEpoch &&
             (m_FormalResponseInFlight || !m_StreamComplete || IsAISpeaking ||
-             IsVoiceOutputPlaying || m_AgentRoundInFlight))
+             IsVoiceOutputPlaying || m_AgentRoundInFlight ||
+             m_UserSpeechActiveForAutonomy || m_AutonomyProbeInFlight))
         {
             yield return null;
         }
 
         m_SongMemoryAcknowledgementCoroutine = null;
-        if (generation != m_SongMemoryGeneration) yield break;
+        if (generation != m_SongMemoryGeneration || originWorkEpoch != m_WorkEpoch) yield break;
 
         ClearScheduledAgentWake();
-        m_SongMemoryResultPending = false;
+        // The formal response receipt clears pending only after a valid completion.
+        // Without Agent Loop there is no receipt: retain the fact, with no automatic retry.
         m_SongMemoryAcknowledgementInFlight = true;
         string toolFrame =
             "[同一真实用户轮次的本机歌曲记忆最终结果]\n" + resultText + "\n" +
@@ -14543,10 +14770,23 @@ public partial class ChatSample : MonoBehaviour
     private void QueueHumBack(AgentHumBackRequest request)
     {
         if (request == null) return;
+        if (request.UnifiedSing && m_WorkNoProgress)
+        { m_SingingRejectedSpeechRound = m_CurrentSpeechRoundId; return; }
+        if (request.UnifiedSing && HasPendingSingingGoalReview())
+        {
+            // A pending approval is a normal wait, not a failed tool or queued retry.
+            m_WorkProgressFact = "\n[Work/Progress] status=waiting_goal_review；未提交演唱，待本次目标审核后重新决定；没有失败纠错任务。\n";
+            if (m_LogAgentLoop) Debug.Log("[Sing/Wait] 目标待审核；未调用执行器、未记失败、未排工具纠错");
+            return;
+        }
+        string validationIdentity = request.UnifiedSing ? SingingRequestKey(request) : "";
         m_SingingRequestSubmittedSinceUserTurn = true;
         if (request.UnifiedSing && !TryResolveUnifiedSing(request, out string singFailure))
         {
-            RecordHumBackResult("未执行：" + singFailure, true);
+            RecordSingingRejection(validationIdentity, singFailure);
+            // The structured rejection owns counting. The display result is not a second failure.
+            m_LastHumBackResult = "未执行：" + singFailure;
+            m_HumBackResultPending = true;
             ReportToolFailureForLlm("sing", "material_not_ready", singFailure,
                 "保留所选 refs，按素材事实修正；不确定可询问。sing 不填写 source/mode/order，" +
                 "只填写清单中的 refs；当前无可播放版本时按证据选 range 或起止时间。");
@@ -15691,6 +15931,7 @@ public partial class ChatSample : MonoBehaviour
             request.timeout = 180;
             //该协程只挂起自己；正式 LLM/TTS/字幕与用户打断都继续运行。
             yield return request.SendWebRequest();
+            RecordSvcWarmupObservation(request.result == UnityWebRequest.Result.Success, request.downloadHandler.text);
             if (m_LogHumBack)
             {
                 if (request.result == UnityWebRequest.Result.Success)
@@ -15720,6 +15961,8 @@ public partial class ChatSample : MonoBehaviour
             yield return request.SendWebRequest();
             bool ready = request.result == UnityWebRequest.Result.Success &&
                          request.responseCode >= 200 && request.responseCode < 300;
+            m_ObservedSvcReachable = ready;
+            m_ObservedSvcHealthAt = Time.realtimeSinceStartup;
             completed(ready, ready
                 ? $"{healthURL} HTTP={request.responseCode}"
                 : $"{healthURL} HTTP={request.responseCode} error={request.error}");
@@ -16901,7 +17144,9 @@ public partial class ChatSample : MonoBehaviour
         else
         {
             PublishSpokenPrefixToLlm();
-            m_ChatSettings.m_ChatModel.PostSpeechMessage(llmInput, CallBackWithSpeech);
+            m_ChatSettings.m_ChatModel.RequestContext = BuildMotionRequestContext(BuildFormalObservationContext());
+            m_FormalResponseInFlight = true;
+            m_ChatSettings.m_ChatModel.PostSpeechMessage(llmInput, CaptureMotionResponseCallback());
         }
     }
 
@@ -17407,7 +17652,9 @@ public partial class ChatSample : MonoBehaviour
                         "[HumBack/PitchVerify] 完整输出编码失败: " + ex.Message);
             }
         }
-        bool wasUserRequested = !m_AgentCurrentRoundIsTick;
+        bool wasUserRequested = m_SingingGoal != null
+            ? string.Equals(m_SingingGoal.origin, "user_request", StringComparison.Ordinal)
+            : !m_AgentCurrentRoundIsTick;
         if (m_HumStreamPlaybackCoroutine != null)
         {
             StopCoroutine(m_HumStreamPlaybackCoroutine);
@@ -17894,7 +18141,8 @@ public partial class ChatSample : MonoBehaviour
             "不要复述字段，不要编造权限或成功状态。" +
             "若文字声称马上执行，同轮必须提交可验证的工具请求；" +
             "选择不执行就不要先口头承诺。" +
-            "本纠错轮不要用 ‹silent/› 或 ‹silence/› 掩盖这条真实失败。]";
+            "参数修正可以用 silent 在内部进行；没有可执行进展时不要再次外放稍等或开始。" +
+            "选择停止时可以一次说明真实原因，不能把未执行说成服务坏了。]";
     }
 
     private string DescribeActiveSkillsForToolFeedback()
@@ -17933,6 +18181,7 @@ public partial class ChatSample : MonoBehaviour
             m_LastSingingRepairAt = Time.realtimeSinceStartup;
         string safeReason = SanitizeToolFeedbackValue(reason);
         NoteToolFailure($"{tool} 未执行：{safeReason}");
+        if (m_WorkNoProgress) return;
         bool realUserWaiting = m_AgentRunning && !m_AgentCurrentRoundIsTick &&
             m_AgentRoundInFlight && m_UserTurnAwaitingReplySince > 0f;
         if (!realUserWaiting) return;

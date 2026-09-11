@@ -1,0 +1,804 @@
+{
+  "schema": 1,
+  "generatedAtUtc": "2026-09-10T02:58:04.631208+00:00",
+  "scope": "Original source clips and mathematical expectations only; not a Unity or subjective naturalness acceptance report.",
+  "reproduce": "python -m Tools.MotionAdapter.review_naturalness_sources",
+  "analysisScript": "Tools/MotionAdapter/review_naturalness_sources.py",
+  "analysisScriptSha256": "da6fc761b653857429c6e423a6a30191212714f783590a8b49916fa002cdb452",
+  "versions": {
+    "numpy": "2.3.0",
+    "scipy": "1.17.1",
+    "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b"
+  },
+  "neutralJointsSha256": "5e1d60cb1935c2ea50c6978848697d83efde5621cbbc287891ddae3ba55dde61",
+  "methods": {
+    "coordinates": "ARDY RH +Y up/+Z forward -> Unity-style coordinates with C=diag(-1,1,1); p_u=C*p_a and R_u=C*R_a*C. Positive X is the character right side.",
+    "rootOriginCharacterAxes": "RightHand minus Hips positions, still in character/world axes. This subtracts translation only, not the generated pelvis rotation.",
+    "chestOriginCharacterAxes": "RightHand minus Spine3 positions, still in character/world axes. This is the basis of the earlier 52.5% cross-centre observation.",
+    "chestOriginChestAxes": "inverse(R_Spine3)*(p_RightHand-p_Spine3); negative X marks the left half-space of the source chest.",
+    "euler": "scipy Rotation.as_euler(\"xyz\", degrees=True), extrinsic axes: X pitch, Y yaw, Z roll; head measured as inverse(R_Spine3)*R_Head. Bounds are sampled extrema, not anatomical joint limits.",
+    "angularSpeed": "Geodesic angle of R[t+1]*inverse(R[t]) multiplied by 20 FPS. Finite inter-frame mean rates, not measured continuous peak velocities. Euler component rates are reported separately and are not vector angular velocity.",
+    "anchorCorrection": "For a partial mask: targetChestCurrent * inverse(targetChestRest) * sourceChestRest * inverse(sourceChestCurrent) * sourceBoneCurrent * inverse(sourceBoneRest) * targetBoneRest. Source rest rotations are identity here.",
+    "headSelectionIssue": "The former visibility screen compared yaw range with pitch range, without a roll exclusion or a temporal-shape/repetition check."
+  },
+  "clips": {
+    "right-wave": {
+      "sourcePath": "Server/ARDY/runtime/unity-preview/right-wave.npz",
+      "sourceAbsolutePath": "E:/VRproject/VR20250611/NeEEvA/Server/ARDY/runtime/unity-preview/right-wave.npz",
+      "sourceSha256": "6c50151257f6e0b82d7c7eb85d0db2444dab21b4ee54e9d2848254bf1dad5816",
+      "sourceText": "While standing in place, a standing person waves the right hand with moderate movements at a moderate pace.",
+      "frameCount": 120,
+      "fps": 20.0,
+      "lastSampleSeconds": 5.95,
+      "clipDurationSeconds": 6.0,
+      "diagnostics": {
+        "rootOriginCharacterAxesMetres": {
+          "minimum": [
+            -0.128543,
+            -0.034638,
+            0.022785
+          ],
+          "maximum": [
+            0.293297,
+            0.782116,
+            0.562574
+          ],
+          "peakToPeak": [
+            0.42184,
+            0.816754,
+            0.539788
+          ],
+          "crossesToLeftFrameCount": 59,
+          "crossesToLeftFrameFraction": 0.49166666666666664
+        },
+        "chestOriginCharacterAxesMetres": {
+          "minimum": [
+            -0.174426,
+            -0.382656,
+            0.104008
+          ],
+          "maximum": [
+            0.30229,
+            0.435752,
+            0.646889
+          ],
+          "peakToPeak": [
+            0.476716,
+            0.818408,
+            0.542881
+          ],
+          "crossesToLeftFrameCount": 63,
+          "crossesToLeftFrameFraction": 0.525
+        },
+        "chestOriginChestAxesMetres": {
+          "minimum": [
+            0.070404,
+            -0.377973,
+            0.133423
+          ],
+          "maximum": [
+            0.309369,
+            0.407239,
+            0.599464
+          ],
+          "peakToPeak": [
+            0.238965,
+            0.785212,
+            0.466041
+          ],
+          "crossesToLeftFrameCount": 0,
+          "crossesToLeftFrameFraction": 0.0
+        },
+        "shoulderOriginChestAxesMetres": {
+          "minimum": [
+            0.038409,
+            -0.550745,
+            0.080099
+          ],
+          "maximum": [
+            0.277374,
+            0.234467,
+            0.54614
+          ],
+          "peakToPeak": [
+            0.238965,
+            0.785212,
+            0.466041
+          ],
+          "crossesToLeftFrameCount": 0,
+          "crossesToLeftFrameFraction": 0.0
+        },
+        "sourceChestGlobalEulerDegrees": {
+          "minimum": [
+            -7.021996,
+            -29.19389,
+            -0.620723
+          ],
+          "maximum": [
+            1.05615,
+            6.792937,
+            5.312557
+          ],
+          "peakToPeak": [
+            8.078145,
+            35.986827,
+            5.93328
+          ]
+        },
+        "samples": [
+          {
+            "timeSeconds": 0.0,
+            "chestOriginCharacterAxesMetres": [
+              0.252654,
+              -0.382656,
+              0.159848
+            ],
+            "chestOriginChestAxesMetres": [
+              0.261196,
+              -0.377973,
+              0.157239
+            ]
+          },
+          {
+            "timeSeconds": 0.5,
+            "chestOriginCharacterAxesMetres": [
+              0.065305,
+              0.056856,
+              0.578445
+            ],
+            "chestOriginChestAxesMetres": [
+              0.183038,
+              0.046543,
+              0.553559
+            ]
+          },
+          {
+            "timeSeconds": 1.0,
+            "chestOriginCharacterAxesMetres": [
+              -0.166727,
+              0.373249,
+              0.4613
+            ],
+            "chestOriginChestAxesMetres": [
+              0.097115,
+              0.328492,
+              0.512418
+            ]
+          },
+          {
+            "timeSeconds": 1.5,
+            "chestOriginCharacterAxesMetres": [
+              -0.160707,
+              0.350336,
+              0.462341
+            ],
+            "chestOriginChestAxesMetres": [
+              0.080587,
+              0.30194,
+              0.514451
+            ]
+          },
+          {
+            "timeSeconds": 2.0,
+            "chestOriginCharacterAxesMetres": [
+              -0.138733,
+              0.356963,
+              0.456804
+            ],
+            "chestOriginChestAxesMetres": [
+              0.085674,
+              0.314041,
+              0.499377
+            ]
+          },
+          {
+            "timeSeconds": 3.0,
+            "chestOriginCharacterAxesMetres": [
+              0.173739,
+              -0.134406,
+              0.414612
+            ],
+            "chestOriginChestAxesMetres": [
+              0.22528,
+              -0.153719,
+              0.381801
+            ]
+          },
+          {
+            "timeSeconds": 4.0,
+            "chestOriginCharacterAxesMetres": [
+              0.277295,
+              -0.362089,
+              0.122812
+            ],
+            "chestOriginChestAxesMetres": [
+              0.27076,
+              -0.359737,
+              0.142697
+            ]
+          },
+          {
+            "timeSeconds": 5.0,
+            "chestOriginCharacterAxesMetres": [
+              -0.000195,
+              0.412371,
+              0.605341
+            ],
+            "chestOriginChestAxesMetres": [
+              0.240858,
+              0.395197,
+              0.56771
+            ]
+          },
+          {
+            "timeSeconds": 5.95,
+            "chestOriginCharacterAxesMetres": [
+              -0.055821,
+              0.4195,
+              0.590375
+            ],
+            "chestOriginChestAxesMetres": [
+              0.223509,
+              0.382579,
+              0.575601
+            ]
+          }
+        ],
+        "neutralTorsoCore27FkPrediction": {
+          "absoluteArmGlobalRotations": {
+            "minimum": [
+              -0.141101,
+              -0.381465,
+              0.10709
+            ],
+            "maximum": [
+              0.296414,
+              0.431972,
+              0.64216
+            ],
+            "peakToPeak": [
+              0.437515,
+              0.813437,
+              0.53507
+            ],
+            "crossesToLeftFrameCount": 58,
+            "crossesToLeftFrameFraction": 0.48333333333333334
+          },
+          "chestAnchoredArmRotations": {
+            "minimum": [
+              0.070404,
+              -0.377973,
+              0.133423
+            ],
+            "maximum": [
+              0.309369,
+              0.407239,
+              0.599464
+            ],
+            "peakToPeak": [
+              0.238965,
+              0.785212,
+              0.466041
+            ],
+            "crossesToLeftFrameCount": 0,
+            "crossesToLeftFrameFraction": 0.0
+          },
+          "anchoredVsSourceChestRelativeMaximumPositionDifferenceMetres": 2.8484729508448936e-07,
+          "assumptions": "Core27 neutral torso and original segment lengths; replace only the four right-arm global rotations; no Unity target geometry, Animator or blending."
+        }
+      }
+    },
+    "nod": {
+      "sourcePath": "Server/ARDY/runtime/unity-head-candidates/nod-seed1.npz",
+      "sourceAbsolutePath": "E:/VRproject/VR20250611/NeEEvA/Server/ARDY/runtime/unity-head-candidates/nod-seed1.npz",
+      "sourceSha256": "b2b273271afb13fdaadb35d2693c0baf2587b717f0b88cc9ce67a04d4e8fd3b7",
+      "sourceText": "A person who is standing nods the head with large movements at a moderate pace.",
+      "frameCount": 120,
+      "fps": 20.0,
+      "lastSampleSeconds": 5.95,
+      "clipDurationSeconds": 6.0,
+      "diagnostics": {
+        "chestRelativeEulerDegrees": {
+          "pitchX": {
+            "minimum": -14.717669,
+            "maximum": 27.978177,
+            "peakToPeak": 42.695846,
+            "startDegrees": -11.708220698769537,
+            "endDegrees": -12.436061686381246,
+            "minimumTimeSeconds": 3.05,
+            "maximumTimeSeconds": 0.55,
+            "maximumSampledComponentRateDegreesPerSecond": 207.3201034645858
+          },
+          "yawY": {
+            "minimum": -13.170754,
+            "maximum": 0.35544,
+            "peakToPeak": 13.526194,
+            "startDegrees": -4.45770384758092,
+            "endDegrees": -1.6497152029317848,
+            "minimumTimeSeconds": 0.55,
+            "maximumTimeSeconds": 4.8,
+            "maximumSampledComponentRateDegreesPerSecond": 49.94125547794486
+          },
+          "rollZ": {
+            "minimum": 0.94284,
+            "maximum": 13.807737,
+            "peakToPeak": 12.864897,
+            "startDegrees": 2.990831432151587,
+            "endDegrees": 5.0088236843580916,
+            "minimumTimeSeconds": 1.0,
+            "maximumTimeSeconds": 0.45,
+            "maximumSampledComponentRateDegreesPerSecond": 42.13498255496955
+          }
+        },
+        "largestPeakToPeakAxis": "pitchX",
+        "chestGlobalEulerDegrees": {
+          "minimum": [
+            2.96179,
+            -2.992999,
+            -2.179839
+          ],
+          "maximum": [
+            7.287214,
+            0.431507,
+            1.183952
+          ],
+          "peakToPeak": [
+            4.325424,
+            3.424506,
+            3.363791
+          ]
+        },
+        "headGlobalAngularSpeed": {
+          "meanDegreesPerSecond": 21.10276110216391,
+          "p95DegreesPerSecond": 122.31623303756828,
+          "maximumDegreesPerSecond": 225.37576033260805,
+          "maximumStepDegrees": 11.268788016630403,
+          "maximumIntervalSeconds": [
+            0.35,
+            0.4
+          ]
+        },
+        "headChestRelativeAngularSpeed": {
+          "meanDegreesPerSecond": 20.007650909146502,
+          "p95DegreesPerSecond": 114.40380564068936,
+          "maximumDegreesPerSecond": 218.6087879724696,
+          "maximumStepDegrees": 10.93043939862348,
+          "maximumIntervalSeconds": [
+            0.35,
+            0.4
+          ]
+        },
+        "headChestRelativeEulerSamples": [
+          {
+            "timeSeconds": 0.0,
+            "pitchYawRollDegrees": [
+              -11.708221,
+              -4.457704,
+              2.990831
+            ]
+          },
+          {
+            "timeSeconds": 0.5,
+            "pitchYawRollDegrees": [
+              26.856461,
+              -12.149126,
+              13.256302
+            ]
+          },
+          {
+            "timeSeconds": 1.0,
+            "pitchYawRollDegrees": [
+              -5.869944,
+              -1.831023,
+              0.94284
+            ]
+          },
+          {
+            "timeSeconds": 1.5,
+            "pitchYawRollDegrees": [
+              -11.420864,
+              -2.062047,
+              3.375759
+            ]
+          },
+          {
+            "timeSeconds": 2.0,
+            "pitchYawRollDegrees": [
+              -12.595208,
+              -2.933943,
+              4.272903
+            ]
+          },
+          {
+            "timeSeconds": 2.5,
+            "pitchYawRollDegrees": [
+              -12.626516,
+              -3.426917,
+              4.384165
+            ]
+          },
+          {
+            "timeSeconds": 3.0,
+            "pitchYawRollDegrees": [
+              -14.65726,
+              -3.669535,
+              4.783826
+            ]
+          },
+          {
+            "timeSeconds": 3.5,
+            "pitchYawRollDegrees": [
+              -12.660092,
+              -2.76275,
+              4.965268
+            ]
+          },
+          {
+            "timeSeconds": 4.0,
+            "pitchYawRollDegrees": [
+              -10.535979,
+              0.009863,
+              3.5075
+            ]
+          },
+          {
+            "timeSeconds": 4.5,
+            "pitchYawRollDegrees": [
+              -10.994903,
+              -0.148158,
+              6.013927
+            ]
+          },
+          {
+            "timeSeconds": 5.0,
+            "pitchYawRollDegrees": [
+              -9.301354,
+              -0.046131,
+              8.950747
+            ]
+          },
+          {
+            "timeSeconds": 5.5,
+            "pitchYawRollDegrees": [
+              -10.804021,
+              -0.358707,
+              5.889302
+            ]
+          },
+          {
+            "timeSeconds": 5.95,
+            "pitchYawRollDegrees": [
+              -12.436062,
+              -1.649715,
+              5.008824
+            ]
+          }
+        ],
+        "timeWindows": [
+          {
+            "startInclusiveSeconds": 0,
+            "endExclusiveSeconds": 1,
+            "eulerDegrees": {
+              "minimum": [
+                -11.708221,
+                -13.170754,
+                1.149364
+              ],
+              "maximum": [
+                27.978177,
+                -1.956058,
+                13.807737
+              ],
+              "peakToPeak": [
+                39.686398,
+                11.214695,
+                12.658373
+              ]
+            }
+          },
+          {
+            "startInclusiveSeconds": 1,
+            "endExclusiveSeconds": 2,
+            "eulerDegrees": {
+              "minimum": [
+                -12.735667,
+                -3.091199,
+                0.94284
+              ],
+              "maximum": [
+                -5.869944,
+                -1.446807,
+                4.547315
+              ],
+              "peakToPeak": [
+                6.865723,
+                1.644392,
+                3.604475
+              ]
+            }
+          },
+          {
+            "startInclusiveSeconds": 2,
+            "endExclusiveSeconds": 6,
+            "eulerDegrees": {
+              "minimum": [
+                -14.717669,
+                -4.090144,
+                3.5075
+              ],
+              "maximum": [
+                -9.293632,
+                0.35544,
+                9.744571
+              ],
+              "peakToPeak": [
+                5.424038,
+                4.445584,
+                6.237071
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "shake-head": {
+      "sourcePath": "Server/ARDY/runtime/unity-head-candidates/shake-head-seed2.npz",
+      "sourceAbsolutePath": "E:/VRproject/VR20250611/NeEEvA/Server/ARDY/runtime/unity-head-candidates/shake-head-seed2.npz",
+      "sourceSha256": "fe8dde13b1bf36e5b7077fdd076d8fd1615771146137809f9306b5017f46ef7e",
+      "sourceText": "While standing in place, a person standing on the floor shakes the head from side to side with large movements at a moderate pace.",
+      "frameCount": 120,
+      "fps": 20.0,
+      "lastSampleSeconds": 5.95,
+      "clipDurationSeconds": 6.0,
+      "diagnostics": {
+        "chestRelativeEulerDegrees": {
+          "pitchX": {
+            "minimum": -0.307499,
+            "maximum": 4.633186,
+            "peakToPeak": 4.940685,
+            "startDegrees": 0.060153053950174395,
+            "endDegrees": 3.6913669392090718,
+            "minimumTimeSeconds": 0.85,
+            "maximumTimeSeconds": 4.15,
+            "maximumSampledComponentRateDegreesPerSecond": 15.667715250637215
+          },
+          "yawY": {
+            "minimum": -8.866428,
+            "maximum": 4.911944,
+            "peakToPeak": 13.778372,
+            "startDegrees": 4.911944306036014,
+            "endDegrees": -8.866427651013886,
+            "minimumTimeSeconds": 5.95,
+            "maximumTimeSeconds": 0.0,
+            "maximumSampledComponentRateDegreesPerSecond": 35.92082576304772
+          },
+          "rollZ": {
+            "minimum": -12.662657,
+            "maximum": 17.92497,
+            "peakToPeak": 30.587627,
+            "startDegrees": -4.1201125886131775,
+            "endDegrees": 17.924970050627714,
+            "minimumTimeSeconds": 5.4,
+            "maximumTimeSeconds": 5.95,
+            "maximumSampledComponentRateDegreesPerSecond": 102.00237729431612
+          }
+        },
+        "largestPeakToPeakAxis": "rollZ",
+        "chestGlobalEulerDegrees": {
+          "minimum": [
+            2.855573,
+            0.974719,
+            1.044628
+          ],
+          "maximum": [
+            5.187577,
+            4.359194,
+            2.991747
+          ],
+          "peakToPeak": [
+            2.332004,
+            3.384476,
+            1.947119
+          ]
+        },
+        "headGlobalAngularSpeed": {
+          "meanDegreesPerSecond": 16.873370499757296,
+          "p95DegreesPerSecond": 74.662144117273,
+          "maximumDegreesPerSecond": 103.05156114610983,
+          "maximumStepDegrees": 5.152578057305492,
+          "maximumIntervalSeconds": [
+            5.65,
+            5.7
+          ]
+        },
+        "headChestRelativeAngularSpeed": {
+          "meanDegreesPerSecond": 17.134112951377915,
+          "p95DegreesPerSecond": 75.43095018822022,
+          "maximumDegreesPerSecond": 108.11991984589008,
+          "maximumStepDegrees": 5.405995992294504,
+          "maximumIntervalSeconds": [
+            5.65,
+            5.7
+          ]
+        },
+        "headChestRelativeEulerSamples": [
+          {
+            "timeSeconds": 0.0,
+            "pitchYawRollDegrees": [
+              0.060153,
+              4.911944,
+              -4.120113
+            ]
+          },
+          {
+            "timeSeconds": 0.5,
+            "pitchYawRollDegrees": [
+              -0.18792,
+              3.921334,
+              -3.953743
+            ]
+          },
+          {
+            "timeSeconds": 1.0,
+            "pitchYawRollDegrees": [
+              -0.038697,
+              4.019108,
+              -4.363079
+            ]
+          },
+          {
+            "timeSeconds": 1.5,
+            "pitchYawRollDegrees": [
+              0.185848,
+              4.531004,
+              -4.620876
+            ]
+          },
+          {
+            "timeSeconds": 2.0,
+            "pitchYawRollDegrees": [
+              0.250756,
+              4.49398,
+              -4.578182
+            ]
+          },
+          {
+            "timeSeconds": 2.5,
+            "pitchYawRollDegrees": [
+              1.563059,
+              3.442922,
+              -4.396425
+            ]
+          },
+          {
+            "timeSeconds": 3.0,
+            "pitchYawRollDegrees": [
+              0.862133,
+              1.822072,
+              -2.535188
+            ]
+          },
+          {
+            "timeSeconds": 3.5,
+            "pitchYawRollDegrees": [
+              2.45619,
+              0.709255,
+              2.372672
+            ]
+          },
+          {
+            "timeSeconds": 4.0,
+            "pitchYawRollDegrees": [
+              2.447694,
+              -5.651044,
+              13.78308
+            ]
+          },
+          {
+            "timeSeconds": 4.5,
+            "pitchYawRollDegrees": [
+              3.246257,
+              1.885037,
+              -7.681825
+            ]
+          },
+          {
+            "timeSeconds": 5.0,
+            "pitchYawRollDegrees": [
+              3.56063,
+              2.325111,
+              -9.388345
+            ]
+          },
+          {
+            "timeSeconds": 5.5,
+            "pitchYawRollDegrees": [
+              3.2065,
+              2.926219,
+              -11.599797
+            ]
+          },
+          {
+            "timeSeconds": 5.95,
+            "pitchYawRollDegrees": [
+              3.691367,
+              -8.866428,
+              17.92497
+            ]
+          }
+        ],
+        "timeWindows": [
+          {
+            "startInclusiveSeconds": 0,
+            "endExclusiveSeconds": 1,
+            "eulerDegrees": {
+              "minimum": [
+                -0.307499,
+                3.507789,
+                -4.293542
+              ],
+              "maximum": [
+                0.182077,
+                4.911944,
+                -3.888953
+              ],
+              "peakToPeak": [
+                0.489576,
+                1.404155,
+                0.404589
+              ]
+            }
+          },
+          {
+            "startInclusiveSeconds": 1,
+            "endExclusiveSeconds": 2,
+            "eulerDegrees": {
+              "minimum": [
+                -0.145698,
+                4.019108,
+                -4.672009
+              ],
+              "maximum": [
+                0.257748,
+                4.685953,
+                -4.360176
+              ],
+              "peakToPeak": [
+                0.403446,
+                0.666845,
+                0.311834
+              ]
+            }
+          },
+          {
+            "startInclusiveSeconds": 2,
+            "endExclusiveSeconds": 6,
+            "eulerDegrees": {
+              "minimum": [
+                0.250756,
+                -8.866428,
+                -12.662657
+              ],
+              "maximum": [
+                4.633186,
+                4.49398,
+                17.92497
+              ],
+              "peakToPeak": [
+                4.38243,
+                13.360407,
+                30.587627
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "limitations": [
+    "The nod and shake-head sources are the rejected raw ARDY candidates, not the newer explicitly controlled conversational envelopes.",
+    "Cross-centre counts and angular ranges do not establish naturalness, semantic success, face clearance or comfort.",
+    "The FK prediction uses Core27 geometry only. Unity retargeting, target proportions, Animator timing and fades require separate validation.",
+    "No original NPZ or generation report is modified; no model generation or GPU work is performed."
+  ]
+}

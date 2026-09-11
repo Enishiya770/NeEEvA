@@ -1,0 +1,952 @@
+{
+  "schema": 1,
+  "sourceReport": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\semantic-motion-planning-v1.json",
+  "sourceReportSha256": "aea87ad2e1edde59b4df249e82c0d2d4c0ffdd3b67a5129a7564adcf0f3e9006",
+  "policyTiming": "Post-development diagnostic audit; requirements added transparently after v1, not a frozen unseen evaluation.",
+  "sourceRequirements": {
+    "en-head-gentle-twice": [
+      [
+        "joint"
+      ],
+      [
+        "axis"
+      ],
+      [
+        "tempo"
+      ],
+      [
+        "size"
+      ],
+      [
+        "repeat",
+        "cycles"
+      ]
+    ],
+    "zh-forward-greeting": [
+      [
+        "left"
+      ],
+      [
+        "right"
+      ]
+    ],
+    "ja-side-display": [
+      [
+        "left"
+      ],
+      [
+        "leftPalm"
+      ],
+      [
+        "mode"
+      ]
+    ],
+    "en-straight-down-hold": [
+      [
+        "left"
+      ],
+      [
+        "right"
+      ],
+      [
+        "leftPalm"
+      ],
+      [
+        "rightPalm"
+      ],
+      [
+        "leftBend"
+      ],
+      [
+        "rightBend"
+      ],
+      [
+        "mode"
+      ]
+    ],
+    "zh-retime-inherited-pose": [
+      [
+        "left"
+      ],
+      [
+        "right"
+      ],
+      [
+        "leftPalm"
+      ],
+      [
+        "rightPalm"
+      ],
+      [
+        "joint"
+      ],
+      [
+        "tempo"
+      ],
+      [
+        "repeat",
+        "cycles"
+      ]
+    ],
+    "en-change-numeric-count": [
+      [
+        "right"
+      ],
+      [
+        "rightPalm"
+      ],
+      [
+        "repeat",
+        "cycles"
+      ]
+    ],
+    "ja-resize-numeric-constraint": [
+      [
+        "right"
+      ],
+      [
+        "rightPalm"
+      ],
+      [
+        "size"
+      ]
+    ],
+    "zh-measured-current-other-arm": [
+      [
+        "left"
+      ],
+      [
+        "right"
+      ],
+      [
+        "mode"
+      ]
+    ],
+    "en-static-both-palms": [
+      [
+        "left"
+      ],
+      [
+        "right"
+      ],
+      [
+        "leftPalm"
+      ],
+      [
+        "rightPalm"
+      ],
+      [
+        "mode"
+      ]
+    ],
+    "zh-down-palm-farewell": [
+      [
+        "left"
+      ],
+      [
+        "right"
+      ],
+      [
+        "leftPalm"
+      ],
+      [
+        "rightPalm"
+      ],
+      [
+        "joint"
+      ],
+      [
+        "size"
+      ]
+    ],
+    "en-deliberate-head-disagree": [
+      [
+        "joint"
+      ],
+      [
+        "axis"
+      ],
+      [
+        "tempo"
+      ],
+      [
+        "size"
+      ],
+      [
+        "repeat",
+        "cycles"
+      ]
+    ],
+    "zh-exact-duration": [
+      [
+        "right"
+      ],
+      [
+        "rightPalm"
+      ],
+      [
+        "joint"
+      ],
+      [
+        "seconds"
+      ]
+    ],
+    "ja-replace-goal-with-evidence": [
+      [
+        "left"
+      ],
+      [
+        "right"
+      ],
+      [
+        "mode"
+      ]
+    ],
+    "en-palm-goal-no-angle-invention": [
+      [
+        "right"
+      ],
+      [
+        "rightPalm"
+      ]
+    ]
+  },
+  "results": [
+    {
+      "caseId": "zh-basic-right",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "basic_name_with_plan_attributes",
+      "sourceAuditApplicable": false,
+      "requiredConstraintCoverage": [],
+      "sourceAuditPassed": null,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "ja-basic-nod",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "basic_name_with_plan_attributes",
+      "sourceAuditApplicable": false,
+      "requiredConstraintCoverage": [],
+      "sourceAuditPassed": null,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "en-head-gentle-twice",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "no_action_tag",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "joint"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "axis"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "tempo"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "size"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "repeat",
+            "cycles"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "zh-free-dance",
+      "frozenPlanningChecksPassed": true,
+      "outputCategory": "compiled_plan",
+      "sourceAuditApplicable": false,
+      "requiredConstraintCoverage": [],
+      "sourceAuditPassed": null,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "zh-forward-greeting",
+      "frozenPlanningChecksPassed": true,
+      "outputCategory": "compiled_plan",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "left"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": {
+        "actual": "gentle",
+        "permittedForThisNaturalGreeting": [
+          "natural",
+          "brisk"
+        ],
+        "passed": false,
+        "reason": "Natural interaction did not ask for deliberate slow motion; gentle preserves the reported slow-wave issue."
+      },
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "ja-side-display",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "malformed_xml",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "left"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "leftPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "mode"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "en-straight-down-hold",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "no_action_tag",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "left"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "leftPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "rightPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "leftBend"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "rightBend"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "mode"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "zh-retime-inherited-pose",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "json_instead_of_xml",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "left"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "leftPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "rightPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "joint"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "tempo"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "repeat",
+            "cycles"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "en-change-numeric-count",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "ledger_or_compiler_rejected",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": [
+            "right"
+          ]
+        },
+        {
+          "oneOfFields": [
+            "rightPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": [
+            "rightPalm"
+          ]
+        },
+        {
+          "oneOfFields": [
+            "repeat",
+            "cycles"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": [
+            "cycles"
+          ]
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "ja-resize-numeric-constraint",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "malformed_xml",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "rightPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "size"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "zh-measured-current-other-arm",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "plan_metadata_or_shape_rejected",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "left"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "mode"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "en-static-both-palms",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "plan_metadata_or_shape_rejected",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "left"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "leftPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "rightPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "mode"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "zh-down-palm-farewell",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "function_instead_of_xml",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "left"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "leftPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "rightPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "joint"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "size"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "ja-free-explanation",
+      "frozenPlanningChecksPassed": true,
+      "outputCategory": "compiled_plan",
+      "sourceAuditApplicable": false,
+      "requiredConstraintCoverage": [],
+      "sourceAuditPassed": null,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "en-no-motion-arithmetic",
+      "frozenPlanningChecksPassed": true,
+      "outputCategory": "no_action_tag",
+      "sourceAuditApplicable": false,
+      "requiredConstraintCoverage": [],
+      "sourceAuditPassed": null,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "zh-real-contact-boundary",
+      "frozenPlanningChecksPassed": true,
+      "outputCategory": "no_action_tag",
+      "sourceAuditApplicable": false,
+      "requiredConstraintCoverage": [],
+      "sourceAuditPassed": null,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "en-deliberate-head-disagree",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "basic_name_with_plan_attributes",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "joint"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "axis"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "tempo"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "size"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "repeat",
+            "cycles"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": {
+        "kind": "gentle_head_three_cycles_exceeds_six_seconds",
+        "preferredSeconds": 6.666666666666666,
+        "maximumSeconds": 6,
+        "requiredTreatment": "Explain or report timing refusal; never silently accelerate, reduce count or claim success."
+      },
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "zh-exact-duration",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "json_instead_of_xml",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "rightPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "joint"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "seconds"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "ja-replace-goal-with-evidence",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "malformed_xml",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "left"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "mode"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    },
+    {
+      "caseId": "en-palm-goal-no-angle-invention",
+      "frozenPlanningChecksPassed": false,
+      "outputCategory": "no_action_tag",
+      "sourceAuditApplicable": true,
+      "requiredConstraintCoverage": [
+        {
+          "oneOfFields": [
+            "right"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        },
+        {
+          "oneOfFields": [
+            "rightPalm"
+          ],
+          "status": "missing_or_unverified",
+          "presentLocks": []
+        }
+      ],
+      "sourceAuditPassed": false,
+      "numericSources": [],
+      "tempoAudit": null,
+      "equivalentRepresentationNotes": [],
+      "capabilityConflict": null,
+      "motionSuccess": null,
+      "interpretation": "A matched pose without sourced locks does not establish cross-turn constraint retention. Valid quotes verify provenance text, not semantic entailment."
+    }
+  ],
+  "outputCategories": {
+    "basic_name_with_plan_attributes": 3,
+    "no_action_tag": 5,
+    "compiled_plan": 3,
+    "malformed_xml": 3,
+    "json_instead_of_xml": 2,
+    "ledger_or_compiler_rejected": 1,
+    "plan_metadata_or_shape_rejected": 2,
+    "function_instead_of_xml": 1
+  },
+  "sourceAuditsPassed": 0,
+  "sourceAuditsApplicable": 14,
+  "limits": "Frozen geometry checks are retained verbatim. Source coverage and tempo are separate. Equivalent sourced count representations and the impossible gentle-three-head-cycle target are disclosed separately. No new model request or motion execution."
+}

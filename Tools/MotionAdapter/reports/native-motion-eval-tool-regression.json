@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "recordedUtc": "2026-09-10T05:34:27.038255+00:00",
+  "scope": "Evaluator CPU fixture and compile verification only; no held-out trajectories generated.",
+  "unittest": {
+    "command": "python -m unittest Server.ARDY.test_native_motion_eval -v",
+    "status": "passed",
+    "testCount": 9
+  },
+  "pyCompile": "passed",
+  "sourceSha256": {
+    "Server/ARDY/evaluate_native_motion.py": "9a846e11bbaccf83267d63235d958bfacb69e69049f673c0cebf71ab662f4daf",
+    "Server/ARDY/native_motion_measurements.py": "b953229ea92054b108774c3e7efd7ab4d56d44defaddf17fef1fb78adbb59b9d",
+    "Server/ARDY/test_native_motion_eval.py": "c28ced21dfb4e2c24d4b64b7ca4aa74e1e49a9df8fbe7c0388eb1beb1cb21fe1"
+  },
+  "frozenTestDatasetSha256": "bad7ec319c961c077b8ab92eb39eb8482e847c2ff67d6c39e5a8434b3e197889",
+  "frozenTestMotionGenerationPerformed": false,
+  "servicesStarted": false,
+  "gpuUsed": false,
+  "labelOwnerReview": "dialogue_motion_hook read-only review confirmed frozen metric semantics, simultaneous bilateral condition, unknown semantic pass, and boundary exclusion."
+}

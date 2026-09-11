@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "status": "complete",
+  "planSha256": "fb1677b5fe2a9d8287b6e3f791598109dfb24a9b8a72c77742f7ab6472d931f1",
+  "datasetSha256": "bad7ec319c961c077b8ab92eb39eb8482e847c2ff67d6c39e5a8434b3e197889",
+  "output": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generalization-final-supported-v1",
+  "policy": "One frozen final-test audit. This marker is not silently replaced after inspecting results.",
+  "completedTrajectories": 384,
+  "report": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generalization-final-supported-v1\\report.json"
+}

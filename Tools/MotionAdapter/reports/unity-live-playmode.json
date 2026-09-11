@@ -1,0 +1,82 @@
+{
+  "status": "passed",
+  "method": "Real Unity PlayMode, real Animator, live HTTP Qwen feature + MLP + ARDY, real UnityWebRequest and motion controller. No manual Tick or Animator.Update.",
+  "limitation": "Isolated real NEVA avatar with original Animator; no private scene, live microphone, TTS or subjective naturalness rating. Dialogue parsing has its separate real ChatSample regression.",
+  "unityVersion": "2022.3.22f1",
+  "error": "",
+  "description": "While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.",
+  "checks": 50157,
+  "sampledFrames": 35478,
+  "receivedChunks": 3,
+  "timelineFrames": 120,
+  "firstWindowSeconds": 1.3737115859985352,
+  "allWindowsSeconds": 1.7512266635894775,
+  "finalReturnErrorDegrees": 0.0,
+  "cancelledReturnErrorDegrees": 0.0,
+  "initialWristBelowShoulderMetres": 0.37033623456954956,
+  "dynamicUpperBodyExcursionDegrees": 23.139751434326172,
+  "historyCapturedFromAnimator": true,
+  "lateResponseRejected": true,
+  "preResponseCancelStayedIdle": true,
+  "diagnosticTracePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\ardy-live\\ardy-motion-20260910T050049882-0969cabee5c34238b80c8da490d46bcb.json",
+  "diagnosticRequests": 3,
+  "diagnosticResponses": 3,
+  "initialHistoryFrames": 16,
+  "lastWindowTimings": {
+    "queueMs": 0.0,
+    "featureMs": 0.0,
+    "generationMs": 158.40769958496094,
+    "totalMs": 172.0
+  },
+  "originalReportPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\ardy-live-playmode.json",
+  "originalReportSha256": "993d49b28002c339a421ff24df53be9254490d7d37645165280bfdf02aec914c",
+  "execution": {
+    "pid": 56820,
+    "exitCode": 0,
+    "logPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\live-grounded-history-regression.log"
+  },
+  "cancelReasonChecks": {
+    "beforeFirstResponse": true,
+    "whilePlaying": true,
+    "activeMotionFactsEmptyAfterBothCancellations": "Asserted by passing real Unity regression",
+    "archivedTraces": [
+      {
+        "originalPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\ardy-live\\ardy-motion-20260910T050049882-0969cabee5c34238b80c8da490d46bcb.json",
+        "archivePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Logs\\ardy-native-diagnostics\\live-grounded\\ardy-motion-20260910T050049882-0969cabee5c34238b80c8da490d46bcb.json",
+        "sha256": "0abc91a219a5608ef6a615c10ef51e3acfae63cb3ae4b3c7746bd5bdfced4898",
+        "finishReason": "completed",
+        "requestCount": 3,
+        "responseCount": 3,
+        "responseFrames": [
+          40,
+          40,
+          40
+        ],
+        "firstRequestHistoryFrames": 16
+      },
+      {
+        "originalPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\ardy-live\\ardy-motion-20260910T050057584-bcb3c37bb1a84c95bdf4cefc06ad4782.json",
+        "archivePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Logs\\ardy-native-diagnostics\\live-grounded\\ardy-motion-20260910T050057584-bcb3c37bb1a84c95bdf4cefc06ad4782.json",
+        "sha256": "edf2411dd375d91c10fc11a8c1dbead1397810f4195babc9d47fa37a880c39e6",
+        "finishReason": "regression-before-first-response",
+        "requestCount": 1,
+        "responseCount": 0,
+        "responseFrames": [],
+        "firstRequestHistoryFrames": 16
+      },
+      {
+        "originalPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\ardy-live\\ardy-motion-20260910T050058602-c01d48a0fc034df3921621798f5f987b.json",
+        "archivePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Logs\\ardy-native-diagnostics\\live-grounded\\ardy-motion-20260910T050058602-c01d48a0fc034df3921621798f5f987b.json",
+        "sha256": "43cbf0579ec6a3d25984056d2e070757e3400743695183c90cc520540f8119c2",
+        "finishReason": "regression-interrupt-playing",
+        "requestCount": 2,
+        "responseCount": 1,
+        "responseFrames": [
+          40
+        ],
+        "firstRequestHistoryFrames": 16
+      }
+    ]
+  },
+  "supersedesHistoricalReport": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\unity-live-playmode-before-height-fix.json"
+}

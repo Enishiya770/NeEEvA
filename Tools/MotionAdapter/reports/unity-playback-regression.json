@@ -1,0 +1,46 @@
+{
+    "status": "passed",
+    "checks": 1762152,
+    "limitation": "Edit-mode playback on real imported VRM prefabs with a fixed idle baseline; this does not measure chat/Animator/VRM late-update concurrency or live ARDY streaming.",
+    "avatars": [
+        {
+            "asset": "Assets/Model/NEVA.vrm",
+            "boundBones": 13,
+            "leftWristRiseMetres": 0.5989879369735718,
+            "rightWristRiseMetres": 0.5989879369735718,
+            "nodExcursionDegrees": 7.999857425689697,
+            "shakeExcursionDegrees": 5.999922752380371,
+            "rootYawErrorDegrees": 0.0,
+            "previews": [
+                "NEVA-idle.png",
+                "NEVA-left-wave-030.png",
+                "NEVA-left-wave-080.png",
+                "NEVA-left-wave-140.png",
+                "NEVA-right-wave.png",
+                "NEVA-stopped.png",
+                "NEVA-nod.png",
+                "NEVA-shake-head.png"
+            ]
+        },
+        {
+            "asset": "Assets/Model/NeEEvA.vrm",
+            "boundBones": 13,
+            "leftWristRiseMetres": 0.5989880561828613,
+            "rightWristRiseMetres": 0.5989880561828613,
+            "nodExcursionDegrees": 7.999857425689697,
+            "shakeExcursionDegrees": 5.999922752380371,
+            "rootYawErrorDegrees": 0.0,
+            "previews": [
+                "NeEEvA-idle.png",
+                "NeEEvA-left-wave-030.png",
+                "NeEEvA-left-wave-080.png",
+                "NeEEvA-left-wave-140.png",
+                "NeEEvA-right-wave.png",
+                "NeEEvA-stopped.png",
+                "NeEEvA-nod.png",
+                "NeEEvA-shake-head.png"
+            ]
+        }
+    ],
+    "sceneComponents": []
+}

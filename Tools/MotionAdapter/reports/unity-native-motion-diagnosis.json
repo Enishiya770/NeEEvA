@@ -1,0 +1,274 @@
+{
+  "checkedAtUtc": "2026-09-10T04:57:57.374463+00:00",
+  "environment": "Actual isolated Unity 2022.3.22f1; actual NEVA.vrm, observed Playmode Animator capture and per-frame SkinnedMeshRenderer.BakeMesh",
+  "capture": {
+    "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\animator-idle-pose.json",
+    "sha256": "104a3bebcca6ffb66c51a78ff47ac93357c4aca892c17dd2250e6a5d06dd69d8",
+    "currentClips": [
+      "hugshoulder_00"
+    ],
+    "observedFrames": 16,
+    "leftWristBelowShoulderMeters": 0.3722461462020874,
+    "rightWristBelowShoulderMeters": 0.38573604822158813,
+    "finding": "Actual input is hugshoulder_00 idle with lowered arms, not a T-pose."
+  },
+  "renderManifestPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1\\render-manifest.json",
+  "renderManifestSha256": "c5aec7cc9c63ab85636144a3d9d806bd2b636324c2e50e246f4ad8d24d035078",
+  "playerSourceSha256": "444b9d8fb00ed8055e2a82c6bdc5344544642182783c4dfdbb4f7abae0049654",
+  "heightComparison": "Same Qwen condition, seed 1, actual captured history and original Player mapping; only backend source standing pelvis height corrected instead of world height zero.",
+  "clips": [
+    {
+      "id": "both-arms-overhead-unity-idle16-seed1",
+      "mapping": "current-root-global",
+      "inputPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-motion-diagnosis\\both-arms-overhead-unity-idle16-seed1.json",
+      "inputSha256": "724335cc7c90d50bafc74749d3a7c95d34d7da433012fb274ac6d7def234eafa",
+      "sourceUnchanged": true,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1\\both-arms-overhead-unity-idle16-seed1-current-root-global",
+      "renderedFrames": 130,
+      "pngCount": 130,
+      "maxTorsoTiltDegrees": 48.014896392822266,
+      "maxHeadTiltDegrees": 37.1787223815918,
+      "bothWristsAboveHeadFramesDuringMotion": 0,
+      "bothWristsAboveShoulderFramesDuringMotion": 0,
+      "maxLeftWristAboveHeadMeters": -0.2698286175727844,
+      "maxRightWristAboveHeadMeters": -0.3379629850387573
+    },
+    {
+      "id": "both-arms-overhead-unity-idle16-seed1",
+      "mapping": "hips-anchor-candidate",
+      "inputPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-motion-diagnosis\\both-arms-overhead-unity-idle16-seed1.json",
+      "inputSha256": "724335cc7c90d50bafc74749d3a7c95d34d7da433012fb274ac6d7def234eafa",
+      "sourceUnchanged": true,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1\\both-arms-overhead-unity-idle16-seed1-hips-anchor-candidate",
+      "renderedFrames": 130,
+      "pngCount": 130,
+      "maxTorsoTiltDegrees": 38.263179779052734,
+      "maxHeadTiltDegrees": 34.19840621948242,
+      "bothWristsAboveHeadFramesDuringMotion": 0,
+      "bothWristsAboveShoulderFramesDuringMotion": 0,
+      "maxLeftWristAboveHeadMeters": -0.36227238178253174,
+      "maxRightWristAboveHeadMeters": -0.3474426865577698
+    },
+    {
+      "id": "both-arms-overhead-unity-idle16-grounded-seed1",
+      "mapping": "current-root-global",
+      "inputPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-unity-idle16-grounded-seed1.json",
+      "inputSha256": "3e88e1d0a1604dcd274d5ce406eb456413823033a66a99cde5f23e86d9a5457b",
+      "sourceUnchanged": true,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1\\both-arms-overhead-unity-idle16-grounded-seed1-current-root-global",
+      "renderedFrames": 130,
+      "pngCount": 130,
+      "maxTorsoTiltDegrees": 3.031315565109253,
+      "maxHeadTiltDegrees": 12.018868446350098,
+      "bothWristsAboveHeadFramesDuringMotion": 0,
+      "bothWristsAboveShoulderFramesDuringMotion": 0,
+      "maxLeftWristAboveHeadMeters": -0.4805845022201538,
+      "maxRightWristAboveHeadMeters": 0.15689098834991455
+    },
+    {
+      "id": "both-arms-overhead-unity-idle16-grounded-seed1",
+      "mapping": "hips-anchor-candidate",
+      "inputPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-unity-idle16-grounded-seed1.json",
+      "inputSha256": "3e88e1d0a1604dcd274d5ce406eb456413823033a66a99cde5f23e86d9a5457b",
+      "sourceUnchanged": true,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1\\both-arms-overhead-unity-idle16-grounded-seed1-hips-anchor-candidate",
+      "renderedFrames": 130,
+      "pngCount": 130,
+      "maxTorsoTiltDegrees": 3.8180317878723145,
+      "maxHeadTiltDegrees": 11.523810386657715,
+      "bothWristsAboveHeadFramesDuringMotion": 0,
+      "bothWristsAboveShoulderFramesDuringMotion": 0,
+      "maxLeftWristAboveHeadMeters": -0.4805845022201538,
+      "maxRightWristAboveHeadMeters": 0.16118991374969482
+    },
+    {
+      "id": "explanatory-palms-up-unity-idle16-seed1",
+      "mapping": "current-root-global",
+      "inputPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-motion-diagnosis\\explanatory-palms-up-unity-idle16-seed1.json",
+      "inputSha256": "d60cf62a73cfd962e8f9b07038d07457f61dd8d3f12a3a10c005e590ba7e9595",
+      "sourceUnchanged": true,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1\\explanatory-palms-up-unity-idle16-seed1-current-root-global",
+      "renderedFrames": 130,
+      "pngCount": 130,
+      "maxTorsoTiltDegrees": 15.986181259155273,
+      "maxHeadTiltDegrees": 18.985681533813477,
+      "bothWristsAboveHeadFramesDuringMotion": 0,
+      "bothWristsAboveShoulderFramesDuringMotion": 0,
+      "maxLeftWristAboveHeadMeters": -0.43033069372177124,
+      "maxRightWristAboveHeadMeters": -0.43287038803100586
+    },
+    {
+      "id": "explanatory-palms-up-unity-idle16-seed1",
+      "mapping": "hips-anchor-candidate",
+      "inputPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-motion-diagnosis\\explanatory-palms-up-unity-idle16-seed1.json",
+      "inputSha256": "d60cf62a73cfd962e8f9b07038d07457f61dd8d3f12a3a10c005e590ba7e9595",
+      "sourceUnchanged": true,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1\\explanatory-palms-up-unity-idle16-seed1-hips-anchor-candidate",
+      "renderedFrames": 130,
+      "pngCount": 130,
+      "maxTorsoTiltDegrees": 29.283279418945312,
+      "maxHeadTiltDegrees": 26.71241569519043,
+      "bothWristsAboveHeadFramesDuringMotion": 0,
+      "bothWristsAboveShoulderFramesDuringMotion": 0,
+      "maxLeftWristAboveHeadMeters": -0.43865710496902466,
+      "maxRightWristAboveHeadMeters": -0.44365912675857544
+    },
+    {
+      "id": "explanatory-palms-up-unity-idle16-grounded-seed1",
+      "mapping": "current-root-global",
+      "inputPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\explanatory-palms-up-unity-idle16-grounded-seed1.json",
+      "inputSha256": "18c27e54af91f7c2fb5ea36ad4dd12b6c6c0ff151dc64079a2a4238e3f8fcee6",
+      "sourceUnchanged": true,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1\\explanatory-palms-up-unity-idle16-grounded-seed1-current-root-global",
+      "renderedFrames": 130,
+      "pngCount": 130,
+      "maxTorsoTiltDegrees": 2.119141101837158,
+      "maxHeadTiltDegrees": 8.843935012817383,
+      "bothWristsAboveHeadFramesDuringMotion": 0,
+      "bothWristsAboveShoulderFramesDuringMotion": 0,
+      "maxLeftWristAboveHeadMeters": -0.4805845022201538,
+      "maxRightWristAboveHeadMeters": -0.4968462586402893
+    },
+    {
+      "id": "explanatory-palms-up-unity-idle16-grounded-seed1",
+      "mapping": "hips-anchor-candidate",
+      "inputPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\explanatory-palms-up-unity-idle16-grounded-seed1.json",
+      "inputSha256": "18c27e54af91f7c2fb5ea36ad4dd12b6c6c0ff151dc64079a2a4238e3f8fcee6",
+      "sourceUnchanged": true,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1\\explanatory-palms-up-unity-idle16-grounded-seed1-hips-anchor-candidate",
+      "renderedFrames": 130,
+      "pngCount": 130,
+      "maxTorsoTiltDegrees": 2.954129457473755,
+      "maxHeadTiltDegrees": 8.05656623840332,
+      "bothWristsAboveHeadFramesDuringMotion": 0,
+      "bothWristsAboveShoulderFramesDuringMotion": 0,
+      "maxLeftWristAboveHeadMeters": -0.4805845022201538,
+      "maxRightWristAboveHeadMeters": -0.4968462586402893
+    }
+  ],
+  "conclusions": [
+    "Correcting projected history world pelvis height removes most visible torso tilt in both tested actions.",
+    "Both-wrists-over-head rate is still zero for these clips; pose stability does not establish requested both-arm semantics.",
+    "Hips-relative candidate has no consistent visual or metric benefit after height correction; it is rejected as the default fix. Production Player and four accepted basic gesture clips remain unchanged."
+  ],
+  "limits": [
+    "One real avatar and a frozen observed Animator pose for matched rendering; final Animator-interaction Playmode is separate.",
+    "Only two exact prompts and seed 1 in the primary visual comparison; not a general arbitrary-motion validation.",
+    "Wrist heights and torso angle are geometric diagnostics; no claim of mesh collision clearance, finger orientation or subjective naturalness from scalar metrics.",
+    "Raw source global motion was not replaced by procedural gestures; the Hips candidate is a diagnostic mapping transform only."
+  ],
+  "executions": [
+    {
+      "phase": "Actual Animator capture",
+      "pid": 26880,
+      "exitCode": 0,
+      "logPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\native-animator-history.log"
+    },
+    {
+      "phase": "Primary height seed1 original/candidate render",
+      "pid": 42424,
+      "exitCode": 0,
+      "logPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\native-height-seed1-render.log"
+    },
+    {
+      "phase": "Updated real Dialogue lifecycle regression",
+      "pid": 26164,
+      "exitCode": 0,
+      "checks": 167,
+      "reportPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\dialogue-motion-regression.json",
+      "logPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\dialogue-lifetime-regression.log"
+    },
+    {
+      "phase": "Two native clips with fixed portrait camera and per-frame human pose",
+      "pid": 17276,
+      "exitCode": 0,
+      "logPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\native-height-seed1-portrait.log"
+    }
+  ],
+  "acceptedBasicClips": [
+    {
+      "name": "left-wave",
+      "sha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d",
+      "unchanged": true
+    },
+    {
+      "name": "right-wave",
+      "sha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+      "unchanged": true
+    },
+    {
+      "name": "nod",
+      "sha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+      "unchanged": true
+    },
+    {
+      "name": "shake-head",
+      "sha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+      "unchanged": true
+    }
+  ],
+  "currentPlayerMatchesRenderedPlayer": true,
+  "portraitRender": {
+    "manifestPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1-portrait\\render-manifest.json",
+    "manifestSha256": "750ad2b1a5319780e6e89495f777c72d85c3d3ef1e36bb7f5ef3707de26a5615",
+    "gifPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Logs\\ardy-native-diagnostics\\overhead-height-fix-seed1.gif",
+    "gifSha256": "4e91a4e3f744d1a1a0bf261e47aac5bf854453538e434c421ff5c47c1c791d38",
+    "stillAt5_8secondsPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Logs\\ardy-native-diagnostics\\overhead-height-fix-seed1.png",
+    "cameraCenter": {
+      "x": 0.10696080327033997,
+      "y": 1.1919982433319092,
+      "z": 0.22374407947063446
+    },
+    "cameraOrthographicSize": 0.5199090838432312,
+    "poseImageChecks": [
+      {
+        "id": "both-arms-overhead-unity-idle16-seed1",
+        "posesCount": 130,
+        "allPoseImageIdentitiesMatch": true,
+        "savedPoseWristMetricsMatchMeasuredSamples": true,
+        "poseImageSha256Index": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1-portrait\\both-arms-overhead-unity-idle16-seed1-current-root-global\\pose-image-sha256.json"
+      },
+      {
+        "id": "both-arms-overhead-unity-idle16-grounded-seed1",
+        "posesCount": 130,
+        "allPoseImageIdentitiesMatch": true,
+        "savedPoseWristMetricsMatchMeasuredSamples": true,
+        "poseImageSha256Index": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generate-diagnostics\\native-render-height-seed1-portrait\\both-arms-overhead-unity-idle16-grounded-seed1-current-root-global\\pose-image-sha256.json"
+      }
+    ],
+    "clips": [
+      {
+        "id": "both-arms-overhead-unity-idle16-seed1",
+        "mapping": "current-root-global",
+        "inputPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-motion-diagnosis\\both-arms-overhead-unity-idle16-seed1.json",
+        "inputSha256": "724335cc7c90d50bafc74749d3a7c95d34d7da433012fb274ac6d7def234eafa",
+        "sourceUnchanged": true,
+        "framesDirectory": "E:/VRproject/VR20250611/NeEEvA/Server/ARDY/runtime/generate-diagnostics/native-render-height-seed1-portrait\\both-arms-overhead-unity-idle16-seed1-current-root-global",
+        "renderedFrames": 130,
+        "pngCount": 130,
+        "maxTorsoTiltDegrees": 48.014896392822266,
+        "maxHeadTiltDegrees": 37.1787223815918,
+        "bothWristsAboveHeadFramesDuringMotion": 0,
+        "bothWristsAboveShoulderFramesDuringMotion": 0,
+        "maxLeftWristAboveHeadMeters": -0.2698286175727844,
+        "maxRightWristAboveHeadMeters": -0.3379629850387573
+      },
+      {
+        "id": "both-arms-overhead-unity-idle16-grounded-seed1",
+        "mapping": "current-root-global",
+        "inputPath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-unity-idle16-grounded-seed1.json",
+        "inputSha256": "3e88e1d0a1604dcd274d5ce406eb456413823033a66a99cde5f23e86d9a5457b",
+        "sourceUnchanged": true,
+        "framesDirectory": "E:/VRproject/VR20250611/NeEEvA/Server/ARDY/runtime/generate-diagnostics/native-render-height-seed1-portrait\\both-arms-overhead-unity-idle16-grounded-seed1-current-root-global",
+        "renderedFrames": 130,
+        "pngCount": 130,
+        "maxTorsoTiltDegrees": 3.031315565109253,
+        "maxHeadTiltDegrees": 12.018868446350098,
+        "bothWristsAboveHeadFramesDuringMotion": 0,
+        "bothWristsAboveShoulderFramesDuringMotion": 0,
+        "maxLeftWristAboveHeadMeters": -0.4805845022201538,
+        "maxRightWristAboveHeadMeters": 0.15689098834991455
+      }
+    ]
+  }
+}

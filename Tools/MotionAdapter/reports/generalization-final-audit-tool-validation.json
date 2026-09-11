@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "checkedAtUtc": "2026-09-10T05:51:15.389801+00:00",
+  "tests": 8,
+  "execution_exit_code": 0,
+  "command": "python -B -m unittest Tools.MotionAdapter.test_audit_generalization -v",
+  "scope": "Synthetic CPU arithmetic/selection/native-val/one-use marker tests and static frozen-80 manifest check only. No real final-test prediction, model load, training, GPU, ARDY, Unity, network or service call.",
+  "real_final_test_predictions": false,
+  "audit_marker_created": false,
+  "source_sha256": {
+    "audit_generalization.py": "5f7f63b3419a51df7282fb425bc16ee3664310a74f1928fd4d3b067bbe2bc070",
+    "test_audit_generalization.py": "98e8d614923d59299a163c82ec3143b34d6651a47ac6ed7113a5c5a135480b9d"
+  },
+  "frozen_suite_sha256": "bad7ec319c961c077b8ab92eb39eb8482e847c2ff67d6c39e5a8434b3e197889"
+}

@@ -1,0 +1,57 @@
+{
+  "status": "passed",
+  "endpoint": "http://127.0.0.1:18082",
+  "contractSource": "DialogueMotionIntent.cs constants",
+  "method": "Real Qwen chat completion with the production motion output contract and synthetic user requests; XML shape/selected intent check.",
+  "limitation": "No private role prompt, microphone or TTS; executable-channel and streaming isolation tested separately in Unity.",
+  "cases": [
+    {
+      "user": "请用你自己的左手向我挥一下手。",
+      "expected": "left-wave",
+      "selected": "left-wave",
+      "response": "你好呀！\n\n<motion name=\"left-wave\"/>",
+      "elapsedSeconds": 0.4400465000071563,
+      "passed": true
+    },
+    {
+      "user": "请用你自己的右手向我挥一下手。",
+      "expected": "right-wave",
+      "selected": "right-wave",
+      "response": "你好呀！<motion name=\"right-wave\"/>",
+      "elapsedSeconds": 0.20783609998761676,
+      "passed": true
+    },
+    {
+      "user": "请轻轻点一次头。",
+      "expected": "nod",
+      "selected": "nod",
+      "response": "好的，明白了。\n\n<motion name=\"nod\"/>",
+      "elapsedSeconds": 0.2375709000043571,
+      "passed": true
+    },
+    {
+      "user": "请轻轻摇一次头。",
+      "expected": "shake-head",
+      "selected": "shake-head",
+      "response": "<motion name=\"shake-head\"/>",
+      "elapsedSeconds": 0.1771260999958031,
+      "passed": true
+    },
+    {
+      "user": "请站在原地，把两只前臂向前稍微摊开、掌心向上，做一个解释事情的上身动作。",
+      "expected": "generate",
+      "selected": "generate",
+      "response": "<motion name=\"generate\" text=\"Stand still, extend both forearms forward slightly with palms facing up in an explanatory gesture.\"/>",
+      "elapsedSeconds": 0.31127780000679195,
+      "passed": true
+    },
+    {
+      "user": "今天我们聊聊你喜欢什么颜色，不需要做任何身体动作。",
+      "expected": null,
+      "selected": null,
+      "response": "我喜欢那种深邃又宁静的深海蓝，感觉能让人瞬间平静下来。你呢？",
+      "elapsedSeconds": 0.27203369999188,
+      "passed": true
+    }
+  ]
+}

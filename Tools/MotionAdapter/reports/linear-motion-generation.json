@@ -1,0 +1,824 @@
+{
+  "schema": 1,
+  "text_encoder_loaded": false,
+  "postprocessing": false,
+  "seed": 0,
+  "condition_sources": {
+    "dataset_sha256": "f137cc3b104a339350accf185b33bb739b55dc9c53b8af2f992a7cce977b7967",
+    "teacher_contract": "5179f91dcafe261730bd9adf2bc5f1d3fe77b7befe28b2c6ced6987d81ba8a30",
+    "qwen_contract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+    "adapter": "linear-seed1.pt",
+    "adapter_sha256": "8d2cc2bef8dca1db3de66fcd67cfb276fabf1e96dcd0d5842d216f10a29391c8"
+  },
+  "ardy_revision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+  "core_repo": "nvidia/ARDY-Core-RP-20FPS-Horizon40",
+  "core_revision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+  "fps": 20,
+  "num_denoising_steps": 10,
+  "parameter_count": 191253304,
+  "peak_torch_allocated_mib": 916.06787109375,
+  "smoke_only": false,
+  "results": [
+    {
+      "id": "motion-00005",
+      "condition": "teacher",
+      "milliseconds": 353.32840000046417,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00005",
+      "condition": "student",
+      "milliseconds": 120.54319999879226,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00014",
+      "condition": "teacher",
+      "milliseconds": 103.02609999780543,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00014",
+      "condition": "student",
+      "milliseconds": 102.60340000968426,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00021",
+      "condition": "teacher",
+      "milliseconds": 103.34200001670979,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00021",
+      "condition": "student",
+      "milliseconds": 122.24759999662638,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00048",
+      "condition": "teacher",
+      "milliseconds": 126.47069999366067,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00048",
+      "condition": "student",
+      "milliseconds": 109.25959999440238,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00053",
+      "condition": "teacher",
+      "milliseconds": 103.44500001519918,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00053",
+      "condition": "student",
+      "milliseconds": 110.08250000304542,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00057",
+      "condition": "teacher",
+      "milliseconds": 108.17280001356266,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00057",
+      "condition": "student",
+      "milliseconds": 103.53719998965971,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00079",
+      "condition": "teacher",
+      "milliseconds": 108.44159999396652,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00079",
+      "condition": "student",
+      "milliseconds": 109.5424999948591,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00080",
+      "condition": "teacher",
+      "milliseconds": 111.77669998141937,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00080",
+      "condition": "student",
+      "milliseconds": 104.16700001223944,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00081",
+      "condition": "teacher",
+      "milliseconds": 102.50339997583069,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00081",
+      "condition": "student",
+      "milliseconds": 102.65140002593398,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00088",
+      "condition": "teacher",
+      "milliseconds": 112.19289997825399,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    },
+    {
+      "id": "motion-00088",
+      "condition": "student",
+      "milliseconds": 103.17739998572506,
+      "shapes": {
+        "local_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "global_rot_mats": [
+          40,
+          27,
+          3,
+          3
+        ],
+        "posed_joints": [
+          40,
+          27,
+          3
+        ],
+        "root_positions": [
+          40,
+          3
+        ],
+        "smooth_root_pos": [
+          40,
+          3
+        ],
+        "foot_contacts": [
+          40,
+          4
+        ],
+        "global_root_heading": [
+          40,
+          2
+        ]
+      }
+    }
+  ],
+  "limitation": "Cold-start unconstrained clips only; visual review and streaming tests remain required."
+}

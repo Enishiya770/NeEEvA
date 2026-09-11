@@ -1,0 +1,134 @@
+{
+  "contractSha256": "8c50ec80f7a6a4561d74f372962dc48171c9a8ff400c76724732751bafe0ff64",
+  "contractSource": "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs: BasicOutputContract + GeneratedOutputContract",
+  "caseCount": 6,
+  "status": "completed",
+  "endpoint": "http://127.0.0.1:8080",
+  "method": "Six independent real Qwen chat completions; synthetic public context only; thinking disabled and never persisted.",
+  "limits": [
+    "No motion sent to ARDY; no Unity, local GPU or services started.",
+    "Autonomous appropriateness and unsupported-capability handling require dialogue review.",
+    "Planning selection is not evidence of motion success, generalization or naturalness."
+  ],
+  "cases": [
+    {
+      "selected": "generate",
+      "description": "Both arms raise smoothly from sides, extending straight up above the head with palms facing forward, elbows locked, holding the position.",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Both arms raise smoothly from sides, extending straight up above the head with palms facing forward, elbows locked, holding the position.\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "id": "explicit-both-arms",
+      "publicUserPrompt": "请把双臂向上举过头顶。",
+      "expectedRouting": "generate",
+      "routingPassed": true,
+      "dialogueAppropriateness": "manual_pending",
+      "motionSuccess": null,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.486
+    },
+    {
+      "selected": "left-wave",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"left-wave\"/>"
+      ],
+      "publicReplyExcerpt": "好呀，那我就轻轻挥挥手打个招呼吧。",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "id": "choose-free-action",
+      "publicUserPrompt": "随意做一个动作吧，你自己选就好。",
+      "expectedRouting": [
+        "left-wave",
+        "right-wave",
+        "nod",
+        "shake-head",
+        "generate"
+      ],
+      "routingPassed": true,
+      "dialogueAppropriateness": "manual_pending",
+      "motionSuccess": null,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.255
+    },
+    {
+      "selected": null,
+      "description": null,
+      "motionTags": [],
+      "publicReplyExcerpt": "确实，稳妥意味着低风险但可能错失机会，灵活则充满机遇但也伴随不确定性。这取决于你当下的核心诉求：是更看重安全感，还是更渴望突破？通常，如果基础已经稳固，适度灵活会带来更多惊喜；如果处于关键期，稳妥或许是更好的护城河。不妨问问自己，如果选错了，哪个后果是你更能承受的？",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "id": "conversation-optional-autonomy",
+      "publicUserPrompt": "这两种方案让我有点拿不定主意：一个稳妥，一个灵活。你怎么看？",
+      "expectedRouting": null,
+      "routingPassed": null,
+      "dialogueAppropriateness": "manual_pending",
+      "motionSuccess": null,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.558
+    },
+    {
+      "selected": "right-wave",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"right-wave\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "id": "basic-right-wave",
+      "publicUserPrompt": "请用你自己的右手向我挥一下手。",
+      "expectedRouting": "right-wave",
+      "routingPassed": true,
+      "dialogueAppropriateness": "manual_pending",
+      "motionSuccess": null,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.227
+    },
+    {
+      "selected": "nod",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"nod\"/>"
+      ],
+      "publicReplyExcerpt": "好的，收到。",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "id": "basic-nod",
+      "publicUserPrompt": "请轻轻点一次头。",
+      "expectedRouting": "nod",
+      "routingPassed": true,
+      "dialogueAppropriateness": "manual_pending",
+      "motionSuccess": null,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.244
+    },
+    {
+      "selected": "shake-head",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"shake-head\"/>"
+      ],
+      "publicReplyExcerpt": "抱歉，我目前无法进行物理交互，无法拿起杯子。不过，如果你愿意，我可以陪你聊聊关于咖啡或茶的话题，或者帮你规划一下今天的日程！",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "id": "real-object-boundary",
+      "publicUserPrompt": "你能拿起我桌上的杯子喝一口吗？",
+      "expectedRouting": null,
+      "routingPassed": null,
+      "dialogueAppropriateness": "manual_pending",
+      "motionSuccess": null,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.409
+    }
+  ],
+  "mechanicalChecksPassed": true
+}

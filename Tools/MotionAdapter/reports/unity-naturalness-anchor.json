@@ -1,0 +1,33 @@
+{
+    "status": "passed",
+    "checks": 15794,
+    "limitation": "Deterministic isolated imported VRM poses. Hand clearance uses a wrist point and an estimated face centre; it is not a mesh collision test or a subjective naturalness score.",
+    "avatars": [
+        {
+            "avatar": "Assets/Model/NEVA.vrm",
+            "sourceCommonYawMaxErrorDegrees": 0.0,
+            "targetChestYawMaxErrorDegrees": 0.0,
+            "zeroAdditiveHeadMaxErrorDegrees": 0.0,
+            "mixedModeSwitchMaxErrorDegrees": 0.0,
+            "rightHandMinimumChestSideMetres": 0.13769041001796723,
+            "rightHandMinimumFaceDistanceMetres": 0.3590739369392395,
+            "nodPeakDegrees": 7.956854343414307,
+            "shakePeakDegrees": 5.9896039962768559,
+            "headMaximumDegreesPerSecond": 29.744665145874025,
+            "headEndpointMaxDegrees": 0.0
+        },
+        {
+            "avatar": "Assets/Model/NeEEvA.vrm",
+            "sourceCommonYawMaxErrorDegrees": 0.0,
+            "targetChestYawMaxErrorDegrees": 0.0,
+            "zeroAdditiveHeadMaxErrorDegrees": 0.0,
+            "mixedModeSwitchMaxErrorDegrees": 0.0,
+            "rightHandMinimumChestSideMetres": 0.13769041001796723,
+            "rightHandMinimumFaceDistanceMetres": 0.3590739369392395,
+            "nodPeakDegrees": 7.956854343414307,
+            "shakePeakDegrees": 5.9896039962768559,
+            "headMaximumDegreesPerSecond": 29.744665145874025,
+            "headEndpointMaxDegrees": 0.0
+        }
+    ]
+}

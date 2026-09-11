@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "checkedAtLocal": "2026-09-10T20:44:00+09:00",
+  "scope": "Read-only process/port/health inventory. No service, model, Unity or feature request started or stopped.",
+  "qwen": {"url":"http://127.0.0.1:8080","healthStatus":"ok","localTunnelPid":14492,"remotePid":15240,"remoteMode":"feature","remotePort":8080,"remoteExecutable":"D:/NeEEvA/motion-feature-server/llama-server.exe","slotCount":3,"contextPerSlot":65536,"allSlotsIdleAtCheck":true,"modelSha256FromVerifiedArdyHealth":"071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4"},
+  "ardy": {"url":"http://127.0.0.1:8093","serverPid":49520,"venvLauncherPid":57324,"ready":true,"languageModelsLoaded":false,"adapterMode":"verified-preview","adapterSha256":"c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab","featureSource":"live-qwen","featureVerified":true,"queueWaiting":0,"queueRunning":0,"port8095Listening":false},
+  "unity": {"userProjectPid":37780,"isolatedProjectRunning":false,"editor":"E:/Unity_Data/2022.3.22f1/Editor/Unity.exe","isolatedProject":"E:/VRproject/VR20250611/NeEEvA/Server/ARDY/runtime/unity-naturalness-validation","actualAvatarPresent":true,"fullProcessArgumentsRecorded":false},
+  "limits": ["Health is an instantaneous observation and must be rechecked immediately before a model request.","Shared-model identity uses existing service provenance and the known remote feature executable; this inventory does not rerun numeric feature equivalence.","The feature POST route has no dedicated /neeeva/motion-features/health GET endpoint.","Current request-stat systemChars excludes transient motion context; it cannot establish which runtime contract was transmitted."]
+}

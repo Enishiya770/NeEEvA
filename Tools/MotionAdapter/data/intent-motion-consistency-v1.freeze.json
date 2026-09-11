@@ -1,0 +1,11 @@
+{
+  "suiteId": "intent-motion-consistency-v1",
+  "suiteSha256": "e8a37ab2ec02d874a3732f16cea3b321fc56a543c57120d1efb6227ba3f2e2fd",
+  "frozenAtUtc": "2026-09-10T11:56:59.820703+00:00",
+  "developmentCount": 12,
+  "holdoutCount": 8,
+  "holdoutSha256": "fd087b264acfc8dd83532b7bf98484de684306821bd24f15ca1b4aafad4de148",
+  "modelRequestsAtFreeze": 0,
+  "motionExecutionsAtFreeze": 0,
+  "scope": "New public dataset; no old holdout reports are overwritten or reclassified."
+}

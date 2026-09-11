@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "status": "experimental_opt_in_only",
+  "contractSha256": "7698f5e8b456f8fbaf9a30b2a50c85b12d2dd54b6fc460ac466455eb24d800cd",
+  "legacyContractSha256": "2e0a7326c68054c9c05798e97f855982896d40679b5ca3b4428730893c4ddaee",
+  "cpu": {
+    "status": "passed",
+    "checks": 558,
+    "runtime": "real production C# on Mono, no Unity or model",
+    "sources": {
+      "Tools/MotionAdapter/SemanticMotionProtocolChecks.cs": "61865d6c97b36154b3625d9955c1830be44cfbe7ab58bca7034c458cf2e887d8",
+      "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlan.cs": "319df0e62bfee4687d55ed85a7b1f921a32c245fef665bcada41cabfde674f0e",
+      "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlanCompiler.cs": "8195ee630d5161eb422fb0127e2970bf3e28e3058e2c18e005aa473dfb3c8209",
+      "Assets/AIChatTookit/Scripts/Motion/ArdyActionConstraintLedger.cs": "40e25d318d59ab08cf7d77629f2f7386d8d9152aec2d34e186b2661169998e2a",
+      "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "82b4a83ce6ccb73ee1ccc81a9e5e46e9d8b23b71f4161e54a5a1e4cdd95a14cc",
+      "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "01fbb5448d8acc2debbe4b2a5ee5a6bf6da0765a16be4023cec6e9927a861f79",
+      "Assets/AIChatTookit/Scripts/Chat/RoleOutputChannels.cs": "6c434e2c73cbdb805cc9fe798b8579436e3266ac393432fa557a8387bac8a0f4",
+      "Assets/AIChatTookit/Scripts/Chat/SpeechText.cs": "a2f88c73aa98c34814b953b9ab9fe43cf9c1e51758b70976dc70e48b93cdf820",
+      "Assets/AIChatTookit/Scripts/Motion/ArdyAdaptiveTiming.cs": "79aa8926926531f7370693c98454a09d7f32a5965d6f4050f66e4fa4fd8a6f72"
+    },
+    "exitCode": 0
+  },
+  "pythonIntegrationTests": {
+    "count": 7,
+    "exitCode": 0
+  },
+  "sourceHashes": {
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "01fbb5448d8acc2debbe4b2a5ee5a6bf6da0765a16be4023cec6e9927a861f79",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlan.cs": "319df0e62bfee4687d55ed85a7b1f921a32c245fef665bcada41cabfde674f0e",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlanCompiler.cs": "8195ee630d5161eb422fb0127e2970bf3e28e3058e2c18e005aa473dfb3c8209",
+    "Assets/Editor/ArdyDialogueMotionRegression.cs": "b5938154f347fb7d59eb913c2c6a10bcb4bd0b17f10ade7bed948d521af8d8bd",
+    "Tools/MotionAdapter/validate_semantic_motion_planning.py": "1e05e65c3e653979786e272004f3804f9513b1c6a3702210b85245742e4701e0",
+    "Tools/MotionAdapter/SemanticMotionProtocolChecks.cs": "61865d6c97b36154b3625d9955c1830be44cfbe7ab58bca7034c458cf2e887d8",
+    "Tools/MotionAdapter/test_semantic_motion_planning.py": "34c810aaf5a7fd9988101e3e6b48ea0380e0703c735eb5b6f44e338f194a0be9",
+    "Tools/MotionAdapter/audit_semantic_motion_planning.py": "3fea114eac215501f6f30ea2acba5c5ac1f90942a4527415df86391085ff6e07",
+    "Tools/MotionAdapter/data/semantic-motion-planning-v1.json": "9986eb69f60fb3d778c15ea44c61f0a183560cdbaf17324eb1906fdb43bca87f"
+  },
+  "evidence": {
+    "semantic-motion-planning-v1.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\semantic-motion-planning-v1.json",
+      "sha256": "aea87ad2e1edde59b4df249e82c0d2d4c0ffdd3b67a5129a7564adcf0f3e9006"
+    },
+    "semantic-motion-planning-v1-source-audit.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\semantic-motion-planning-v1-source-audit.json",
+      "sha256": "d93bb3a0377357d6b18605452901a37e733f25e17d69062d9bb71c989a3a769d"
+    },
+    "semantic-motion-planning-v2.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\semantic-motion-planning-v2.json",
+      "sha256": "3bb0d6f0473f47372334f6a262ec954a752917514398027f992973754577c817"
+    },
+    "semantic-motion-planning-v2-source-audit.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\semantic-motion-planning-v2-source-audit.json",
+      "sha256": "b625336639494b0e5e31fbf6625e8b1479d444c08e71959e5cd07f2efcb76fe4"
+    },
+    "semantic-motion-planning-holdout-v2.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\semantic-motion-planning-holdout-v2.json",
+      "sha256": "ddd41e4b36f36aba7d3fa25b2d2e15403c9d20edf8c802f3946be901f57fa9ba"
+    },
+    "semantic-motion-planning-holdout-v2-source-audit.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\semantic-motion-planning-holdout-v2-source-audit.json",
+      "sha256": "da96cb4478a6484448283e0b8be750daf09ee006a39055760e199eec99c45616"
+    }
+  },
+  "modelRequests": {
+    "developmentV1": 20,
+    "developmentV2": 20,
+    "holdoutV2Once": 6
+  },
+  "summary": {
+    "v2FrozenParameterMatches": "13/20",
+    "v2NecessarySourceCoverage": "3/14",
+    "holdoutFrozenParameterMatches": "4/6",
+    "holdoutNecessarySourceCoverage": "0/4"
+  },
+  "limits": [
+    "No Unity or motion execution by this probe.",
+    "Source quote membership does not prove semantic entailment.",
+    "The six held-out expressions were evaluated once; do not tune or reroll them.",
+    "V2 still omits or misinterprets explicit constraints, including palm directions, fixed elbows and inherited restrictions. Not ready as default chat planner.",
+    "The original source-audit compiled_plan category also included accepted basic actions; inspect per-case csharp.name and compiled fields."
+  ]
+}

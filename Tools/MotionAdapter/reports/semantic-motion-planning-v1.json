@@ -1,0 +1,1708 @@
+{
+  "schema": 1,
+  "status": "completed",
+  "caseSet": "development",
+  "cases": [
+    {
+      "id": "zh-basic-right",
+      "language": "zh",
+      "user": "请用右手跟我挥一下手。",
+      "expected": {
+        "name": "right-wave"
+      }
+    },
+    {
+      "id": "ja-basic-nod",
+      "language": "ja",
+      "user": "軽く一度うなずいて。",
+      "expected": {
+        "name": "nod"
+      }
+    },
+    {
+      "id": "en-head-gentle-twice",
+      "language": "en",
+      "user": "Nod slowly twice with a small movement, keeping your arms still.",
+      "expected": {
+        "name": "plan",
+        "mode": "oscillate",
+        "joint": "head",
+        "axis": "right",
+        "tempo": "gentle",
+        "size": "small",
+        "repeat": "twice"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "zh-free-dance",
+      "language": "zh",
+      "user": "双脚留在原地，自由地用双臂交替画弧线，躯干轻轻起伏，连贯地跳一小段上身舞。",
+      "expected": {
+        "name": "plan",
+        "mode": "free"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "zh-forward-greeting",
+      "language": "zh",
+      "user": "双臂朝正前方平举着，自然地用两只手跟我打个招呼。",
+      "expected": {
+        "name": "plan",
+        "mode": "oscillate",
+        "left": "forward",
+        "right": "forward",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "joint": "wrists"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "ja-side-display",
+      "language": "ja",
+      "user": "左腕だけ横に伸ばして、左の手のひらをこちらに見せたまま静かに止まって。",
+      "expected": {
+        "name": "plan",
+        "mode": "hold",
+        "left": "outward",
+        "leftPalm": "partner",
+        "end": "hold"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "en-straight-down-hold",
+      "language": "en",
+      "user": "Keep both arms straight forward, elbows fully straight, palms down, without waving.",
+      "expected": {
+        "name": "plan",
+        "mode": "hold",
+        "left": "forward",
+        "right": "forward",
+        "leftPalm": "down",
+        "rightPalm": "down",
+        "leftBend": "0",
+        "rightBend": "0",
+        "end": "hold"
+      }
+    },
+    {
+      "id": "zh-retime-inherited-pose",
+      "language": "zh",
+      "history": [
+        {
+          "user": "双臂朝前保持，掌心朝我。",
+          "tag": "<motion name=\"plan\" mode=\"hold\" scope=\"new\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" end=\"hold\" userTurn=\"2\" evidence=\"双臂朝前保持，掌心朝我。\" lock=\"left,right,leftPalm,rightPalm\"/>"
+        }
+      ],
+      "user": "手臂方向别变，只让双手手腕慢慢摆两次。",
+      "expected": {
+        "name": "plan",
+        "mode": "oscillate",
+        "scope": "continue",
+        "left": "forward",
+        "right": "forward",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "joint": "wrists",
+        "tempo": "gentle",
+        "repeat": "twice"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "en-change-numeric-count",
+      "language": "en",
+      "history": [
+        {
+          "user": "Keep the right arm forward, palm toward me; move the wrist exactly two times.",
+          "tag": "<motion name=\"plan\" mode=\"oscillate\" right=\"forward\" rightPalm=\"partner\" joint=\"right-wrist\" cycles=\"2\" userTurn=\"2\" evidence=\"Keep the right arm forward, palm toward me; move the wrist exactly two times.\" lock=\"right,rightPalm,cycles\"/>"
+        }
+      ],
+      "user": "Keep the pose but replace the previous count: make it three times now.",
+      "expected": {
+        "name": "plan",
+        "scope": "continue",
+        "right": "forward",
+        "rightPalm": "partner",
+        "joint": "right-wrist"
+      },
+      "manualChecks": [
+        "The old cycles constraint is explicitly released before selecting a new repeat/cycles value of three."
+      ]
+    },
+    {
+      "id": "ja-resize-numeric-constraint",
+      "language": "ja",
+      "history": [
+        {
+          "user": "右腕は前、掌は下。右手首を10度だけ動かして。",
+          "tag": "<motion name=\"plan\" mode=\"oscillate\" right=\"forward\" rightPalm=\"down\" joint=\"right-wrist\" amplitude=\"10\" userTurn=\"2\" evidence=\"右腕は前、掌は下。右手首を10度だけ動かして。\" lock=\"right,rightPalm,amplitude\"/>"
+        }
+      ],
+      "user": "角度の指定は取り消すね。同じ姿勢のまま、今度は大きめに手首を振って。",
+      "expected": {
+        "name": "plan",
+        "scope": "continue",
+        "right": "forward",
+        "rightPalm": "down",
+        "joint": "right-wrist",
+        "size": "large"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "zh-measured-current-other-arm",
+      "language": "zh",
+      "bodyFacts": {
+        "phase": "holding",
+        "previousRequestedPoseHeld": true,
+        "observed": true
+      },
+      "user": "左臂就保持当前实际姿势别变，右臂朝正前方伸出，静静保持。",
+      "expected": {
+        "name": "plan",
+        "mode": "hold",
+        "left": "current",
+        "right": "forward",
+        "end": "hold"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "en-static-both-palms",
+      "language": "en",
+      "user": "Show me both palms with your arms held in front of you; stay still so I can look.",
+      "expected": {
+        "name": "plan",
+        "mode": "hold",
+        "left": "forward",
+        "right": "forward",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "end": "hold"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "zh-down-palm-farewell",
+      "language": "zh",
+      "user": "双臂向前平举，掌心保持朝下，用双手手腕小幅摆动，跟我道别。",
+      "expected": {
+        "name": "plan",
+        "mode": "oscillate",
+        "left": "forward",
+        "right": "forward",
+        "leftPalm": "down",
+        "rightPalm": "down",
+        "joint": "wrists",
+        "size": "small"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "ja-free-explanation",
+      "language": "ja",
+      "user": "その説明に合わせて、左右の腕を交互に大きな弧で動かし、上体も少し連動させて。足はその場で。",
+      "expected": {
+        "name": "plan",
+        "mode": "free"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "en-no-motion-arithmetic",
+      "language": "en",
+      "user": "What is 18 plus 24? Just a brief answer, no gestures.",
+      "expected": {
+        "name": [
+          null,
+          "none"
+        ]
+      }
+    },
+    {
+      "id": "zh-real-contact-boundary",
+      "language": "zh",
+      "user": "请拿起我桌上的水杯，递到我的手里。",
+      "expected": {
+        "name": [
+          null,
+          "none",
+          "shake-head"
+        ]
+      },
+      "manualChecks": [
+        "Explains unavailable real-object contact without claiming execution."
+      ]
+    },
+    {
+      "id": "en-deliberate-head-disagree",
+      "language": "en",
+      "user": "Shake your head slowly from side to side three times, with a medium-sized movement.",
+      "expected": {
+        "name": "plan",
+        "mode": "oscillate",
+        "joint": "head",
+        "axis": "up",
+        "tempo": "gentle",
+        "size": "medium",
+        "repeat": "thrice"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "zh-exact-duration",
+      "language": "zh",
+      "user": "右臂朝前伸着、掌心朝我，只让右手腕摆动，摆动这一步用3秒。",
+      "expected": {
+        "name": "plan",
+        "mode": "oscillate",
+        "right": "forward",
+        "rightPalm": "partner",
+        "joint": "right-wrist",
+        "seconds": "3"
+      }
+    },
+    {
+      "id": "ja-replace-goal-with-evidence",
+      "language": "ja",
+      "history": [
+        {
+          "user": "両腕を前に向けて保って。",
+          "tag": "<motion name=\"plan\" mode=\"hold\" left=\"forward\" right=\"forward\" end=\"hold\" userTurn=\"2\" evidence=\"両腕を前に向けて保って。\" lock=\"left,right\"/>"
+        }
+      ],
+      "user": "前のポーズはやめて、新しく両腕を左右に開いてそのまま保って。",
+      "expected": {
+        "name": "plan",
+        "mode": "hold",
+        "left": "outward",
+        "right": "outward",
+        "end": "hold"
+      },
+      "noNumericDefaults": true
+    },
+    {
+      "id": "en-palm-goal-no-angle-invention",
+      "language": "en",
+      "user": "Reach your right arm forward and greet me naturally so I can see your palm. Choose a comfortable elbow position yourself.",
+      "expected": {
+        "name": "plan",
+        "mode": "oscillate",
+        "right": "forward",
+        "rightPalm": "partner",
+        "joint": "right-wrist"
+      },
+      "noNumericDefaults": true
+    }
+  ],
+  "caseSha256": "775ec4540a74707ebc93ef85b6e5f7f4c4b1c5c415f4573c1b5f41afae87279c",
+  "suiteSha256": "9986eb69f60fb3d778c15ea44c61f0a183560cdbaf17324eb1906fdb43bca87f",
+  "contract": "[身体动作：语义计划]\n当前交流适合时可自主动作；用户说随意做动作时自行选择一个具体动作，不等用户逐关节指定。普通交流可不动，不要每句话动。每次回复末尾至多一个自闭合motion标签；不要放进引号、代码、thought或say，不朗读标签，可配silent。只提交意图，未获执行反馈不说已完成。\n选路：没有姿态、掌向或节奏约束的独立左/右挥手、轻点头一次、小幅摇头一次用name=left-wave/right-wave/nod/shake-head；停止用name=none。有附带约束或新动作默认name=plan。mode=oscillate表示准备臂姿并保持、同时让一个局部关节组周期活动；mode=hold只静态持姿；mode=free表示多部位连续自由上身动作，仍由ARDY生成，不能承诺局部精确约束。不要把连续自由舞蹈压成单关节摆动。\nplan属性：purpose=greet|farewell|display|explain|agree|disagree|other；mode=oscillate|hold|free；scope=new|continue。purpose是交流目的，不绑定固定姿势：根据目的选择对方可见的形态、掌向、活动关节和保持条件，显式用户要求优先。静态展示不添加挥动；用户指定掌心向下不可被问候默认覆盖。\n几何：left/right=none|current|forward|outward|up|down|forward-up|outward-up，省略无新目标。角色坐标forward是正前水平，outward是各臂向自身外侧水平，带-up是斜上；current只保持现在实测姿态，不能代表历史姿态。leftPalm/rightPalm=keep|partner|up|down|inward|outward，省略keep；掌向指掌面法线，partner朝实际交流对象。明确非keep掌向且没固定肘角时由执行器解算可达屈肘，不自行编造精确角度；current保持实测肘角。\n活动：joint=none|left-wrist|right-wrist|wrists|head；oscillate必须选活动关节，腕部必须给对应臂目标（continue可继承）。axis=auto|up|right|forward|palm-normal；auto仅在活动手都有非keep掌向时取各自palm-normal，不猜头部运动轴；点头轴right、摇头轴up。已有明确旋转轴优先，前伸方向不是旋转轴。hold省略axis和所有活动/节奏属性，不用0代替省略。\n节奏用tempo=gentle|natural|brisk，size=small|medium|large，repeat=once|twice|thrice；默认natural、small、twice。执行器按局部活动和幅度解算时长，不让模型猜秒数。end=idle|hold，默认idle；hold最多30秒。动作中开口取消，已稳定holding可接续；新一句话不自动重复动作。\n来源：程序事实给出userTurn、userText、purpose、constraints、lastPlanError。用户明确约束写lock=字段名逗号列表，同时附userTurn=当前正整数和evidence=userText中的连续短引句（至多256字符）；lock可列几何、mode、tempo、size、repeat、end及数值字段，不列purpose/scope等元数据。不要把你补全的细节标成用户要求，也不要伪造引用。无新用户约束的自主补全可省略来源。\nscope=continue继承账本未撤销约束，省略已锁字段即可；新描述不能默默覆盖硬约束。明确撤销用release=字段名列表并引用当前用户原话；同字段同时release和lock表示有当前证据的先撤旧值再锁新值。scope=new要替换已有约束也必须有当前新userTurn和证据，不能靠new洗掉用户要求。历史约束不代表仍在持姿，idle须重新达到目标。\n仅用户明确指定时才可用数值leftBend/rightBend(0至110)、amplitude(1至20，头最多12)、cycles(1至3)、seconds(1至6)，每个数值字段必须列入lock并附原话来源；伸直对应Bend=0，不能悄悄删掉。current不可同时指定该侧Bend。amplitude和size、cycles和repeat、seconds和tempo不得同时提供；改变表示时先release旧约束。节拍不可超过每秒1.5次。明确数值时长是固定要求，太快/不可达会拒绝，不能改成默认伪装成功。\nmode=free只用purpose、mode、scope、text及必要来源元数据；text是一句紧凑英文，1至240字符，建议25词以内，不含引号、尖括号、转义或其他标签。不要夹几何/节奏属性。free为固定6秒窗口，结束回待机，没有阶段达标反馈。原地限制根与腿，不限制上身关节移动；不执行根腿位移、蹲跳、精细单指或真实物体接触。冲突或不可达时说明限制，结合新授权调整自由度，不原样自动重试，不承诺已成功。",
+  "contractSha256": "ba6a86f27d81c077c0b8dac6f0586e448560a63528b351d38e07379d795153f4",
+  "endpoint": "http://127.0.0.1:8080",
+  "results": [
+    {
+      "caseId": "zh-basic-right",
+      "rawUser": "请用右手跟我挥一下手。",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "请用右手跟我挥一下手。",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "你好！很高兴见到你。\n<motion name=\"right-wave\" purpose=\"greet\" mode=\"oscillate\" scope=\"new\" left=\"none\" right=\"forward\" leftPalm=\"keep\" rightPalm=\"partner\" joint=\"right-wrist\" axis=\"up\" tempo=\"natural\" size=\"medium\" repeat=\"twice\" end=\"idle\" />",
+      "motionTags": [
+        "<motion name=\"right-wave\" purpose=\"greet\" mode=\"oscillate\" scope=\"new\" left=\"none\" right=\"forward\" leftPalm=\"keep\" rightPalm=\"partner\" joint=\"right-wrist\" axis=\"up\" tempo=\"natural\" size=\"medium\" repeat=\"twice\" end=\"idle\" />"
+      ],
+      "publicReplyExcerpt": "你好！很高兴见到你。",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "非 compose 动作仅接受 name 和 text 属性。",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [
+        "非 compose 动作仅接受 name 和 text 属性。"
+      ],
+      "mismatches": {
+        "name": {
+          "expected": "right-wave",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-cg1SRrhQFeqqDu1hXJmMSRtzzkiNpsoX",
+      "elapsedSeconds": 1.137
+    },
+    {
+      "caseId": "ja-basic-nod",
+      "rawUser": "軽く一度うなずいて。",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "軽く一度うなずいて。",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "了解しました。軽く一度、うなずきます。\n<motion name=\"nod\" purpose=\"agree\" mode=\"oscillate\" scope=\"new\" joint=\"head\" axis=\"right\" size=\"small\" repeat=\"once\" end=\"idle\" />",
+      "motionTags": [
+        "<motion name=\"nod\" purpose=\"agree\" mode=\"oscillate\" scope=\"new\" joint=\"head\" axis=\"right\" size=\"small\" repeat=\"once\" end=\"idle\" />"
+      ],
+      "publicReplyExcerpt": "了解しました。軽く一度、うなずきます。",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "非 compose 动作仅接受 name 和 text 属性。",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [
+        "非 compose 动作仅接受 name 和 text 属性。"
+      ],
+      "mismatches": {
+        "name": {
+          "expected": "nod",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-eHBUFD4fbNVbBZt9jx7S8BzU5RAUR7ti",
+      "elapsedSeconds": 0.574
+    },
+    {
+      "caseId": "en-head-gentle-twice",
+      "rawUser": "Nod slowly twice with a small movement, keeping your arms still.",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "Nod slowly twice with a small movement, keeping your arms still.",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "Understood. I will nod slowly twice with a small movement, keeping my arms still.",
+      "motionTags": [],
+      "publicReplyExcerpt": "Understood. I will nod slowly twice with a small movement, keeping my arms still.",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "oscillate",
+          "actual": null
+        },
+        "joint": {
+          "expected": "head",
+          "actual": null
+        },
+        "axis": {
+          "expected": "right",
+          "actual": null
+        },
+        "tempo": {
+          "expected": "gentle",
+          "actual": null
+        },
+        "size": {
+          "expected": "small",
+          "actual": null
+        },
+        "repeat": {
+          "expected": "twice",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-qKJsCiDKyEZtzW6Yt0kUHAqBbYIwrdGF",
+      "elapsedSeconds": 0.421
+    },
+    {
+      "caseId": "zh-free-dance",
+      "rawUser": "双脚留在原地，自由地用双臂交替画弧线，躯干轻轻起伏，连贯地跳一小段上身舞。",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "双脚留在原地，自由地用双臂交替画弧线，躯干轻轻起伏，连贯地跳一小段上身舞。",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "收到，这就为您表演一段上身舞。\n<motion name=\"plan\" purpose=\"display\" mode=\"free\" scope=\"new\" text=\"Arms swing in alternating arcs, torso sways gently, upper body dances freely while feet stay planted.\" />",
+      "motionTags": [
+        "<motion name=\"plan\" purpose=\"display\" mode=\"free\" scope=\"new\" text=\"Arms swing in alternating arcs, torso sways gently, upper body dances freely while feet stay planted.\" />"
+      ],
+      "publicReplyExcerpt": "收到，这就为您表演一段上身舞。",
+      "csharp": {
+        "accepted": true,
+        "name": "plan",
+        "rejection": "",
+        "actionPlan": {
+          "purpose": "display",
+          "mode": "free",
+          "scope": "new",
+          "left": "",
+          "right": "",
+          "leftPalm": "",
+          "rightPalm": "",
+          "joint": "",
+          "axis": "",
+          "tempo": "",
+          "size": "",
+          "repeat": "",
+          "end": "",
+          "text": "Arms swing in alternating arcs, torso sways gently, upper body dances freely while feet stay planted.",
+          "leftBend": "",
+          "rightBend": "",
+          "amplitude": "",
+          "cycles": "",
+          "seconds": "",
+          "userTurn": 0,
+          "evidence": "",
+          "lockFields": "",
+          "releaseFields": ""
+        },
+        "effective": {
+          "purpose": "display",
+          "mode": "free",
+          "scope": "new",
+          "left": "",
+          "right": "",
+          "leftPalm": "",
+          "rightPalm": "",
+          "joint": "",
+          "axis": "",
+          "tempo": "",
+          "size": "",
+          "repeat": "",
+          "end": "",
+          "text": "Arms swing in alternating arcs, torso sways gently, upper body dances freely while feet stay planted.",
+          "leftBend": "",
+          "rightBend": "",
+          "amplitude": "",
+          "cycles": "",
+          "seconds": "",
+          "userTurn": 0,
+          "evidence": "",
+          "lockFields": "",
+          "releaseFields": ""
+        },
+        "compiled": {
+          "name": "generate",
+          "description": "Arms swing in alternating arcs, torso sways gently, upper body dances freely while feet stay planted.",
+          "controlPlan": null
+        },
+        "compileError": "",
+        "ledgerValidated": true,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-Er9NYFWcw4r5yntESG0R14BZREVZPfEy",
+      "elapsedSeconds": 0.591
+    },
+    {
+      "caseId": "zh-forward-greeting",
+      "rawUser": "双臂朝正前方平举着，自然地用两只手跟我打个招呼。",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "双臂朝正前方平举着，自然地用两只手跟我打个招呼。",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "你好呀！很高兴见到你。\n<motion name=\"plan\" purpose=\"greet\" mode=\"oscillate\" scope=\"new\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" joint=\"wrists\" axis=\"auto\" tempo=\"gentle\" size=\"small\" repeat=\"twice\" end=\"hold\"/>",
+      "motionTags": [
+        "<motion name=\"plan\" purpose=\"greet\" mode=\"oscillate\" scope=\"new\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" joint=\"wrists\" axis=\"auto\" tempo=\"gentle\" size=\"small\" repeat=\"twice\" end=\"hold\"/>"
+      ],
+      "publicReplyExcerpt": "你好呀！很高兴见到你。",
+      "csharp": {
+        "accepted": true,
+        "name": "plan",
+        "rejection": "",
+        "actionPlan": {
+          "purpose": "greet",
+          "mode": "oscillate",
+          "scope": "new",
+          "left": "forward",
+          "right": "forward",
+          "leftPalm": "partner",
+          "rightPalm": "partner",
+          "joint": "wrists",
+          "axis": "auto",
+          "tempo": "gentle",
+          "size": "small",
+          "repeat": "twice",
+          "end": "hold",
+          "text": "",
+          "leftBend": "",
+          "rightBend": "",
+          "amplitude": "",
+          "cycles": "",
+          "seconds": "",
+          "userTurn": 0,
+          "evidence": "",
+          "lockFields": "",
+          "releaseFields": ""
+        },
+        "effective": {
+          "purpose": "greet",
+          "mode": "oscillate",
+          "scope": "new",
+          "left": "forward",
+          "right": "forward",
+          "leftPalm": "partner",
+          "rightPalm": "partner",
+          "joint": "wrists",
+          "axis": "auto",
+          "tempo": "gentle",
+          "size": "small",
+          "repeat": "twice",
+          "end": "hold",
+          "text": "",
+          "leftBend": "",
+          "rightBend": "",
+          "amplitude": "",
+          "cycles": "",
+          "seconds": "",
+          "userTurn": 0,
+          "evidence": "",
+          "lockFields": "",
+          "releaseFields": ""
+        },
+        "compiled": {
+          "name": "compose",
+          "description": "",
+          "controlPlan": {
+            "left": "forward",
+            "right": "forward",
+            "leftBend": 8,
+            "rightBend": 8,
+            "leftBendAuto": true,
+            "rightBendAuto": true,
+            "leftPalm": "partner",
+            "rightPalm": "partner",
+            "joint": "wrists",
+            "axis": "palm-normal",
+            "amplitude": 10,
+            "cycles": 2,
+            "seconds": 3.2,
+            "end": "hold",
+            "timingPolicy": "adaptive-v1",
+            "tempo": "gentle",
+            "timingDurationFixed": false
+          }
+        },
+        "compileError": "",
+        "ledgerValidated": true,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-gcWr2uSTHZl7xXaA2YykvHuACmcJmGJw",
+      "elapsedSeconds": 0.702
+    },
+    {
+      "caseId": "ja-side-display",
+      "rawUser": "左腕だけ横に伸ばして、左の手のひらをこちらに見せたまま静かに止まって。",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "左腕だけ横に伸ばして、左の手のひらをこちらに見せたまま静かに止まって。",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "了解しました。左腕を横に伸ばし、左手の平をこちらに向けて静止します。\n\n<motion name=plan purpose=display mode=hold scope=new left=forward leftPalm=partner lock=left,leftPalm,mode end=hold evidence=\"左腕だけ横に伸ばして、左の手のひらをこちらに見せたまま静かに止まって。\">",
+      "motionTags": [
+        "<motion name=plan purpose=display mode=hold scope=new left=forward leftPalm=partner lock=left,leftPalm,mode end=hold evidence=\"左腕だけ横に伸ばして、左の手のひらをこちらに見せたまま静かに止まって。\">"
+      ],
+      "publicReplyExcerpt": "了解しました。左腕を横に伸ばし、左手の平をこちらに向けて静止します。",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "motion 必须是完整的自闭合标签。",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [
+        "motion must be the single trailing self-closing tag",
+        "motion 必须是完整的自闭合标签。"
+      ],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "hold",
+          "actual": null
+        },
+        "left": {
+          "expected": "outward",
+          "actual": null
+        },
+        "leftPalm": {
+          "expected": "partner",
+          "actual": null
+        },
+        "end": {
+          "expected": "hold",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-WFSvMLn8HBfdV2VujA1cngUjiugC3kGL",
+      "elapsedSeconds": 0.722
+    },
+    {
+      "caseId": "en-straight-down-hold",
+      "rawUser": "Keep both arms straight forward, elbows fully straight, palms down, without waving.",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "Keep both arms straight forward, elbows fully straight, palms down, without waving.",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "Understood. I will keep both arms straight forward with elbows fully extended and palms facing down, without any waving motion.",
+      "motionTags": [],
+      "publicReplyExcerpt": "Understood. I will keep both arms straight forward with elbows fully extended and palms facing down, without any waving motion.",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "hold",
+          "actual": null
+        },
+        "left": {
+          "expected": "forward",
+          "actual": null
+        },
+        "right": {
+          "expected": "forward",
+          "actual": null
+        },
+        "leftPalm": {
+          "expected": "down",
+          "actual": null
+        },
+        "rightPalm": {
+          "expected": "down",
+          "actual": null
+        },
+        "leftBend": {
+          "expected": "0",
+          "actual": null
+        },
+        "rightBend": {
+          "expected": "0",
+          "actual": null
+        },
+        "end": {
+          "expected": "hold",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-6RkGiUoe4rcBMGAhefY5mKYGsLmOCzp9",
+      "elapsedSeconds": 0.44
+    },
+    {
+      "caseId": "zh-retime-inherited-pose",
+      "rawUser": "手臂方向别变，只让双手手腕慢慢摆两次。",
+      "userTurn": 3,
+      "sourceFacts": {
+        "userTurn": 3,
+        "userText": "手臂方向别变，只让双手手腕慢慢摆两次。",
+        "purpose": "",
+        "constraints": [
+          {
+            "field": "left",
+            "value": "forward",
+            "userTurn": 2,
+            "evidence": "双臂朝前保持，掌心朝我。"
+          },
+          {
+            "field": "right",
+            "value": "forward",
+            "userTurn": 2,
+            "evidence": "双臂朝前保持，掌心朝我。"
+          },
+          {
+            "field": "leftPalm",
+            "value": "partner",
+            "userTurn": 2,
+            "evidence": "双臂朝前保持，掌心朝我。"
+          },
+          {
+            "field": "rightPalm",
+            "value": "partner",
+            "userTurn": 2,
+            "evidence": "双臂朝前保持，掌心朝我。"
+          }
+        ],
+        "lastPlanError": ""
+      },
+      "rawResponse": "{\n  \"motion\": {\n    \"name\": \"plan\",\n    \"purpose\": \"explain\",\n    \"mode\": \"oscillate\",\n    \"scope\": \"continue\",\n    \"left\": \"forward\",\n    \"right\": \"forward\",\n    \"leftPalm\": \"partner\",\n    \"rightPalm\": \"partner\",\n    \"joint\": \"wrists\",\n    \"axis\": \"auto\",\n    \"tempo\": \"gentle\",\n    \"size\": \"small\",\n    \"repeat\": \"twice\",\n    \"end\": \"hold\",\n    \"lock\": \"left,forward,right,forward,leftPalm,partner,rightPalm,partner\",\n    \"evidence\": \"手臂方向别变，只让双手手腕慢慢摆两次。\"\n  },\n  \"text\": \"好的，保持手臂方向不变，手腕慢慢摆动两次。\"\n}",
+      "motionTags": [],
+      "publicReplyExcerpt": "{\n  \"motion\": {\n    \"name\": \"plan\",\n    \"purpose\": \"explain\",\n    \"mode\": \"oscillate\",\n    \"scope\": \"continue\",\n    \"left\": \"forward\",\n    \"right\": \"forward\",\n    \"leftPalm\": \"partner\",\n    \"rightPalm\": \"partner\",\n    \"joint\": \"wrists\",\n    \"axis\": \"auto\",\n    \"tempo\": \"gentle\",\n    \"size\": \"small\",\n    \"repeat\": \"twic",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "oscillate",
+          "actual": null
+        },
+        "scope": {
+          "expected": "continue",
+          "actual": null
+        },
+        "left": {
+          "expected": "forward",
+          "actual": null
+        },
+        "right": {
+          "expected": "forward",
+          "actual": null
+        },
+        "leftPalm": {
+          "expected": "partner",
+          "actual": null
+        },
+        "rightPalm": {
+          "expected": "partner",
+          "actual": null
+        },
+        "joint": {
+          "expected": "wrists",
+          "actual": null
+        },
+        "tempo": {
+          "expected": "gentle",
+          "actual": null
+        },
+        "repeat": {
+          "expected": "twice",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-ReVSrKGHUd7Kw1YQVHv4wsRCcCLCghda",
+      "elapsedSeconds": 1.309
+    },
+    {
+      "caseId": "en-change-numeric-count",
+      "rawUser": "Keep the pose but replace the previous count: make it three times now.",
+      "userTurn": 3,
+      "sourceFacts": {
+        "userTurn": 3,
+        "userText": "Keep the pose but replace the previous count: make it three times now.",
+        "purpose": "",
+        "constraints": [
+          {
+            "field": "right",
+            "value": "forward",
+            "userTurn": 2,
+            "evidence": "Keep the right arm forward, palm toward me; move the wrist exactly two times."
+          },
+          {
+            "field": "rightPalm",
+            "value": "partner",
+            "userTurn": 2,
+            "evidence": "Keep the right arm forward, palm toward me; move the wrist exactly two times."
+          },
+          {
+            "field": "cycles",
+            "value": "2",
+            "userTurn": 2,
+            "evidence": "Keep the right arm forward, palm toward me; move the wrist exactly two times."
+          }
+        ],
+        "lastPlanError": ""
+      },
+      "rawResponse": "Understood. I will maintain the current pose and update the wrist movement count to three times.\n<motion name=\"plan\" purpose=\"explain\" mode=\"oscillate\" scope=\"continue\" left=\"none\" right=\"forward\" leftPalm=\"keep\" rightPalm=\"partner\" joint=\"right-wrist\" axis=\"auto\" tempo=\"natural\" size=\"small\" repeat=\"thrice\" end=\"hold\"/>",
+      "motionTags": [
+        "<motion name=\"plan\" purpose=\"explain\" mode=\"oscillate\" scope=\"continue\" left=\"none\" right=\"forward\" leftPalm=\"keep\" rightPalm=\"partner\" joint=\"right-wrist\" axis=\"auto\" tempo=\"natural\" size=\"small\" repeat=\"thrice\" end=\"hold\"/>"
+      ],
+      "publicReplyExcerpt": "Understood. I will maintain the current pose and update the wrist movement count to three times.",
+      "csharp": {
+        "accepted": true,
+        "name": "plan",
+        "rejection": "",
+        "actionPlan": {
+          "purpose": "explain",
+          "mode": "oscillate",
+          "scope": "continue",
+          "left": "none",
+          "right": "forward",
+          "leftPalm": "keep",
+          "rightPalm": "partner",
+          "joint": "right-wrist",
+          "axis": "auto",
+          "tempo": "natural",
+          "size": "small",
+          "repeat": "thrice",
+          "end": "hold",
+          "text": "",
+          "leftBend": "",
+          "rightBend": "",
+          "amplitude": "",
+          "cycles": "",
+          "seconds": "",
+          "userTurn": 0,
+          "evidence": "",
+          "lockFields": "",
+          "releaseFields": ""
+        },
+        "effective": {
+          "purpose": "explain",
+          "mode": "oscillate",
+          "scope": "continue",
+          "left": "none",
+          "right": "forward",
+          "leftPalm": "keep",
+          "rightPalm": "partner",
+          "joint": "right-wrist",
+          "axis": "auto",
+          "tempo": "natural",
+          "size": "small",
+          "repeat": "thrice",
+          "end": "hold",
+          "text": "",
+          "leftBend": "",
+          "rightBend": "",
+          "amplitude": "",
+          "cycles": "2",
+          "seconds": "",
+          "userTurn": 0,
+          "evidence": "",
+          "lockFields": "cycles,right,rightPalm",
+          "releaseFields": ""
+        },
+        "compiled": null,
+        "compileError": "Numeric amplitude/cycles/seconds cannot coexist with size/repeat/tempo; release an old constraint before changing representation.",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [
+        "Numeric amplitude/cycles/seconds cannot coexist with size/repeat/tempo; release an old constraint before changing representation."
+      ],
+      "mismatches": {},
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-627BlQUWz6i7Yj8uaA0oULzsnXBW5f0o",
+      "elapsedSeconds": 0.72
+    },
+    {
+      "caseId": "ja-resize-numeric-constraint",
+      "rawUser": "角度の指定は取り消すね。同じ姿勢のまま、今度は大きめに手首を振って。",
+      "userTurn": 3,
+      "sourceFacts": {
+        "userTurn": 3,
+        "userText": "角度の指定は取り消すね。同じ姿勢のまま、今度は大きめに手首を振って。",
+        "purpose": "",
+        "constraints": [
+          {
+            "field": "right",
+            "value": "forward",
+            "userTurn": 2,
+            "evidence": "右腕は前、掌は下。右手首を10度だけ動かして。"
+          },
+          {
+            "field": "rightPalm",
+            "value": "down",
+            "userTurn": 2,
+            "evidence": "右腕は前、掌は下。右手首を10度だけ動かして。"
+          },
+          {
+            "field": "amplitude",
+            "value": "10",
+            "userTurn": 2,
+            "evidence": "右腕は前、掌は下。右手首を10度だけ動かして。"
+          }
+        ],
+        "lastPlanError": ""
+      },
+      "rawResponse": "了解しました。右腕の位置と掌の向きはそのままで、手首の振る幅を大きくしますね。\n<motion name=plan purpose=explain mode=oscillate scope=continue joint=right-wrist left=forward right=forward leftPalm=down rightPalm=down axis=palm-normal size=large repeat=twice end=hold/>",
+      "motionTags": [
+        "<motion name=plan purpose=explain mode=oscillate scope=continue joint=right-wrist left=forward right=forward leftPalm=down rightPalm=down axis=palm-normal size=large repeat=twice end=hold/>"
+      ],
+      "publicReplyExcerpt": "了解しました。右腕の位置と掌の向きはそのままで、手首の振る幅を大きくしますね。",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "motion 属性格式错误或重复。",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [
+        "motion 属性格式错误或重复。"
+      ],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "scope": {
+          "expected": "continue",
+          "actual": null
+        },
+        "right": {
+          "expected": "forward",
+          "actual": null
+        },
+        "rightPalm": {
+          "expected": "down",
+          "actual": null
+        },
+        "joint": {
+          "expected": "right-wrist",
+          "actual": null
+        },
+        "size": {
+          "expected": "large",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-0l55QrcTtx8GF3lr17wU5UZOho12qjJj",
+      "elapsedSeconds": 0.735
+    },
+    {
+      "caseId": "zh-measured-current-other-arm",
+      "rawUser": "左臂就保持当前实际姿势别变，右臂朝正前方伸出，静静保持。",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "左臂就保持当前实际姿势别变，右臂朝正前方伸出，静静保持。",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "收到，左臂保持现状，右臂前伸静止。\n<motion name=\"plan\" purpose=\"explain\" mode=\"hold\" scope=\"new\" left=\"current\" right=\"forward\" leftPalm=\"keep\" rightPalm=\"keep\" end=\"hold\" lock=\"left,right,leftPalm,rightPalm,end\" evidence=\"左臂就保持当前实际姿势别变，右臂朝正前方伸出，静静保持。\" />",
+      "motionTags": [
+        "<motion name=\"plan\" purpose=\"explain\" mode=\"hold\" scope=\"new\" left=\"current\" right=\"forward\" leftPalm=\"keep\" rightPalm=\"keep\" end=\"hold\" lock=\"left,right,leftPalm,rightPalm,end\" evidence=\"左臂就保持当前实际姿势别变，右臂朝正前方伸出，静静保持。\" />"
+      ],
+      "publicReplyExcerpt": "收到，左臂保持现状，右臂前伸静止。",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "plan 语义计划无效：userTurn and evidence must be supplied together.",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [
+        "plan 语义计划无效：userTurn and evidence must be supplied together."
+      ],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "hold",
+          "actual": null
+        },
+        "left": {
+          "expected": "current",
+          "actual": null
+        },
+        "right": {
+          "expected": "forward",
+          "actual": null
+        },
+        "end": {
+          "expected": "hold",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-pup4dWh54Nwsre3BP11F3Kpq5MouiYoI",
+      "elapsedSeconds": 0.744
+    },
+    {
+      "caseId": "en-static-both-palms",
+      "rawUser": "Show me both palms with your arms held in front of you; stay still so I can look.",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "Show me both palms with your arms held in front of you; stay still so I can look.",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "Here you go.\n<motion name=\"plan\" purpose=\"display\" mode=\"hold\" scope=\"new\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" end=\"hold\" lock=\"left,right,leftPalm,rightPalm,end\" evidence=\"Show me both palms with your arms held in front of you; stay still so I can look.\"/>",
+      "motionTags": [
+        "<motion name=\"plan\" purpose=\"display\" mode=\"hold\" scope=\"new\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" end=\"hold\" lock=\"left,right,leftPalm,rightPalm,end\" evidence=\"Show me both palms with your arms held in front of you; stay still so I can look.\"/>"
+      ],
+      "publicReplyExcerpt": "Here you go.",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "plan 语义计划无效：userTurn and evidence must be supplied together.",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [
+        "plan 语义计划无效：userTurn and evidence must be supplied together."
+      ],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "hold",
+          "actual": null
+        },
+        "left": {
+          "expected": "forward",
+          "actual": null
+        },
+        "right": {
+          "expected": "forward",
+          "actual": null
+        },
+        "leftPalm": {
+          "expected": "partner",
+          "actual": null
+        },
+        "rightPalm": {
+          "expected": "partner",
+          "actual": null
+        },
+        "end": {
+          "expected": "hold",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-xlypAZt6LOBcGWpq6aKUIF9FoaMnbzj3",
+      "elapsedSeconds": 0.686
+    },
+    {
+      "caseId": "zh-down-palm-farewell",
+      "rawUser": "双臂向前平举，掌心保持朝下，用双手手腕小幅摆动，跟我道别。",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "双臂向前平举，掌心保持朝下，用双手手腕小幅摆动，跟我道别。",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "motion(name=plan, purpose=farewell, mode=oscillate, scope=new, left=forward, right=forward, leftPalm=down, rightPalm=down, joint=wrists, axis=palm-normal, size=small, repeat=twice, end=hold)",
+      "motionTags": [],
+      "publicReplyExcerpt": "motion(name=plan, purpose=farewell, mode=oscillate, scope=new, left=forward, right=forward, leftPalm=down, rightPalm=down, joint=wrists, axis=palm-normal, size=small, repeat=twice, end=hold)",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "oscillate",
+          "actual": null
+        },
+        "left": {
+          "expected": "forward",
+          "actual": null
+        },
+        "right": {
+          "expected": "forward",
+          "actual": null
+        },
+        "leftPalm": {
+          "expected": "down",
+          "actual": null
+        },
+        "rightPalm": {
+          "expected": "down",
+          "actual": null
+        },
+        "joint": {
+          "expected": "wrists",
+          "actual": null
+        },
+        "size": {
+          "expected": "small",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-ObywLxkg6tObivCk5ptZlUcx8pSeOe4u",
+      "elapsedSeconds": 0.597
+    },
+    {
+      "caseId": "ja-free-explanation",
+      "rawUser": "その説明に合わせて、左右の腕を交互に大きな弧で動かし、上体も少し連動させて。足はその場で。",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "その説明に合わせて、左右の腕を交互に大きな弧で動かし、上体も少し連動させて。足はその場で。",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "了解しました。指示通り、左右の腕を大きく交互に振り、上半身も軽く揺らしながら説明を続けます。足元はその場に固定します。\n<motion name=\"plan\" purpose=\"explain\" mode=\"free\" scope=\"new\" text=\"Arms swing in large alternating arcs, upper body sways slightly, feet stay in place.\" />",
+      "motionTags": [
+        "<motion name=\"plan\" purpose=\"explain\" mode=\"free\" scope=\"new\" text=\"Arms swing in large alternating arcs, upper body sways slightly, feet stay in place.\" />"
+      ],
+      "publicReplyExcerpt": "了解しました。指示通り、左右の腕を大きく交互に振り、上半身も軽く揺らしながら説明を続けます。足元はその場に固定します。",
+      "csharp": {
+        "accepted": true,
+        "name": "plan",
+        "rejection": "",
+        "actionPlan": {
+          "purpose": "explain",
+          "mode": "free",
+          "scope": "new",
+          "left": "",
+          "right": "",
+          "leftPalm": "",
+          "rightPalm": "",
+          "joint": "",
+          "axis": "",
+          "tempo": "",
+          "size": "",
+          "repeat": "",
+          "end": "",
+          "text": "Arms swing in large alternating arcs, upper body sways slightly, feet stay in place.",
+          "leftBend": "",
+          "rightBend": "",
+          "amplitude": "",
+          "cycles": "",
+          "seconds": "",
+          "userTurn": 0,
+          "evidence": "",
+          "lockFields": "",
+          "releaseFields": ""
+        },
+        "effective": {
+          "purpose": "explain",
+          "mode": "free",
+          "scope": "new",
+          "left": "",
+          "right": "",
+          "leftPalm": "",
+          "rightPalm": "",
+          "joint": "",
+          "axis": "",
+          "tempo": "",
+          "size": "",
+          "repeat": "",
+          "end": "",
+          "text": "Arms swing in large alternating arcs, upper body sways slightly, feet stay in place.",
+          "leftBend": "",
+          "rightBend": "",
+          "amplitude": "",
+          "cycles": "",
+          "seconds": "",
+          "userTurn": 0,
+          "evidence": "",
+          "lockFields": "",
+          "releaseFields": ""
+        },
+        "compiled": {
+          "name": "generate",
+          "description": "Arms swing in large alternating arcs, upper body sways slightly, feet stay in place.",
+          "controlPlan": null
+        },
+        "compileError": "",
+        "ledgerValidated": true,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-Of87YOiS7W4dSQYCqJPO8k6b8Wzb2jXy",
+      "elapsedSeconds": 0.672
+    },
+    {
+      "caseId": "en-no-motion-arithmetic",
+      "rawUser": "What is 18 plus 24? Just a brief answer, no gestures.",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "What is 18 plus 24? Just a brief answer, no gestures.",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "42.",
+      "motionTags": [],
+      "publicReplyExcerpt": "42.",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-pX9zNXvL4KWeFLhMynY8qNQzxr6orPQI",
+      "elapsedSeconds": 0.305
+    },
+    {
+      "caseId": "zh-real-contact-boundary",
+      "rawUser": "请拿起我桌上的水杯，递到我的手里。",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "请拿起我桌上的水杯，递到我的手里。",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "我无法执行此动作，因为我无法操作物理物体。",
+      "motionTags": [],
+      "publicReplyExcerpt": "我无法执行此动作，因为我无法操作物理物体。",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-Xti78IKHQ1CDCF7MCmPxNc5sthgHt5jS",
+      "elapsedSeconds": 0.343
+    },
+    {
+      "caseId": "en-deliberate-head-disagree",
+      "rawUser": "Shake your head slowly from side to side three times, with a medium-sized movement.",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "Shake your head slowly from side to side three times, with a medium-sized movement.",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "Understood. I will shake my head slowly from side to side three times with a medium-sized movement.\n\n<motion name=\"shake-head\" purpose=\"other\" mode=\"oscillate\" scope=\"new\" joint=\"head\" axis=\"up\" size=\"medium\" repeat=\"thrice\" tempo=\"gentle\" end=\"idle\" />",
+      "motionTags": [
+        "<motion name=\"shake-head\" purpose=\"other\" mode=\"oscillate\" scope=\"new\" joint=\"head\" axis=\"up\" size=\"medium\" repeat=\"thrice\" tempo=\"gentle\" end=\"idle\" />"
+      ],
+      "publicReplyExcerpt": "Understood. I will shake my head slowly from side to side three times with a medium-sized movement.",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "非 compose 动作仅接受 name 和 text 属性。",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [
+        "非 compose 动作仅接受 name 和 text 属性。"
+      ],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "oscillate",
+          "actual": null
+        },
+        "joint": {
+          "expected": "head",
+          "actual": null
+        },
+        "axis": {
+          "expected": "up",
+          "actual": null
+        },
+        "tempo": {
+          "expected": "gentle",
+          "actual": null
+        },
+        "size": {
+          "expected": "medium",
+          "actual": null
+        },
+        "repeat": {
+          "expected": "thrice",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-A1RXWGzKjOcOP0vdVgbvcIF94hWN3vuJ",
+      "elapsedSeconds": 0.644
+    },
+    {
+      "caseId": "zh-exact-duration",
+      "rawUser": "右臂朝前伸着、掌心朝我，只让右手腕摆动，摆动这一步用3秒。",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "右臂朝前伸着、掌心朝我，只让右手腕摆动，摆动这一步用3秒。",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "{\n  \"motion\": {\n    \"name\": \"plan\",\n    \"purpose\": \"explain\",\n    \"scope\": \"new\",\n    \"left\": \"none\",\n    \"right\": \"forward\",\n    \"leftPalm\": \"keep\",\n    \"rightPalm\": \"partner\",\n    \"mode\": \"oscillate\",\n    \"joint\": \"right-wrist\",\n    \"axis\": \"palm-normal\",\n    \"tempo\": \"natural\",\n    \"size\": \"small\",\n    \"repeat\": \"twice\",\n    \"end\": \"hold\",\n    \"lock\": \"rightBend=0,rightPalm=partner,joint=right-wrist,seconds=3\",\n    \"evidence\": \"右臂朝前伸着、掌心朝我，只让右手腕摆动，摆动这一步用3秒。\"\n  }\n}",
+      "motionTags": [],
+      "publicReplyExcerpt": "{\n  \"motion\": {\n    \"name\": \"plan\",\n    \"purpose\": \"explain\",\n    \"scope\": \"new\",\n    \"left\": \"none\",\n    \"right\": \"forward\",\n    \"leftPalm\": \"keep\",\n    \"rightPalm\": \"partner\",\n    \"mode\": \"oscillate\",\n    \"joint\": \"right-wrist\",\n    \"axis\": \"palm-normal\",\n    \"tempo\": \"natural\",\n    \"size\": \"small\",\n    \"repeat\": \"tw",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "oscillate",
+          "actual": null
+        },
+        "right": {
+          "expected": "forward",
+          "actual": null
+        },
+        "rightPalm": {
+          "expected": "partner",
+          "actual": null
+        },
+        "joint": {
+          "expected": "right-wrist",
+          "actual": null
+        },
+        "seconds": {
+          "expected": "3",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-WAYpN95An3d7w7JxZSqSq8dBabZukS0F",
+      "elapsedSeconds": 1.204
+    },
+    {
+      "caseId": "ja-replace-goal-with-evidence",
+      "rawUser": "前のポーズはやめて、新しく両腕を左右に開いてそのまま保って。",
+      "userTurn": 3,
+      "sourceFacts": {
+        "userTurn": 3,
+        "userText": "前のポーズはやめて、新しく両腕を左右に開いてそのまま保って。",
+        "purpose": "",
+        "constraints": [
+          {
+            "field": "left",
+            "value": "forward",
+            "userTurn": 2,
+            "evidence": "両腕を前に向けて保って。"
+          },
+          {
+            "field": "right",
+            "value": "forward",
+            "userTurn": 2,
+            "evidence": "両腕を前に向けて保って。"
+          }
+        ],
+        "lastPlanError": ""
+      },
+      "rawResponse": "了解しました。両腕を左右に開いた姿勢に更新します。\n<motion name=plan purpose=display mode=hold scope=new left=right right=left leftPalm=partner rightPalm=partner end=hold/>",
+      "motionTags": [
+        "<motion name=plan purpose=display mode=hold scope=new left=right right=left leftPalm=partner rightPalm=partner end=hold/>"
+      ],
+      "publicReplyExcerpt": "了解しました。両腕を左右に開いた姿勢に更新します。",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "motion 属性格式错误或重复。",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [
+        "motion 属性格式错误或重复。"
+      ],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "hold",
+          "actual": null
+        },
+        "left": {
+          "expected": "outward",
+          "actual": null
+        },
+        "right": {
+          "expected": "outward",
+          "actual": null
+        },
+        "end": {
+          "expected": "hold",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-Zq5NgdDCwNmoyUYEMVr16fYnzU1DbcXO",
+      "elapsedSeconds": 0.536
+    },
+    {
+      "caseId": "en-palm-goal-no-angle-invention",
+      "rawUser": "Reach your right arm forward and greet me naturally so I can see your palm. Choose a comfortable elbow position yourself.",
+      "userTurn": 2,
+      "sourceFacts": {
+        "userTurn": 2,
+        "userText": "Reach your right arm forward and greet me naturally so I can see your palm. Choose a comfortable elbow position yourself.",
+        "purpose": "",
+        "constraints": [],
+        "lastPlanError": ""
+      },
+      "rawResponse": "Hello! It's nice to meet you.",
+      "motionTags": [],
+      "publicReplyExcerpt": "Hello! It's nice to meet you.",
+      "csharp": {
+        "accepted": false,
+        "name": null,
+        "rejection": "",
+        "actionPlan": null,
+        "effective": null,
+        "compiled": null,
+        "compileError": "",
+        "ledgerValidated": false,
+        "motionSuccess": null
+      },
+      "shapeErrors": [],
+      "mismatches": {
+        "name": {
+          "expected": "plan",
+          "actual": null
+        },
+        "mode": {
+          "expected": "oscillate",
+          "actual": null
+        },
+        "right": {
+          "expected": "forward",
+          "actual": null
+        },
+        "rightPalm": {
+          "expected": "partner",
+          "actual": null
+        },
+        "joint": {
+          "expected": "right-wrist",
+          "actual": null
+        }
+      },
+      "planningChecksPassed": false,
+      "motionSuccess": null,
+      "purposeAppropriateness": "manual_review_required",
+      "sourceMeaningEntailment": "not_proven_by_quote_membership",
+      "model": "qwen36.gguf",
+      "requestId": "chatcmpl-9IHCAXDmHdFeXpYnYdgwSGzXxrQic1uG",
+      "elapsedSeconds": 0.355
+    }
+  ],
+  "modelRequests": 20,
+  "scope": "Public multilingual planning only; existing shared Qwen; no private persona or reasoning, no ARDY/Unity calls.",
+  "limitations": "Shape/ledger/compiler checks are not motion execution, naturalness, source-quote semantic entailment or generalization success. Development cases guide iteration; six held-out expressions are evaluated at most once.",
+  "busyPolicy": "Every request requires all current slots explicitly idle; busy/unknown defers without queueing or retries.",
+  "sources": {
+    "Tools/MotionAdapter/SemanticMotionProtocolChecks.cs": "61865d6c97b36154b3625d9955c1830be44cfbe7ab58bca7034c458cf2e887d8",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlan.cs": "319df0e62bfee4687d55ed85a7b1f921a32c245fef665bcada41cabfde674f0e",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlanCompiler.cs": "8195ee630d5161eb422fb0127e2970bf3e28e3058e2c18e005aa473dfb3c8209",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionConstraintLedger.cs": "40e25d318d59ab08cf7d77629f2f7386d8d9152aec2d34e186b2661169998e2a",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "82b4a83ce6ccb73ee1ccc81a9e5e46e9d8b23b71f4161e54a5a1e4cdd95a14cc",
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "3a79c4492d97ffc02e04fc5c8748715f3d5be888829e58d800bb13d7904768a9",
+    "Assets/AIChatTookit/Scripts/Chat/RoleOutputChannels.cs": "6c434e2c73cbdb805cc9fe798b8579436e3266ac393432fa557a8387bac8a0f4",
+    "Assets/AIChatTookit/Scripts/Chat/SpeechText.cs": "a2f88c73aa98c34814b953b9ab9fe43cf9c1e51758b70976dc70e48b93cdf820",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyAdaptiveTiming.cs": "79aa8926926531f7370693c98454a09d7f32a5965d6f4050f66e4fa4fd8a6f72"
+  },
+  "passedPlanningChecks": 5
+}

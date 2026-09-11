@@ -1,0 +1,54 @@
+{
+  "cpu": {
+    "tests": 21,
+    "passed": true,
+    "command": "python -m unittest -v test_motion_generated_capability.py test_intent_consistency.py"
+  },
+  "status": "source-frozen-awaiting-real-unity-regression",
+  "limitations": [
+    "Known capability phrase checks are not a universal semantic classifier.",
+    "Previously played streamed speech cannot be retracted; remaining failed-round speech is discarded.",
+    "Same-Qwen corrections use collected output before dispatch; physical success is measured separately.",
+    "Legacy Generated and experimental Semantic contract literals remain unchanged; feedback extension v2 has known public development failures."
+  ],
+  "unity": {
+    "requestedEntryPoint": "ArdyMotionFeedbackChatRegression.RunInteractive",
+    "executedHere": false
+  },
+  "checkedAtUtc": "2026-09-10T12:17:54.4375190Z",
+  "sources": [
+    {
+      "sha256": "d70d5a07e6767745360487e535ef512723509e087dd15fa42d9f977eb487ec54",
+      "path": "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs"
+    },
+    {
+      "sha256": "296c589826f09cc76654175d6c8982314bdb59f2afe41cafba2be00cd8cb0af1",
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.MotionFeedback.cs"
+    },
+    {
+      "sha256": "40fd31bca1d570f7e70089084d538a399b33c91c110e433a341224857c4ea177",
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs"
+    },
+    {
+      "sha256": "97191351f9b82343a86e2d71575379bd62492b68edf8393567af175003c1a6e9",
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.ActionPlanning.cs"
+    },
+    {
+      "sha256": "7e9ed5b082c964a7aa19e14ee982cd6efe311a0dfb8286fe15ed9118117834fe",
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.cs"
+    },
+    {
+      "sha256": "f9d5b7d942a19ea9055291e803795bac85d55ea2875c206f0c86ba38dee15bb6",
+      "path": "Assets/Editor/ArdyMotionFeedbackChatRegression.cs"
+    }
+  ],
+  "capabilityRegression": {
+    "afterExitCode": 0,
+    "testSourceSha256": "f67dc8c8c1179b76372556eebabadc01f82afde0377703a6ea806c8920e78b42",
+    "before": "Tools/MotionAdapter/reports/motion-generated-capability-before.txt",
+    "testSource": "Tools/MotionAdapter/test_motion_generated_capability.py",
+    "beforeExitCode": 1,
+    "historicalUnityFailure": "Server/ARDY/runtime/intent-feedback-v1/pass2/ArdyMotionFeedbackChatRegression/unity.log",
+    "after": "Tools/MotionAdapter/reports/motion-generated-capability-after.txt"
+  }
+}

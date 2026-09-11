@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "dataset_sha256": "f137cc3b104a339350accf185b33bb739b55dc9c53b8af2f992a7cce977b7967",
+  "qwen_contract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+  "teacher_contract": "5179f91dcafe261730bd9adf2bc5f1d3fe77b7befe28b2c6ced6987d81ba8a30",
+  "selection_rule": "Architecture by mean validation standardized MSE across seeds 0 and 1; checkpoint by best validation score within that architecture.",
+  "selected_checkpoint": "mlp-seed1.pt",
+  "aggregates": {
+    "linear": {
+      "validation_mse_mean": 0.13823086768388748,
+      "validation_mse_std": 0.0007365867495536804
+    },
+    "mlp": {
+      "validation_mse_mean": 0.10063676536083221,
+      "validation_mse_std": 0.0001932680606842041
+    }
+  },
+  "runs": [
+    {
+      "name": "linear-seed0",
+      "architecture": "linear",
+      "seed": 0,
+      "checkpoint": "linear-seed0.pt",
+      "best_epoch": 98,
+      "scores": {
+        "train": {
+          "standardized_mse": 0.09689641743898392,
+          "cosine": 0.9867647886276245,
+          "norm_ratio": 0.9847620129585266
+        },
+        "val": {
+          "standardized_mse": 0.13896745443344116,
+          "cosine": 0.980898916721344,
+          "norm_ratio": 0.9777250289916992
+        },
+        "test": {
+          "standardized_mse": 0.12227228283882141,
+          "cosine": 0.9831296801567078,
+          "norm_ratio": 0.9873642325401306
+        }
+      },
+      "constant_train_mean_baseline": {
+        "train": {
+          "standardized_mse": 1.0,
+          "cosine": 0.8399893641471863,
+          "norm_ratio": 0.8399935960769653
+        },
+        "val": {
+          "standardized_mse": 1.0250931978225708,
+          "cosine": 0.8380025029182434,
+          "norm_ratio": 0.8384450674057007
+        },
+        "test": {
+          "standardized_mse": 0.9918652176856995,
+          "cosine": 0.8419214487075806,
+          "norm_ratio": 0.841236412525177
+        }
+      }
+    },
+    {
+      "name": "linear-seed1",
+      "architecture": "linear",
+      "seed": 1,
+      "checkpoint": "linear-seed1.pt",
+      "best_epoch": 100,
+      "scores": {
+        "train": {
+          "standardized_mse": 0.09374770522117615,
+          "cosine": 0.9872587323188782,
+          "norm_ratio": 0.9825737476348877
+        },
+        "val": {
+          "standardized_mse": 0.1374942809343338,
+          "cosine": 0.9811407923698425,
+          "norm_ratio": 0.9757810235023499
+        },
+        "test": {
+          "standardized_mse": 0.11660446226596832,
+          "cosine": 0.9839849472045898,
+          "norm_ratio": 0.9843726754188538
+        }
+      },
+      "constant_train_mean_baseline": {
+        "train": {
+          "standardized_mse": 1.0,
+          "cosine": 0.8399893641471863,
+          "norm_ratio": 0.8399935960769653
+        },
+        "val": {
+          "standardized_mse": 1.0250931978225708,
+          "cosine": 0.8380025029182434,
+          "norm_ratio": 0.8384450674057007
+        },
+        "test": {
+          "standardized_mse": 0.9918652176856995,
+          "cosine": 0.8419214487075806,
+          "norm_ratio": 0.841236412525177
+        }
+      }
+    },
+    {
+      "name": "mlp-seed0",
+      "architecture": "mlp",
+      "seed": 0,
+      "checkpoint": "mlp-seed0.pt",
+      "best_epoch": 100,
+      "scores": {
+        "train": {
+          "standardized_mse": 0.06396102905273438,
+          "cosine": 0.991554319858551,
+          "norm_ratio": 0.9884867668151855
+        },
+        "val": {
+          "standardized_mse": 0.10083003342151642,
+          "cosine": 0.9865015149116516,
+          "norm_ratio": 0.9802118539810181
+        },
+        "test": {
+          "standardized_mse": 0.08556195348501205,
+          "cosine": 0.9885761737823486,
+          "norm_ratio": 0.9882596135139465
+        }
+      },
+      "constant_train_mean_baseline": {
+        "train": {
+          "standardized_mse": 1.0,
+          "cosine": 0.8399893641471863,
+          "norm_ratio": 0.8399935960769653
+        },
+        "val": {
+          "standardized_mse": 1.0250931978225708,
+          "cosine": 0.8380025029182434,
+          "norm_ratio": 0.8384450674057007
+        },
+        "test": {
+          "standardized_mse": 0.9918652176856995,
+          "cosine": 0.8419214487075806,
+          "norm_ratio": 0.841236412525177
+        }
+      }
+    },
+    {
+      "name": "mlp-seed1",
+      "architecture": "mlp",
+      "seed": 1,
+      "checkpoint": "mlp-seed1.pt",
+      "best_epoch": 100,
+      "scores": {
+        "train": {
+          "standardized_mse": 0.0633942186832428,
+          "cosine": 0.9916204214096069,
+          "norm_ratio": 0.9902257323265076
+        },
+        "val": {
+          "standardized_mse": 0.10044349730014801,
+          "cosine": 0.9865381121635437,
+          "norm_ratio": 0.9824483394622803
+        },
+        "test": {
+          "standardized_mse": 0.08640595525503159,
+          "cosine": 0.988376796245575,
+          "norm_ratio": 0.9902514815330505
+        }
+      },
+      "constant_train_mean_baseline": {
+        "train": {
+          "standardized_mse": 1.0,
+          "cosine": 0.8399893641471863,
+          "norm_ratio": 0.8399935960769653
+        },
+        "val": {
+          "standardized_mse": 1.0250931978225708,
+          "cosine": 0.8380025029182434,
+          "norm_ratio": 0.8384450674057007
+        },
+        "test": {
+          "standardized_mse": 0.9918652176856995,
+          "cosine": 0.8419214487075806,
+          "norm_ratio": 0.841236412525177
+        }
+      }
+    }
+  ],
+  "limitation": "Synthetic template corpus and two seeds only. Held-out feature scores do not establish real motion quality or production readiness."
+}

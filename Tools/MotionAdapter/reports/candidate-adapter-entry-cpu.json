@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "passed": true,
+  "utc": "2026-09-10T05:49:51.528435+00:00",
+  "scope": "CPU-only synthetic checkpoint/selection locks and existing service protocol; no live candidate quality or GPU execution",
+  "tests": {
+    "candidate_lock_groups": 6,
+    "selection_policy": 7,
+    "service_protocol": 11
+  },
+  "candidate_gpu_tested": false,
+  "real_candidate_trained": false,
+  "test_metrics_computed": false,
+  "default_launcher_modified": false,
+  "source_sha256": {
+    "Server/ARDY/motion_service/adapter_selection.py": "034417768d019b356c86b7dde62d0ea0aa52ce0c2a37dd058902cc1107906aec",
+    "Server/ARDY/motion_service/backend.py": "4e80033d9d4b13d77841c87aad8ec24a03efa95fdd14684a8c4f2409f38e9f86",
+    "Server/ARDY/motion_service/app.py": "eeff8b3596e2473f546fffd2058c9358c9a7d5bcd32046cd09c9f7ee9e3a567b",
+    "Server/ARDY/test_adapter_selection.py": "79794975467757f87e99ed0bcbf7e50a77e2877c5ef42169e77682c8f140f43b",
+    "Tools/MotionAdapter/train_extension.py": "9f177dd3af245f390a5166752fc8c45e181e3eb14ebdd6443e82eb27997c74fb"
+  }
+}

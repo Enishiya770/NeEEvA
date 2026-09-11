@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "checks": [
+    "Validated two-row prefix resumes remaining four rows and reproduces frozen values",
+    "Contract mismatch rejected before requests",
+    "Changed text manifest rejected before requests"
+  ],
+  "scope": "CPU integrity and resumability; requests in this regression are mocked. Separate production control export verified exact real features."
+}

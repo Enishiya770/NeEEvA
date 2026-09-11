@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "passed": true,
+  "utc": "2026-09-10T06:22:48.749013+00:00",
+  "scope": "Synthetic CPU evidence gates plus strict real-shape MLP loading, no actual release or runtime activation",
+  "tests": {
+    "release": 6,
+    "candidate": 6,
+    "conditioning": 4,
+    "service": 11
+  },
+  "active_file_written": false,
+  "services_started": false,
+  "gpu_used": false,
+  "naturalnessAccepted": false,
+  "source_sha256": {
+    "Server/ARDY/motion_service/adapter_release.py": "ba4d6eeba66f592c1540da5985cfcf4289cda4aaffac36eb09a908e35b95c057",
+    "Server/ARDY/motion_service/app.py": "933f068c3d10f0190083a34d3f3df23aea8a49b8f531020e58a3bd5e3958fc07",
+    "Server/ARDY/motion_service/backend.py": "8c6f1eef11cf3dcece283f382234b0ca4c46c1ade3efb02d0915f0135c1ca642",
+    "Server/ARDY/test_adapter_release.py": "a3106e2acd03ebbbf5a2086f2561002f45cd8cc5007af9f89090785c37959a8f",
+    "Server/ARDY/start_motion_service.ps1": "c3a0853561f9d577ee51792b18195f45eb2fa4d9f5b0a776974dbf6e92283a6d"
+  },
+  "launcher_validation": {
+    "powershell_ast_errors": 0,
+    "conflicting_adapter_parameter_pairs_rejected_before_python": 3,
+    "service_started": false
+  }
+}

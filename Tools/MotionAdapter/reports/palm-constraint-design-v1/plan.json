@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "primaryEntry": "ArdyConstraintRegression.RunPalmPrimaryBatch",
+  "fullEntry": "ArdyConstraintRegression.RunPalmBatch",
+  "actualLoop": "Animator, Player10000, VRM, production Observer12000, independent harness12500; no manual Tick/Observe",
+  "storedSampleLimitHz": 80,
+  "frameChecks": "every real frame; raw phase transitions retained even between storage intervals",
+  "testCases": [
+    "actual first Qwen original XML -> current production parser -> auto bend -> real Chat event/Bridge/Controller -> partner palm-normal10deg two cycles",
+    "explicitly bound partner beats adversarial MainCamera",
+    "different-side elevated target is captured at new-plan start; moving it mid-plan does not retarget the snapshot",
+    "current keep preserves actual arm/hand rotations",
+    "current with palm up/down preserves shoulder/elbow/wrist positions while allowing forearm axial roll",
+    "palm inward/outward",
+    "legacy keep10deg two cycles",
+    "original XML with old fixed8 policy is a measured low-margin reachable boundary: full curve must complete within unchanged80deg bound",
+    "explicit0 rejects rather than silently changing bend",
+    "missing actual humanoid finger map, negative/nonuniform scale are unsupported; keep accepts absent optional finger map",
+    "no bound target/no MainCamera fallback explicitly labelled character-forward",
+    "MainCamera fallback records actual camera position",
+    "Controller retains exact rejected plan and error, never claims holding; Bind clears",
+    "actual11900 arm override becomes production observer/controller runtime failure; retained plan/error then Bind clears"
+  ],
+  "thresholds": {
+    "armDirectionDegrees": 5,
+    "fixedBendErrorDegrees": 4,
+    "palmTrackingDegrees": 5,
+    "actualWristSwingDegrees": 80.05,
+    "currentPointDriftMeters": 0.005,
+    "currentKeepQuaternionDegrees": 0.25
+  },
+  "independentBasis": "Triangle Hand/IndexProximal/LittleProximal with anatomical sign; measured static deviation from runtime MiddleProximal basis0.2479deg, no threshold loosening",
+  "uncontrolledPreservation": "Paired real Animator root/torso/legs/blendshape checks retained; explicit palm excludes only forearm axial rotation from old full-rotation stability gate",
+  "positiveNegativePolicy": "Public Qwen auto plan and feasible positive cases must actually complete; expected unreachable/unsupported/runtime-fault cases have explicit failure assertions and cannot substitute for positive success",
+  "sourceHashes": {
+    "Assets/Editor/ArdyConstraintRegression.cs": "be2101ce0e0ddfc7a3c2966d44819158dba5bfed3f24b6327a19b540887ce5d3",
+    "Assets/Editor/ArdyConstraintPalmRegression.cs": "aea7dfb8fa6b4eaa5238dd8cc60581c3c61def2093a5060e285836fdd3091dd9",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyPalmGeometry.cs": "e78ac5872c58bce4e65ea36e77b95ff12845aefbffa963456b8e5af795410764",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyConstraintSession.cs": "a730dc5f7d3233b60207258ed1fb67911427e5bc9490c7ebbced5e88691b9831",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "b66004fee7c13d01ce43d614a2c1e19b43e29839dc059b33cde443af5c87f90f"
+  },
+  "notClaimed": [
+    "exhaustive parameter combinations",
+    "medical safety of engineering wrist bounds",
+    "native ARDY or adapter quality improvement",
+    "subjective naturalness or body/clothing collision guarantee"
+  ],
+  "archivedWrongNegativeExpectation": "Server/ARDY/runtime/palm-execution-v1/full-failed-v1/constraint-regression.json",
+  "boundaryEvidence": "fixed8 actual bend stayed8deg; actual swing79.39..79.69deg and full-curve planned swing79.45..79.75deg. Reaching this pose was correct; the test expectation was wrong."
+}

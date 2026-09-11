@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "manifest": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\render-manifest.json",
+  "manifestSha256": "4b0604a836c02e7c70d9702e521928a6d286bd8df672df622678853535d98176",
+  "playerSourceSha256": "444b9d8fb00ed8055e2a82c6bdc5344544642182783c4dfdbb4f7abae0049654",
+  "baselinePoseSha256": "104a3bebcca6ffb66c51a78ff47ac93357c4aca892c17dd2250e6a5d06dd69d8",
+  "camera": {
+    "center": {
+      "x": 0.016132831573486328,
+      "y": 1.2611114978790283,
+      "z": 0.18878421187400818
+    },
+    "orthographicSize": 0.6715932488441467
+  },
+  "clips": [
+    {
+      "id": "raise-actual-old-grounded-seed0",
+      "inputSha256": "78db0327810ca4f0e4c9f0c642ff902b645841e530f3d68e030eb4ca95bddbc6",
+      "renderedFrames": 130,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\raise-actual-old-grounded-seed0-current-root-global",
+      "semanticPass": null,
+      "necessaryBothWristsAboveHeadPlus5cmDuringSixSeconds": {
+        "frameFraction": 0.0,
+        "firstObservedSeconds": null,
+        "longestContinuousSeconds": 0.0
+      },
+      "metricScope": "Actual target-avatar world Y wrist minus Head joint; same-frame bilateral threshold. Frame intervals are 50ms. This is a necessary observation, not full arm extension or palm compliance."
+    },
+    {
+      "id": "raise-actual-candidate-grounded-seed0",
+      "inputSha256": "8aa8f4efc8ed32c0d66ba8c4ca4ddd1d676f40a1accf65073dab0041d96da8e6",
+      "renderedFrames": 130,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\raise-actual-candidate-grounded-seed0-current-root-global",
+      "semanticPass": null,
+      "necessaryBothWristsAboveHeadPlus5cmDuringSixSeconds": {
+        "frameFraction": 0.44166666666666665,
+        "firstObservedSeconds": 2.2,
+        "longestContinuousSeconds": 2.65
+      },
+      "metricScope": "Actual target-avatar world Y wrist minus Head joint; same-frame bilateral threshold. Frame intervals are 50ms. This is a necessary observation, not full arm extension or palm compliance."
+    },
+    {
+      "id": "raise-actual-old-grounded-seed1",
+      "inputSha256": "e855dc8ded15beee4957e87241376204a854bab57a789659df2691a884d9e980",
+      "renderedFrames": 130,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\raise-actual-old-grounded-seed1-current-root-global",
+      "semanticPass": null,
+      "necessaryBothWristsAboveHeadPlus5cmDuringSixSeconds": {
+        "frameFraction": 0.0,
+        "firstObservedSeconds": null,
+        "longestContinuousSeconds": 0.0
+      },
+      "metricScope": "Actual target-avatar world Y wrist minus Head joint; same-frame bilateral threshold. Frame intervals are 50ms. This is a necessary observation, not full arm extension or palm compliance."
+    },
+    {
+      "id": "raise-actual-candidate-grounded-seed1",
+      "inputSha256": "64671badaa0c129deda5103a03575a66a4c65b4af84062cdbc42b58bee89b7ca",
+      "renderedFrames": 130,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\raise-actual-candidate-grounded-seed1-current-root-global",
+      "semanticPass": null,
+      "necessaryBothWristsAboveHeadPlus5cmDuringSixSeconds": {
+        "frameFraction": 0.05,
+        "firstObservedSeconds": 2.35,
+        "longestContinuousSeconds": 0.3
+      },
+      "metricScope": "Actual target-avatar world Y wrist minus Head joint; same-frame bilateral threshold. Frame intervals are 50ms. This is a necessary observation, not full arm extension or palm compliance."
+    },
+    {
+      "id": "explain-actual-old-grounded-seed0",
+      "inputSha256": "fd92e9d1d59a54bc3ce1c90683fac595650fcee2d9ec442ae0095958f03e625e",
+      "renderedFrames": 130,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\explain-actual-old-grounded-seed0-current-root-global",
+      "semanticPass": null,
+      "metricScope": "Explain observations remain descriptive and manual; no overhead criterion is applied."
+    },
+    {
+      "id": "explain-actual-candidate-grounded-seed0",
+      "inputSha256": "420f7ac19e9b097bcbd10dc712fbe42c2caeb6b7cce86f64aeaa918cef36c7eb",
+      "renderedFrames": 130,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\explain-actual-candidate-grounded-seed0-current-root-global",
+      "semanticPass": null,
+      "metricScope": "Explain observations remain descriptive and manual; no overhead criterion is applied."
+    },
+    {
+      "id": "explain-actual-old-grounded-seed1",
+      "inputSha256": "25adc01552feb974d54375a59ac06a8aa3ec1b6f83a17c362509b072535a6034",
+      "renderedFrames": 130,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\explain-actual-old-grounded-seed1-current-root-global",
+      "semanticPass": null,
+      "metricScope": "Explain observations remain descriptive and manual; no overhead criterion is applied."
+    },
+    {
+      "id": "explain-actual-candidate-grounded-seed1",
+      "inputSha256": "e53ca3a91e38e2b596bed0dffc0f9925ef680cfb6afc46dc61a40aa233094bd2",
+      "renderedFrames": 130,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\explain-actual-candidate-grounded-seed1-current-root-global",
+      "semanticPass": null,
+      "metricScope": "Explain observations remain descriptive and manual; no overhead criterion is applied."
+    },
+    {
+      "id": "val-00904-candidate-grounded-seed0",
+      "inputSha256": "ae578ba0bd2885402596f9a571c6fa298f7bf79c9e1e09f5ad1da583ceeae7fb",
+      "renderedFrames": 130,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\val-00904-candidate-grounded-seed0-current-root-global",
+      "semanticPass": null,
+      "necessaryBothWristsAboveHeadPlus5cmDuringSixSeconds": {
+        "frameFraction": 0.5083333333333333,
+        "firstObservedSeconds": 2.6,
+        "longestContinuousSeconds": 3.05
+      },
+      "metricScope": "Actual target-avatar world Y wrist minus Head joint; same-frame bilateral threshold. Frame intervals are 50ms. This is a necessary observation, not full arm extension or palm compliance."
+    },
+    {
+      "id": "val-00904-candidate-grounded-seed1",
+      "inputSha256": "e0726b7d1916a4362444982e81eb68ab6c66e36fd20f1b423c0e7d93f8320bc1",
+      "renderedFrames": 130,
+      "framesDirectory": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\candidate-vrm-review-v1\\val-00904-candidate-grounded-seed1-current-root-global",
+      "semanticPass": null,
+      "necessaryBothWristsAboveHeadPlus5cmDuringSixSeconds": {
+        "frameFraction": 0.0,
+        "firstObservedSeconds": null,
+        "longestContinuousSeconds": 0.0
+      },
+      "metricScope": "Actual target-avatar world Y wrist minus Head joint; same-frame bilateral threshold. Frame intervals are 50ms. This is a necessary observation, not full arm extension or palm compliance."
+    }
+  ],
+  "rendering": "Actual NEVA VRM with production original mapping; BakeMesh on every frame; frozen real Animator baseline; all ten native clips unchanged.",
+  "servicesStarted": false,
+  "originalProjectChanged": false,
+  "visualObservations": {
+    "raise-actual-seed0": "Selected candidate has both arms visibly raised at the 3-second contact-sheet frame; old has one raised arm at 5 seconds. Candidate response is delayed and not perfectly sustained.",
+    "raise-actual-seed1": "Candidate often has one hand higher than the other; a short bilateral height event is not complete consistent overhead action.",
+    "explain-actual-seed0": "At 5 seconds candidate visibly moves both forearms, while old mainly moves one. Exact palm-up shape and naturalness still need manual judgment.",
+    "explain-actual-seed1": "Selected 0.5,1.5,3,5-second frames are near idle, so no full explanatory-action success claim is made."
+  },
+  "artifactManifest": "E:\\VRproject\\VR20250611\\NeEEvA\\Logs\\ardy-generalization\\review-spec-manifest.json",
+  "automaticOverallSemanticSuccess": null
+}

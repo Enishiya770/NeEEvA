@@ -1,0 +1,2809 @@
+{
+  "schema": 1,
+  "status": "complete",
+  "sourceReport": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generalization-final-supported-v1\\report.json",
+  "sourceReportSha256": "2159fbc3c7aefc569cb409cc57b40e4834ca5d457b4ece9f3d216db0ecf68be9",
+  "planSha256": "fb1677b5fe2a9d8287b6e3f791598109dfb24a9b8a72c77742f7ab6472d931f1",
+  "datasetSha256": "bad7ec319c961c077b8ab92eb39eb8482e847c2ff67d6c39e5a8434b3e197889",
+  "sourceScripts": {
+    "evaluate_native_motion.py": "f562b984214a07e617f13960c39c735e424e2d03891ce840c6e775e5d94f655a",
+    "native_motion_measurements.py": "b953229ea92054b108774c3e7efd7ab4d56d44defaddf17fef1fb78adbb59b9d",
+    "diagnose_generated_motion.py": "139f4d9e8c4d695520287d74c867565bbf1d9d679e8f80f54d3f3a6c0d3eac46",
+    "motion_service/backend.py": "8c6f1eef11cf3dcece283f382234b0ca4c46c1ade3efb02d0915f0135c1ca642"
+  },
+  "summarizerSha256": "53fdb1842463463346abaf0d8995c90e05c3fabdaf5782dbbe6215c58ba68552",
+  "candidateSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+  "records": 64,
+  "semanticGroups": 32,
+  "conditions": [
+    "old",
+    "candidate",
+    "teacher"
+  ],
+  "trajectories": 384,
+  "history": "Same captured Animator projected grounded16, continuation16",
+  "seeds": [
+    0,
+    1
+  ],
+  "necessaryObservationPolicy": "Explicit label-defined world-Y height gates only. Both sides must satisfy a bilateral gate in the same frame. Gates are necessary observations, never complete semantic or naturalness successes. Event counts, ordering, palms and target-avatar clipping remain manual.",
+  "timingPolicy": "First/hold medians exclude unreached observations. Paired timing differences include only observations reached by both conditions. Generation timings exclude Qwen encoding, networking, service queues, Unity playback and speech; this is not live end-to-end latency. Conditions run in fixed teacher/old/candidate order, so these timings are descriptive, not a controlled comparative speed benchmark.",
+  "totalOfflineWallSeconds": 177.83858260000125,
+  "rows": [
+    {
+      "condition": "old",
+      "trajectories": 128,
+      "explicitNecessaryHeightObservations": {
+        "denominator": 36,
+        "reached": 16,
+        "notReached": 20,
+        "reachedWithin1Second": 6,
+        "reachedWithin2Seconds": 6,
+        "firstObservedSecondsReachedOnly": {
+          "count": 16,
+          "mean": 2.45,
+          "median": 3.4000000000000004,
+          "p95": 4.2625,
+          "minimum": 0.0,
+          "maximum": 4.9
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 16,
+          "mean": 2.475,
+          "median": 1.8499999999999999,
+          "p95": 6.0,
+          "minimum": 0.35,
+          "maximum": 6.0
+        },
+        "frameFractionReachedOnly": {
+          "count": 16,
+          "mean": 0.4322916666666667,
+          "median": 0.33333333333333337,
+          "p95": 1.0,
+          "minimum": 0.06666666666666667,
+          "maximum": 1.0
+        }
+      },
+      "offlineGenerationWindowMilliseconds": {
+        "count": 384,
+        "mean": 112.13982473926383,
+        "median": 110.44620000757277,
+        "p95": 128.146905003814,
+        "minimum": 99.50559999560937,
+        "maximum": 157.96490001957864
+      },
+      "firstWindowMilliseconds": {
+        "count": 128,
+        "mean": 114.16009531376403,
+        "median": 113.05780000111554,
+        "p95": 133.5754650135641,
+        "minimum": 99.50559999560937,
+        "maximum": 157.96490001957864
+      },
+      "allThreeGenerationWindowsMilliseconds": {
+        "count": 128,
+        "mean": 336.4194742177915,
+        "median": 332.9186499759089,
+        "p95": 364.2550200034747,
+        "minimum": 305.93739994219504,
+        "maximum": 404.797699971823
+      }
+    },
+    {
+      "condition": "candidate",
+      "trajectories": 128,
+      "explicitNecessaryHeightObservations": {
+        "denominator": 36,
+        "reached": 21,
+        "notReached": 15,
+        "reachedWithin1Second": 4,
+        "reachedWithin2Seconds": 5,
+        "firstObservedSecondsReachedOnly": {
+          "count": 21,
+          "mean": 3.5595238095238093,
+          "median": 4.05,
+          "p95": 5.9,
+          "minimum": 0.0,
+          "maximum": 5.95
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 21,
+          "mean": 1.8285714285714285,
+          "median": 1.15,
+          "p95": 6.0,
+          "minimum": 0.05,
+          "maximum": 6.0
+        },
+        "frameFractionReachedOnly": {
+          "count": 21,
+          "mean": 0.30634920634920637,
+          "median": 0.19166666666666668,
+          "p95": 1.0,
+          "minimum": 0.008333333333333333,
+          "maximum": 1.0
+        }
+      },
+      "offlineGenerationWindowMilliseconds": {
+        "count": 384,
+        "mean": 111.07004296809464,
+        "median": 109.52555001131259,
+        "p95": 124.57800500123993,
+        "minimum": 96.92459998768754,
+        "maximum": 141.95619997917674
+      },
+      "firstWindowMilliseconds": {
+        "count": 128,
+        "mean": 111.5338656240965,
+        "median": 110.00564999994822,
+        "p95": 123.307959997328,
+        "minimum": 100.75610000058077,
+        "maximum": 141.95619997917674
+      },
+      "allThreeGenerationWindowsMilliseconds": {
+        "count": 128,
+        "mean": 333.2101289042839,
+        "median": 328.8400000164984,
+        "p95": 360.7831850007642,
+        "minimum": 307.44330000015907,
+        "maximum": 377.8822000022046
+      }
+    },
+    {
+      "condition": "teacher",
+      "trajectories": 128,
+      "explicitNecessaryHeightObservations": {
+        "denominator": 36,
+        "reached": 32,
+        "notReached": 4,
+        "reachedWithin1Second": 4,
+        "reachedWithin2Seconds": 9,
+        "firstObservedSecondsReachedOnly": {
+          "count": 32,
+          "mean": 2.9921874999999996,
+          "median": 3.25,
+          "p95": 5.795,
+          "minimum": 0.0,
+          "maximum": 5.9
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 32,
+          "mean": 2.3984375,
+          "median": 2.0,
+          "p95": 6.0,
+          "minimum": 0.1,
+          "maximum": 6.0
+        },
+        "frameFractionReachedOnly": {
+          "count": 32,
+          "mean": 0.4028645833333333,
+          "median": 0.3333333333333333,
+          "p95": 1.0,
+          "minimum": 0.016666666666666666,
+          "maximum": 1.0
+        }
+      },
+      "offlineGenerationWindowMilliseconds": {
+        "count": 384,
+        "mean": 122.32115000028898,
+        "median": 112.40275000454858,
+        "p95": 193.78384000156072,
+        "minimum": 99.78239997872151,
+        "maximum": 243.3428000076674
+      },
+      "firstWindowMilliseconds": {
+        "count": 128,
+        "mean": 141.44414453198806,
+        "median": 123.92959999851882,
+        "p95": 220.57467499689665,
+        "minimum": 102.01790000428446,
+        "maximum": 243.3428000076674
+      },
+      "allThreeGenerationWindowsMilliseconds": {
+        "count": 128,
+        "mean": 366.96345000086694,
+        "median": 350.5485000205226,
+        "p95": 448.2878399794572,
+        "minimum": 305.51249999552965,
+        "maximum": 509.3079000071157
+      }
+    }
+  ],
+  "pairedComparisons": [
+    {
+      "condition": "candidate",
+      "baseline": "old",
+      "newlyReached": [
+        [
+          "generalization-v1-01-2",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-05-1",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-05-2",
+          0,
+          0
+        ],
+        [
+          "generalization-v1-05-2",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-06-1",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-06-2",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-24-1",
+          0,
+          0
+        ],
+        [
+          "generalization-v1-24-1",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-26-1",
+          0,
+          1
+        ]
+      ],
+      "noLongerReached": [
+        [
+          "generalization-v1-02-1",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-02-2",
+          0,
+          0
+        ],
+        [
+          "generalization-v1-02-2",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-03-2",
+          0,
+          0
+        ]
+      ],
+      "pairedCommonReachedFirstTimeDifferenceSeconds": {
+        "count": 12,
+        "mean": 0.2541666666666665,
+        "median": 0.0,
+        "p95": 2.692499999999999,
+        "minimum": -1.95,
+        "maximum": 3.05
+      },
+      "pairedCommonReachedLongestHoldDifferenceSeconds": {
+        "count": 12,
+        "mean": -0.19583333333333328,
+        "median": 0.0,
+        "p95": 1.0699999999999994,
+        "minimum": -2.15,
+        "maximum": 1.4
+      }
+    },
+    {
+      "condition": "candidate",
+      "baseline": "teacher",
+      "newlyReached": [
+        [
+          "generalization-v1-05-1",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-06-1",
+          1,
+          0
+        ]
+      ],
+      "noLongerReached": [
+        [
+          "generalization-v1-02-1",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-02-2",
+          0,
+          0
+        ],
+        [
+          "generalization-v1-02-2",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-03-2",
+          0,
+          0
+        ],
+        [
+          "generalization-v1-03-2",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-06-2",
+          0,
+          0
+        ],
+        [
+          "generalization-v1-24-2",
+          0,
+          0
+        ],
+        [
+          "generalization-v1-24-2",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-26-1",
+          1,
+          1
+        ],
+        [
+          "generalization-v1-26-2",
+          0,
+          1
+        ],
+        [
+          "generalization-v1-27-1",
+          0,
+          0
+        ],
+        [
+          "generalization-v1-27-1",
+          1,
+          0
+        ],
+        [
+          "generalization-v1-27-2",
+          0,
+          0
+        ]
+      ],
+      "pairedCommonReachedFirstTimeDifferenceSeconds": {
+        "count": 19,
+        "mean": 0.8315789473684211,
+        "median": 0.15000000000000036,
+        "p95": 2.564999999999997,
+        "minimum": -0.10000000000000053,
+        "maximum": 4.050000000000001
+      },
+      "pairedCommonReachedLongestHoldDifferenceSeconds": {
+        "count": 19,
+        "mean": -0.7710526315789474,
+        "median": -0.1499999999999999,
+        "p95": 0.37999999999999723,
+        "minimum": -4.0,
+        "maximum": 1.5499999999999998
+      }
+    }
+  ],
+  "groups": [
+    {
+      "semanticGroup": "generalization-v1/asymmetric-left-shoulder-right-chest",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-24-1",
+        "generalization-v1-24-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 0,
+        "notReached": 4,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/asymmetric-left-shoulder-right-chest",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-24-1",
+        "generalization-v1-24-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 2,
+        "notReached": 2,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 2,
+          "mean": 5.075,
+          "median": 5.075,
+          "p95": 5.8175,
+          "minimum": 4.25,
+          "maximum": 5.9
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 2,
+          "mean": 0.925,
+          "median": 0.925,
+          "p95": 1.6675,
+          "minimum": 0.1,
+          "maximum": 1.75
+        },
+        "frameFractionReachedOnly": {
+          "count": 2,
+          "mean": 0.15416666666666667,
+          "median": 0.15416666666666667,
+          "p95": 0.27791666666666665,
+          "minimum": 0.016666666666666666,
+          "maximum": 0.2916666666666667
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/asymmetric-left-shoulder-right-chest",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-24-1",
+        "generalization-v1-24-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 4,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 4,
+          "mean": 4.7625,
+          "median": 4.925,
+          "p95": 5.75,
+          "minimum": 3.45,
+          "maximum": 5.75
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 4,
+          "mean": 1.2125,
+          "median": 1.075,
+          "p95": 2.4524999999999997,
+          "minimum": 0.15,
+          "maximum": 2.55
+        },
+        "frameFractionReachedOnly": {
+          "count": 4,
+          "mean": 0.2020833333333333,
+          "median": 0.17916666666666667,
+          "p95": 0.40874999999999995,
+          "minimum": 0.025,
+          "maximum": 0.425
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-chest-approach-no-contact",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-10-1",
+        "generalization-v1-10-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-chest-approach-no-contact",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-10-1",
+        "generalization-v1-10-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-chest-approach-no-contact",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-10-1",
+        "generalization-v1-10-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-low-forward-palms-down",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-04-1",
+        "generalization-v1-04-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 4,
+        "notReached": 0,
+        "reachedWithin1Second": 4,
+        "reachedWithin2Seconds": 4,
+        "firstObservedSecondsReachedOnly": {
+          "count": 4,
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "minimum": 0.0,
+          "maximum": 0.0
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 4,
+          "mean": 5.9,
+          "median": 6.0,
+          "p95": 6.0,
+          "minimum": 5.6,
+          "maximum": 6.0
+        },
+        "frameFractionReachedOnly": {
+          "count": 4,
+          "mean": 0.9833333333333334,
+          "median": 1.0,
+          "p95": 1.0,
+          "minimum": 0.9333333333333333,
+          "maximum": 1.0
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-low-forward-palms-down",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-04-1",
+        "generalization-v1-04-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 4,
+        "notReached": 0,
+        "reachedWithin1Second": 4,
+        "reachedWithin2Seconds": 4,
+        "firstObservedSecondsReachedOnly": {
+          "count": 4,
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "minimum": 0.0,
+          "maximum": 0.0
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 4,
+          "mean": 6.0,
+          "median": 6.0,
+          "p95": 6.0,
+          "minimum": 6.0,
+          "maximum": 6.0
+        },
+        "frameFractionReachedOnly": {
+          "count": 4,
+          "mean": 1.0,
+          "median": 1.0,
+          "p95": 1.0,
+          "minimum": 1.0,
+          "maximum": 1.0
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-low-forward-palms-down",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-04-1",
+        "generalization-v1-04-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 4,
+        "notReached": 0,
+        "reachedWithin1Second": 4,
+        "reachedWithin2Seconds": 4,
+        "firstObservedSecondsReachedOnly": {
+          "count": 4,
+          "mean": 0.0,
+          "median": 0.0,
+          "p95": 0.0,
+          "minimum": 0.0,
+          "maximum": 0.0
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 4,
+          "mean": 6.0,
+          "median": 6.0,
+          "p95": 6.0,
+          "minimum": 6.0,
+          "maximum": 6.0
+        },
+        "frameFractionReachedOnly": {
+          "count": 4,
+          "mean": 1.0,
+          "median": 1.0,
+          "p95": 1.0,
+          "minimum": 1.0,
+          "maximum": 1.0
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-low-out-in-twice",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-31-1",
+        "generalization-v1-31-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-low-out-in-twice",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-31-1",
+        "generalization-v1-31-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-low-out-in-twice",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-31-1",
+        "generalization-v1-31-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-shoulder-wave-two",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-09-1",
+        "generalization-v1-09-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-shoulder-wave-two",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-09-1",
+        "generalization-v1-09-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-shoulder-wave-two",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-09-1",
+        "generalization-v1-09-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-side-t-shape",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-03-1",
+        "generalization-v1-03-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 3,
+        "notReached": 1,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 3,
+          "mean": 3.733333333333333,
+          "median": 3.75,
+          "p95": 3.75,
+          "minimum": 3.7,
+          "maximum": 3.75
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 3,
+          "mean": 2.2666666666666666,
+          "median": 2.25,
+          "p95": 2.295,
+          "minimum": 2.25,
+          "maximum": 2.3
+        },
+        "frameFractionReachedOnly": {
+          "count": 3,
+          "mean": 0.37777777777777777,
+          "median": 0.375,
+          "p95": 0.3825,
+          "minimum": 0.375,
+          "maximum": 0.38333333333333336
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-side-t-shape",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-03-1",
+        "generalization-v1-03-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 2,
+        "notReached": 2,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 1,
+        "firstObservedSecondsReachedOnly": {
+          "count": 2,
+          "mean": 1.9249999999999998,
+          "median": 1.9249999999999998,
+          "p95": 2.0374999999999996,
+          "minimum": 1.8,
+          "maximum": 2.05
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 2,
+          "mean": 0.175,
+          "median": 0.175,
+          "p95": 0.1975,
+          "minimum": 0.15,
+          "maximum": 0.2
+        },
+        "frameFractionReachedOnly": {
+          "count": 2,
+          "mean": 0.029166666666666667,
+          "median": 0.029166666666666667,
+          "p95": 0.032916666666666664,
+          "minimum": 0.025,
+          "maximum": 0.03333333333333333
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/both-side-t-shape",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-03-1",
+        "generalization-v1-03-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 4,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 2,
+        "firstObservedSecondsReachedOnly": {
+          "count": 4,
+          "mean": 1.975,
+          "median": 1.9749999999999999,
+          "p95": 2.135,
+          "minimum": 1.8,
+          "maximum": 2.15
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 4,
+          "mean": 4.025,
+          "median": 4.025,
+          "p95": 4.1850000000000005,
+          "minimum": 3.85,
+          "maximum": 4.2
+        },
+        "frameFractionReachedOnly": {
+          "count": 4,
+          "mean": 0.6708333333333334,
+          "median": 0.6708333333333334,
+          "p95": 0.6975,
+          "minimum": 0.6416666666666667,
+          "maximum": 0.7
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/bow-small-arms-down",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-18-1",
+        "generalization-v1-18-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/bow-small-arms-down",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-18-1",
+        "generalization-v1-18-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/bow-small-arms-down",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-18-1",
+        "generalization-v1-18-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/forward-lean-right-hand-reach",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-23-1",
+        "generalization-v1-23-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/forward-lean-right-hand-reach",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-23-1",
+        "generalization-v1-23-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/forward-lean-right-hand-reach",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-23-1",
+        "generalization-v1-23-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/head-right-left-arm-side",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-26-1",
+        "generalization-v1-26-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 0,
+        "notReached": 4,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/head-right-left-arm-side",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-26-1",
+        "generalization-v1-26-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 1,
+        "notReached": 3,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 1,
+          "mean": 5.6,
+          "median": 5.6,
+          "p95": 5.6,
+          "minimum": 5.6,
+          "maximum": 5.6
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 1,
+          "mean": 0.4,
+          "median": 0.4,
+          "p95": 0.4,
+          "minimum": 0.4,
+          "maximum": 0.4
+        },
+        "frameFractionReachedOnly": {
+          "count": 1,
+          "mean": 0.06666666666666667,
+          "median": 0.06666666666666667,
+          "p95": 0.06666666666666667,
+          "minimum": 0.06666666666666667,
+          "maximum": 0.06666666666666667
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/head-right-left-arm-side",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-26-1",
+        "generalization-v1-26-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 3,
+        "notReached": 1,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 3,
+          "mean": 3.866666666666667,
+          "median": 4.0,
+          "p95": 4.045,
+          "minimum": 3.55,
+          "maximum": 4.05
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 3,
+          "mean": 1.5,
+          "median": 2.0,
+          "p95": 2.315,
+          "minimum": 0.15,
+          "maximum": 2.35
+        },
+        "frameFractionReachedOnly": {
+          "count": 3,
+          "mean": 0.25,
+          "median": 0.3333333333333333,
+          "p95": 0.3858333333333333,
+          "minimum": 0.025,
+          "maximum": 0.39166666666666666
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-forward-shoulder-hold",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-01-1",
+        "generalization-v1-01-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 3,
+        "notReached": 1,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 3,
+          "mean": 3.4333333333333336,
+          "median": 3.45,
+          "p95": 3.495,
+          "minimum": 3.35,
+          "maximum": 3.5
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 3,
+          "mean": 0.7166666666666667,
+          "median": 0.65,
+          "p95": 0.965,
+          "minimum": 0.5,
+          "maximum": 1.0
+        },
+        "frameFractionReachedOnly": {
+          "count": 3,
+          "mean": 0.16666666666666666,
+          "median": 0.16666666666666666,
+          "p95": 0.16666666666666666,
+          "minimum": 0.16666666666666666,
+          "maximum": 0.16666666666666666
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-forward-shoulder-hold",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-01-1",
+        "generalization-v1-01-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 4,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 4,
+          "mean": 4.95,
+          "median": 4.949999999999999,
+          "p95": 5.842499999999999,
+          "minimum": 4.05,
+          "maximum": 5.85
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 4,
+          "mean": 0.6375,
+          "median": 0.25,
+          "p95": 1.6599999999999993,
+          "minimum": 0.15,
+          "maximum": 1.9
+        },
+        "frameFractionReachedOnly": {
+          "count": 4,
+          "mean": 0.11458333333333333,
+          "median": 0.058333333333333334,
+          "p95": 0.28166666666666657,
+          "minimum": 0.025,
+          "maximum": 0.31666666666666665
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-forward-shoulder-hold",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-01-1",
+        "generalization-v1-01-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 4,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 4,
+          "mean": 3.2249999999999996,
+          "median": 3.25,
+          "p95": 3.4925,
+          "minimum": 2.9,
+          "maximum": 3.5
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 4,
+          "mean": 1.725,
+          "median": 1.65,
+          "p95": 2.6699999999999995,
+          "minimum": 0.75,
+          "maximum": 2.85
+        },
+        "frameFractionReachedOnly": {
+          "count": 4,
+          "mean": 0.3041666666666667,
+          "median": 0.275,
+          "p95": 0.4449999999999999,
+          "minimum": 0.19166666666666668,
+          "maximum": 0.475
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-overhead-other-rest",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-05-1",
+        "generalization-v1-05-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 1,
+        "notReached": 3,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 1,
+          "mean": 3.7,
+          "median": 3.7,
+          "p95": 3.7,
+          "minimum": 3.7,
+          "maximum": 3.7
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 1,
+          "mean": 1.25,
+          "median": 1.25,
+          "p95": 1.25,
+          "minimum": 1.25,
+          "maximum": 1.25
+        },
+        "frameFractionReachedOnly": {
+          "count": 1,
+          "mean": 0.25,
+          "median": 0.25,
+          "p95": 0.25,
+          "minimum": 0.25,
+          "maximum": 0.25
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-overhead-other-rest",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-05-1",
+        "generalization-v1-05-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 4,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 4,
+          "mean": 4.300000000000001,
+          "median": 3.875,
+          "p95": 5.637499999999999,
+          "minimum": 3.55,
+          "maximum": 5.9
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 4,
+          "mean": 1.4,
+          "median": 1.725,
+          "p95": 2.0275,
+          "minimum": 0.1,
+          "maximum": 2.05
+        },
+        "frameFractionReachedOnly": {
+          "count": 4,
+          "mean": 0.23333333333333336,
+          "median": 0.2875,
+          "p95": 0.33791666666666664,
+          "minimum": 0.016666666666666666,
+          "maximum": 0.3416666666666667
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-overhead-other-rest",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-05-1",
+        "generalization-v1-05-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 3,
+        "notReached": 1,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 1,
+        "firstObservedSecondsReachedOnly": {
+          "count": 3,
+          "mean": 3.6333333333333333,
+          "median": 3.8,
+          "p95": 5.69,
+          "minimum": 1.2,
+          "maximum": 5.9
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 3,
+          "mean": 0.8666666666666667,
+          "median": 0.5,
+          "p95": 1.8499999999999999,
+          "minimum": 0.1,
+          "maximum": 2.0
+        },
+        "frameFractionReachedOnly": {
+          "count": 3,
+          "mean": 0.14444444444444443,
+          "median": 0.08333333333333333,
+          "p95": 0.3083333333333333,
+          "minimum": 0.016666666666666666,
+          "maximum": 0.3333333333333333
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-temple-wave-two",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-07-1",
+        "generalization-v1-07-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-temple-wave-two",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-07-1",
+        "generalization-v1-07-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-temple-wave-two",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-07-1",
+        "generalization-v1-07-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-then-right-no-overlap",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-27-1",
+        "generalization-v1-27-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 0,
+        "notReached": 4,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-then-right-no-overlap",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-27-1",
+        "generalization-v1-27-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 0,
+        "notReached": 4,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-then-right-no-overlap",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-27-1",
+        "generalization-v1-27-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 3,
+        "notReached": 1,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 3,
+          "mean": 3.9500000000000006,
+          "median": 4.0,
+          "p95": 5.26,
+          "minimum": 2.45,
+          "maximum": 5.4
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 3,
+          "mean": 1.9666666666666666,
+          "median": 2.0,
+          "p95": 3.3949999999999996,
+          "minimum": 0.35,
+          "maximum": 3.55
+        },
+        "frameFractionReachedOnly": {
+          "count": 3,
+          "mean": 0.3277777777777778,
+          "median": 0.3333333333333333,
+          "p95": 0.5658333333333333,
+          "minimum": 0.058333333333333334,
+          "maximum": 0.5916666666666667
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-waist-outward-semicircle",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-12-1",
+        "generalization-v1-12-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-waist-outward-semicircle",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-12-1",
+        "generalization-v1-12-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/left-waist-outward-semicircle",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-12-1",
+        "generalization-v1-12-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/look-left-pause-forward",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-17-1",
+        "generalization-v1-17-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/look-left-pause-forward",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-17-1",
+        "generalization-v1-17-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/look-left-pause-forward",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-17-1",
+        "generalization-v1-17-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/look-left-then-right-forward",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-30-1",
+        "generalization-v1-30-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/look-left-then-right-forward",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-30-1",
+        "generalization-v1-30-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/look-left-then-right-forward",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-30-1",
+        "generalization-v1-30-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/nod-and-left-chest-raise",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-21-1",
+        "generalization-v1-21-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/nod-and-left-chest-raise",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-21-1",
+        "generalization-v1-21-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/nod-and-left-chest-raise",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-21-1",
+        "generalization-v1-21-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/nod-twice-torso-quiet",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-14-1",
+        "generalization-v1-14-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/nod-twice-torso-quiet",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-14-1",
+        "generalization-v1-14-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/nod-twice-torso-quiet",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-14-1",
+        "generalization-v1-14-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-chest-stop-left-rest",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-11-1",
+        "generalization-v1-11-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-chest-stop-left-rest",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-11-1",
+        "generalization-v1-11-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-chest-stop-left-rest",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-11-1",
+        "generalization-v1-11-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-hold-lower-then-nod",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-32-1",
+        "generalization-v1-32-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-hold-lower-then-nod",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-32-1",
+        "generalization-v1-32-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-hold-lower-then-nod",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-32-1",
+        "generalization-v1-32-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-overhead-other-rest",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-06-1",
+        "generalization-v1-06-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 1,
+        "notReached": 3,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 1,
+          "mean": 4.05,
+          "median": 4.05,
+          "p95": 4.05,
+          "minimum": 4.05,
+          "maximum": 4.05
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 1,
+          "mean": 0.35,
+          "median": 0.35,
+          "p95": 0.35,
+          "minimum": 0.35,
+          "maximum": 0.35
+        },
+        "frameFractionReachedOnly": {
+          "count": 1,
+          "mean": 0.06666666666666667,
+          "median": 0.06666666666666667,
+          "p95": 0.06666666666666667,
+          "minimum": 0.06666666666666667,
+          "maximum": 0.06666666666666667
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-overhead-other-rest",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-06-1",
+        "generalization-v1-06-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 3,
+        "notReached": 1,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 3,
+          "mean": 4.699999999999999,
+          "median": 4.1,
+          "p95": 5.765,
+          "minimum": 4.05,
+          "maximum": 5.95
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 3,
+          "mean": 0.5666666666666667,
+          "median": 0.5,
+          "p95": 1.085,
+          "minimum": 0.05,
+          "maximum": 1.15
+        },
+        "frameFractionReachedOnly": {
+          "count": 3,
+          "mean": 0.09444444444444446,
+          "median": 0.08333333333333333,
+          "p95": 0.18083333333333335,
+          "minimum": 0.008333333333333333,
+          "maximum": 0.19166666666666668
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-overhead-other-rest",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-06-1",
+        "generalization-v1-06-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 3,
+        "notReached": 1,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 1,
+        "firstObservedSecondsReachedOnly": {
+          "count": 3,
+          "mean": 2.733333333333334,
+          "median": 2.15,
+          "p95": 3.95,
+          "minimum": 1.9,
+          "maximum": 4.15
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 3,
+          "mean": 2.566666666666667,
+          "median": 2.4,
+          "p95": 3.345,
+          "minimum": 1.85,
+          "maximum": 3.45
+        },
+        "frameFractionReachedOnly": {
+          "count": 3,
+          "mean": 0.42777777777777776,
+          "median": 0.4,
+          "p95": 0.5575,
+          "minimum": 0.30833333333333335,
+          "maximum": 0.575
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-shoulder-wave-three",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-08-1",
+        "generalization-v1-08-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-shoulder-wave-three",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-08-1",
+        "generalization-v1-08-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-shoulder-wave-three",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-08-1",
+        "generalization-v1-08-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-side-shoulder-hold",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-02-1",
+        "generalization-v1-02-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 4,
+        "notReached": 0,
+        "reachedWithin1Second": 2,
+        "reachedWithin2Seconds": 2,
+        "firstObservedSecondsReachedOnly": {
+          "count": 4,
+          "mean": 2.4875000000000003,
+          "median": 2.1,
+          "p95": 4.645,
+          "minimum": 0.85,
+          "maximum": 4.9
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 4,
+          "mean": 1.3624999999999998,
+          "median": 1.375,
+          "p95": 1.9899999999999998,
+          "minimum": 0.65,
+          "maximum": 2.05
+        },
+        "frameFractionReachedOnly": {
+          "count": 4,
+          "mean": 0.2583333333333333,
+          "median": 0.25416666666666665,
+          "p95": 0.33916666666666667,
+          "minimum": 0.18333333333333332,
+          "maximum": 0.3416666666666667
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-side-shoulder-hold",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-02-1",
+        "generalization-v1-02-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 1,
+        "notReached": 3,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": {
+          "count": 1,
+          "mean": 4.05,
+          "median": 4.05,
+          "p95": 4.05,
+          "minimum": 4.05,
+          "maximum": 4.05
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 1,
+          "mean": 1.95,
+          "median": 1.95,
+          "p95": 1.95,
+          "minimum": 1.95,
+          "maximum": 1.95
+        },
+        "frameFractionReachedOnly": {
+          "count": 1,
+          "mean": 0.325,
+          "median": 0.325,
+          "p95": 0.325,
+          "minimum": 0.325,
+          "maximum": 0.325
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-side-shoulder-hold",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-02-1",
+        "generalization-v1-02-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 4,
+        "reached": 4,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 1,
+        "firstObservedSecondsReachedOnly": {
+          "count": 4,
+          "mean": 3.3375000000000004,
+          "median": 2.875,
+          "p95": 5.527499999999999,
+          "minimum": 1.75,
+          "maximum": 5.85
+        },
+        "longestContinuousSecondsReachedOnly": {
+          "count": 4,
+          "mean": 1.0499999999999998,
+          "median": 1.075,
+          "p95": 1.8924999999999998,
+          "minimum": 0.15,
+          "maximum": 1.9
+        },
+        "frameFractionReachedOnly": {
+          "count": 4,
+          "mean": 0.18333333333333335,
+          "median": 0.19583333333333333,
+          "p95": 0.3154166666666667,
+          "minimum": 0.025,
+          "maximum": 0.31666666666666665
+        }
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-wave-then-two-nods",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-28-1",
+        "generalization-v1-28-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-wave-then-two-nods",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-28-1",
+        "generalization-v1-28-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/right-wave-then-two-nods",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-28-1",
+        "generalization-v1-28-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shake-and-low-hands-apart",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-22-1",
+        "generalization-v1-22-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shake-and-low-hands-apart",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-22-1",
+        "generalization-v1-22-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shake-and-low-hands-apart",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-22-1",
+        "generalization-v1-22-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shake-once-shoulders-quiet",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-15-1",
+        "generalization-v1-15-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shake-once-shoulders-quiet",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-15-1",
+        "generalization-v1-15-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shake-once-shoulders-quiet",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-15-1",
+        "generalization-v1-15-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shake-then-facing-palms-chest",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-29-1",
+        "generalization-v1-29-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shake-then-facing-palms-chest",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-29-1",
+        "generalization-v1-29-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shake-then-facing-palms-chest",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-29-1",
+        "generalization-v1-29-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shrug-and-left-head-tilt",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-25-1",
+        "generalization-v1-25-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shrug-and-left-head-tilt",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-25-1",
+        "generalization-v1-25-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shrug-and-left-head-tilt",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-25-1",
+        "generalization-v1-25-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shrug-once-head-level",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-13-1",
+        "generalization-v1-13-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shrug-once-head-level",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-13-1",
+        "generalization-v1-13-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/shrug-once-head-level",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-13-1",
+        "generalization-v1-13-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/tilt-head-right-return",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-16-1",
+        "generalization-v1-16-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/tilt-head-right-return",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-16-1",
+        "generalization-v1-16-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/tilt-head-right-return",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-16-1",
+        "generalization-v1-16-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/torso-turn-right-hips-forward",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-19-1",
+        "generalization-v1-19-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/torso-turn-right-hips-forward",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-19-1",
+        "generalization-v1-19-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/torso-turn-right-hips-forward",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-19-1",
+        "generalization-v1-19-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/upper-body-lean-left-return",
+      "condition": "old",
+      "recordIds": [
+        "generalization-v1-20-1",
+        "generalization-v1-20-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/upper-body-lean-left-return",
+      "condition": "candidate",
+      "recordIds": [
+        "generalization-v1-20-1",
+        "generalization-v1-20-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    },
+    {
+      "semanticGroup": "generalization-v1/upper-body-lean-left-return",
+      "condition": "teacher",
+      "recordIds": [
+        "generalization-v1-20-1",
+        "generalization-v1-20-2"
+      ],
+      "trajectories": 4,
+      "heightObservations": {
+        "denominator": 0,
+        "reached": 0,
+        "notReached": 0,
+        "reachedWithin1Second": 0,
+        "reachedWithin2Seconds": 0,
+        "firstObservedSecondsReachedOnly": null,
+        "longestContinuousSecondsReachedOnly": null,
+        "frameFractionReachedOnly": null
+      },
+      "semanticPass": null
+    }
+  ],
+  "semanticSuccessRate": null,
+  "naturalnessSuccessRate": null,
+  "testUsedForFurtherTuning": false
+}

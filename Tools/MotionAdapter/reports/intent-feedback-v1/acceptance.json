@@ -1,0 +1,483 @@
+{
+  "schemaVersion": 1,
+  "collectedAtUtc": "2026-09-10T12:35:27.032764+00:00",
+  "implementationStatus": "integrated-with-component-and-isolated-Unity-validation",
+  "overallSemanticAcceptance": false,
+  "fullRealChatAutomaticCorrectionSemanticAcceptance": null,
+  "fingerActuatorImplemented": false,
+  "semanticPlanningExperimentEnabledByThisWork": false,
+  "evidence": {
+    "replay": {
+      "path": "Tools/MotionAdapter/reports/intent-feedback-v1/replay.json",
+      "sha256": "f19926dbeba35b7f8fb33d8bd4f035355700408c4eb61020754745a8759c7b4c"
+    },
+    "observation": {
+      "path": "Server/ARDY/runtime/intent-feedback-v1/verified-component-results/observation.json",
+      "sha256": "598c8169b6b2c2a60bca2b11ba6d112b5291b411a92409f0e514964187f838cb"
+    },
+    "chatRepair": {
+      "path": "Tools/MotionAdapter/reports/intent-feedback-v1/chatRepair.json",
+      "sha256": "b68133ee9f4c375f3bc199bd8b4a97bcbe3381598cd1bc0f7193daf68760cb51"
+    },
+    "semanticRegression": {
+      "path": "Tools/MotionAdapter/reports/intent-feedback-v1/semanticRegression.json",
+      "sha256": "1e05423f3332e9109aa4bd57ccf1a6c4ae59adeddbe44b75186d3995f9f8adcb"
+    },
+    "dialogueRegression": {
+      "path": "Tools/MotionAdapter/reports/intent-feedback-v1/dialogueRegression.json",
+      "sha256": "a9f41e519dc654cb920ba34b3d0d6c930ee54876abec8cf2556c8ae36589c434"
+    },
+    "liveHttp": {
+      "path": "Server/ARDY/runtime/intent-feedback-v1/ownership-final/ArdyLivePlayModeRegression/report.json",
+      "sha256": "afcf93e2f3e71241c06ff6ce11f7d45b0a53d831466909f0bf543ebf444fbe6e"
+    },
+    "actualMatrix": {
+      "path": "Server/ARDY/runtime/intent-feedback-v1/pass3/ArdyIntentGeneralizationRegression/report.json",
+      "sha256": "d7a9d78eb67188a9938da866dee5885b4dcb41496fdd5325d78054c083a8bffe"
+    },
+    "matrixAudit": {
+      "path": "Tools/MotionAdapter/reports/intent-generalization-native-v1-audit.json",
+      "sha256": "f58a2a756cd7533ed048665244f4c9bce9df078ed4b0ee2834fd70a5e892268d"
+    },
+    "development": {
+      "path": "Tools/MotionAdapter/reports/intent-consistency-development-v2.json",
+      "sha256": "b2f96904ce2fea9df10f52b1e33d920eec41f4bccb9300f18e4752a608ebe5f9"
+    },
+    "developmentReview": {
+      "path": "Tools/MotionAdapter/reports/intent-consistency-development-v2-reviewed.json",
+      "sha256": "265c30d9c3beee3866b8fecc72967c0852d698a804fd8263751d2851148358bf"
+    },
+    "holdout": {
+      "path": "Tools/MotionAdapter/reports/intent-consistency-holdout-v1.json",
+      "sha256": "4d7de9471c86245f544fea2bb059255c7ca62ba9f0f68e8b9689c1ebc34aee29"
+    },
+    "holdoutReview": {
+      "path": "Tools/MotionAdapter/reports/intent-consistency-holdout-v1-reviewed.json",
+      "sha256": "235aa93b1aab5d225476968981756b8348bf3833af174a56e86b7b04e93de549"
+    },
+    "chatSourceFreeze": {
+      "path": "Tools/MotionAdapter/reports/motion-feedback-chat-source-freeze-v1.json",
+      "sha256": "94b665c9a061a64cc76683ad45e9879e819123396201250e0ea1301603504ad6"
+    },
+    "matrixRuntimeSources": {
+      "path": "Server/ARDY/runtime/intent-feedback-v1/final-source-snapshot/runtime-hashes.json",
+      "sha256": "9a41cb6a9dfc8f34aa74f40050432d55e4abf67ef6fbc59d52e92515938875cf"
+    }
+  },
+  "results": {
+    "replay": {
+      "passed": true,
+      "scope": "Real isolated NEVA/Animator with exact stored clip replay; no network or semantic success claim."
+    },
+    "observation": {
+      "passed": true,
+      "fixtures": 4
+    },
+    "chatRepair": {
+      "passed": true,
+      "checks": 61,
+      "transport": "fake same-model callback; actual production ChatSample"
+    },
+    "existingSemanticChecks": 322,
+    "existingDialogueChecks": 1306,
+    "liveHttp": {
+      "passed": true,
+      "firstWindowSeconds": 0.890150785446167,
+      "allWindowsSeconds": 1.4024293422698975,
+      "goalStatus": "not-reached",
+      "automaticChatCorrectionExecuted": false
+    },
+    "publicDevelopment": {
+      "passed": 7,
+      "total": 12,
+      "motionExecutions": 0
+    },
+    "publicHoldoutOnce": {
+      "passed": 6,
+      "total": 8,
+      "motionExecutions": 0
+    },
+    "actualMatrix": {
+      "plannedRows": 8,
+      "completedRows": 8,
+      "reachedRows": 3,
+      "notReachedRows": 5,
+      "unknownRows": 0,
+      "infrastructureFailedRows": 0,
+      "fullSemanticSuccess": null,
+      "naturalness": null
+    }
+  },
+  "matrixRows": [
+    {
+      "id": "near-head-idle-seed0",
+      "necessaryGoalStatus": "not-reached",
+      "actionId": "intent-matrix-v1:1:generated",
+      "actualResponseGeneration": 101,
+      "initialHistorySha256": "0184e24be99b027f8fa67f390fd8759f3b4de1d2195253845b1ebd925adaea07",
+      "sourceFramesSha256": "d714ff0854bc6e2e7acce8772379f8e64c4b93e3dc5e5161666c5715d3104840",
+      "firstWindowSeconds": 0.780506700000001,
+      "allWindowsSeconds": 1.0922551,
+      "actualWaveTimeAtHandoff": -1.0
+    },
+    {
+      "id": "near-head-idle-seed1",
+      "necessaryGoalStatus": "not-reached",
+      "actionId": "intent-matrix-v1:2:generated",
+      "actualResponseGeneration": 103,
+      "initialHistorySha256": "01b811990ee4abc2aac943289d6ca1d6d37a3755e161322289cb2def7ece92f6",
+      "sourceFramesSha256": "700865a1ce0651a36187314bf5ac2f0059223828167a948708e13bd0c6845b13",
+      "firstWindowSeconds": 0.7900945000000021,
+      "allWindowsSeconds": 1.0877329000000024,
+      "actualWaveTimeAtHandoff": -1.0
+    },
+    {
+      "id": "near-head-wave-seed0",
+      "necessaryGoalStatus": "not-reached",
+      "actionId": "intent-matrix-v1:3:generated",
+      "actualResponseGeneration": 105,
+      "initialHistorySha256": "b36668390aaa448a335f8aba90ae0b452759bb11b146ae7500128814071f3c5b",
+      "sourceFramesSha256": "25f2b4e6f0310f39287b3e12ddae123c10d58ee5b8d2d11a71639d1225fe5fbf",
+      "firstWindowSeconds": 0.6735801000000023,
+      "allWindowsSeconds": 1.0044566999999986,
+      "actualWaveTimeAtHandoff": 0.7166605591773987
+    },
+    {
+      "id": "near-head-wave-seed1",
+      "necessaryGoalStatus": "not-reached",
+      "actionId": "intent-matrix-v1:4:generated",
+      "actualResponseGeneration": 107,
+      "initialHistorySha256": "26a64b69651942afe5f8319f206ebde4f4756a8633e36f26513f23089691c224",
+      "sourceFramesSha256": "ee88f149b4bfb5b9bbe8bbe283d3d7fb6c05cbd27bbaf98c79393454abe94dcc",
+      "firstWindowSeconds": 0.689427000000002,
+      "allWindowsSeconds": 1.054538199999996,
+      "actualWaveTimeAtHandoff": 0.7000125050544739
+    },
+    {
+      "id": "forward-idle-seed0",
+      "necessaryGoalStatus": "reached",
+      "actionId": "intent-matrix-v1:5:generated",
+      "actualResponseGeneration": 109,
+      "initialHistorySha256": "2445e1e3849d9561bb2e88817cdc072f38cf807d9afb47fa72bb2c265c418b6c",
+      "sourceFramesSha256": "69a4cf35a8435464893426786434dc3cf10f96978813a86fbfb24d9a8a7b513a",
+      "firstWindowSeconds": 0.7414118000000016,
+      "allWindowsSeconds": 1.0383960000000059,
+      "actualWaveTimeAtHandoff": -1.0
+    },
+    {
+      "id": "forward-idle-seed1",
+      "necessaryGoalStatus": "reached",
+      "actionId": "intent-matrix-v1:6:generated",
+      "actualResponseGeneration": 111,
+      "initialHistorySha256": "dcb69ad4754cd15f06624309afe5501bac1b48e3234b3f84aaa0f1e4a0854f62",
+      "sourceFramesSha256": "f97cb0c3647f1e8c460132dcc56d1852f5a5e08ea76dee382214c270ba50c73b",
+      "firstWindowSeconds": 0.7586436000000063,
+      "allWindowsSeconds": 1.0708859000000004,
+      "actualWaveTimeAtHandoff": -1.0
+    },
+    {
+      "id": "forward-wave-seed0",
+      "necessaryGoalStatus": "not-reached",
+      "actionId": "intent-matrix-v1:7:generated",
+      "actualResponseGeneration": 113,
+      "initialHistorySha256": "7a90f9fa0ec2f2c9410e93cab038c85a3b0d7da66a4779b14806bea4ae072892",
+      "sourceFramesSha256": "ee3cdf88e2711c8df18e9eb0f386ddeecbea362ac14cb3edceb1ea19317bf543",
+      "firstWindowSeconds": 0.7420922000000019,
+      "allWindowsSeconds": 1.0724098000000026,
+      "actualWaveTimeAtHandoff": 0.7000015377998352
+    },
+    {
+      "id": "forward-wave-seed1",
+      "necessaryGoalStatus": "reached",
+      "actionId": "intent-matrix-v1:8:generated",
+      "actualResponseGeneration": 115,
+      "initialHistorySha256": "f9e7544e74d1fe4a659f002ad5a0410186227bc60d3f49a818d021c9be6e403f",
+      "sourceFramesSha256": "9d3d39ad2fdfea30cbba0afaf405dc5d0fbd81bc8b459b5638fdc85f66afeb59",
+      "firstWindowSeconds": 0.7069639999999922,
+      "allWindowsSeconds": 1.0376175999999973,
+      "actualWaveTimeAtHandoff": 0.716674268245697
+    }
+  ],
+  "unchangedResources": [
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/left-wave.json",
+      "sha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d",
+      "expectedSha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d",
+      "unchanged": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/right-wave.json",
+      "sha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+      "expectedSha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+      "unchanged": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/nod.json",
+      "sha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+      "expectedSha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+      "unchanged": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/shake-head.json",
+      "sha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+      "expectedSha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+      "unchanged": true
+    },
+    {
+      "path": "Tools/MotionAdapter/runtime/generalization-v1/candidates/finetune-seed0.pt",
+      "sha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+      "expectedSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+      "unchanged": true
+    }
+  ],
+  "finalRuntimeSources": [
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyActionConstraintLedger.cs",
+      "sha256": "40e25d318d59ab08cf7d77629f2f7386d8d9152aec2d34e186b2661169998e2a",
+      "matrixCompiledSha256": "40e25d318d59ab08cf7d77629f2f7386d8d9152aec2d34e186b2661169998e2a",
+      "finalIsolatedSha256": "40e25d318d59ab08cf7d77629f2f7386d8d9152aec2d34e186b2661169998e2a",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlan.cs",
+      "sha256": "319df0e62bfee4687d55ed85a7b1f921a32c245fef665bcada41cabfde674f0e",
+      "matrixCompiledSha256": "319df0e62bfee4687d55ed85a7b1f921a32c245fef665bcada41cabfde674f0e",
+      "finalIsolatedSha256": "319df0e62bfee4687d55ed85a7b1f921a32c245fef665bcada41cabfde674f0e",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlanCompiler.cs",
+      "sha256": "8195ee630d5161eb422fb0127e2970bf3e28e3058e2c18e005aa473dfb3c8209",
+      "matrixCompiledSha256": "8195ee630d5161eb422fb0127e2970bf3e28e3058e2c18e005aa473dfb3c8209",
+      "finalIsolatedSha256": "8195ee630d5161eb422fb0127e2970bf3e28e3058e2c18e005aa473dfb3c8209",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyAdaptiveTiming.cs",
+      "sha256": "79aa8926926531f7370693c98454a09d7f32a5965d6f4050f66e4fa4fd8a6f72",
+      "matrixCompiledSha256": "79aa8926926531f7370693c98454a09d7f32a5965d6f4050f66e4fa4fd8a6f72",
+      "finalIsolatedSha256": "79aa8926926531f7370693c98454a09d7f32a5965d6f4050f66e4fa4fd8a6f72",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyAvatarRestPose.cs",
+      "sha256": "ad7220769faeee95c2a3128c3fa52cebd75b52c3be1ce1b1e16274bcde095916",
+      "matrixCompiledSha256": "ad7220769faeee95c2a3128c3fa52cebd75b52c3be1ce1b1e16274bcde095916",
+      "finalIsolatedSha256": "ad7220769faeee95c2a3128c3fa52cebd75b52c3be1ce1b1e16274bcde095916",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyConstraintObserver.cs",
+      "sha256": "b4bc0f114a5063e6f96077a32cc1ecc0b468a162ccec9b8dbc0bf9c0a5dbc446",
+      "matrixCompiledSha256": "b4bc0f114a5063e6f96077a32cc1ecc0b468a162ccec9b8dbc0bf9c0a5dbc446",
+      "finalIsolatedSha256": "b4bc0f114a5063e6f96077a32cc1ecc0b468a162ccec9b8dbc0bf9c0a5dbc446",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyConstraintSession.cs",
+      "sha256": "15dade49424443bd2b50fd40af91df19c914ffb194a08ec43bf366c4cbe05792",
+      "matrixCompiledSha256": "15dade49424443bd2b50fd40af91df19c914ffb194a08ec43bf366c4cbe05792",
+      "finalIsolatedSha256": "15dade49424443bd2b50fd40af91df19c914ffb194a08ec43bf366c4cbe05792",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs",
+      "sha256": "82b4a83ce6ccb73ee1ccc81a9e5e46e9d8b23b71f4161e54a5a1e4cdd95a14cc",
+      "matrixCompiledSha256": "82b4a83ce6ccb73ee1ccc81a9e5e46e9d8b23b71f4161e54a5a1e4cdd95a14cc",
+      "finalIsolatedSha256": "82b4a83ce6ccb73ee1ccc81a9e5e46e9d8b23b71f4161e54a5a1e4cdd95a14cc",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyControlTrace.cs",
+      "sha256": "a1db5a4f105bf92fbbc9f710581275061e4538d810918fd23e04147afcee9136",
+      "matrixCompiledSha256": "a1db5a4f105bf92fbbc9f710581275061e4538d810918fd23e04147afcee9136",
+      "finalIsolatedSha256": "a1db5a4f105bf92fbbc9f710581275061e4538d810918fd23e04147afcee9136",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.cs",
+      "sha256": "1d4e1777f4c11c1073b0cf9898d8b016f4cedb90a50f0cece758228a2b105f3f",
+      "matrixCompiledSha256": "40009803f005171747c662f72e7ce8d451659ce6c365423d4aba70f24de92b18",
+      "finalIsolatedSha256": "1d4e1777f4c11c1073b0cf9898d8b016f4cedb90a50f0cece758228a2b105f3f",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.Intent.cs",
+      "sha256": "8ef6ca030e19d9c2c4a632081ad8fc9cb019566351814f2e2b7373141026ac11",
+      "matrixCompiledSha256": "8ef6ca030e19d9c2c4a632081ad8fc9cb019566351814f2e2b7373141026ac11",
+      "finalIsolatedSha256": "8ef6ca030e19d9c2c4a632081ad8fc9cb019566351814f2e2b7373141026ac11",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveProtocol.cs",
+      "sha256": "b3bb9ead21d30d3afcb277a46d2ebdf69d6c0edd8696c836c5b708672fee244d",
+      "matrixCompiledSha256": "b3bb9ead21d30d3afcb277a46d2ebdf69d6c0edd8696c836c5b708672fee244d",
+      "finalIsolatedSha256": "b3bb9ead21d30d3afcb277a46d2ebdf69d6c0edd8696c836c5b708672fee244d",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionCapabilities.cs",
+      "sha256": "c998e09ab5bd929d3154682842d0060a71da9e7add6fc29259fca98ee7c1f71f",
+      "matrixCompiledSha256": "c998e09ab5bd929d3154682842d0060a71da9e7add6fc29259fca98ee7c1f71f",
+      "finalIsolatedSha256": "c998e09ab5bd929d3154682842d0060a71da9e7add6fc29259fca98ee7c1f71f",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionClip.cs",
+      "sha256": "f2b32c0bb4e1456e55a04e3ecb8a2b594a490ba8bbef22f3dfdca829cd8a4375",
+      "matrixCompiledSha256": "f2b32c0bb4e1456e55a04e3ecb8a2b594a490ba8bbef22f3dfdca829cd8a4375",
+      "finalIsolatedSha256": "f2b32c0bb4e1456e55a04e3ecb8a2b594a490ba8bbef22f3dfdca829cd8a4375",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionExecutionFeedback.cs",
+      "sha256": "d92ba21d05f0ab9f6ce1e656454f3be7ee15e5dc0e1a6557d816024910545165",
+      "matrixCompiledSha256": "d92ba21d05f0ab9f6ce1e656454f3be7ee15e5dc0e1a6557d816024910545165",
+      "finalIsolatedSha256": "d92ba21d05f0ab9f6ce1e656454f3be7ee15e5dc0e1a6557d816024910545165",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionGoal.cs",
+      "sha256": "005bb04892bee1999153f798502dff19aa93dac70190a260331467345bc23cec",
+      "matrixCompiledSha256": "005bb04892bee1999153f798502dff19aa93dac70190a260331467345bc23cec",
+      "finalIsolatedSha256": "005bb04892bee1999153f798502dff19aa93dac70190a260331467345bc23cec",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionObservation.cs",
+      "sha256": "ee312e4b309fcaf2d7d46b5c1e049f9634a3eacd312239fabbd2ec897f168951",
+      "matrixCompiledSha256": "ee312e4b309fcaf2d7d46b5c1e049f9634a3eacd312239fabbd2ec897f168951",
+      "finalIsolatedSha256": "ee312e4b309fcaf2d7d46b5c1e049f9634a3eacd312239fabbd2ec897f168951",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionObserver.cs",
+      "sha256": "170d7b6a6cc9da3ddc34250c1e2cecc1b1726d24c81c43ffa28fb8910435c512",
+      "matrixCompiledSha256": "170d7b6a6cc9da3ddc34250c1e2cecc1b1726d24c81c43ffa28fb8910435c512",
+      "finalIsolatedSha256": "170d7b6a6cc9da3ddc34250c1e2cecc1b1726d24c81c43ffa28fb8910435c512",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs",
+      "sha256": "db485f87c87836cdb2162cf1f0462566da6033e7ad230b9b0cfba00bdf2ef862",
+      "matrixCompiledSha256": "db485f87c87836cdb2162cf1f0462566da6033e7ad230b9b0cfba00bdf2ef862",
+      "finalIsolatedSha256": "db485f87c87836cdb2162cf1f0462566da6033e7ad230b9b0cfba00bdf2ef862",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionTrace.cs",
+      "sha256": "641ee6b9e8404600610378180840e3311698eacf0aa3885566bfeb2263e1157a",
+      "matrixCompiledSha256": "641ee6b9e8404600610378180840e3311698eacf0aa3885566bfeb2263e1157a",
+      "finalIsolatedSha256": "641ee6b9e8404600610378180840e3311698eacf0aa3885566bfeb2263e1157a",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyPalmGeometry.cs",
+      "sha256": "e78ac5872c58bce4e65ea36e77b95ff12845aefbffa963456b8e5af795410764",
+      "matrixCompiledSha256": "e78ac5872c58bce4e65ea36e77b95ff12845aefbffa963456b8e5af795410764",
+      "finalIsolatedSha256": "e78ac5872c58bce4e65ea36e77b95ff12845aefbffa963456b8e5af795410764",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ArdyDialogueMotionBridge.cs",
+      "sha256": "6a9f5de5c542284f989da8a45dd693ba3f4a30466ca1331bf5faecbc8699e76a",
+      "matrixCompiledSha256": "6a9f5de5c542284f989da8a45dd693ba3f4a30466ca1331bf5faecbc8699e76a",
+      "finalIsolatedSha256": "6a9f5de5c542284f989da8a45dd693ba3f4a30466ca1331bf5faecbc8699e76a",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs",
+      "sha256": "40fd31bca1d570f7e70089084d538a399b33c91c110e433a341224857c4ea177",
+      "matrixCompiledSha256": "40fd31bca1d570f7e70089084d538a399b33c91c110e433a341224857c4ea177",
+      "finalIsolatedSha256": "40fd31bca1d570f7e70089084d538a399b33c91c110e433a341224857c4ea177",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.MotionFeedback.cs",
+      "sha256": "296c589826f09cc76654175d6c8982314bdb59f2afe41cafba2be00cd8cb0af1",
+      "matrixCompiledSha256": "296c589826f09cc76654175d6c8982314bdb59f2afe41cafba2be00cd8cb0af1",
+      "finalIsolatedSha256": "296c589826f09cc76654175d6c8982314bdb59f2afe41cafba2be00cd8cb0af1",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs",
+      "sha256": "d70d5a07e6767745360487e535ef512723509e087dd15fa42d9f977eb487ec54",
+      "matrixCompiledSha256": "d70d5a07e6767745360487e535ef512723509e087dd15fa42d9f977eb487ec54",
+      "finalIsolatedSha256": "d70d5a07e6767745360487e535ef512723509e087dd15fa42d9f977eb487ec54",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.cs",
+      "sha256": "7e9ed5b082c964a7aa19e14ee982cd6efe311a0dfb8286fe15ed9118117834fe",
+      "matrixCompiledSha256": "7e9ed5b082c964a7aa19e14ee982cd6efe311a0dfb8286fe15ed9118117834fe",
+      "finalIsolatedSha256": "7e9ed5b082c964a7aa19e14ee982cd6efe311a0dfb8286fe15ed9118117834fe",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.ActionPlanning.cs",
+      "sha256": "97191351f9b82343a86e2d71575379bd62492b68edf8393567af175003c1a6e9",
+      "matrixCompiledSha256": "97191351f9b82343a86e2d71575379bd62492b68edf8393567af175003c1a6e9",
+      "finalIsolatedSha256": "97191351f9b82343a86e2d71575379bd62492b68edf8393567af175003c1a6e9",
+      "matchesFinalIsolated": true,
+      "changedSinceMatrix": false
+    }
+  ],
+  "sourceProvenance": {
+    "matrixCompiledController": {
+      "path": "Server/ARDY/runtime/intent-feedback-v1/final-source-snapshot/ArdyLiveMotionController.matrix-compiled.cs",
+      "sha256": "40009803f005171747c662f72e7ce8d451659ce6c365423d4aba70f24de92b18"
+    },
+    "matrixCompiledHarness": {
+      "path": "Server/ARDY/runtime/intent-feedback-v1/final-source-snapshot/ArdyIntentGeneralizationRegression.compiled.cs",
+      "sha256": "a88d6c3384fd5f18ca0a8f7990d384db66a0496db13b1bf5701e76ce50de8d72"
+    },
+    "finalHarness": {
+      "path": "Assets/Editor/ArdyIntentGeneralizationRegression.cs",
+      "sha256": "2c279d64ac77a1ce440e842e9066d0b46226be989d4b8c80455356d7ba2df10e"
+    },
+    "finalReplayHarness": {
+      "path": "Assets/Editor/ArdyIntentReplayRegression.cs",
+      "sha256": "32674cb5ed862726bd73d2f74b679b14a21b7c1e818a73c71eef6246d2cc90be"
+    },
+    "finalControllerChangesAfterMatrix": "Completion label distinguishes playback from achievement. HTTP response application and error cleanup now check playback ownership before modifying Player, covering an external-Play same-frame race. No generation description, adapter, playback geometry or measurement thresholds changed. Final replay and live HTTP checks are separate evidence; matrix was not rerun.",
+    "matrixHarnessOnlyChange": "Resolve relative hash inputs against the isolated Unity project directory."
+  },
+  "limitations": [
+    "Necessary wrist-region achievement does not imply complete motion semantics, fingers, palms, sustained end pose or naturalness.",
+    "Initial histories are measured independently, not identical elementwise seed pairs. Wave handoff is first sampled time >=0.7 s and its 0.75 s history can include idle frames.",
+    "Chat continuation scheduling uses fake transport in Unity; real public Qwen probes and real ARDY/VRM runs are separate, not a full private-scene end-to-end semantic acceptance.",
+    "Failure correction occurs after completed-motion feedback and speech idle, at most once. It is not continuous per-frame replanning.",
+    "Already spoken original streaming audio cannot be retracted; arbitrary narration truthfulness is not formally enforced.",
+    "No new model loaded or trained, no private scene opened, no main Unity Play state manipulated."
+  ],
+  "preservedDebugFailures": [
+    "Server/ARDY/runtime/intent-feedback-v1/ArdyMotionObservationRegression/unity.log",
+    "Server/ARDY/runtime/intent-feedback-v1/pass2/ArdyMotionFeedbackChatRegression/unity.log"
+  ]
+}

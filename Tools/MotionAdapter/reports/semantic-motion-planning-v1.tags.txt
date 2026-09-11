@@ -1,0 +1,12 @@
+<motion name="right-wave" purpose="greet" mode="oscillate" scope="new" left="none" right="forward" leftPalm="keep" rightPalm="partner" joint="right-wrist" axis="up" tempo="natural" size="medium" repeat="twice" end="idle" />
+<motion name="nod" purpose="agree" mode="oscillate" scope="new" joint="head" axis="right" size="small" repeat="once" end="idle" />
+<motion name="plan" purpose="display" mode="free" scope="new" text="Arms swing in alternating arcs, torso sways gently, upper body dances freely while feet stay planted." />
+<motion name="plan" purpose="greet" mode="oscillate" scope="new" left="forward" right="forward" leftPalm="partner" rightPalm="partner" joint="wrists" axis="auto" tempo="gentle" size="small" repeat="twice" end="hold"/>
+<motion name=plan purpose=display mode=hold scope=new left=forward leftPalm=partner lock=left,leftPalm,mode end=hold evidence="左腕だけ横に伸ばして、左の手のひらをこちらに見せたまま静かに止まって。">
+<motion name="plan" purpose="explain" mode="oscillate" scope="continue" left="none" right="forward" leftPalm="keep" rightPalm="partner" joint="right-wrist" axis="auto" tempo="natural" size="small" repeat="thrice" end="hold"/>
+<motion name=plan purpose=explain mode=oscillate scope=continue joint=right-wrist left=forward right=forward leftPalm=down rightPalm=down axis=palm-normal size=large repeat=twice end=hold/>
+<motion name="plan" purpose="explain" mode="hold" scope="new" left="current" right="forward" leftPalm="keep" rightPalm="keep" end="hold" lock="left,right,leftPalm,rightPalm,end" evidence="左臂就保持当前实际姿势别变，右臂朝正前方伸出，静静保持。" />
+<motion name="plan" purpose="display" mode="hold" scope="new" left="forward" right="forward" leftPalm="partner" rightPalm="partner" end="hold" lock="left,right,leftPalm,rightPalm,end" evidence="Show me both palms with your arms held in front of you; stay still so I can look."/>
+<motion name="plan" purpose="explain" mode="free" scope="new" text="Arms swing in large alternating arcs, upper body sways slightly, feet stay in place." />
+<motion name="shake-head" purpose="other" mode="oscillate" scope="new" joint="head" axis="up" size="medium" repeat="thrice" tempo="gentle" end="idle" />
+<motion name=plan purpose=display mode=hold scope=new left=right right=left leftPalm=partner rightPalm=partner end=hold/>

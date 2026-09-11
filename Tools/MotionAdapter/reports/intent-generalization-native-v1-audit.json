@@ -1,0 +1,190 @@
+{
+  "status": "read-only-audit-passed",
+  "auditedAtUtc": "2026-09-10T12:28:43.626264+00:00",
+  "sourceReportSha256": "d7a9d78eb67188a9938da866dee5885b4dcb41496fdd5325d78054c083a8bffe",
+  "matrixSignatureSha256": "734eec6869611b442890af6c978590c27da65b90da684ffab899f572b1c408d4",
+  "compiledHarnessSha256": "a88d6c3384fd5f18ca0a8f7990d384db66a0496db13b1bf5701e76ce50de8d72",
+  "runtimeSourceChecks": [
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.cs",
+      "sha256": "40009803f005171747c662f72e7ce8d451659ce6c365423d4aba70f24de92b18",
+      "evidencePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\intent-feedback-v1\\final-source-snapshot\\ArdyLiveMotionController.matrix-compiled.cs",
+      "evidenceSha256": "40009803f005171747c662f72e7ce8d451659ce6c365423d4aba70f24de92b18",
+      "currentIsolatedSha256": "f6f1f8ab65be85bede4de2e9f2abf161354d6e1dc121b0d0c0ed33faaec696ba",
+      "matches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.Intent.cs",
+      "sha256": "8ef6ca030e19d9c2c4a632081ad8fc9cb019566351814f2e2b7373141026ac11",
+      "evidencePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Assets\\AIChatTookit\\Scripts\\Motion\\ArdyLiveMotionController.Intent.cs",
+      "evidenceSha256": "8ef6ca030e19d9c2c4a632081ad8fc9cb019566351814f2e2b7373141026ac11",
+      "currentIsolatedSha256": "8ef6ca030e19d9c2c4a632081ad8fc9cb019566351814f2e2b7373141026ac11",
+      "matches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs",
+      "sha256": "db485f87c87836cdb2162cf1f0462566da6033e7ad230b9b0cfba00bdf2ef862",
+      "evidencePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Assets\\AIChatTookit\\Scripts\\Motion\\ArdyMotionPlayer.cs",
+      "evidenceSha256": "db485f87c87836cdb2162cf1f0462566da6033e7ad230b9b0cfba00bdf2ef862",
+      "currentIsolatedSha256": "db485f87c87836cdb2162cf1f0462566da6033e7ad230b9b0cfba00bdf2ef862",
+      "matches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionObserver.cs",
+      "sha256": "170d7b6a6cc9da3ddc34250c1e2cecc1b1726d24c81c43ffa28fb8910435c512",
+      "evidencePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Assets\\AIChatTookit\\Scripts\\Motion\\ArdyMotionObserver.cs",
+      "evidenceSha256": "170d7b6a6cc9da3ddc34250c1e2cecc1b1726d24c81c43ffa28fb8910435c512",
+      "currentIsolatedSha256": "170d7b6a6cc9da3ddc34250c1e2cecc1b1726d24c81c43ffa28fb8910435c512",
+      "matches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionObservation.cs",
+      "sha256": "ee312e4b309fcaf2d7d46b5c1e049f9634a3eacd312239fabbd2ec897f168951",
+      "evidencePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Assets\\AIChatTookit\\Scripts\\Motion\\ArdyMotionObservation.cs",
+      "evidenceSha256": "ee312e4b309fcaf2d7d46b5c1e049f9634a3eacd312239fabbd2ec897f168951",
+      "currentIsolatedSha256": "ee312e4b309fcaf2d7d46b5c1e049f9634a3eacd312239fabbd2ec897f168951",
+      "matches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionGoal.cs",
+      "sha256": "005bb04892bee1999153f798502dff19aa93dac70190a260331467345bc23cec",
+      "evidencePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Assets\\AIChatTookit\\Scripts\\Motion\\ArdyMotionGoal.cs",
+      "evidenceSha256": "005bb04892bee1999153f798502dff19aa93dac70190a260331467345bc23cec",
+      "currentIsolatedSha256": "005bb04892bee1999153f798502dff19aa93dac70190a260331467345bc23cec",
+      "matches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveProtocol.cs",
+      "sha256": "b3bb9ead21d30d3afcb277a46d2ebdf69d6c0edd8696c836c5b708672fee244d",
+      "evidencePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Assets\\AIChatTookit\\Scripts\\Motion\\ArdyLiveProtocol.cs",
+      "evidenceSha256": "b3bb9ead21d30d3afcb277a46d2ebdf69d6c0edd8696c836c5b708672fee244d",
+      "currentIsolatedSha256": "b3bb9ead21d30d3afcb277a46d2ebdf69d6c0edd8696c836c5b708672fee244d",
+      "matches": true
+    }
+  ],
+  "resourceChecks": [
+    {
+      "path": "Assets/Model/NEVA.vrm",
+      "sha256": "d02820de92e697d8dd37fea4e993a2127c36684e19ebff8cffbc0b999dd25551"
+    },
+    {
+      "path": "Assets/AIChatTookit/Animation/Animator Controller.controller",
+      "sha256": "1846a9ef9f32036a2b9f581ee477e66cb699ac2009adade88e1d8e6bb7fbb7a6"
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/left-wave.json",
+      "sha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d"
+    }
+  ],
+  "harnessSourceDiff": "--- actual-compiled-pass3\n+++ current-source\n@@ -478,7 +478,8 @@\n         using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read))\n         using (var writer = new StreamWriter(stream, new UTF8Encoding(false))) writer.Write(content);\n     }\n-    private static string HashFile(string path) => Hash(File.ReadAllBytes(Path.GetFullPath(path)));\n+    private static string HashFile(string path) => Hash(File.ReadAllBytes(Path.GetFullPath(\n+        Path.IsPathRooted(path) ? path : Path.Combine(Application.dataPath, \"..\", path))));\n     private static string HashText(string text) => Hash(Encoding.UTF8.GetBytes(text));\n     private static string Hash(byte[] bytes)\n     {\n",
+  "rows": [
+    {
+      "id": "near-head-idle-seed0",
+      "necessaryGoalStatus": "not-reached",
+      "independentMaximumStableSeconds": 0.0,
+      "actualSamples": 360,
+      "traceAndSourceAndHistoryHashesMatch": true,
+      "actualWaveTimeAtHandoff": -1.0,
+      "firstWindowSeconds": 0.780506700000001,
+      "generatedResponseGeneration": 101,
+      "fullSemanticSuccess": null,
+      "naturalness": null
+    },
+    {
+      "id": "near-head-idle-seed1",
+      "necessaryGoalStatus": "not-reached",
+      "independentMaximumStableSeconds": 0.0,
+      "actualSamples": 361,
+      "traceAndSourceAndHistoryHashesMatch": true,
+      "actualWaveTimeAtHandoff": -1.0,
+      "firstWindowSeconds": 0.7900945000000021,
+      "generatedResponseGeneration": 103,
+      "fullSemanticSuccess": null,
+      "naturalness": null
+    },
+    {
+      "id": "near-head-wave-seed0",
+      "necessaryGoalStatus": "not-reached",
+      "independentMaximumStableSeconds": 0.0,
+      "actualSamples": 360,
+      "traceAndSourceAndHistoryHashesMatch": true,
+      "actualWaveTimeAtHandoff": 0.7166605591773987,
+      "firstWindowSeconds": 0.6735801000000023,
+      "generatedResponseGeneration": 105,
+      "fullSemanticSuccess": null,
+      "naturalness": null
+    },
+    {
+      "id": "near-head-wave-seed1",
+      "necessaryGoalStatus": "not-reached",
+      "independentMaximumStableSeconds": 0.0,
+      "actualSamples": 361,
+      "traceAndSourceAndHistoryHashesMatch": true,
+      "actualWaveTimeAtHandoff": 0.7000125050544739,
+      "firstWindowSeconds": 0.689427000000002,
+      "generatedResponseGeneration": 107,
+      "fullSemanticSuccess": null,
+      "naturalness": null
+    },
+    {
+      "id": "forward-idle-seed0",
+      "necessaryGoalStatus": "reached",
+      "independentMaximumStableSeconds": 0.9166711000000021,
+      "actualSamples": 360,
+      "traceAndSourceAndHistoryHashesMatch": true,
+      "actualWaveTimeAtHandoff": -1.0,
+      "firstWindowSeconds": 0.7414118000000016,
+      "generatedResponseGeneration": 109,
+      "fullSemanticSuccess": null,
+      "naturalness": null
+    },
+    {
+      "id": "forward-idle-seed1",
+      "necessaryGoalStatus": "reached",
+      "independentMaximumStableSeconds": 0.8500730000000019,
+      "actualSamples": 361,
+      "traceAndSourceAndHistoryHashesMatch": true,
+      "actualWaveTimeAtHandoff": -1.0,
+      "firstWindowSeconds": 0.7586436000000063,
+      "generatedResponseGeneration": 111,
+      "fullSemanticSuccess": null,
+      "naturalness": null
+    },
+    {
+      "id": "forward-wave-seed0",
+      "necessaryGoalStatus": "not-reached",
+      "independentMaximumStableSeconds": 0.0,
+      "actualSamples": 361,
+      "traceAndSourceAndHistoryHashesMatch": true,
+      "actualWaveTimeAtHandoff": 0.7000015377998352,
+      "firstWindowSeconds": 0.7420922000000019,
+      "generatedResponseGeneration": 113,
+      "fullSemanticSuccess": null,
+      "naturalness": null
+    },
+    {
+      "id": "forward-wave-seed1",
+      "necessaryGoalStatus": "reached",
+      "independentMaximumStableSeconds": 0.7333422999999897,
+      "actualSamples": 361,
+      "traceAndSourceAndHistoryHashesMatch": true,
+      "actualWaveTimeAtHandoff": 0.716674268245697,
+      "firstWindowSeconds": 0.7069639999999922,
+      "generatedResponseGeneration": 115,
+      "fullSemanticSuccess": null,
+      "naturalness": null
+    }
+  ],
+  "necessaryReached": 3,
+  "limitations": [
+    "The eight histories are real and individually hashed, not byte-identical histories across seeds.",
+    "Sixteen frames at20Hz span0.75s. The wave handoff at0.7000-0.7167s therefore includes a small idle-to-wave entry portion; per-history absolute sample timestamps are not present in the wire format.",
+    "row.responseGeneration names the preparation/base generation; the actual generated generation is that value+1, bound by terminal feedback and trace.turnId.",
+    "Old HashFile resolved relative plan source/asset paths against process CWD. Actual compiled source snapshots and other isolated runtime/assets match the emitted hashes, so the possible CWD ambiguity does not change this run's attribution. Controller has since changed; its preserved matrix-compiled snapshot is used. Absolute trace/report/sample hashes are unaffected.",
+    "Post-VRM necessary wrist-region classification was independently recomputed from actual shoulder/elbow/wrist/head positions. This still does not establish complete semantics, fingers, sustained final holding or naturalness.",
+    "No correction request, model chat or motion rerun was executed by this audit."
+  ],
+  "fullSemanticSuccess": null,
+  "naturalness": null,
+  "sourceReportUnchanged": true
+}

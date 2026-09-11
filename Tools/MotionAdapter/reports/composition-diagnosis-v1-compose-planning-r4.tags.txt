@@ -1,0 +1,8 @@
+<motion name="compose" left="forward" right="forward" leftBend="0" rightBend="0" joint="wrists" axis="up" amplitude="10" cycles="2" seconds="3.2" end="hold"/>
+<motion name="compose" left="outward" right="outward" leftBend="0" rightBend="0" joint="head" axis="right" amplitude="8" cycles="1" seconds="1" end="idle"/>
+<motion name="compose" left="current" right="forward" leftBend="8" rightBend="0" joint="none" axis="up" amplitude="10" cycles="1" seconds="1" end="hold"/>
+<motion name="compose" left="forward" right="forward" leftBend="0" rightBend="0" joint="wrists" axis="up" amplitude="10" cycles="2" seconds="3.2" end="idle"/>
+<motion name="left-wave"/>
+<motion name="nod"/>
+<motion name="generate" text="Stand still, sway torso gently, and swing arms in loose, alternating arcs to the rhythm."/>
+<motion name="compose" left="forward" right="forward" leftBend="0" rightBend="0" joint="none" axis="up" amplitude="10" cycles="1" seconds="1" end="hold"/>

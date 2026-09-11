@@ -1,0 +1,140 @@
+{
+  "schema": 2,
+  "createdUtc": "2026-09-10T09:16:21.313648+00:00",
+  "status": "protocol_legal_planning_semantics_limited",
+  "productionContract": "GeneratedOutputContract is the complete single specification; enabled Chat selects it instead of also appending Basic. Basic-only bridges retain original BasicOutputContract.",
+  "contractSha256": "b204c4de7b4cf3371eef93c43dc2c7067859e4f4d33f7f010b4df88e207a46e6",
+  "contractMatchesCompiledCSharp": true,
+  "contractCharacters": 2085,
+  "scope": "Actual pure-System C# parser/plan and exact extracted pure Editor test methods; public Qwen planning only. Parent owns real Unity and avatar execution; this report makes no motion-success claim.",
+  "implementation": [
+    "Strict six-way bilateral palm goals and backward-compatible keep",
+    "palm-normal axis requires an explicit palm goal for each moving wrist",
+    "Missing Bend in directional palm plans derives internal Auto=true; explicit numeric/current/no-palm semantics remain unchanged, and XML Auto injection is rejected",
+    "Snapshots include palms/auto; quote and every-stream-split isolation, changed-palm deduplication, basic-only gating and real Chat TTS queue regression sources updated"
+  ],
+  "validation": {
+    "compilerExitCode": 0,
+    "pureAssertions": 783,
+    "developmentActualTags": 14,
+    "developmentAcceptedTags": 14,
+    "developmentNoActionReplies": 1,
+    "developmentCSharpAssertionsIncludingTags": 797,
+    "developmentCSharpExitCode": 0,
+    "newExpressionActualTags": 4,
+    "newExpressionAcceptedTags": 4,
+    "newExpressionCSharpAssertionsIncludingTags": 787,
+    "newExpressionCSharpExitCode": 0,
+    "newExpressionsEvaluatedOnce": true,
+    "newExpressionsOnceMarkerSha256": "eb848f32825be2087503a7d22f1bd4a614452a6bdf6bc25369e09a7554cdf69b",
+    "diffCheckExitCode": 0,
+    "realUnityRegression": "Pending parent scheduling; not inferred from pure C# preflight"
+  },
+  "planningObservations": {
+    "developmentCases": 15,
+    "developmentPredeclaredFieldMatches": 11,
+    "newExpressionCases": 4,
+    "newExpressionPredeclaredFieldMatches": 3,
+    "countsWarning": "These are selected-field development diagnostics, not semantic motion success rates. Right=current can honor a static right-arm request even when a narrow expected field was none; the accompanying left forward-vs-outward error is substantive. New case 1 matches selected fields but adds zero elbow angles, so it is not evidence of reachable greeting execution.",
+    "freeGeneratedDescriptions": [
+      {
+        "caseId": "zh-open-upper-body-dance-regression",
+        "characters": 92,
+        "words": 14,
+        "text": "Alternating arms drawing arcs with slight torso sway, free upper body dance, feet stationary"
+      },
+      {
+        "caseId": "new-en-free-arm-loops-and-torso",
+        "characters": 52,
+        "words": 9,
+        "text": "Alternating arm loops with gentle torso rise and dip"
+      }
+    ]
+  },
+  "remainingSemanticProblems": [
+    {
+      "cases": [
+        "zh-forward-greeting",
+        "en-forward-farewell",
+        "new-zh-window-farewell"
+      ],
+      "issue": "The model chooses bilateral forward partner-facing wrist waves but adds explicit zero elbow angles to natural descriptions; that removes the executor freedom and can make the goal unreachable. The meaning of extended/平伸 should not be overstated as a definitive elbow constraint."
+    },
+    {
+      "cases": [
+        "zh-single-forward-greeting-render-fixture"
+      ],
+      "issue": "The single-arm posture now routes through compose, but the requested greeting lacks wrist motion."
+    },
+    {
+      "cases": [
+        "ja-single-side-palm-display"
+      ],
+      "issue": "Left lateral static display is still encoded as forward; the spoken public description nevertheless says lateral. A new right-side formulation is correct, which does not erase the old failure."
+    },
+    {
+      "cases": [
+        "new-zh-fixed-straight-limit-explanation"
+      ],
+      "issue": "The model repeats a previously failed static straight-arm palm target instead of explaining the limit, though it preserves explicit zero elbows and does not secretly enable Auto."
+    }
+  ],
+  "positiveObservations": [
+    "Both independent basic hand gestures and nod remain correctly routed in these cases",
+    "Ordinary arithmetic reply emits no action",
+    "Free upper-body dance routes to generate in both final development and new English formulation, within 240 characters",
+    "Development correction preserves forward geometry and adds partner-facing palm-normal wrist motion",
+    "Development refusal retains explicit straight-arm constraints and returns none instead of an auto-bend substitute"
+  ],
+  "releaseInterpretation": "The representation, parser boundary and final generated descriptions passed their stated structural checks. The new planner is not a guarantee of complete constraint adherence, reachable automatic greeting, or reliable refusal across formulations. Keep executable failure feedback and honest user-visible status; do not label all natural goals solved.",
+  "firstRealExecutionFixture": "palm-purpose-first-qwen-plan-v2.json keeps the preselected original first-run model tag and exposes the new parser-derived auto flags via direct C# export. It is not replaced by a later better-looking model result.",
+  "archivedReports": {
+    "palm-purpose-planning-v1.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v1.json",
+      "sha256": "32cfa5de52ecb564e6c1fccf311c230a89fd4ee49fbfc329b1e027d22d349f85"
+    },
+    "palm-purpose-planning-v2.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v2.json",
+      "sha256": "a8c9d1ca64e50acaf00903bf8cf9b7d3357b4c38e247749973e20d451b9e5280"
+    },
+    "palm-purpose-planning-v3-restored.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v3-restored.json",
+      "sha256": "b22f2c0794d1dcee7c280c515f4034342fd461e179d95b8b31d56e4c339195d2"
+    },
+    "palm-purpose-planning-v4-compact.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v4-compact.json",
+      "sha256": "b34b536588f324de116f4c969c5e63aa55e4d9cd962f7cabc7b98707bff3f876"
+    },
+    "palm-purpose-planning-v5-single-contract.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v5-single-contract.json",
+      "sha256": "153ca645ba948bf8cbbbf5d7c26aeb2a0daeab0f8a5ceae4882cf9f0beb36b1d"
+    },
+    "palm-purpose-new-expressions-v1.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-new-expressions-v1.json",
+      "sha256": "ebbb4fd1c20c2cb7c57b80640723d3e6a5452f0f58ef39d2f17b93c1b0bb70a1"
+    },
+    "palm-purpose-new-expressions-v1.once.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-new-expressions-v1.once.json",
+      "sha256": "eb848f32825be2087503a7d22f1bd4a614452a6bdf6bc25369e09a7554cdf69b"
+    },
+    "palm-purpose-first-qwen-plan-v1.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-first-qwen-plan-v1.json",
+      "sha256": "30f97e0cffa1fbf27ccbe893abc182a9096f15ff095bc65beff9b8e20be164ed"
+    },
+    "palm-purpose-first-qwen-plan-v2.json": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-first-qwen-plan-v2.json",
+      "sha256": "9a106eb49df777c7f22762f0dc0bf9c8de0523a224c98bbfefc5493f9fe532b9"
+    }
+  },
+  "sourceSha256": {
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "b66004fee7c13d01ce43d614a2c1e19b43e29839dc059b33cde443af5c87f90f",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs.meta": "124fd8aac7a39fcfeab59df373ca28b0b1d89294998f9f552038d24d81fa0d7f",
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "02837df1b24e8ace2c1b2bd7629298d859b8be5d29deccf6f86c17b0c45f18e4",
+    "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs": "986ef4790e05865496e3e9ecd34d261bd0971ab46d03fef2f761b3e5c041cbfb",
+    "Assets/Editor/ArdyDialogueMotionRegression.cs": "5cc12341a0f49a4219c55e8043bd0fcbae7ccd8cfe7093cf7990d15280dfc29e",
+    "Tools/MotionAdapter/validate_dialogue_motion.py": "62612e4546f1399607c1f8b991412e41d442ec088dcec6a8a848eee9f6a2f829",
+    "Tools/MotionAdapter/validate_purpose_motion_planning.py": "0da6cf6c447125fa76fcafa6f704555f61bd1f8f16ca70170236120b7e5e0e48",
+    "Tools/MotionAdapter/data/palm-purpose-new-expressions-v1.json": "ba2481d83a9b67ffce65aae456f5407fa5b0167feffe74c738b8b2f3f579659e",
+    "Server/ARDY/runtime/palm-protocol-check/Program.cs": "315e9675b8cb6a2ff3e0208a4cca8e6784346a5a9124c10c4ef6e50ff9d96699"
+  }
+}

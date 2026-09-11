@@ -1,0 +1,9 @@
+{
+    "passed": true,
+    "checks": 167,
+    "unityVersion": "2022.3.22f1",
+    "checkedAtUtc": "2026-09-10T04:41:04.9795203Z",
+    "environment": "Real Unity Editor; actual inactive ChatSample and production parser sources, no stubs",
+    "scope": "Completed action channel, every stream boundary, malformed/private/quoted input, TTS queue, stale generation rejection, response-independent body lifetime, exact same-chain idempotency and pure-motion interruption",
+    "excludes": "No model or service request; visual naturalness covered separately"
+}

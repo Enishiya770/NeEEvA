@@ -1,0 +1,710 @@
+{
+  "schema": 2,
+  "status": "completed",
+  "contract": "\n[完整动作目标与选路]\n本轮至多一个末尾自闭合motion标签，不能放在引号、代码、thought或say中，也不朗读标签。可以自主选择合适的交流动作；普通交流可不动，不要每句话都做动作。\n先识别表达目的与最近未撤销的用户约束，再按完整目标选唯一的路线：\n1. 只有没有附带姿态或多关节保持约束的完整独立目标，才优先使用对应基本手势：left-wave(自身左挥手)、right-wave(自身右挥手)、nod(轻点头)、shake-head(轻摇头)。写成<motion name=\"对应名称\"/>。单臂也一样：要求任何明确臂姿态、前伸、侧展、掌向或保持时，必须走compose，不能只执行“挥手”一词。明确停止则<motion name=\"none\"/>。\n2. 固定手臂方向/肘角/掌向，加至多一种局部周期运动，优先用 compose。静态姿态也用compose。\n3. 多部位连续自由运动继续用 generate：交替手臂轨迹、躯干起伏、自由舞蹈不属于固定臂姿加单一局部周期，不能用compose中的head摆动代替。\n[目的与约束]\n按表达目的规划可观察形态，不要求用户逐关节教学。招呼/告别通常应让交流对象看到掌面并轻摆；静态示掌则不附加摆动。用户明确的掌心朝下、静止、侧别、方向或肘角优先；不把所有交流目的变成同一动作。\n保留最近未撤销的约束，但以前你自行补的参数不是用户限制。纠错时只改未被用户限定的部分。历史动作目标不是当前姿态事实；idle或没有进行中动作事实时，从当前姿态重新达到目标，不能假定仍保持旧姿态。\n[compose参数]\n格式：<motion name=\"compose\" 属性=\"值\"/>，不使用text或JSON。\nleft/right：none(默认)、current、forward、outward、up、down、forward-up、outward-up。按角色自身坐标：forward正前水平；outward该臂向自身外侧水平；up/down上下；-up斜上。前方与侧方须区分。current保持当前实际臂姿，不恢复历史姿态。至少指定一臂或joint。\nleftPalm/rightPalm：keep(默认，不新增掌向约束)、partner(朝交流对象)、up、down、inward(朝中线)、outward(离中线)。掌向是掌面法线，不是手指方向；非keep必须设置对应手臂目标。partner取程序提供的交流位置，不能虚构已定位用户。\nleftBend/rightBend：肘屈曲0..110度。明确伸直必须填0，固定角度必须填数值，不能偷偷改屈肘。有方向目标且palm非keep、用户未限定肘角时，省略Bend让执行器求解可达的适当屈肘；current保持实测，无掌向旧计划默认8度。前伸/平伸/extended只指定方向，不自行加肘0；明确伸直/straight才填0。Bend只接受数值，不能写current或auto；让执行器求解就是省略该属性。\njoint：none(默认)、left-wrist、right-wrist、wrists、head；活动腕必须设置对应臂，两腕必须两臂都有目标。静态用none，并省略amplitude/cycles/seconds，不能填0。\naxis：up(默认)、right、forward为角色旋转轴；点头right，摇头up。palm-normal只用于腕部运动，绕每只手目标掌面法线摆动，必须给每只活动手显式非keep掌向，适合掌面朝人的招呼。要保持掌面朝人而在掌面内摆手，选palm-normal并明确写每只活动手的Palm=partner；只有用户指定其他旋转轴才覆盖。不能把伸臂方向误作摆动轴。\namplitude：1..20度，head最多12，默认10；cycles：整数1..3，默认2；seconds：1..6，默认3.2，cycles/seconds<=1.5。end：idle(默认)或hold(最多30秒)。准备姿态达标后才做局部运动；已稳定holding可在用户开口后接续，运动中开口取消。\n[generate参数]\n格式：<motion name=\"generate\" text=\"English motion description\"/>。开放式上身运动继续用 generate。text用一句短英文，至多240字符且至多25个英文词；写清侧别、运动方向、结束位置或姿态和真正活动的关节，不要重复背景。固定6秒，6秒动作结束后默认回待机；接口没有阶段达标反馈，不保证then的先后目标达标。\n[执行边界]\n原地仅限制根节点和腿部；不支持蹲跳、精细单指、真实物体操作或可靠接触。自主动作轻微自然，用户明确的动作目标和幅度优先。反馈不可达时不自动重试、不假称完成。去掉挥动不代表原静态姿态可达；没有新可达证据时，不提交原失败姿态或擅改目标。只有用户放宽对应限制才可换解，否则说明限制，可不带动作或轻摇头。数字用英文小数点，不输出未列出的属性。",
+  "contractSha256": "b204c4de7b4cf3371eef93c43dc2c7067859e4f4d33f7f010b4df88e207a46e6",
+  "cases": [
+    {
+      "id": "zh-independent-greeting",
+      "language": "zh",
+      "user": "用右手跟我打个招呼吧。",
+      "expected": {
+        "name": "right-wave"
+      }
+    },
+    {
+      "id": "ja-independent-farewell",
+      "language": "ja",
+      "user": "そろそろ行くね。左手を振って見送って。",
+      "expected": {
+        "name": "left-wave"
+      }
+    },
+    {
+      "id": "zh-forward-greeting",
+      "language": "zh",
+      "user": "双臂向前平伸，用双手跟我打个招呼。",
+      "expected": {
+        "name": "compose",
+        "left": "forward",
+        "right": "forward",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "joint": "wrists",
+        "axis": "palm-normal"
+      },
+      "needsReachabilityChoice": true
+    },
+    {
+      "id": "zh-single-forward-greeting-render-fixture",
+      "language": "zh",
+      "user": "右臂向前伸着，跟我打个招呼。",
+      "expected": {
+        "name": "compose",
+        "left": "none",
+        "right": "forward",
+        "rightPalm": "partner",
+        "joint": "right-wrist",
+        "axis": "palm-normal"
+      }
+    },
+    {
+      "id": "en-forward-farewell",
+      "language": "en",
+      "user": "Keep both arms extended in front of you and wave goodbye to me with both hands.",
+      "expected": {
+        "name": "compose",
+        "left": "forward",
+        "right": "forward",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "joint": "wrists",
+        "axis": "palm-normal"
+      },
+      "needsReachabilityChoice": true
+    },
+    {
+      "id": "ja-static-palm-display",
+      "language": "ja",
+      "user": "両腕を前に伸ばして、両方の手のひらを私に見せて。そのままでいて。",
+      "expected": {
+        "name": "compose",
+        "left": "forward",
+        "right": "forward",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "joint": "none",
+        "end": "hold"
+      }
+    },
+    {
+      "id": "en-explicit-palms-down",
+      "language": "en",
+      "user": "Extend both arms straight forward, palms down, and keep them still.",
+      "expected": {
+        "name": "compose",
+        "left": "forward",
+        "right": "forward",
+        "leftBend": 0,
+        "rightBend": 0,
+        "leftPalm": "down",
+        "rightPalm": "down",
+        "joint": "none",
+        "end": "hold"
+      }
+    },
+    {
+      "id": "zh-down-palm-overrides-farewell-default",
+      "language": "zh",
+      "user": "双臂向前平伸，掌心一直朝下，用这个姿势挥手告别。",
+      "expected": {
+        "name": "compose",
+        "left": "forward",
+        "right": "forward",
+        "leftPalm": "down",
+        "rightPalm": "down",
+        "joint": "wrists"
+      }
+    },
+    {
+      "id": "zh-correction-preserves-forward-hold",
+      "language": "zh",
+      "fact": {
+        "phase": "holding",
+        "previousRequestedPoseHeld": true,
+        "controlPlan": {
+          "left": "forward",
+          "right": "forward",
+          "leftBend": 40,
+          "rightBend": 40,
+          "joint": "none",
+          "axis": "up",
+          "amplitude": 10,
+          "cycles": 2,
+          "seconds": 3.2,
+          "end": "hold",
+          "leftPalm": "down",
+          "rightPalm": "down",
+          "leftBendAuto": false,
+          "rightBendAuto": false
+        },
+        "measuredConstraintState": {
+          "observed": true,
+          "goalsReached": true,
+          "phase": "holding"
+        }
+      },
+      "history": [
+        {
+          "role": "user",
+          "content": "双臂向前平伸，稍微屈肘，先这样保持。"
+        },
+        {
+          "role": "assistant",
+          "content": "<silent/><motion name=\"compose\" left=\"forward\" right=\"forward\" leftBend=\"40\" rightBend=\"40\" leftPalm=\"down\" rightPalm=\"down\" end=\"hold\"/>"
+        }
+      ],
+      "user": "手臂别换方向，我想让你在这个基础上像面对面打招呼那样挥手。",
+      "expected": {
+        "name": "compose",
+        "left": [
+          "current",
+          "forward"
+        ],
+        "right": [
+          "current",
+          "forward"
+        ],
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "joint": "wrists",
+        "axis": "palm-normal"
+      }
+    },
+    {
+      "id": "ja-single-side-palm-display",
+      "language": "ja",
+      "user": "左腕を横に伸ばして、左の手のひらを私に見せて。右腕は動かさないで。",
+      "expected": {
+        "name": "compose",
+        "left": "outward",
+        "right": "none",
+        "leftPalm": "partner",
+        "joint": "none"
+      }
+    },
+    {
+      "id": "en-ordinary-no-forced-motion",
+      "language": "en",
+      "user": "What is 17 plus 26? Please answer briefly.",
+      "expected": {
+        "name": null
+      }
+    },
+    {
+      "id": "zh-independent-nod-regression",
+      "language": "zh",
+      "user": "请轻轻点一次头。",
+      "expected": {
+        "name": "nod"
+      }
+    },
+    {
+      "id": "zh-open-upper-body-dance-regression",
+      "language": "zh",
+      "user": "双脚留在原地，随音乐自然地交替用双臂画弧线，带一点躯干起伏，做连贯的自由上身舞蹈。",
+      "expected": {
+        "name": "generate"
+      }
+    },
+    {
+      "id": "zh-failed-straight-goal-relaxed-to-greeting",
+      "language": "zh",
+      "fact": {
+        "phase": "idle-Animator",
+        "previousRequestedPoseHeld": false,
+        "lastControlPlan": {
+          "left": "forward",
+          "right": "forward",
+          "leftBend": 0,
+          "rightBend": 0,
+          "joint": "wrists",
+          "axis": "palm-normal",
+          "amplitude": 10,
+          "cycles": 2,
+          "seconds": 3.2,
+          "end": "hold",
+          "leftPalm": "partner",
+          "rightPalm": "partner",
+          "leftBendAuto": false,
+          "rightBendAuto": false
+        },
+        "lastControlObservation": {
+          "observed": true,
+          "goalsReached": false,
+          "phase": "failed"
+        },
+        "lastControlError": "palm-unreachable: fully straight forward arms require wrist swing above the 80 degree engineering limit"
+      },
+      "history": [
+        {
+          "role": "user",
+          "content": "双臂朝前平伸，肘部完全伸直，掌心朝我挥手。"
+        }
+      ],
+      "user": "那就不用坚持刚才的伸直要求了，双臂还是朝前，自然地用两只手跟我打招呼就好。",
+      "expected": {
+        "name": "compose",
+        "left": "forward",
+        "right": "forward",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "joint": "wrists",
+        "axis": "palm-normal"
+      },
+      "needsReachabilityChoice": true
+    },
+    {
+      "id": "en-failed-straight-goal-still-required",
+      "language": "en",
+      "fact": {
+        "phase": "idle-Animator",
+        "previousRequestedPoseHeld": false,
+        "lastControlPlan": {
+          "left": "forward",
+          "right": "forward",
+          "leftBend": 0,
+          "rightBend": 0,
+          "joint": "wrists",
+          "axis": "palm-normal",
+          "amplitude": 10,
+          "cycles": 2,
+          "seconds": 3.2,
+          "end": "hold",
+          "leftPalm": "partner",
+          "rightPalm": "partner",
+          "leftBendAuto": false,
+          "rightBendAuto": false
+        },
+        "lastControlObservation": {
+          "observed": true,
+          "goalsReached": false,
+          "phase": "failed"
+        },
+        "lastControlError": "palm-unreachable: fully straight forward arms require wrist swing above the 80 degree engineering limit"
+      },
+      "history": [
+        {
+          "role": "user",
+          "content": "Hold both arms straight forward with zero elbow bend and wave at me, palms facing me."
+        }
+      ],
+      "user": "I still require completely straight elbows, arms forward, and palms facing me. Do not change those constraints.",
+      "expected": {
+        "name": [
+          null,
+          "none"
+        ]
+      },
+      "requiresLimitationExplanation": true
+    }
+  ],
+  "caseSet": "development",
+  "caseSha256": "aae33bf2f32bb6a479e0dd6ea77576eda32f21a865bc3ae5048e264e4ada5d19",
+  "results": [
+    {
+      "caseId": "zh-independent-greeting",
+      "motionTags": [
+        "<motion name=\"right-wave\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "actualParameters": {
+        "name": "right-wave"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": true,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.532
+    },
+    {
+      "caseId": "ja-independent-farewell",
+      "motionTags": [
+        "<motion name=\"left-wave\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "actualParameters": {
+        "name": "left-wave"
+      },
+      "publicReplyExcerpt": "はい、気をつけて行ってらっしゃい。",
+      "planningChecksPassed": true,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.276
+    },
+    {
+      "caseId": "zh-forward-greeting",
+      "motionTags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" leftBend=\"0\" rightBend=\"0\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"hold\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {
+        "reachabilityChoice": "The plan fixes near-straight elbows for a relaxed directional palm goal instead of leaving elbow-solving freedom"
+      },
+      "elbowFreedomOrFlexionSelected": false,
+      "actualParameters": {
+        "left": "forward",
+        "right": "forward",
+        "leftBend": 0.0,
+        "rightBend": 0.0,
+        "joint": "wrists",
+        "axis": "palm-normal",
+        "amplitude": 10.0,
+        "cycles": 2.0,
+        "seconds": 3.2,
+        "end": "hold",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "leftBendAuto": false,
+        "rightBendAuto": false,
+        "name": "compose"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": false,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.518
+    },
+    {
+      "caseId": "zh-single-forward-greeting-render-fixture",
+      "motionTags": [
+        "<motion name=\"compose\" left=\"none\" right=\"forward\" rightPalm=\"partner\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {
+        "joint": {
+          "expected": "right-wrist",
+          "actual": "none"
+        },
+        "axis": {
+          "expected": "palm-normal",
+          "actual": "up"
+        }
+      },
+      "actualParameters": {
+        "left": "none",
+        "right": "forward",
+        "leftBend": 8.0,
+        "rightBend": 8.0,
+        "joint": "none",
+        "axis": "up",
+        "amplitude": 10.0,
+        "cycles": 2.0,
+        "seconds": 3.2,
+        "end": "idle",
+        "leftPalm": "keep",
+        "rightPalm": "partner",
+        "leftBendAuto": false,
+        "rightBendAuto": true,
+        "name": "compose"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": false,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.293
+    },
+    {
+      "caseId": "en-forward-farewell",
+      "motionTags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" leftBend=\"0\" rightBend=\"0\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"3\" seconds=\"3\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {
+        "reachabilityChoice": "The plan fixes near-straight elbows for a relaxed directional palm goal instead of leaving elbow-solving freedom"
+      },
+      "elbowFreedomOrFlexionSelected": false,
+      "actualParameters": {
+        "left": "forward",
+        "right": "forward",
+        "leftBend": 0.0,
+        "rightBend": 0.0,
+        "joint": "wrists",
+        "axis": "palm-normal",
+        "amplitude": 10.0,
+        "cycles": 3.0,
+        "seconds": 3.0,
+        "end": "idle",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "leftBendAuto": false,
+        "rightBendAuto": false,
+        "name": "compose"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": false,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.5
+    },
+    {
+      "caseId": "ja-static-palm-display",
+      "motionTags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" leftBend=\"0\" rightBend=\"0\" joint=\"none\" end=\"hold\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "actualParameters": {
+        "left": "forward",
+        "right": "forward",
+        "leftBend": 0.0,
+        "rightBend": 0.0,
+        "joint": "none",
+        "axis": "up",
+        "amplitude": 10.0,
+        "cycles": 2.0,
+        "seconds": 3.2,
+        "end": "hold",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "leftBendAuto": false,
+        "rightBendAuto": false,
+        "name": "compose"
+      },
+      "publicReplyExcerpt": "了解しました。両腕を前に伸ばし、手のひらを見せた状態で静止します。",
+      "planningChecksPassed": true,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.523
+    },
+    {
+      "caseId": "en-explicit-palms-down",
+      "motionTags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"down\" rightPalm=\"down\" leftBend=\"0\" rightBend=\"0\" joint=\"none\" end=\"hold\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "actualParameters": {
+        "left": "forward",
+        "right": "forward",
+        "leftBend": 0.0,
+        "rightBend": 0.0,
+        "joint": "none",
+        "axis": "up",
+        "amplitude": 10.0,
+        "cycles": 2.0,
+        "seconds": 3.2,
+        "end": "hold",
+        "leftPalm": "down",
+        "rightPalm": "down",
+        "leftBendAuto": false,
+        "rightBendAuto": false,
+        "name": "compose"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": true,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.429
+    },
+    {
+      "caseId": "zh-down-palm-overrides-farewell-default",
+      "motionTags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"down\" rightPalm=\"down\" leftBend=\"0\" rightBend=\"0\" joint=\"wrists\" axis=\"up\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"idle\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "actualParameters": {
+        "left": "forward",
+        "right": "forward",
+        "leftBend": 0.0,
+        "rightBend": 0.0,
+        "joint": "wrists",
+        "axis": "up",
+        "amplitude": 10.0,
+        "cycles": 2.0,
+        "seconds": 3.2,
+        "end": "idle",
+        "leftPalm": "down",
+        "rightPalm": "down",
+        "leftBendAuto": false,
+        "rightBendAuto": false,
+        "name": "compose"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": true,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.526
+    },
+    {
+      "caseId": "zh-correction-preserves-forward-hold",
+      "motionTags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"hold\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "actualParameters": {
+        "left": "forward",
+        "right": "forward",
+        "leftBend": 8.0,
+        "rightBend": 8.0,
+        "joint": "wrists",
+        "axis": "palm-normal",
+        "amplitude": 10.0,
+        "cycles": 2.0,
+        "seconds": 3.2,
+        "end": "hold",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "leftBendAuto": true,
+        "rightBendAuto": true,
+        "name": "compose"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": true,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.5
+    },
+    {
+      "caseId": "ja-single-side-palm-display",
+      "motionTags": [
+        "<motion name=\"compose\" left=\"forward\" leftPalm=\"partner\" leftBend=\"0\" right=\"current\" rightPalm=\"keep\" joint=\"none\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {
+        "left": {
+          "expected": "outward",
+          "actual": "forward"
+        },
+        "right": {
+          "expected": "none",
+          "actual": "current"
+        }
+      },
+      "actualParameters": {
+        "left": "forward",
+        "right": "current",
+        "leftBend": 0.0,
+        "rightBend": 8.0,
+        "joint": "none",
+        "axis": "up",
+        "amplitude": 10.0,
+        "cycles": 2.0,
+        "seconds": 3.2,
+        "end": "idle",
+        "leftPalm": "partner",
+        "rightPalm": "keep",
+        "leftBendAuto": false,
+        "rightBendAuto": false,
+        "name": "compose"
+      },
+      "publicReplyExcerpt": "了解しました。左腕を横に伸ばし、左手の平をあなたに向けて静止します。右腕は動かしません。",
+      "planningChecksPassed": false,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.486
+    },
+    {
+      "caseId": "en-ordinary-no-forced-motion",
+      "motionTags": [],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "actualParameters": {
+        "name": null
+      },
+      "publicReplyExcerpt": "43",
+      "planningChecksPassed": true,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.178
+    },
+    {
+      "caseId": "zh-independent-nod-regression",
+      "motionTags": [
+        "<motion name=\"nod\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "actualParameters": {
+        "name": "nod"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": true,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.197
+    },
+    {
+      "caseId": "zh-open-upper-body-dance-regression",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Alternating arms drawing arcs with slight torso sway, free upper body dance, feet stationary\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "generatedCharacters": 92,
+      "generatedEnglishWords": 14,
+      "actualParameters": {
+        "name": "generate",
+        "text": "Alternating arms drawing arcs with slight torso sway, free upper body dance, feet stationary"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": true,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.292
+    },
+    {
+      "caseId": "zh-failed-straight-goal-relaxed-to-greeting",
+      "motionTags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"hold\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "elbowFreedomOrFlexionSelected": true,
+      "actualParameters": {
+        "left": "forward",
+        "right": "forward",
+        "leftBend": 8.0,
+        "rightBend": 8.0,
+        "joint": "wrists",
+        "axis": "palm-normal",
+        "amplitude": 10.0,
+        "cycles": 2.0,
+        "seconds": 3.2,
+        "end": "hold",
+        "leftPalm": "partner",
+        "rightPalm": "partner",
+        "leftBendAuto": true,
+        "rightBendAuto": true,
+        "name": "compose"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": true,
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.448
+    },
+    {
+      "caseId": "en-failed-straight-goal-still-required",
+      "motionTags": [
+        "<motion name=\"none\"/>"
+      ],
+      "motionSuccess": null,
+      "dialogueAppropriateness": "manual_review_required",
+      "shapeErrors": [],
+      "mismatches": {},
+      "actualParameters": {
+        "name": "none"
+      },
+      "publicReplyExcerpt": "",
+      "planningChecksPassed": true,
+      "limitationExplanation": "manual_review_required",
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.213
+    }
+  ],
+  "endpoint": "http://127.0.0.1:8080",
+  "scope": "Real existing Qwen; public multilingual purpose requests with synthetic controller facts. No private persona, reasoning logs, ARDY request, Unity execution or model changes.",
+  "limits": "Development planning diagnostics only. A matching palm/axis/pose is not geometric reachability, motion success, naturalness or a held-out final evaluation. C# syntax/validation is checked separately.",
+  "schemaChange": "Version 2 reflects the new production parser: unspecified directional-palm elbows derive BendAuto=true. This changes interpretation, not the old report or its first-run result. Prompts are unchanged.",
+  "busyPolicy": "Require all existing slots idle before every request; stop without queueing on busy or unknown status.",
+  "planningChecksPassed": false
+}

@@ -1,0 +1,66 @@
+{
+  "checkedAtUtc": "2026-09-10T06:15:20.421283+00:00",
+  "scope": "Autonomous motion planning contract only; no lifecycle, Player, runtime clip or adapter weight changes.",
+  "cpuProtocol": {
+    "passed": true,
+    "checks": 213,
+    "compileExitCode": 0,
+    "executionExitCode": 0,
+    "environment": "Unity-bundled Mono and Roslyn C# 9 CLI; production DialogueMotionProtocol, RoleOutputChannels and SpeechText, no stubs",
+    "excludes": "Full ChatSample Editor regression was prepared but not run in this task."
+  },
+  "editorRegression": {
+    "prepared": true,
+    "executed": false,
+    "entryPoint": "ArdyDialogueMotionRegression.RunBatch",
+    "additionalCoverage": [
+      "Actual ChatSample receives autonomous capability only when enabled",
+      "Any generated description at every stream split stays out of speech",
+      "Same-generation exact generated intent dispatches once",
+      "Stationary/default-amplitude wording preserves explicit upper-body requests"
+    ]
+  },
+  "livePlanning": {
+    "report": "Tools/MotionAdapter/reports/dialogue-autonomous-planning-smoke.json",
+    "cases": 7,
+    "syntaxPassed": 7,
+    "requiredRoutingPassed": 5,
+    "requiredRoutingTotal": 5,
+    "optionalCases": 2,
+    "model": "qwen36.gguf",
+    "runtime": "Existing Qwen endpoint http://127.0.0.1:8080",
+    "reviewer": "assistant qualitative review of final visible reply only",
+    "observations": [
+      "Explicit double-arm overhead request emits one generate tag with bilateral, upward and above-head target.",
+      "Free choice selected left-wave, which is valid under basic gesture priority.",
+      "Conversation-only scenario emitted no motion; this is permitted and does not demonstrate spontaneous new-action frequency.",
+      "Right wave and nod use the accepted basic routes.",
+      "Cup request describes inability to operate real objects and emits shake-head, without a false contact-completion claim.",
+      "Non-basic welcome prompt selects a concrete bilateral waist-to-chest raise with open palms."
+    ],
+    "limits": [
+      "No action requests sent to ARDY or Unity.",
+      "The extra welcome request demonstrates open-ended planning on request, not unsolicited new-action appropriateness.",
+      "Real dialogue/session testing is still needed for when and how often autonomous actions are appropriate.",
+      "Native motion metrics cannot substitute for that dialogue assessment; no motion success or naturalness claim is made."
+    ]
+  },
+  "developmentHistory": {
+    "firstRun": "Tools/MotionAdapter/reports/dialogue-autonomous-planning-smoke-initial.json",
+    "rootBoundaryFixRun": "Tools/MotionAdapter/reports/dialogue-autonomous-planning-smoke-root-boundary-fix.json",
+    "findings": [
+      "Initial root/leg wording was misread as prohibiting arm displacement and refused overhead. Explicit upper-body joint/arm allowance fixed this observed response.",
+      "Initial smoke incorrectly required generate for a free-choice request; corrected to allow a concrete accepted basic action too.",
+      "Final contract explicitly makes user action target/amplitude take priority over subtle spontaneous-action defaults."
+    ],
+    "isHeldOutEvaluation": false
+  },
+  "sourceSha256": {
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "908e96168e5ab92b9afc64bc2d949a0d0937b5cd76fafd610e9c02ceda4b5a1a",
+    "Assets/Editor/ArdyDialogueMotionRegression.cs": "f57b8ab8a05d532095f74a06bcb434d2a4f5cf9f8d853f6f8f7e0f212ad34e36",
+    "Assets/AIChatTookit/Scripts/Chat/RoleOutputChannels.cs": "6c434e2c73cbdb805cc9fe798b8579436e3266ac393432fa557a8387bac8a0f4",
+    "Assets/AIChatTookit/Scripts/Chat/SpeechText.cs": "a2f88c73aa98c34814b953b9ab9fe43cf9c1e51758b70976dc70e48b93cdf820",
+    "Server/ARDY/runtime/dialogue-protocol-check/Program.cs": "24708e3b74602b445b4bd7d4cbcf45c7f2eb2d17892b0365c4a31b40e335c0d2",
+    "Tools/MotionAdapter/validate_autonomous_dialogue_motion.py": "c589b9969350f117e5a568e45440421429e8dadf6c419cca4731460a7dbf183d"
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "createdUtc": "2026-09-10T09:31:37.868857+00:00",
+  "scope": "Final source synchronization, unchanged accepted assets, and exact report identities; not universal naturalness acceptance.",
+  "sources": [
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs",
+      "sha256": "b66004fee7c13d01ce43d614a2c1e19b43e29839dc059b33cde443af5c87f90f",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyConstraintSession.cs",
+      "sha256": "a730dc5f7d3233b60207258ed1fb67911427e5bc9490c7ebbced5e88691b9831",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyPalmGeometry.cs",
+      "sha256": "e78ac5872c58bce4e65ea36e77b95ff12845aefbffa963456b8e5af795410764",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs",
+      "sha256": "94c219abb28ea1fddc28466cad3804d0d3db540cbc204a6e3f352a5a8f446172",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.cs",
+      "sha256": "a4d6decb91e85385dc010b0c44ac7ecf0c24c15ec226c614dd852eb18a565d66",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyConstraintObserver.cs",
+      "sha256": "b4bc0f114a5063e6f96077a32cc1ecc0b468a162ccec9b8dbc0bf9c0a5dbc446",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyControlTrace.cs",
+      "sha256": "a1db5a4f105bf92fbbc9f710581275061e4538d810918fd23e04147afcee9136",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs",
+      "sha256": "2d839e97949fa2e5e8a7d101fd2d952af2dbce68ec89af510203ba16f8385c56",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs",
+      "sha256": "7cc104ecc84adca02b77f8c85308c83ce7fb613357251e1c1966403059b19fbe",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ArdyDialogueMotionBridge.cs",
+      "sha256": "72116744e4c005e9ef145acd5c58c2a20d6e6cb09fee375290fb3b57caba20c2",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdyConstraintRegression.cs",
+      "sha256": "be2101ce0e0ddfc7a3c2966d44819158dba5bfed3f24b6327a19b540887ce5d3",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdyConstraintPalmRegression.cs",
+      "sha256": "d4a978b0de221897fae910f7ecb040f1e936ebaa474ffbd6d0d750f5ceb8d14a",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdyDialogueMotionRegression.cs",
+      "sha256": "e5f610f06f5698df854bd5e8a2858f78e265c5c3cd3ccaadd520d77c2f28fa11",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdyConstraintPreviewWindow.cs",
+      "sha256": "dfb508e5ce577a5f11af4e9ab0acaa389a1d3f1b0c5c80070511ce2357e30e90",
+      "matchesIsolated": true
+    },
+    {
+      "path": "Assets/Editor/ArdyDialogueMotionWindow.cs",
+      "sha256": "8a75d84a329972ac8afbb318db9a760fe32b5a86068aee698525a7ce946308d7",
+      "matchesIsolated": true
+    }
+  ],
+  "unchangedAssets": [
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/left-wave.json",
+      "sha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d"
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/right-wave.json",
+      "sha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd"
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/nod.json",
+      "sha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77"
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/shake-head.json",
+      "sha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946"
+    },
+    {
+      "path": "Server/ARDY/runtime/active-adapter-release.json",
+      "sha256": "8e2df4f825a62e1fbfd097691d55115cc8923807ea078c8124bf3d966127fb0e"
+    },
+    {
+      "path": "Tools/MotionAdapter/runtime/generalization-v1/candidates/finetune-seed0.pt",
+      "sha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab"
+    }
+  ],
+  "reports": [
+    {
+      "path": "Server/ARDY/runtime/palm-execution-v1/full-pass-v1/constraint-regression.json",
+      "bytes": 49653368,
+      "sha256": "ae60a49f995314bb558e0dfbf4cf96ee50c9f2356ce2c71daa67d679a6a0c63a"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/palm-purpose-protocol-release-selection.json",
+      "bytes": 13060,
+      "sha256": "e1f7080eb5ed769fa663dc635dc375e4c94a09ff88c1f62ea83d5c5929f672f4"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/palm-purpose-protocol-final-freeze.json",
+      "bytes": 3048,
+      "sha256": "54a8bb8d6c0353f2deb1fc2166bba3ce2fd682ff3c04124d9739c7d56d39af19"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/palm-purpose-first-qwen-plan-v2.json",
+      "bytes": 2925,
+      "sha256": "9a106eb49df777c7f22762f0dc0bf9c8de0523a224c98bbfefc5493f9fe532b9"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/palm-final-legacy-anchor.json",
+      "bytes": 1499,
+      "sha256": "903c665f74680805062ec7bfd27e3af3196416935ea8e664a173ce3e9a29b523"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/palm-final-legacy-stream.json",
+      "bytes": 2658,
+      "sha256": "5fd2b919f3366e581b4659c84f3147e26362ab521ce1666045d943a70dfda29c"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/palm-final-legacy-dialogue.json",
+      "bytes": 707,
+      "sha256": "98bb40daa1f7f880939c76437bbf8762bb78be0797d01ef1231c1ca447c40e58"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/palm-final-legacy-playmode.json",
+      "bytes": 2734,
+      "sha256": "3433cec174f6981111fd0dc678857cffda8f431ac93a45410ec6b2e8c85943b7"
+    },
+    {
+      "path": "Tools/MotionAdapter/reports/palm-final-live-http.json",
+      "bytes": 9806,
+      "sha256": "60795e883dad03427d074fd0230685d58f995e6b280878c57e4739c916f39b39"
+    },
+    {
+      "path": "Server/ARDY/runtime/palm-execution-v1/final-live-trace.json",
+      "bytes": 299214,
+      "sha256": "7c5d03ac224b9961ed44e1fd79ebfc6f2fde72ec0b6018bc0088b28f0f3f26bf"
+    }
+  ]
+}

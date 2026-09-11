@@ -1,0 +1,408 @@
+{
+  "schema": 1,
+  "date": "2026-09-10",
+  "base_url": "http://127.0.0.1:18082",
+  "feature_contract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+  "model_sha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+  "validation_scope": "Real HTTP, full configured 3 x 65536 chat capacity and vision; not a 65536-token occupancy stress test",
+  "cached_feature_compatibility": [
+    {
+      "id": "motion-00000",
+      "max_abs_error": 0.0,
+      "cosine": 1.0000001192092896,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 218
+      }
+    },
+    {
+      "id": "motion-00001",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 35
+      }
+    },
+    {
+      "id": "motion-00004",
+      "max_abs_error": 0.0,
+      "cosine": 0.9999999403953552,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 35
+      }
+    },
+    {
+      "id": "motion-00010",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 35
+      }
+    },
+    {
+      "id": "motion-00048",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 34
+      }
+    },
+    {
+      "id": "motion-00053",
+      "max_abs_error": 0.0,
+      "cosine": 1.0000001192092896,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 33
+      }
+    },
+    {
+      "id": "motion-00091",
+      "max_abs_error": 0.0,
+      "cosine": 1.0000001192092896,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 34
+      }
+    },
+    {
+      "id": "motion-00182",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 32
+      }
+    },
+    {
+      "id": "motion-00273",
+      "max_abs_error": 0.0,
+      "cosine": 0.9999999403953552,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 36
+      }
+    },
+    {
+      "id": "motion-00364",
+      "max_abs_error": 0.0,
+      "cosine": 1.0000001192092896,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 34
+      }
+    },
+    {
+      "id": "motion-00455",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 27
+      }
+    },
+    {
+      "id": "motion-00546",
+      "max_abs_error": 0.0,
+      "cosine": 1.0000001192092896,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 30
+      }
+    },
+    {
+      "id": "motion-00637",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 1,
+        "encode_ms": 27
+      }
+    },
+    {
+      "id": "motion-00728",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 28
+      }
+    },
+    {
+      "id": "motion-00819",
+      "max_abs_error": 0.0,
+      "cosine": 0.9999999403953552,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 30
+      }
+    },
+    {
+      "id": "motion-00910",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 32
+      }
+    },
+    {
+      "id": "motion-01001",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 1,
+        "encode_ms": 31
+      }
+    },
+    {
+      "id": "motion-01092",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 27
+      }
+    },
+    {
+      "id": "motion-01183",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 28
+      }
+    },
+    {
+      "id": "motion-01274",
+      "max_abs_error": 0.0,
+      "cosine": 0.9999999403953552,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 30
+      }
+    },
+    {
+      "id": "motion-01365",
+      "max_abs_error": 0.0,
+      "cosine": 1.0000001192092896,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 27
+      }
+    },
+    {
+      "id": "motion-01456",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 27
+      }
+    },
+    {
+      "id": "motion-01547",
+      "max_abs_error": 0.0,
+      "cosine": 0.9999999403953552,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 30
+      }
+    },
+    {
+      "id": "motion-01638",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 30
+      }
+    },
+    {
+      "id": "motion-01729",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 26
+      }
+    },
+    {
+      "id": "motion-01820",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 29
+      }
+    },
+    {
+      "id": "motion-01911",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 30
+      }
+    },
+    {
+      "id": "motion-01999",
+      "max_abs_error": 0.0,
+      "cosine": 1.0,
+      "timings": {
+        "queue_ms": 0,
+        "encode_ms": 27
+      }
+    }
+  ],
+  "repeat_max_abs": 0.0,
+  "endpoint_metadata": {
+    "feature_contract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+    "protocol": "qwen-motion-raw-last-v1",
+    "feature_source": "live-qwen",
+    "request_id": "repeat-a",
+    "text": "While standing in place, a person who is standing waves the left hand with moderate movements at a moderate pace.",
+    "dimension": 2048,
+    "pooling": "last_input_token_raw",
+    "template": "Motion description: {text}\nRepresentation:",
+    "shared_model": true,
+    "model_path": "D:\\NeEEvA\\llamacpp-b8919-cuda131-sm120\\qwen36.gguf",
+    "model_sha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+    "llama_cpp_revision": "dc80c5252a6d49301726e5987cc1fa006b69d93e",
+    "context_tokens": 512,
+    "input_tokens": 28,
+    "chat_slots": 3,
+    "chat_context_tokens_per_slot": 65536,
+    "timings": {
+      "queue_ms": 0,
+      "encode_ms": 28
+    }
+  },
+  "invalid_contract": {
+    "status": 400,
+    "body": {
+      "error": {
+        "code": 400,
+        "message": "Expected text, request_id, and the exact trained feature_contract hash",
+        "type": "invalid_request_error"
+      }
+    }
+  },
+  "oversize": {
+    "status": 400,
+    "body": {
+      "error": {
+        "code": 400,
+        "message": "Motion text must be 1..1024 UTF-8 bytes and request_id at most 128 bytes",
+        "type": "invalid_request_error"
+      }
+    }
+  },
+  "chat_slot_state_unchanged": true,
+  "chat_tokens_equal": true,
+  "cached_continuation_timings": {
+    "cache_n": 18,
+    "prompt_n": 1,
+    "prompt_ms": 16.114,
+    "prompt_per_token_ms": 16.114,
+    "prompt_per_second": 62.05783790492739,
+    "predicted_n": 7,
+    "predicted_ms": 30.273,
+    "predicted_per_token_ms": 4.324714285714285,
+    "predicted_per_second": 231.22914808575297
+  },
+  "chat_cached_tokens_after_feature": 18,
+  "slots": [
+    {
+      "id": 0,
+      "n_ctx": 65536
+    },
+    {
+      "id": 1,
+      "n_ctx": 65536
+    },
+    {
+      "id": 2,
+      "n_ctx": 65536
+    }
+  ],
+  "scheduling": {
+    "queue_full_http_status": 503,
+    "queued_feature_timings": {
+      "queue_ms": 731,
+      "encode_ms": 28
+    },
+    "policy": "idle-chat-only, server inference thread"
+  },
+  "vision": {
+    "synthetic_image_sha256": "ae248fdc7e8b1d8125443bd7c77825ab552efe7a060fd89683dbbf3949e03fc0",
+    "response": "Red",
+    "usage": {
+      "completion_tokens": 2,
+      "prompt_tokens": 76,
+      "total_tokens": 78,
+      "prompt_tokens_details": {
+        "cached_tokens": 72
+      }
+    }
+  },
+  "feature_after_vision": true,
+  "passed": true,
+  "runtime_provenance": {
+    "schema": 1,
+    "model_sha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+    "model_path": "D:\\NeEEvA\\llamacpp-b8919-cuda131-sm120\\qwen36.gguf",
+    "model_size": 19500506080,
+    "runtime_files": {
+      "cublas64_13.dll": "101ae2b98be62704ec96e90a3c49373b76122fc6b502497a7b6fae9ab0f01564",
+      "cublasLt64_13.dll": "517b6a69ac9faa7354cffcbd92179aec0cc18a8f6237d36b28d9adfe8c912d8d",
+      "cudart64_13.dll": "352ba4ebe61e9a3b171f357a3daf5dd15b6af4a9857673ff893bd6fd2964c075",
+      "ggml-base.dll": "c331e3321d6b7484e17c9e0172952bc1ab5719acaac8972c76f066b29cddf975",
+      "ggml-cpu-alderlake.dll": "5a8f0d27b420113d776a79a1ab8f60ca7b535f4a1a43eec94a731f1e343aa00e",
+      "ggml-cpu-cannonlake.dll": "0418a223f33df9de1b297ac8c92f3d7266da342c87ca65c014977c9ecc49480a",
+      "ggml-cpu-cascadelake.dll": "690abdfb27329e3214ba23c8736525f274f577bc0f7d2f5879ae56668cfe6c49",
+      "ggml-cpu-cooperlake.dll": "405e3b0d047f483d92edff1563737196b3f7d06a038e333135e1a03d2ad00478",
+      "ggml-cpu-haswell.dll": "911dd8bb7a1ec45f4b2c57ca10bb17a8eb47fe4cdc6da2673a438b35c9615c0f",
+      "ggml-cpu-icelake.dll": "1597dabd264c24deb35f2774e9f0fba4d3ecefee97f8076214e9a116444a5105",
+      "ggml-cpu-ivybridge.dll": "2fb88396eb6fdb51a5dcdc70427c907fe7d0879e362db59960df63d8be369278",
+      "ggml-cpu-piledriver.dll": "605a65ac9a31f311b84b556549abbd9bd0c140e28c452107666a90ae03d5a6f9",
+      "ggml-cpu-sandybridge.dll": "0e5956c2ca5b35278017e17ff31f5df45b96aacc77b370dad0ca75a5935d6990",
+      "ggml-cpu-sapphirerapids.dll": "438054ea0951b8e61f6d4303ed03217b9cd649f5e65677ae4ab74855ce43b0fe",
+      "ggml-cpu-skylakex.dll": "e03276ed1662d649730cacfe7e983cf04139ea0f6e9c16b3a23daf0090bdebe2",
+      "ggml-cpu-sse42.dll": "9d8c23c65c714f92c083a77207f0e2cd445b04c7ee564dca3e430d13f4b8d2ff",
+      "ggml-cpu-x64.dll": "d5019865a6dabafef5f4a6f33cc2f2acc38ef0a070821a712fa42d0d14ff5f7f",
+      "ggml-cpu-zen4.dll": "7e8c6cc8af7d6a05c626566037071b2b77b5ca6eb825ceec2c0d5ebca1fa8f04",
+      "ggml-cuda.dll": "7d9141dd20b2ff01388b1c7a85a08bcb0376acd39b0516c2939e99383900782b",
+      "ggml-rpc.dll": "34d6275648afedb97df5e00b6c4739d78b7f71bca2292cd29577bf6ffcf5590b",
+      "ggml.dll": "f797d8ead71ab91e3ba7a853dadb995284e67bb94b5fcc204ef916f0513b8f9e",
+      "libomp140.x86_64.dll": "9ab1cb787e52b2a36133899c01c1db1f876067d1471cd224ead85f40a8152b99",
+      "llama-common.dll": "afc76c1e320d79bcbfab77afec318a1265d93f81f65c1b0030971a66d218df2a",
+      "llama-server.exe": "216182b1de18d1f7257e04a4065fee97bf302271467ee9d8f453b07588901480",
+      "llama.dll": "dee469ce5c79ccff1830fa37e3abace5254a02e89218c64c56624f073b7c6162",
+      "mtmd.dll": "31c2e5846ad5f94debda03fc5da37b880d4190da526b29a44383729df96e80d2"
+    },
+    "llama_cpp_revision": "dc80c5252a6d49301726e5987cc1fa006b69d93e",
+    "chat_context_tokens": 196608,
+    "chat_slots": 3,
+    "motion_context_tokens": 512,
+    "port": 8082,
+    "started_at": "2026-09-10T12:41:05.0818785+09:00"
+  },
+  "process_evidence": {
+    "qwen_processes": [
+      {
+        "ProcessId": 9032,
+        "ExecutablePath": "D:\\NeEEvA\\motion-feature-server\\llama-server.exe",
+        "CommandLine": "\"D:\\NeEEvA\\motion-feature-server\\llama-server.exe\" -m D:\\NeEEvA\\llamacpp-b8919-cuda131-sm120\\qwen36.gguf --mmproj D:\\NeEEvA\\llamacpp-b8919-cuda131-sm120\\mmproj-Q8_0.gguf --host 127.0.0.1 --port 8082 --jinja --chat-template-file D:\\NeEEvA\\services\\qwen36_chat_template.jinja -c 196608 --parallel 3 --slot-prompt-similarity 0.8 -ngl 99 --flash-attn on "
+      }
+    ],
+    "shared_model_evidence": [
+      "srv  init_motion_: shared action model=000002B400897630 chat_model=000002B400897630 action_model=000002B400897630 ctx=512 slots_unchanged=true"
+    ],
+    "gpu": "NVIDIA GeForce RTX 5090, 24807 MiB, 7381 MiB"
+  }
+}

@@ -1,0 +1,241 @@
+{
+  "schema": 1,
+  "purpose": "Temporarily release only our idle ARDY service for one full-CUDA official teacher diagnostic; restore same service immediately afterwards.",
+  "before": {
+    "utc": "2026-09-10T05:07:59.315189+00:00",
+    "gpuCsv": "0, NVIDIA GeForce RTX 4090, 24564, 8155, 15984",
+    "computeProcessesCsv": "2540, [Insufficient Permissions], [N/A]\n48536, C:\\Windows\\explorer.exe, [N/A]\n38564, C:\\Windows\\SystemApps\\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\\StartMenuExperienceHost.exe, [N/A]\n51916, C:\\Windows\\SystemApps\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\\SearchHost.exe, [N/A]\n4324, C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\CEF\\NVIDIA Overlay.exe, [N/A]\n25300, C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\CEF\\NVIDIA Overlay.exe, [N/A]\n20320, [Insufficient Permissions], [N/A]\n56176, [Insufficient Permissions], [N/A]\n57992, C:\\Program Files\\WindowsApps\\B9ECED6F.ArmouryCrate_6.5.14.0_x64__qmba6cd70vzyy\\ArmouryCrate.exe, [N/A]\n54908, [Insufficient Permissions], [N/A]\n12660, C:\\Windows\\SystemApps\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\\TextInputHost.exe, [N/A]\n11024, [Insufficient Permissions], [N/A]\n7244, C:\\Program Files\\LGHUB\\system_tray\\lghub_system_tray.exe, [N/A]\n13696, [Insufficient Permissions], [N/A]\n7736, [Insufficient Permissions], [N/A]\n38560, E:\\Youdao\\Dict\\11.3.16.0\\YoudaoDictHelper.exe, [N/A]\n55112, C:\\Windows\\SystemApps\\ShellExperienceHost_cw5n1h2txyewy\\ShellExperienceHost.exe, [N/A]\n50320, [Insufficient Permissions], [N/A]\n33636, E:\\Sony\\INZONEHub.exe, [N/A]\n30004, [Insufficient Permissions], [N/A]\n49112, [Insufficient Permissions], [N/A]\n32588, [Insufficient Permissions], [N/A]\n6876, C:\\Windows\\ImmersiveControlPanel\\SystemSettings.exe, [N/A]\n48720, C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.903.8094.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe, [N/A]\n25360, [Insufficient Permissions], [N/A]\n28748, [Insufficient Permissions], [N/A]\n30076, C:\\Program Files\\WindowsApps\\Microsoft.WindowsTerminal_1.24.11911.0_x64__8wekyb3d8bbwe\\WindowsTerminal.exe, [N/A]\n22876, C:\\Users\\FANG Yingjie\\Miniconda3\\python.exe, [N/A]\n9088, [Insufficient Permissions], [N/A]\n22152, E:\\VRproject\\VR20250611\\NeEEvA\\GPT-SoVITS\\runtime\\python.exe, [N/A]\n44308, C:\\Program Files\\WindowsApps\\Microsoft.YourPhone_1.26071.164.0_x64__8wekyb3d8bbwe\\PhoneExperienceHost.exe, [N/A]\n6760, C:\\Windows\\System32\\ShellHost.exe, [N/A]\n35328, C:\\Users\\FANG Yingjie\\Miniconda3\\python.exe, [N/A]\n9120, D:\\ProgramFile\\WPS Office\\12.1.0.28505\\office6\\promecefpluginhost.exe, [N/A]",
+    "systemAvailableGiB": 11.101837158203125,
+    "freeGpuMiB": 15984.0,
+    "perProcessMemoryLimitation": "WDDM reports N/A; use total before/after rather than assigning process memory."
+  },
+  "previousHealth": {
+    "service": "neeeva-ardy-motion",
+    "ready": true,
+    "backend": {
+      "ready": true,
+      "languageModelsLoaded": false,
+      "adapter": "mlp-seed1",
+      "adapterSha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa",
+      "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+      "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+      "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+      "fps": 20,
+      "newFrames": 40,
+      "historyFrames": 16,
+      "gpuPreflight": {
+        "freeMiB": 23036.0,
+        "totalMiB": 24563.5
+      }
+    },
+    "features": {
+      "source": "live-qwen",
+      "verified": true,
+      "baseUrl": "http://127.0.0.1:8080",
+      "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+      "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4"
+    },
+    "queue": {
+      "waiting": 0,
+      "limit": 4,
+      "running": 0
+    },
+    "characters": {
+      "count": 1,
+      "limit": 64
+    },
+    "counters": {
+      "submitted": 6,
+      "completed": 4,
+      "cancelled": 2,
+      "failed": 0,
+      "staleResultsDiscarded": 1,
+      "queueRejected": 0
+    },
+    "baselineResourcesModified": false
+  },
+  "verifiedOwnedProcesses": [
+    {
+      "pid": 20944,
+      "parent": 37880,
+      "cmdline": [
+        "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\.venv\\Scripts\\python.exe",
+        "-m",
+        "Server.ARDY.motion_service.app",
+        "--port",
+        "8093"
+      ],
+      "created": 1789016285.199355
+    },
+    {
+      "pid": 35328,
+      "parent": 20944,
+      "cmdline": [
+        "C:\\Users\\FANG Yingjie\\Miniconda3\\python.exe",
+        "-m",
+        "Server.ARDY.motion_service.app",
+        "--port",
+        "8093"
+      ],
+      "created": 1789016285.2282107
+    }
+  ],
+  "previousRunningRecord": {
+    "schema": 1,
+    "version": "grounded-projection-explicit-seed",
+    "launcherPid": 20944,
+    "serverPid": 35328,
+    "serviceUrl": "http://127.0.0.1:8093",
+    "health": {
+      "service": "neeeva-ardy-motion",
+      "ready": true,
+      "backend": {
+        "ready": true,
+        "languageModelsLoaded": false,
+        "adapter": "mlp-seed1",
+        "adapterSha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa",
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+        "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+        "fps": 20,
+        "newFrames": 40,
+        "historyFrames": 16,
+        "gpuPreflight": {
+          "freeMiB": 23036.0,
+          "totalMiB": 24563.5
+        }
+      },
+      "features": {
+        "source": "live-qwen",
+        "verified": true,
+        "baseUrl": "http://127.0.0.1:8080",
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4"
+      },
+      "queue": {
+        "waiting": 0,
+        "limit": 4,
+        "running": 0
+      },
+      "characters": {
+        "count": 1,
+        "limit": 64
+      },
+      "counters": {
+        "submitted": 6,
+        "completed": 4,
+        "cancelled": 2,
+        "failed": 0,
+        "staleResultsDiscarded": 1,
+        "queueRejected": 0
+      },
+      "baselineResourcesModified": false
+    },
+    "seedPolicy": "request seed initializes independent revision RNG without identity hashing",
+    "projectedRootHeightPolicy": "source foot/toe support plane world Y=0",
+    "verifiedTests": "Tools/MotionAdapter/reports/ardy-motion-grounded-history-regression.json",
+    "moduleSha256": {
+      "app.py": "b23bde8324df0187b6a4fca90e92e721defb3a34253d5055d2762dac2edccb97",
+      "backend.py": "806d7099f568f82e926075743708ea681b5307cc6642af555f9fe0da4fe76e34",
+      "protocol.py": "58bcd7c8d5cdac14a30a744c598fc0932492d02dbd67bb09cc8c584460fd3685",
+      "service.py": "516c12af6a6caa9f2d22a1dcc7f860f89a94fbca219d6aa1fe3fcc797f68ed9d",
+      "__init__.py": "a35db85c2bef6f89bdde2226670b7a3126cfb5b3e8c5e447c5e0f1f668d39d70"
+    },
+    "healthObservedUtc": "2026-09-10T05:03:05.954349+00:00",
+    "unityLiveRegression": "Tools/MotionAdapter/reports/unity-live-playmode.json"
+  },
+  "afterPause": {
+    "utc": "2026-09-10T05:08:00.573166+00:00",
+    "gpuCsv": "0, NVIDIA GeForce RTX 4090, 24564, 6777, 17362",
+    "computeProcessesCsv": "2540, [Insufficient Permissions], [N/A]\n48536, C:\\Windows\\explorer.exe, [N/A]\n38564, C:\\Windows\\SystemApps\\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\\StartMenuExperienceHost.exe, [N/A]\n51916, C:\\Windows\\SystemApps\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\\SearchHost.exe, [N/A]\n4324, C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\CEF\\NVIDIA Overlay.exe, [N/A]\n25300, C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\CEF\\NVIDIA Overlay.exe, [N/A]\n20320, [Insufficient Permissions], [N/A]\n56176, [Insufficient Permissions], [N/A]\n57992, C:\\Program Files\\WindowsApps\\B9ECED6F.ArmouryCrate_6.5.14.0_x64__qmba6cd70vzyy\\ArmouryCrate.exe, [N/A]\n54908, [Insufficient Permissions], [N/A]\n12660, C:\\Windows\\SystemApps\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\\TextInputHost.exe, [N/A]\n11024, [Insufficient Permissions], [N/A]\n7244, C:\\Program Files\\LGHUB\\system_tray\\lghub_system_tray.exe, [N/A]\n13696, [Insufficient Permissions], [N/A]\n7736, [Insufficient Permissions], [N/A]\n38560, E:\\Youdao\\Dict\\11.3.16.0\\YoudaoDictHelper.exe, [N/A]\n55112, C:\\Windows\\SystemApps\\ShellExperienceHost_cw5n1h2txyewy\\ShellExperienceHost.exe, [N/A]\n50320, [Insufficient Permissions], [N/A]\n33636, E:\\Sony\\INZONEHub.exe, [N/A]\n30004, [Insufficient Permissions], [N/A]\n49112, [Insufficient Permissions], [N/A]\n32588, [Insufficient Permissions], [N/A]\n6876, C:\\Windows\\ImmersiveControlPanel\\SystemSettings.exe, [N/A]\n48720, C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.903.8094.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe, [N/A]\n25360, [Insufficient Permissions], [N/A]\n28748, [Insufficient Permissions], [N/A]\n30076, C:\\Program Files\\WindowsApps\\Microsoft.WindowsTerminal_1.24.11911.0_x64__8wekyb3d8bbwe\\WindowsTerminal.exe, [N/A]\n22876, C:\\Users\\FANG Yingjie\\Miniconda3\\python.exe, [N/A]\n9088, [Insufficient Permissions], [N/A]\n22152, E:\\VRproject\\VR20250611\\NeEEvA\\GPT-SoVITS\\runtime\\python.exe, [N/A]\n44308, C:\\Program Files\\WindowsApps\\Microsoft.YourPhone_1.26071.164.0_x64__8wekyb3d8bbwe\\PhoneExperienceHost.exe, [N/A]\n6760, C:\\Windows\\System32\\ShellHost.exe, [N/A]\n9120, D:\\ProgramFile\\WPS Office\\12.1.0.28505\\office6\\promecefpluginhost.exe, [N/A]",
+    "systemAvailableGiB": 12.988662719726562,
+    "freeGpuMiB": 17362.0,
+    "perProcessMemoryLimitation": "WDDM reports N/A; use total before/after rather than assigning process memory."
+  },
+  "oldOwnedProcessesExited": true,
+  "teacherWindowMeets18GiB": false,
+  "teacherStarted": false,
+  "restorationReason": "Post-pause nvidia-smi free memory below the agreed 18 GiB preflight threshold; restored immediately without teacher load.",
+  "restoredService": {
+    "launcherPid": 49604,
+    "serverPid": 30400,
+    "health": {
+      "service": "neeeva-ardy-motion",
+      "ready": true,
+      "backend": {
+        "ready": true,
+        "languageModelsLoaded": false,
+        "adapter": "mlp-seed1",
+        "adapterSha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa",
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+        "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+        "fps": 20,
+        "newFrames": 40,
+        "historyFrames": 16,
+        "gpuPreflight": {
+          "freeMiB": 23036.0,
+          "totalMiB": 24563.5
+        }
+      },
+      "features": {
+        "source": "live-qwen",
+        "verified": true,
+        "baseUrl": "http://127.0.0.1:8080",
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4"
+      },
+      "queue": {
+        "waiting": 0,
+        "limit": 4,
+        "running": 0
+      },
+      "characters": {
+        "count": 1,
+        "limit": 64
+      },
+      "counters": {
+        "submitted": 1,
+        "completed": 1,
+        "cancelled": 0,
+        "failed": 0,
+        "staleResultsDiscarded": 0,
+        "queueRejected": 0
+      },
+      "baselineResourcesModified": false
+    },
+    "check": {
+      "method": "One real live-Qwen 40-frame generation followed by cancellation; no second ARDY or language model loaded.",
+      "seconds": 1.1724921000131872,
+      "provenance": {
+        "mode": "dynamic-ardy-native",
+        "featureSource": "live-qwen",
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+        "historySource": "ardy-cold-start-no-live-pose",
+        "conditionReusedWithinRevision": false,
+        "featureRequestId": "restore-one-window",
+        "initialHistoryProjection": null,
+        "derivedSeed": 0,
+        "languageModelsLoaded": false
+      },
+      "timings": {
+        "queueMs": 0.0,
+        "featureMs": 437.0000000053551,
+        "generationMs": 665.7993000117131,
+        "totalMs": 1108.9999999967404
+      },
+      "cancel": {
+        "characterId": "teacher-window-recovery-20260910",
+        "turnId": "restore-check",
+        "revision": 1,
+        "cancelled": true
+      }
+    },
+    "utc": "2026-09-10T05:09:22.497310+00:00"
+  },
+  "afterRestore": {
+    "systemAvailableGiB": 11.167839050292969,
+    "gpuCsv": "0, NVIDIA GeForce RTX 4090, 24564, 8169, 15970"
+  }
+}

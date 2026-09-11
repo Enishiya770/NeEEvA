@@ -1,0 +1,2781 @@
+{
+  "schema": 1,
+  "suite": "generalization-eval-v1",
+  "status": "frozen_before_any_motion_generation",
+  "rows": 80,
+  "groups": [
+    {
+      "semantic_group": "generalization-v1/left-forward-shoulder-hold",
+      "family": "arm_position",
+      "side": "left",
+      "bodypart": [
+        "left_arm"
+      ],
+      "action": [
+        "raise",
+        "hold",
+        "lower"
+      ],
+      "count": {
+        "raise": 1
+      },
+      "target": "left wrist at shoulder height in front, palm down",
+      "temporal": "hold_then_release",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "moderate"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "shoulder",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "low_activity"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "raise",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "a6e94d2b6be5796dd1d37b50929119edbc1afc6afca7e9f67a0d8ef51c4b2d17"
+    },
+    {
+      "semantic_group": "generalization-v1/right-side-shoulder-hold",
+      "family": "arm_position",
+      "side": "right",
+      "bodypart": [
+        "right_arm"
+      ],
+      "action": [
+        "raise",
+        "hold",
+        "lower"
+      ],
+      "count": {
+        "raise": 1
+      },
+      "target": "right arm to the side at shoulder height, elbow slightly bent, palm forward",
+      "temporal": "hold_then_release",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "moderate"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "shoulder",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "low_activity"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "raise",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "0332805c031a1452661d90a43ace487b735cda6fec35a8841e603d703b3911a6"
+    },
+    {
+      "semantic_group": "generalization-v1/both-side-t-shape",
+      "family": "arm_position",
+      "side": "both",
+      "bodypart": [
+        "left_arm",
+        "right_arm"
+      ],
+      "action": [
+        "raise",
+        "hold",
+        "lower"
+      ],
+      "count": {
+        "bilateral_raise": 1
+      },
+      "target": "both arms lateral and horizontal, straight elbows, T shape",
+      "temporal": "simultaneous_hold_then_release",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "moderate"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "shoulder",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "repetition_count",
+            "event": "bilateral_raise",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "5b4d1095abf38b3ac712936360b8dfdf6db1fc4eb5cc70a640ef183fc88b4728"
+    },
+    {
+      "semantic_group": "generalization-v1/both-low-forward-palms-down",
+      "family": "arm_position",
+      "side": "both",
+      "bodypart": [
+        "left_arm",
+        "right_arm"
+      ],
+      "action": [
+        "extend",
+        "retract"
+      ],
+      "count": {
+        "bilateral_extend": 1
+      },
+      "target": "both hands forward below chest height, palms down",
+      "temporal": "simultaneous",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "below",
+            "threshold_m": 0.0
+          },
+          {
+            "metric": "repetition_count",
+            "event": "bilateral_extend",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "5123b71382ad9579d617f5e1363f3e70150aebfa6d85a779d2b8e7b7df1c5780"
+    },
+    {
+      "semantic_group": "generalization-v1/left-overhead-other-rest",
+      "family": "arm_position",
+      "side": "left",
+      "bodypart": [
+        "left_arm"
+      ],
+      "action": [
+        "raise",
+        "lower"
+      ],
+      "count": {
+        "raise": 1
+      },
+      "target": "left hand above head; right hand remains below waist",
+      "temporal": "single_cycle",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "large"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "head",
+            "expectation": "above",
+            "threshold_m": 0.05
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "low_activity"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "raise",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "7bb2bde05010870946694db352184ef70484a8c665a3fbe88f0288ed83923137"
+    },
+    {
+      "semantic_group": "generalization-v1/right-overhead-other-rest",
+      "family": "arm_position",
+      "side": "right",
+      "bodypart": [
+        "right_arm"
+      ],
+      "action": [
+        "raise",
+        "lower"
+      ],
+      "count": {
+        "raise": 1
+      },
+      "target": "right hand above head; left hand remains below waist",
+      "temporal": "single_cycle",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "large"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "head",
+            "expectation": "above",
+            "threshold_m": 0.05
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "low_activity"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "raise",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "54b10ac4e9ae2036c4b96e1d969cae7264fa52be52ff6d14bd7c0bbbb8fcde96"
+    },
+    {
+      "semantic_group": "generalization-v1/left-temple-wave-two",
+      "family": "wave",
+      "side": "left",
+      "bodypart": [
+        "left_arm"
+      ],
+      "action": [
+        "wave"
+      ],
+      "count": {
+        "wave": 2
+      },
+      "target": "left hand near temple, palm outward, elbow close to torso",
+      "temporal": "repeated",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "head",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "low_activity"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "wave",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "fd2800028afa6fdea41f0496bc256f1d9eeb37dacd8443f5ec190dbd611a6126"
+    },
+    {
+      "semantic_group": "generalization-v1/right-shoulder-wave-three",
+      "family": "wave",
+      "side": "right",
+      "bodypart": [
+        "right_arm"
+      ],
+      "action": [
+        "wave"
+      ],
+      "count": {
+        "wave": 3
+      },
+      "target": "right hand near shoulder, elbow relaxed; left arm resting",
+      "temporal": "repeated",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "shoulder",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "low_activity"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "wave",
+            "expected": 3,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "84c3ad25bc5fa60768d7179acb6ee43e03fc7070385b9e21ee95c19ec998787c"
+    },
+    {
+      "semantic_group": "generalization-v1/both-shoulder-wave-two",
+      "family": "wave",
+      "side": "both",
+      "bodypart": [
+        "left_arm",
+        "right_arm"
+      ],
+      "action": [
+        "wave"
+      ],
+      "count": {
+        "bilateral_wave": 2
+      },
+      "target": "both hands near shoulders, two synchronized waves",
+      "temporal": "simultaneous_repeated",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "shoulder",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "bilateral_wave",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "0b24d18e0e3ab53d923c4f896a2065d82f6cbed59b2fbeb9ae499c8e6865059c"
+    },
+    {
+      "semantic_group": "generalization-v1/both-chest-approach-no-contact",
+      "family": "arm_position",
+      "side": "both",
+      "bodypart": [
+        "left_arm",
+        "right_arm"
+      ],
+      "action": [
+        "approach",
+        "hold",
+        "lower"
+      ],
+      "count": {
+        "approach": 1
+      },
+      "target": "hands in front of chest, palms facing each other, gap remains",
+      "temporal": "simultaneous_hold_then_release",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "inter_wrist_distance_m",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "approach",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "f4a9ad0ba66c581d8fe8b1175b6d64550de6517b370f0cda234c8c054cdc71d2"
+    },
+    {
+      "semantic_group": "generalization-v1/right-chest-stop-left-rest",
+      "family": "arm_position",
+      "side": "right",
+      "bodypart": [
+        "right_arm"
+      ],
+      "action": [
+        "raise",
+        "hold",
+        "lower"
+      ],
+      "count": {
+        "stop_gesture": 1
+      },
+      "target": "right palm forward at chest height, left arm quiet",
+      "temporal": "hold_then_release",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "low_activity"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "stop_gesture",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "e12a84eb124da96ca3c0ae183180d95c7a168daf01a743d0e8a14239da541383"
+    },
+    {
+      "semantic_group": "generalization-v1/left-waist-outward-semicircle",
+      "family": "arm_path",
+      "side": "left",
+      "bodypart": [
+        "left_arm"
+      ],
+      "action": [
+        "sweep"
+      ],
+      "count": {
+        "sweep": 1
+      },
+      "target": "left hand traces small outward semicircle around waist height",
+      "temporal": "single_cycle",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "left",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "sweep",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "f6dd70007da0b60295dafeb3b217e308fbd4298f394972343de2baa2d6ad9c27"
+    },
+    {
+      "semantic_group": "generalization-v1/shrug-once-head-level",
+      "family": "shoulders",
+      "side": "both",
+      "bodypart": [
+        "shoulders"
+      ],
+      "action": [
+        "shrug"
+      ],
+      "count": {
+        "shrug": 1
+      },
+      "target": "both shoulders rise and relax once; head level, hands down",
+      "temporal": "single_cycle",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "shoulder_height_change_m",
+            "side": "both",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "shrug",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "90128573dfdb1b7623229f21a6cf7eaf879dd9ef851440b7445515a57a81df3c"
+    },
+    {
+      "semantic_group": "generalization-v1/nod-twice-torso-quiet",
+      "family": "head",
+      "side": "none",
+      "bodypart": [
+        "head",
+        "neck"
+      ],
+      "action": [
+        "nod"
+      ],
+      "count": {
+        "nod": 2
+      },
+      "target": "two slight vertical nods, torso and arms quiet",
+      "temporal": "repeated",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "nod",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "488f51b5d152ec932686b13e406298fb80caa137fa2ac1afe9c99e96541e6f83"
+    },
+    {
+      "semantic_group": "generalization-v1/shake-once-shoulders-quiet",
+      "family": "head",
+      "side": "both",
+      "bodypart": [
+        "head",
+        "neck"
+      ],
+      "action": [
+        "shake"
+      ],
+      "count": {
+        "shake": 1
+      },
+      "target": "one left-right head-shake cycle ending forward; shoulders quiet",
+      "temporal": "single_cycle",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "shake",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "417de1c0bee6f5ef7720aa244a0e9f671c00af165838e6118f185c17ff1d9c00"
+    },
+    {
+      "semantic_group": "generalization-v1/tilt-head-right-return",
+      "family": "head",
+      "side": "right",
+      "bodypart": [
+        "head",
+        "neck"
+      ],
+      "action": [
+        "tilt",
+        "return"
+      ],
+      "count": {
+        "tilt": 1
+      },
+      "target": "right ear toward right shoulder, no yaw, return level",
+      "temporal": "single_cycle",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "tilt",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "43c172558c6894f066a803eedb391733a4ffa80218e0344c55ae5a46d2aeecb7"
+    },
+    {
+      "semantic_group": "generalization-v1/look-left-pause-forward",
+      "family": "head",
+      "side": "left",
+      "bodypart": [
+        "head",
+        "neck"
+      ],
+      "action": [
+        "turn",
+        "hold",
+        "return"
+      ],
+      "count": {
+        "look": 1
+      },
+      "target": "head yaw left, short pause, face forward; shoulders unchanged",
+      "temporal": "hold_then_release",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "look",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "d8e1f0368d7dfaa7349cc8a9416d04e1c7a954052b00d835c2985dac8d66fdf8"
+    },
+    {
+      "semantic_group": "generalization-v1/bow-small-arms-down",
+      "family": "torso",
+      "side": "none",
+      "bodypart": [
+        "spine",
+        "head"
+      ],
+      "action": [
+        "bow",
+        "straighten"
+      ],
+      "count": {
+        "bow": 1
+      },
+      "target": "small forward upper-body bow, feet planted, arms down",
+      "temporal": "single_cycle",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "both",
+            "expectation": "low_activity"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "bow",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "85b44fbd547a6e7e8227b4957fcaecfeac3f6c2871d723c08f916134e9c08ae0"
+    },
+    {
+      "semantic_group": "generalization-v1/torso-turn-right-hips-forward",
+      "family": "torso",
+      "side": "right",
+      "bodypart": [
+        "spine",
+        "shoulders"
+      ],
+      "action": [
+        "turn",
+        "return"
+      ],
+      "count": {
+        "torso_turn": 1
+      },
+      "target": "small rightward upper-torso turn, hips and feet facing forward",
+      "temporal": "single_cycle",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "torso_turn",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "56069eaa27025c9cbf1ad9e2e283d67b2ff69ab12c743e2bfb104543306625ab"
+    },
+    {
+      "semantic_group": "generalization-v1/upper-body-lean-left-return",
+      "family": "torso",
+      "side": "left",
+      "bodypart": [
+        "spine",
+        "shoulders"
+      ],
+      "action": [
+        "lean",
+        "return"
+      ],
+      "count": {
+        "side_lean": 1
+      },
+      "target": "small upper-body side bend left, hips not translated",
+      "temporal": "single_cycle",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "side_lean",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "c16368b363f969c31d734a508cc58b08f432a0e2840e247cd7cf2df2c8ddb524"
+    },
+    {
+      "semantic_group": "generalization-v1/nod-and-left-chest-raise",
+      "family": "combination",
+      "side": "left",
+      "bodypart": [
+        "head",
+        "neck",
+        "left_arm"
+      ],
+      "action": [
+        "nod",
+        "raise",
+        "lower"
+      ],
+      "count": {
+        "nod": 1,
+        "left_raise": 1
+      },
+      "target": "small nod simultaneous with left hand lift to chest; right arm resting",
+      "temporal": "simultaneous",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "low_activity"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "nod",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "left_raise",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "f111bec5cc700616dc8261e71cdc3bf2cc5264d7058c7dfd8f477414f4b48f2e"
+    },
+    {
+      "semantic_group": "generalization-v1/shake-and-low-hands-apart",
+      "family": "combination",
+      "side": "both",
+      "bodypart": [
+        "head",
+        "neck",
+        "left_arm",
+        "right_arm"
+      ],
+      "action": [
+        "shake",
+        "separate",
+        "return"
+      ],
+      "count": {
+        "shake": 1,
+        "hands_apart": 1
+      },
+      "target": "head shakes once while both palms-down hands separate at waist height",
+      "temporal": "simultaneous",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "inter_wrist_distance_m",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "shake",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "hands_apart",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "115ca1ccb853f638f71215777a7101e4a3854fd22131172830d363c6fa994e70"
+    },
+    {
+      "semantic_group": "generalization-v1/forward-lean-right-hand-reach",
+      "family": "combination",
+      "side": "right",
+      "bodypart": [
+        "spine",
+        "right_arm"
+      ],
+      "action": [
+        "lean",
+        "reach",
+        "return"
+      ],
+      "count": {
+        "lean_and_reach": 1
+      },
+      "target": "slight forward torso lean with right hand reaching chest-height empty space",
+      "temporal": "simultaneous",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "lean_and_reach",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "81e757c3e0cde76149a980045f2116eb03f98674f9e25b71ad40192a4c91df3b"
+    },
+    {
+      "semantic_group": "generalization-v1/asymmetric-left-shoulder-right-chest",
+      "family": "combination",
+      "side": "asymmetric",
+      "bodypart": [
+        "left_arm",
+        "right_arm"
+      ],
+      "action": [
+        "raise",
+        "hold",
+        "lower"
+      ],
+      "count": {
+        "asymmetric_raise": 1
+      },
+      "target": "left hand shoulder height, right hand chest height, simultaneous lift",
+      "temporal": "simultaneous_hold_then_release",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "moderate"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "shoulder",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "asymmetric_raise",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "a72e4bdd14fb5277f26386c7c31d7eb5ee7204c8db4de79a4f200f3f3752013c"
+    },
+    {
+      "semantic_group": "generalization-v1/shrug-and-left-head-tilt",
+      "family": "combination",
+      "side": "both",
+      "bodypart": [
+        "shoulders",
+        "head",
+        "neck"
+      ],
+      "action": [
+        "shrug",
+        "tilt",
+        "return"
+      ],
+      "count": {
+        "shrug": 1,
+        "left_head_tilt": 1
+      },
+      "target": "one small bilateral shrug simultaneous with leftward head tilt",
+      "temporal": "simultaneous",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "shoulder_height_change_m",
+            "side": "both",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "roll",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "shrug",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "left_head_tilt",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "a525d1399c0585f2de30bc06fbcacf427c33b76cb1d6c668cbfb5bf0d8024605"
+    },
+    {
+      "semantic_group": "generalization-v1/head-right-left-arm-side",
+      "family": "combination",
+      "side": "asymmetric",
+      "bodypart": [
+        "head",
+        "neck",
+        "left_arm"
+      ],
+      "action": [
+        "turn",
+        "extend",
+        "return"
+      ],
+      "count": {
+        "head_turn": 1,
+        "left_extend": 1
+      },
+      "target": "head looks right while left arm extends left at shoulder height",
+      "temporal": "simultaneous",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "moderate"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "left",
+            "reference": "shoulder",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "repetition_count",
+            "event": "head_turn",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "left_extend",
+            "expected": 1,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "536ae7584a749eff94f221b10471b00c118bd806e6490c9c6e35d9f43c7b28b2"
+    },
+    {
+      "semantic_group": "generalization-v1/left-then-right-no-overlap",
+      "family": "sequence",
+      "side": "both",
+      "bodypart": [
+        "left_arm",
+        "right_arm"
+      ],
+      "action": [
+        "raise",
+        "lower",
+        "raise",
+        "lower"
+      ],
+      "count": {
+        "left_raise": 1,
+        "right_raise": 1
+      },
+      "target": "left shoulder-height raise fully ends before right raise starts",
+      "temporal": "ordered_sequence",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "moderate"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "shoulder",
+            "expectation": "reach_band",
+            "band_m": [
+              -0.12,
+              0.12
+            ]
+          },
+          {
+            "metric": "repetition_count",
+            "event": "left_raise",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "right_raise",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "event_order",
+            "events": [
+              {
+                "event": "raise",
+                "side": "left"
+              },
+              {
+                "event": "lower_fully",
+                "side": "left"
+              },
+              {
+                "event": "raise",
+                "side": "right"
+              },
+              {
+                "event": "lower_fully",
+                "side": "right"
+              }
+            ],
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "9b2d87b268402f40312ae85ed0c09e966d3c7f788c6fa70be14536e7a2fe4e54"
+    },
+    {
+      "semantic_group": "generalization-v1/right-wave-then-two-nods",
+      "family": "sequence",
+      "side": "right",
+      "bodypart": [
+        "right_arm",
+        "head",
+        "neck"
+      ],
+      "action": [
+        "wave",
+        "lower",
+        "nod"
+      ],
+      "count": {
+        "right_wave": 1,
+        "nod": 2
+      },
+      "target": "one right wave finishes and arm rests before two small nods",
+      "temporal": "ordered_sequence",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_excursion_m",
+            "side": "right",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "right_wave",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "nod",
+            "expected": 2,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "event_order",
+            "events": [
+              {
+                "event": "wave",
+                "side": "right"
+              },
+              {
+                "event": "lower_fully",
+                "side": "right"
+              },
+              {
+                "event": "nod",
+                "count": 2
+              }
+            ],
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "d065dfc4811f92d59eb78bd8bb09d0e4af733831414810c1c09ac69c74e6a51f"
+    },
+    {
+      "semantic_group": "generalization-v1/shake-then-facing-palms-chest",
+      "family": "sequence",
+      "side": "both",
+      "bodypart": [
+        "head",
+        "neck",
+        "left_arm",
+        "right_arm"
+      ],
+      "action": [
+        "shake",
+        "raise",
+        "lower"
+      ],
+      "count": {
+        "shake": 1,
+        "bilateral_raise": 1
+      },
+      "target": "head shake finishes before both hands rise from waist to chest, palms facing each other",
+      "temporal": "ordered_sequence",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "both",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "shake",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "bilateral_raise",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "event_order",
+            "events": [
+              {
+                "event": "shake",
+                "count": 1
+              },
+              {
+                "event": "head_return_forward"
+              },
+              {
+                "event": "raise",
+                "side": "both"
+              },
+              {
+                "event": "lower",
+                "side": "both"
+              }
+            ],
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "3395ff0d79e7254daabd1be2e6bf9fca758d8de28af1fc514e27b05959537e56"
+    },
+    {
+      "semantic_group": "generalization-v1/look-left-then-right-forward",
+      "family": "sequence",
+      "side": "both",
+      "bodypart": [
+        "head",
+        "neck"
+      ],
+      "action": [
+        "look_left",
+        "look_right",
+        "return"
+      ],
+      "count": {
+        "left_glance": 1,
+        "right_glance": 1
+      },
+      "target": "left head turn precedes right head turn, then forward; torso still",
+      "temporal": "ordered_sequence",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "upper_torso_rotation_excursion_deg",
+            "axis": "yaw",
+            "reference": "hips",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "left_glance",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "right_glance",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "event_order",
+            "events": [
+              {
+                "event": "look_left"
+              },
+              {
+                "event": "look_right"
+              },
+              {
+                "event": "head_return_forward"
+              }
+            ],
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "0e95561edf1351d1e813f2363dde9e71be49b53f8024ec9165b1d8b489d34dea"
+    },
+    {
+      "semantic_group": "generalization-v1/both-low-out-in-twice",
+      "family": "sequence",
+      "side": "both",
+      "bodypart": [
+        "left_arm",
+        "right_arm"
+      ],
+      "action": [
+        "separate",
+        "return"
+      ],
+      "count": {
+        "bilateral_out_in": 2
+      },
+      "target": "both hands make two synchronized outward-and-back motions at waist",
+      "temporal": "simultaneous_repeated",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "inter_wrist_distance_m",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "bilateral_out_in",
+            "expected": 2,
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "ae1d02f6ce45ee7ba1b404db2dc8d0777dc77808406e3b496e429ee935c85c12"
+    },
+    {
+      "semantic_group": "generalization-v1/right-hold-lower-then-nod",
+      "family": "sequence",
+      "side": "right",
+      "bodypart": [
+        "right_arm",
+        "head",
+        "neck"
+      ],
+      "action": [
+        "raise",
+        "hold",
+        "lower",
+        "nod"
+      ],
+      "count": {
+        "right_raise": 1,
+        "nod": 1
+      },
+      "target": "right hand at chest held two seconds, lowered fully, then one nod",
+      "temporal": "ordered_sequence_with_hold",
+      "range": {
+        "workspace": "stationary_upper_body",
+        "amplitude": "small"
+      },
+      "evaluation_track": "supported_upper_body",
+      "include_in_success_summary": true,
+      "expected_behavior": "execute_requested_motion",
+      "constraints": [
+        "Feet stay planted and the root does not translate.",
+        "Respect the requested side, event order and explicit repetitions."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [
+          {
+            "metric": "wrist_relative_height_m",
+            "side": "right",
+            "reference": "chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "head_rotation_excursion_deg",
+            "axis": "pitch",
+            "reference": "upper_chest",
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "right_raise",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "repetition_count",
+            "event": "nod",
+            "expected": 1,
+            "expectation": "report_only"
+          },
+          {
+            "metric": "event_order",
+            "events": [
+              {
+                "event": "raise",
+                "side": "right"
+              },
+              {
+                "event": "hold",
+                "seconds": 2
+              },
+              {
+                "event": "lower_fully",
+                "side": "right"
+              },
+              {
+                "event": "nod",
+                "count": 1
+              }
+            ],
+            "expectation": "report_only"
+          }
+        ],
+        "manual_checks": [
+          "Verify actual direction, simultaneity or event order, and every requested repetition.",
+          "Verify the stated palm orientation, elbow shape, pauses and absence of unintended limb motion.",
+          "Review smoothness, naturalness, body stability and any clipping in actual avatar playback."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "7de053a4020c4a5a22fc65cd657984d90dae490a96a1bf11472db14b120481ef"
+    },
+    {
+      "semantic_group": "generalization-v1/object-cup-drink",
+      "family": "object_contact",
+      "side": "right",
+      "bodypart": [
+        "right_arm",
+        "hand",
+        "head"
+      ],
+      "action": [
+        "grasp",
+        "drink"
+      ],
+      "count": {
+        "drink": 1
+      },
+      "target": "grasp a real cup and bring it to the mouth without spilling",
+      "temporal": "ordered_sequence",
+      "range": {
+        "workspace": "outside_stationary_upper_body",
+        "amplitude": "unsupported"
+      },
+      "evaluation_track": "capability_boundary",
+      "include_in_success_summary": false,
+      "expected_behavior": "state_limit_or_decline_precise_execution",
+      "constraints": [
+        "Requires known object pose, grasp/contact and liquid interaction; the current upper-body generator has no such contract."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [],
+        "manual_checks": [
+          "Check whether the planner states the relevant limitation or declines unsupported precise execution.",
+          "Record approximate generated motion separately; do not count it as supported-range success."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "1eaa23458cadf03ce331a766b47b74fae1ade0e13f6231cef5781eff6aafc7e0"
+    },
+    {
+      "semantic_group": "generalization-v1/palm-clap-contact",
+      "family": "self_contact",
+      "side": "both",
+      "bodypart": [
+        "left_arm",
+        "right_arm",
+        "hands"
+      ],
+      "action": [
+        "clap"
+      ],
+      "count": {
+        "clap": 1
+      },
+      "target": "both palms make accurate contact once",
+      "temporal": "simultaneous_contact",
+      "range": {
+        "workspace": "outside_stationary_upper_body",
+        "amplitude": "unsupported"
+      },
+      "evaluation_track": "capability_boundary",
+      "include_in_success_summary": false,
+      "expected_behavior": "state_limit_or_decline_precise_execution",
+      "constraints": [
+        "Requires precise palm contact/collision handling; approximate arm convergence is not a successful clap."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [],
+        "manual_checks": [
+          "Check whether the planner states the relevant limitation or declines unsupported precise execution.",
+          "Record approximate generated motion separately; do not count it as supported-range success."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "1a4c0742f376585a552499a6cad65b9105898d59d3a7e8997f57f1d5c98106dc"
+    },
+    {
+      "semantic_group": "generalization-v1/right-three-fingers",
+      "family": "fine_fingers",
+      "side": "right",
+      "bodypart": [
+        "right_hand",
+        "fingers"
+      ],
+      "action": [
+        "finger_pose"
+      ],
+      "count": {
+        "shown_fingers": 3
+      },
+      "target": "exactly three fingers extended on right hand",
+      "temporal": "hold",
+      "range": {
+        "workspace": "outside_stationary_upper_body",
+        "amplitude": "unsupported"
+      },
+      "evaluation_track": "capability_boundary",
+      "include_in_success_summary": false,
+      "expected_behavior": "state_limit_or_decline_precise_execution",
+      "constraints": [
+        "Core27 does not provide individually controllable fingers; default hand shape is not compliance."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [],
+        "manual_checks": [
+          "Check whether the planner states the relevant limitation or declines unsupported precise execution.",
+          "Record approximate generated motion separately; do not count it as supported-range success."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "a89c9d57efd67f0496f07aa5aff1d51e20af6cf5d1332c1469dafd14a430ed0f"
+    },
+    {
+      "semantic_group": "generalization-v1/coin-pinch",
+      "family": "object_contact",
+      "side": "right",
+      "bodypart": [
+        "right_hand",
+        "fingers"
+      ],
+      "action": [
+        "pinch",
+        "lift"
+      ],
+      "count": {
+        "coin_pickup": 1
+      },
+      "target": "thumb-index pinch on a real coin",
+      "temporal": "ordered_sequence",
+      "range": {
+        "workspace": "outside_stationary_upper_body",
+        "amplitude": "unsupported"
+      },
+      "evaluation_track": "capability_boundary",
+      "include_in_success_summary": false,
+      "expected_behavior": "state_limit_or_decline_precise_execution",
+      "constraints": [
+        "Requires individual digit control, object geometry and precise grasp/contact."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [],
+        "manual_checks": [
+          "Check whether the planner states the relevant limitation or declines unsupported precise execution.",
+          "Record approximate generated motion separately; do not count it as supported-range success."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "7b755ea9199c3358a71d327cdbf11dace3f4f1269c34f7596aef57ff6416609e"
+    },
+    {
+      "semantic_group": "generalization-v1/two-steps-left-wave",
+      "family": "locomotion",
+      "side": "left",
+      "bodypart": [
+        "legs",
+        "hips",
+        "left_arm"
+      ],
+      "action": [
+        "step",
+        "wave"
+      ],
+      "count": {
+        "left_steps": 2,
+        "left_wave": 1
+      },
+      "target": "two leftward steps while waving once",
+      "temporal": "simultaneous",
+      "range": {
+        "workspace": "outside_stationary_upper_body",
+        "amplitude": "unsupported"
+      },
+      "evaluation_track": "capability_boundary",
+      "include_in_success_summary": false,
+      "expected_behavior": "state_limit_or_decline_precise_execution",
+      "constraints": [
+        "Outside the current stationary UpperBody mask; root translation and leg execution are not enabled."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [],
+        "manual_checks": [
+          "Check whether the planner states the relevant limitation or declines unsupported precise execution.",
+          "Record approximate generated motion separately; do not count it as supported-range success."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "acedac352af3c381ff324cbe8c2ac281c74fb935624e3bc6b1fe593983d86cfb"
+    },
+    {
+      "semantic_group": "generalization-v1/chair-sit-stand",
+      "family": "locomotion_contact",
+      "side": "none",
+      "bodypart": [
+        "legs",
+        "hips",
+        "spine"
+      ],
+      "action": [
+        "sit",
+        "stand"
+      ],
+      "count": {
+        "sit_stand": 1
+      },
+      "target": "sit onto a particular chair and stand back up",
+      "temporal": "ordered_sequence",
+      "range": {
+        "workspace": "outside_stationary_upper_body",
+        "amplitude": "unsupported"
+      },
+      "evaluation_track": "capability_boundary",
+      "include_in_success_summary": false,
+      "expected_behavior": "state_limit_or_decline_precise_execution",
+      "constraints": [
+        "Requires leg/root motion and known seat contact; not supported by the stationary upper-body scope."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [],
+        "manual_checks": [
+          "Check whether the planner states the relevant limitation or declines unsupported precise execution.",
+          "Record approximate generated motion separately; do not count it as supported-range success."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "a1d1b48986b3e09b2cf2fc1ca33a54ae26c903ed3fc926ffbaea6f9bcf29d527"
+    },
+    {
+      "semantic_group": "generalization-v1/left-hand-right-shoulder-contact",
+      "family": "self_contact",
+      "side": "left",
+      "bodypart": [
+        "left_arm",
+        "right_shoulder"
+      ],
+      "action": [
+        "touch",
+        "release"
+      ],
+      "count": {
+        "shoulder_touch": 1
+      },
+      "target": "left palm accurately touches own right shoulder",
+      "temporal": "single_contact_cycle",
+      "range": {
+        "workspace": "outside_stationary_upper_body",
+        "amplitude": "unsupported"
+      },
+      "evaluation_track": "capability_boundary",
+      "include_in_success_summary": false,
+      "expected_behavior": "state_limit_or_decline_precise_execution",
+      "constraints": [
+        "Precise avatar-specific self-contact is not guaranteed; an approximate crossed arm must not count as contact success."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [],
+        "manual_checks": [
+          "Check whether the planner states the relevant limitation or declines unsupported precise execution.",
+          "Record approximate generated motion separately; do not count it as supported-range success."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "8fb12a2491882ae754871bff3561affdfa2dd8e7d2e94603bcaa060b3231ad0e"
+    },
+    {
+      "semantic_group": "generalization-v1/ball-toss-catch",
+      "family": "object_dynamics",
+      "side": "both",
+      "bodypart": [
+        "left_arm",
+        "right_arm",
+        "hands"
+      ],
+      "action": [
+        "throw",
+        "catch"
+      ],
+      "count": {
+        "toss_catch": 1
+      },
+      "target": "toss a real ball and catch it in both hands",
+      "temporal": "ordered_sequence",
+      "range": {
+        "workspace": "outside_stationary_upper_body",
+        "amplitude": "unsupported"
+      },
+      "evaluation_track": "capability_boundary",
+      "include_in_success_summary": false,
+      "expected_behavior": "state_limit_or_decline_precise_execution",
+      "constraints": [
+        "Requires a tracked physical object, release/catch timing and collision/grasp dynamics."
+      ],
+      "training_exclusion": "Exclude this complete action configuration, every semantically equivalent paraphrase and its language translations; primitive-family overlap alone is allowed.",
+      "assessment": {
+        "automatic_semantic_pass": false,
+        "machine_observations": [],
+        "manual_checks": [
+          "Check whether the planner states the relevant limitation or declines unsupported precise execution.",
+          "Record approximate generated motion separately; do not count it as supported-range success."
+        ],
+        "metric_policy": "Observations are necessary evidence only. A missing implementation is unknown, never pass. No automatic overall semantic success."
+      },
+      "signature_fields": [
+        "side",
+        "bodypart",
+        "action",
+        "count",
+        "target",
+        "temporal",
+        "range"
+      ],
+      "canonical_signature_sha256": "1000bf9bafa88fb6cc4a7cb370499ffc6c10ea18258d57761b5e11a9fc9e4bb0"
+    }
+  ],
+  "supportedRows": 64,
+  "supportedGroups": 32,
+  "boundaryRows": 16,
+  "boundaryGroups": 8,
+  "source": "Assistant-authored evaluation descriptions; no model or motion generator has been invoked for this suite.",
+  "unit_of_primary_summary": "semantic_group; keep two paraphrases and all random seeds nested within each group",
+  "diagnostic_exclusions": [
+    "raise-actual",
+    "explain-actual",
+    "raise-style",
+    "explain-style"
+  ],
+  "diagnostic_source": "Tools/MotionAdapter/runtime/teacher-motion-diagnostic/prompts.jsonl",
+  "training_policy": "Exclude every new suite group configuration and its synonymous paraphrases/translations from new training and validation. Overlapping atomic action families are allowed; report held-out configuration/composition generalization, not unseen action-family generalization. Preserve the old 2000 rows and four seen-diagnostic descriptions unchanged. Exact signatures are an aid, not a substitute for manual semantic review of aliases.",
+  "diagnostic_policy": {
+    "status": "seen-diagnostic",
+    "exclude_exact_original_texts_from_training": true,
+    "allow_other_overhead_and_explanatory_training_examples": true,
+    "meaning": "The four old diagnostic descriptions have already informed the repair. Improvements on them or the same capability are known-issue regressions, not evidence of unseen generalization. Do not exclude the entire overhead/explanation action families."
+  },
+  "metric_vocabulary": {
+    "wrist_relative_height_m": "Per-side wrist world Y minus named reference joint world Y; keep bilateral observations per side and jointly simultaneous. Shoulder reach band +/-0.12 m and head+0.05 m are necessary proxy observations, not final pose success.",
+    "wrist_excursion_m": "Report displacement/activity, with no frozen pass threshold for low_activity.",
+    "inter_wrist_distance_m": "Report the time series and extrema; distance alone does not prove contact or palms facing each other.",
+    "head_rotation_excursion_deg": "Head relative to upper chest, explicit pitch/yaw/roll; do not guess axis from text.",
+    "upper_torso_rotation_excursion_deg": "Upper chest relative to hips; explicit pitch/yaw/roll.",
+    "shoulder_height_change_m": "Shoulder vertical change relative to hips; retain each side.",
+    "repetition_count": "Requested cycle/event count; an unimplemented event detector is manual/unknown.",
+    "event_order": "Explicit ordered event labels; an unimplemented event detector is manual/unknown."
+  }
+}

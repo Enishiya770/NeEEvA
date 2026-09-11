@@ -1,0 +1,2166 @@
+{
+    "avatar": "Assets/Model/NEVA.vrm",
+    "method": "Actual retargeted VRM bones; SkinnedMeshRenderer.BakeMesh for every PNG, rendered at 20 FPS including return to idle. Fixed idle baseline, no live chat or audio.",
+    "clips": [
+        {
+            "id": "right-wave",
+            "sourceJsonPath": "Assets/AIChatTookit/Resources/ARDY/right-wave.json",
+            "sourceJsonSha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+            "motionText": "Derived right-hand wave: mirrored reviewed left-hand wave; not a native right-hand-condition sample.",
+            "fps": 20.0,
+            "samples": [
+                {
+                    "frame": 0,
+                    "seconds": 0.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 1,
+                    "seconds": 0.05000000074505806,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14307257533073426,
+                    "rightHandChestHeightMetres": -0.3368164896965027,
+                    "rightHandFaceDistanceMetres": 0.6194044351577759,
+                    "rightHandSpeedMetresPerSecond": 0.10405820608139038
+                },
+                {
+                    "frame": 2,
+                    "seconds": 0.10000000149011612,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.13762716948986054,
+                    "rightHandChestHeightMetres": -0.34013062715530398,
+                    "rightHandFaceDistanceMetres": 0.62116938829422,
+                    "rightHandSpeedMetresPerSecond": 0.2369525283575058
+                },
+                {
+                    "frame": 3,
+                    "seconds": 0.15000000596046449,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14133039116859437,
+                    "rightHandChestHeightMetres": -0.3409229516983032,
+                    "rightHandFaceDistanceMetres": 0.622868001461029,
+                    "rightHandSpeedMetresPerSecond": 0.47910118103027346
+                },
+                {
+                    "frame": 4,
+                    "seconds": 0.20000000298023225,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1601451337337494,
+                    "rightHandChestHeightMetres": -0.33399486541748049,
+                    "rightHandFaceDistanceMetres": 0.6228469014167786,
+                    "rightHandSpeedMetresPerSecond": 0.8796524405479431
+                },
+                {
+                    "frame": 5,
+                    "seconds": 0.25,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.19121742248535157,
+                    "rightHandChestHeightMetres": -0.3144489526748657,
+                    "rightHandFaceDistanceMetres": 0.6195025444030762,
+                    "rightHandSpeedMetresPerSecond": 1.2508010864257813
+                },
+                {
+                    "frame": 6,
+                    "seconds": 0.30000001192092898,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.23561543226242066,
+                    "rightHandChestHeightMetres": -0.2854959964752197,
+                    "rightHandFaceDistanceMetres": 0.6163110733032227,
+                    "rightHandSpeedMetresPerSecond": 1.3247491121292115
+                },
+                {
+                    "frame": 7,
+                    "seconds": 0.3499999940395355,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.2856864631175995,
+                    "rightHandChestHeightMetres": -0.24802494049072267,
+                    "rightHandFaceDistanceMetres": 0.6124615669250488,
+                    "rightHandSpeedMetresPerSecond": 1.3756595849990845
+                },
+                {
+                    "frame": 8,
+                    "seconds": 0.4000000059604645,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3383908271789551,
+                    "rightHandChestHeightMetres": -0.19739443063735963,
+                    "rightHandFaceDistanceMetres": 0.6054365634918213,
+                    "rightHandSpeedMetresPerSecond": 1.525256633758545
+                },
+                {
+                    "frame": 9,
+                    "seconds": 0.44999998807907107,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.38271865248680117,
+                    "rightHandChestHeightMetres": -0.1361933946609497,
+                    "rightHandFaceDistanceMetres": 0.5943248271942139,
+                    "rightHandSpeedMetresPerSecond": 1.5569995641708375
+                },
+                {
+                    "frame": 10,
+                    "seconds": 0.5,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.41888684034347536,
+                    "rightHandChestHeightMetres": -0.07049882411956787,
+                    "rightHandFaceDistanceMetres": 0.5796564817428589,
+                    "rightHandSpeedMetresPerSecond": 1.5034915208816529
+                },
+                {
+                    "frame": 11,
+                    "seconds": 0.550000011920929,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.442037433385849,
+                    "rightHandChestHeightMetres": -0.0034219026565551759,
+                    "rightHandFaceDistanceMetres": 0.5614252090454102,
+                    "rightHandSpeedMetresPerSecond": 1.419209361076355
+                },
+                {
+                    "frame": 12,
+                    "seconds": 0.6000000238418579,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.4508749544620514,
+                    "rightHandChestHeightMetres": 0.061231136322021487,
+                    "rightHandFaceDistanceMetres": 0.539849042892456,
+                    "rightHandSpeedMetresPerSecond": 1.305993914604187
+                },
+                {
+                    "frame": 13,
+                    "seconds": 0.6499999761581421,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.44518476724624636,
+                    "rightHandChestHeightMetres": 0.11750364303588867,
+                    "rightHandFaceDistanceMetres": 0.5168644189834595,
+                    "rightHandSpeedMetresPerSecond": 1.1315727233886719
+                },
+                {
+                    "frame": 14,
+                    "seconds": 0.699999988079071,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.4284669756889343,
+                    "rightHandChestHeightMetres": 0.16431856155395509,
+                    "rightHandFaceDistanceMetres": 0.49125927686691286,
+                    "rightHandSpeedMetresPerSecond": 0.9944328665733337
+                },
+                {
+                    "frame": 15,
+                    "seconds": 0.75,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.40086397528648379,
+                    "rightHandChestHeightMetres": 0.20050227642059327,
+                    "rightHandFaceDistanceMetres": 0.462985634803772,
+                    "rightHandSpeedMetresPerSecond": 0.9144055247306824
+                },
+                {
+                    "frame": 16,
+                    "seconds": 0.800000011920929,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3648991584777832,
+                    "rightHandChestHeightMetres": 0.22491872310638429,
+                    "rightHandFaceDistanceMetres": 0.432007372379303,
+                    "rightHandSpeedMetresPerSecond": 0.8758869767189026
+                },
+                {
+                    "frame": 17,
+                    "seconds": 0.8500000238418579,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.32665061950683596,
+                    "rightHandChestHeightMetres": 0.23656904697418214,
+                    "rightHandFaceDistanceMetres": 0.4002669155597687,
+                    "rightHandSpeedMetresPerSecond": 0.8005231022834778
+                },
+                {
+                    "frame": 18,
+                    "seconds": 0.8999999761581421,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.2941662669181824,
+                    "rightHandChestHeightMetres": 0.23841869831085206,
+                    "rightHandFaceDistanceMetres": 0.37459468841552737,
+                    "rightHandSpeedMetresPerSecond": 0.6509471535682678
+                },
+                {
+                    "frame": 19,
+                    "seconds": 0.949999988079071,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.2767583131790161,
+                    "rightHandChestHeightMetres": 0.2366647720336914,
+                    "rightHandFaceDistanceMetres": 0.36037418246269228,
+                    "rightHandSpeedMetresPerSecond": 0.350932240486145
+                },
+                {
+                    "frame": 20,
+                    "seconds": 1.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.27862367033958437,
+                    "rightHandChestHeightMetres": 0.24021673202514649,
+                    "rightHandFaceDistanceMetres": 0.3595463037490845,
+                    "rightHandSpeedMetresPerSecond": 0.10220205783843994
+                },
+                {
+                    "frame": 21,
+                    "seconds": 1.0499999523162842,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3000316619873047,
+                    "rightHandChestHeightMetres": 0.24684739112854005,
+                    "rightHandFaceDistanceMetres": 0.3716757297515869,
+                    "rightHandSpeedMetresPerSecond": 0.4711640477180481
+                },
+                {
+                    "frame": 22,
+                    "seconds": 1.100000023841858,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.32304421067237856,
+                    "rightHandChestHeightMetres": 0.2543916702270508,
+                    "rightHandFaceDistanceMetres": 0.3866543471813202,
+                    "rightHandSpeedMetresPerSecond": 0.500957190990448
+                },
+                {
+                    "frame": 23,
+                    "seconds": 1.149999976158142,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.34614208340644839,
+                    "rightHandChestHeightMetres": 0.2603631019592285,
+                    "rightHandFaceDistanceMetres": 0.40253424644470217,
+                    "rightHandSpeedMetresPerSecond": 0.49598658084869387
+                },
+                {
+                    "frame": 24,
+                    "seconds": 1.2000000476837159,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3676127791404724,
+                    "rightHandChestHeightMetres": 0.2639669179916382,
+                    "rightHandFaceDistanceMetres": 0.41857340931892397,
+                    "rightHandSpeedMetresPerSecond": 0.4479190707206726
+                },
+                {
+                    "frame": 25,
+                    "seconds": 1.25,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3827371895313263,
+                    "rightHandChestHeightMetres": 0.26345181465148928,
+                    "rightHandFaceDistanceMetres": 0.43169042468070986,
+                    "rightHandSpeedMetresPerSecond": 0.3028249144554138
+                },
+                {
+                    "frame": 26,
+                    "seconds": 1.2999999523162842,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.385369211435318,
+                    "rightHandChestHeightMetres": 0.26224756240844729,
+                    "rightHandFaceDistanceMetres": 0.43461811542510989,
+                    "rightHandSpeedMetresPerSecond": 0.06320402026176453
+                },
+                {
+                    "frame": 27,
+                    "seconds": 1.350000023841858,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3726877272129059,
+                    "rightHandChestHeightMetres": 0.2624499797821045,
+                    "rightHandFaceDistanceMetres": 0.42623522877693179,
+                    "rightHandSpeedMetresPerSecond": 0.27960970997810366
+                },
+                {
+                    "frame": 28,
+                    "seconds": 1.399999976158142,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.34698429703712466,
+                    "rightHandChestHeightMetres": 0.26036548614501955,
+                    "rightHandFaceDistanceMetres": 0.40816816687583926,
+                    "rightHandSpeedMetresPerSecond": 0.5404565334320068
+                },
+                {
+                    "frame": 29,
+                    "seconds": 1.4500000476837159,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3209444284439087,
+                    "rightHandChestHeightMetres": 0.2543034553527832,
+                    "rightHandFaceDistanceMetres": 0.38812029361724856,
+                    "rightHandSpeedMetresPerSecond": 0.5382407903671265
+                },
+                {
+                    "frame": 30,
+                    "seconds": 1.5,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.30808237195014956,
+                    "rightHandChestHeightMetres": 0.24995636940002442,
+                    "rightHandFaceDistanceMetres": 0.3766835629940033,
+                    "rightHandSpeedMetresPerSecond": 0.27385997772216799
+                },
+                {
+                    "frame": 31,
+                    "seconds": 1.5499999523162842,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3154367506504059,
+                    "rightHandChestHeightMetres": 0.2516593933105469,
+                    "rightHandFaceDistanceMetres": 0.3781116008758545,
+                    "rightHandSpeedMetresPerSecond": 0.22218981385231019
+                },
+                {
+                    "frame": 32,
+                    "seconds": 1.600000023841858,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3369196951389313,
+                    "rightHandChestHeightMetres": 0.2585330009460449,
+                    "rightHandFaceDistanceMetres": 0.39041242003440859,
+                    "rightHandSpeedMetresPerSecond": 0.5010602474212647
+                },
+                {
+                    "frame": 33,
+                    "seconds": 1.649999976158142,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3569909334182739,
+                    "rightHandChestHeightMetres": 0.2642805576324463,
+                    "rightHandFaceDistanceMetres": 0.40432849526405337,
+                    "rightHandSpeedMetresPerSecond": 0.44227564334869387
+                },
+                {
+                    "frame": 34,
+                    "seconds": 1.7000000476837159,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.35619062185287478,
+                    "rightHandChestHeightMetres": 0.26580536365509035,
+                    "rightHandFaceDistanceMetres": 0.4026828408241272,
+                    "rightHandSpeedMetresPerSecond": 0.052803847938776019
+                },
+                {
+                    "frame": 35,
+                    "seconds": 1.75,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.33472949266433718,
+                    "rightHandChestHeightMetres": 0.26438188552856448,
+                    "rightHandFaceDistanceMetres": 0.3872380256652832,
+                    "rightHandSpeedMetresPerSecond": 0.4515526294708252
+                },
+                {
+                    "frame": 36,
+                    "seconds": 1.7999999523162842,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3078722357749939,
+                    "rightHandChestHeightMetres": 0.257551908493042,
+                    "rightHandFaceDistanceMetres": 0.3695073127746582,
+                    "rightHandSpeedMetresPerSecond": 0.585730254650116
+                },
+                {
+                    "frame": 37,
+                    "seconds": 1.850000023841858,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.2881077527999878,
+                    "rightHandChestHeightMetres": 0.24677824974060059,
+                    "rightHandFaceDistanceMetres": 0.35907381772994997,
+                    "rightHandSpeedMetresPerSecond": 0.4872111976146698
+                },
+                {
+                    "frame": 38,
+                    "seconds": 1.899999976158142,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.2910439670085907,
+                    "rightHandChestHeightMetres": 0.2443981170654297,
+                    "rightHandFaceDistanceMetres": 0.36342093348503115,
+                    "rightHandSpeedMetresPerSecond": 0.09812384098768234
+                },
+                {
+                    "frame": 39,
+                    "seconds": 1.9500000476837159,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.311000794172287,
+                    "rightHandChestHeightMetres": 0.24853014945983888,
+                    "rightHandFaceDistanceMetres": 0.37695223093032839,
+                    "rightHandSpeedMetresPerSecond": 0.4165249466896057
+                },
+                {
+                    "frame": 40,
+                    "seconds": 2.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.33809688687324526,
+                    "rightHandChestHeightMetres": 0.2520641088485718,
+                    "rightHandFaceDistanceMetres": 0.3954034745693207,
+                    "rightHandSpeedMetresPerSecond": 0.5680460333824158
+                },
+                {
+                    "frame": 41,
+                    "seconds": 2.049999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3624952435493469,
+                    "rightHandChestHeightMetres": 0.25104260444641116,
+                    "rightHandFaceDistanceMetres": 0.41442203521728518,
+                    "rightHandSpeedMetresPerSecond": 0.4957297444343567
+                },
+                {
+                    "frame": 42,
+                    "seconds": 2.0999999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3735847473144531,
+                    "rightHandChestHeightMetres": 0.24736571311950684,
+                    "rightHandFaceDistanceMetres": 0.4232184886932373,
+                    "rightHandSpeedMetresPerSecond": 0.23813189566135407
+                },
+                {
+                    "frame": 43,
+                    "seconds": 2.1500000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.369882196187973,
+                    "rightHandChestHeightMetres": 0.244429349899292,
+                    "rightHandFaceDistanceMetres": 0.4214591681957245,
+                    "rightHandSpeedMetresPerSecond": 0.1107424944639206
+                },
+                {
+                    "frame": 44,
+                    "seconds": 2.200000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.35462552309036257,
+                    "rightHandChestHeightMetres": 0.24061191082000733,
+                    "rightHandFaceDistanceMetres": 0.4113304615020752,
+                    "rightHandSpeedMetresPerSecond": 0.3365808427333832
+                },
+                {
+                    "frame": 45,
+                    "seconds": 2.25,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3329693377017975,
+                    "rightHandChestHeightMetres": 0.23623156547546388,
+                    "rightHandFaceDistanceMetres": 0.39561083912849429,
+                    "rightHandSpeedMetresPerSecond": 0.4517950117588043
+                },
+                {
+                    "frame": 46,
+                    "seconds": 2.299999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.31205907464027407,
+                    "rightHandChestHeightMetres": 0.23136687278747559,
+                    "rightHandFaceDistanceMetres": 0.38016727566719057,
+                    "rightHandSpeedMetresPerSecond": 0.43304240703582766
+                },
+                {
+                    "frame": 47,
+                    "seconds": 2.3499999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.29904887080192568,
+                    "rightHandChestHeightMetres": 0.2283010482788086,
+                    "rightHandFaceDistanceMetres": 0.3700295686721802,
+                    "rightHandSpeedMetresPerSecond": 0.2673960030078888
+                },
+                {
+                    "frame": 48,
+                    "seconds": 2.4000000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.29713672399520876,
+                    "rightHandChestHeightMetres": 0.22946953773498536,
+                    "rightHandFaceDistanceMetres": 0.367958664894104,
+                    "rightHandSpeedMetresPerSecond": 0.04698965698480606
+                },
+                {
+                    "frame": 49,
+                    "seconds": 2.450000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3034823536872864,
+                    "rightHandChestHeightMetres": 0.23335957527160645,
+                    "rightHandFaceDistanceMetres": 0.37281662225723269,
+                    "rightHandSpeedMetresPerSecond": 0.1488819569349289
+                },
+                {
+                    "frame": 50,
+                    "seconds": 2.5,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3139219880104065,
+                    "rightHandChestHeightMetres": 0.24014496803283692,
+                    "rightHandFaceDistanceMetres": 0.3808048665523529,
+                    "rightHandSpeedMetresPerSecond": 0.2490254044532776
+                },
+                {
+                    "frame": 51,
+                    "seconds": 2.549999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.32643577456474306,
+                    "rightHandChestHeightMetres": 0.24496960639953614,
+                    "rightHandFaceDistanceMetres": 0.39134451746940615,
+                    "rightHandSpeedMetresPerSecond": 0.268718957901001
+                },
+                {
+                    "frame": 52,
+                    "seconds": 2.5999999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3402465581893921,
+                    "rightHandChestHeightMetres": 0.2464766502380371,
+                    "rightHandFaceDistanceMetres": 0.4036022126674652,
+                    "rightHandSpeedMetresPerSecond": 0.27922990918159487
+                },
+                {
+                    "frame": 53,
+                    "seconds": 2.6500000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.35354194045066836,
+                    "rightHandChestHeightMetres": 0.2444300651550293,
+                    "rightHandFaceDistanceMetres": 0.41573476791381838,
+                    "rightHandSpeedMetresPerSecond": 0.2706230878829956
+                },
+                {
+                    "frame": 54,
+                    "seconds": 2.700000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3625769317150116,
+                    "rightHandChestHeightMetres": 0.23743653297424317,
+                    "rightHandFaceDistanceMetres": 0.42514246702194216,
+                    "rightHandSpeedMetresPerSecond": 0.2339320033788681
+                },
+                {
+                    "frame": 55,
+                    "seconds": 2.75,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.36513882875442507,
+                    "rightHandChestHeightMetres": 0.22634148597717286,
+                    "rightHandFaceDistanceMetres": 0.4305339455604553,
+                    "rightHandSpeedMetresPerSecond": 0.24488405883312226
+                },
+                {
+                    "frame": 56,
+                    "seconds": 2.799999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3627966046333313,
+                    "rightHandChestHeightMetres": 0.20807278156280518,
+                    "rightHandFaceDistanceMetres": 0.43393486738204958,
+                    "rightHandSpeedMetresPerSecond": 0.38943472504615786
+                },
+                {
+                    "frame": 57,
+                    "seconds": 2.8499999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3598456084728241,
+                    "rightHandChestHeightMetres": 0.18189287185668946,
+                    "rightHandFaceDistanceMetres": 0.4375060200691223,
+                    "rightHandSpeedMetresPerSecond": 0.5311117172241211
+                },
+                {
+                    "frame": 58,
+                    "seconds": 2.9000000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3542466461658478,
+                    "rightHandChestHeightMetres": 0.1436476707458496,
+                    "rightHandFaceDistanceMetres": 0.444801390171051,
+                    "rightHandSpeedMetresPerSecond": 0.780648946762085
+                },
+                {
+                    "frame": 59,
+                    "seconds": 2.950000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3464008867740631,
+                    "rightHandChestHeightMetres": 0.09684240818023682,
+                    "rightHandFaceDistanceMetres": 0.4555997848510742,
+                    "rightHandSpeedMetresPerSecond": 0.9515332579612732
+                },
+                {
+                    "frame": 60,
+                    "seconds": 3.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3362397849559784,
+                    "rightHandChestHeightMetres": 0.042636990547180179,
+                    "rightHandFaceDistanceMetres": 0.47140970826148989,
+                    "rightHandSpeedMetresPerSecond": 1.1030941009521485
+                },
+                {
+                    "frame": 61,
+                    "seconds": 3.049999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3252527713775635,
+                    "rightHandChestHeightMetres": -0.01898336410522461,
+                    "rightHandFaceDistanceMetres": 0.49344712495803835,
+                    "rightHandSpeedMetresPerSecond": 1.256976842880249
+                },
+                {
+                    "frame": 62,
+                    "seconds": 3.0999999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.3094777464866638,
+                    "rightHandChestHeightMetres": -0.08134210109710694,
+                    "rightHandFaceDistanceMetres": 0.5178285241127014,
+                    "rightHandSpeedMetresPerSecond": 1.3021764755249024
+                },
+                {
+                    "frame": 63,
+                    "seconds": 3.1500000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.2910117208957672,
+                    "rightHandChestHeightMetres": -0.14043617248535157,
+                    "rightHandFaceDistanceMetres": 0.5426456928253174,
+                    "rightHandSpeedMetresPerSecond": 1.279358148574829
+                },
+                {
+                    "frame": 64,
+                    "seconds": 3.200000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.26977965235710146,
+                    "rightHandChestHeightMetres": -0.1944342851638794,
+                    "rightHandFaceDistanceMetres": 0.5664629340171814,
+                    "rightHandSpeedMetresPerSecond": 1.2335891723632813
+                },
+                {
+                    "frame": 65,
+                    "seconds": 3.25,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.24688130617141725,
+                    "rightHandChestHeightMetres": -0.2421022653579712,
+                    "rightHandFaceDistanceMetres": 0.588015079498291,
+                    "rightHandSpeedMetresPerSecond": 1.182558298110962
+                },
+                {
+                    "frame": 66,
+                    "seconds": 3.299999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.2250952422618866,
+                    "rightHandChestHeightMetres": -0.28011107444763186,
+                    "rightHandFaceDistanceMetres": 0.6052162647247315,
+                    "rightHandSpeedMetresPerSecond": 1.0723559856414796
+                },
+                {
+                    "frame": 67,
+                    "seconds": 3.3499999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.20446476340293885,
+                    "rightHandChestHeightMetres": -0.30763959884643557,
+                    "rightHandFaceDistanceMetres": 0.6169754862785339,
+                    "rightHandSpeedMetresPerSecond": 0.9415124654769898
+                },
+                {
+                    "frame": 68,
+                    "seconds": 3.4000000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1837884485721588,
+                    "rightHandChestHeightMetres": -0.3251166343688965,
+                    "rightHandFaceDistanceMetres": 0.6227373480796814,
+                    "rightHandSpeedMetresPerSecond": 0.8051999807357788
+                },
+                {
+                    "frame": 69,
+                    "seconds": 3.450000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.16510498523712159,
+                    "rightHandChestHeightMetres": -0.3348037004470825,
+                    "rightHandFaceDistanceMetres": 0.6243049502372742,
+                    "rightHandSpeedMetresPerSecond": 0.6696721315383911
+                },
+                {
+                    "frame": 70,
+                    "seconds": 3.5,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1500265896320343,
+                    "rightHandChestHeightMetres": -0.33853232860565188,
+                    "rightHandFaceDistanceMetres": 0.6230518221855164,
+                    "rightHandSpeedMetresPerSecond": 0.46943214535713198
+                },
+                {
+                    "frame": 71,
+                    "seconds": 3.549999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14102673530578614,
+                    "rightHandChestHeightMetres": -0.33933061361312868,
+                    "rightHandFaceDistanceMetres": 0.6212795972824097,
+                    "rightHandSpeedMetresPerSecond": 0.30953505635261538
+                },
+                {
+                    "frame": 72,
+                    "seconds": 3.5999999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.13769035041332246,
+                    "rightHandChestHeightMetres": -0.33912211656570437,
+                    "rightHandFaceDistanceMetres": 0.6201750040054321,
+                    "rightHandSpeedMetresPerSecond": 0.17712029814720155
+                },
+                {
+                    "frame": 73,
+                    "seconds": 3.6500000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14082644879817964,
+                    "rightHandChestHeightMetres": -0.3386131525039673,
+                    "rightHandFaceDistanceMetres": 0.6203577518463135,
+                    "rightHandSpeedMetresPerSecond": 0.08166930824518204
+                },
+                {
+                    "frame": 74,
+                    "seconds": 3.700000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1458841860294342,
+                    "rightHandChestHeightMetres": -0.33851468563079836,
+                    "rightHandFaceDistanceMetres": 0.6214468479156494,
+                    "rightHandSpeedMetresPerSecond": 0.10766788572072983
+                },
+                {
+                    "frame": 75,
+                    "seconds": 3.75,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.15215253829956056,
+                    "rightHandChestHeightMetres": -0.3382728099822998,
+                    "rightHandFaceDistanceMetres": 0.6228010654449463,
+                    "rightHandSpeedMetresPerSecond": 0.16946224868297578
+                },
+                {
+                    "frame": 76,
+                    "seconds": 3.799999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.15758122503757478,
+                    "rightHandChestHeightMetres": -0.3372918367385864,
+                    "rightHandFaceDistanceMetres": 0.6234325766563416,
+                    "rightHandSpeedMetresPerSecond": 0.2050982117652893
+                },
+                {
+                    "frame": 77,
+                    "seconds": 3.8499999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.16135099530220033,
+                    "rightHandChestHeightMetres": -0.3351660966873169,
+                    "rightHandFaceDistanceMetres": 0.6228010654449463,
+                    "rightHandSpeedMetresPerSecond": 0.23202434182167054
+                },
+                {
+                    "frame": 78,
+                    "seconds": 3.9000000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.16239401698112489,
+                    "rightHandChestHeightMetres": -0.33234691619873049,
+                    "rightHandFaceDistanceMetres": 0.6210511922836304,
+                    "rightHandSpeedMetresPerSecond": 0.23789583146572114
+                },
+                {
+                    "frame": 79,
+                    "seconds": 3.950000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.16170954704284669,
+                    "rightHandChestHeightMetres": -0.3292279839515686,
+                    "rightHandFaceDistanceMetres": 0.618743896484375,
+                    "rightHandSpeedMetresPerSecond": 0.23029865324497224
+                },
+                {
+                    "frame": 80,
+                    "seconds": 4.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.15976029634475709,
+                    "rightHandChestHeightMetres": -0.3263760209083557,
+                    "rightHandFaceDistanceMetres": 0.616391658782959,
+                    "rightHandSpeedMetresPerSecond": 0.1995202749967575
+                },
+                {
+                    "frame": 81,
+                    "seconds": 4.050000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.15628057718276978,
+                    "rightHandChestHeightMetres": -0.3243250846862793,
+                    "rightHandFaceDistanceMetres": 0.6142327189445496,
+                    "rightHandSpeedMetresPerSecond": 0.1525317281484604
+                },
+                {
+                    "frame": 82,
+                    "seconds": 4.099999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.15329501032829286,
+                    "rightHandChestHeightMetres": -0.3232685327529907,
+                    "rightHandFaceDistanceMetres": 0.6129470467567444,
+                    "rightHandSpeedMetresPerSecond": 0.10353849083185196
+                },
+                {
+                    "frame": 83,
+                    "seconds": 4.150000095367432,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.15088851749897004,
+                    "rightHandChestHeightMetres": -0.32307857275009158,
+                    "rightHandFaceDistanceMetres": 0.6123595237731934,
+                    "rightHandSpeedMetresPerSecond": 0.057586658746004108
+                },
+                {
+                    "frame": 84,
+                    "seconds": 4.199999809265137,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1488524079322815,
+                    "rightHandChestHeightMetres": -0.32373058795928957,
+                    "rightHandFaceDistanceMetres": 0.6123973727226257,
+                    "rightHandSpeedMetresPerSecond": 0.045229025185108188
+                },
+                {
+                    "frame": 85,
+                    "seconds": 4.25,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.147401362657547,
+                    "rightHandChestHeightMetres": -0.32515138387680056,
+                    "rightHandFaceDistanceMetres": 0.6130115389823914,
+                    "rightHandSpeedMetresPerSecond": 0.07855401933193207
+                },
+                {
+                    "frame": 86,
+                    "seconds": 4.300000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14621014893054963,
+                    "rightHandChestHeightMetres": -0.3269697427749634,
+                    "rightHandFaceDistanceMetres": 0.6140317916870117,
+                    "rightHandSpeedMetresPerSecond": 0.08996157348155976
+                },
+                {
+                    "frame": 87,
+                    "seconds": 4.349999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14556562900543214,
+                    "rightHandChestHeightMetres": -0.3288523554801941,
+                    "rightHandFaceDistanceMetres": 0.615213930606842,
+                    "rightHandSpeedMetresPerSecond": 0.09882326424121857
+                },
+                {
+                    "frame": 88,
+                    "seconds": 4.400000095367432,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1450970321893692,
+                    "rightHandChestHeightMetres": -0.33052992820739748,
+                    "rightHandFaceDistanceMetres": 0.6162685751914978,
+                    "rightHandSpeedMetresPerSecond": 0.09848740696907044
+                },
+                {
+                    "frame": 89,
+                    "seconds": 4.449999809265137,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14483648538589478,
+                    "rightHandChestHeightMetres": -0.331859827041626,
+                    "rightHandFaceDistanceMetres": 0.617096483707428,
+                    "rightHandSpeedMetresPerSecond": 0.09087616205215454
+                },
+                {
+                    "frame": 90,
+                    "seconds": 4.5,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1445106416940689,
+                    "rightHandChestHeightMetres": -0.33256644010543826,
+                    "rightHandFaceDistanceMetres": 0.6174531579017639,
+                    "rightHandSpeedMetresPerSecond": 0.060640204697847369
+                },
+                {
+                    "frame": 91,
+                    "seconds": 4.550000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1446213573217392,
+                    "rightHandChestHeightMetres": -0.33278822898864748,
+                    "rightHandFaceDistanceMetres": 0.6175715923309326,
+                    "rightHandSpeedMetresPerSecond": 0.030214231461286546
+                },
+                {
+                    "frame": 92,
+                    "seconds": 4.599999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1448172628879547,
+                    "rightHandChestHeightMetres": -0.33247727155685427,
+                    "rightHandFaceDistanceMetres": 0.6173138618469238,
+                    "rightHandSpeedMetresPerSecond": 0.007374645210802555
+                },
+                {
+                    "frame": 93,
+                    "seconds": 4.650000095367432,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14496879279613496,
+                    "rightHandChestHeightMetres": -0.3319045305252075,
+                    "rightHandFaceDistanceMetres": 0.6169093251228333,
+                    "rightHandSpeedMetresPerSecond": 0.030352475121617318
+                },
+                {
+                    "frame": 94,
+                    "seconds": 4.699999809265137,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14481638371944428,
+                    "rightHandChestHeightMetres": -0.3315383195877075,
+                    "rightHandFaceDistanceMetres": 0.6166787147521973,
+                    "rightHandSpeedMetresPerSecond": 0.03855183348059654
+                },
+                {
+                    "frame": 95,
+                    "seconds": 4.75,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14474482834339143,
+                    "rightHandChestHeightMetres": -0.33124613761901858,
+                    "rightHandFaceDistanceMetres": 0.616585373878479,
+                    "rightHandSpeedMetresPerSecond": 0.047163624316453937
+                },
+                {
+                    "frame": 96,
+                    "seconds": 4.800000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1444740891456604,
+                    "rightHandChestHeightMetres": -0.3309382200241089,
+                    "rightHandFaceDistanceMetres": 0.6164385676383972,
+                    "rightHandSpeedMetresPerSecond": 0.0473925806581974
+                },
+                {
+                    "frame": 97,
+                    "seconds": 4.849999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14406728744506837,
+                    "rightHandChestHeightMetres": -0.3308194875717163,
+                    "rightHandFaceDistanceMetres": 0.6163765788078308,
+                    "rightHandSpeedMetresPerSecond": 0.03226187452673912
+                },
+                {
+                    "frame": 98,
+                    "seconds": 4.900000095367432,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1433521956205368,
+                    "rightHandChestHeightMetres": -0.33068573474884035,
+                    "rightHandFaceDistanceMetres": 0.6162229180335999,
+                    "rightHandSpeedMetresPerSecond": 0.03260647878050804
+                },
+                {
+                    "frame": 99,
+                    "seconds": 4.949999809265137,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14269068837165833,
+                    "rightHandChestHeightMetres": -0.3305823802947998,
+                    "rightHandFaceDistanceMetres": 0.6160635352134705,
+                    "rightHandSpeedMetresPerSecond": 0.023175206035375596
+                },
+                {
+                    "frame": 100,
+                    "seconds": 5.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14214010536670686,
+                    "rightHandChestHeightMetres": -0.3303897976875305,
+                    "rightHandFaceDistanceMetres": 0.6158006191253662,
+                    "rightHandSpeedMetresPerSecond": 0.015404834412038327
+                },
+                {
+                    "frame": 101,
+                    "seconds": 5.050000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14195524156093598,
+                    "rightHandChestHeightMetres": -0.33036506175994875,
+                    "rightHandFaceDistanceMetres": 0.6156865954399109,
+                    "rightHandSpeedMetresPerSecond": 0.010109998285770417
+                },
+                {
+                    "frame": 102,
+                    "seconds": 5.099999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14160358905792237,
+                    "rightHandChestHeightMetres": -0.3306218385696411,
+                    "rightHandFaceDistanceMetres": 0.6158063411712647,
+                    "rightHandSpeedMetresPerSecond": 0.012936847284436226
+                },
+                {
+                    "frame": 103,
+                    "seconds": 5.150000095367432,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14150983095169068,
+                    "rightHandChestHeightMetres": -0.3310256004333496,
+                    "rightHandFaceDistanceMetres": 0.616115391254425,
+                    "rightHandSpeedMetresPerSecond": 0.014711577445268631
+                },
+                {
+                    "frame": 104,
+                    "seconds": 5.199999809265137,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14160732924938203,
+                    "rightHandChestHeightMetres": -0.33131855726242068,
+                    "rightHandFaceDistanceMetres": 0.6163563132286072,
+                    "rightHandSpeedMetresPerSecond": 0.014649732038378716
+                },
+                {
+                    "frame": 105,
+                    "seconds": 5.25,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14171461760997773,
+                    "rightHandChestHeightMetres": -0.3316664695739746,
+                    "rightHandFaceDistanceMetres": 0.6166263222694397,
+                    "rightHandSpeedMetresPerSecond": 0.020278263837099077
+                },
+                {
+                    "frame": 106,
+                    "seconds": 5.300000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1415208876132965,
+                    "rightHandChestHeightMetres": -0.3319127559661865,
+                    "rightHandFaceDistanceMetres": 0.6167585849761963,
+                    "rightHandSpeedMetresPerSecond": 0.014388469979166985
+                },
+                {
+                    "frame": 107,
+                    "seconds": 5.349999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1415904015302658,
+                    "rightHandChestHeightMetres": -0.3319666385650635,
+                    "rightHandFaceDistanceMetres": 0.6168100237846375,
+                    "rightHandSpeedMetresPerSecond": 0.0039348723366856579
+                },
+                {
+                    "frame": 108,
+                    "seconds": 5.400000095367432,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14180992543697358,
+                    "rightHandChestHeightMetres": -0.3318302631378174,
+                    "rightHandFaceDistanceMetres": 0.616750955581665,
+                    "rightHandSpeedMetresPerSecond": 0.007025514729321003
+                },
+                {
+                    "frame": 109,
+                    "seconds": 5.449999809265137,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14191943407058717,
+                    "rightHandChestHeightMetres": -0.3318312168121338,
+                    "rightHandFaceDistanceMetres": 0.6167879104614258,
+                    "rightHandSpeedMetresPerSecond": 0.0031692422926425936
+                },
+                {
+                    "frame": 110,
+                    "seconds": 5.5,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1420302838087082,
+                    "rightHandChestHeightMetres": -0.33172839879989626,
+                    "rightHandFaceDistanceMetres": 0.6167541146278381,
+                    "rightHandSpeedMetresPerSecond": 0.008947120979428292
+                },
+                {
+                    "frame": 111,
+                    "seconds": 5.550000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1423676759004593,
+                    "rightHandChestHeightMetres": -0.33157920837402346,
+                    "rightHandFaceDistanceMetres": 0.6167437434196472,
+                    "rightHandSpeedMetresPerSecond": 0.01382636371999979
+                },
+                {
+                    "frame": 112,
+                    "seconds": 5.599999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14270782470703126,
+                    "rightHandChestHeightMetres": -0.33128583431243899,
+                    "rightHandFaceDistanceMetres": 0.6166143417358398,
+                    "rightHandSpeedMetresPerSecond": 0.01798834837973118
+                },
+                {
+                    "frame": 113,
+                    "seconds": 5.650000095367432,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14301803708076478,
+                    "rightHandChestHeightMetres": -0.33098721504211428,
+                    "rightHandFaceDistanceMetres": 0.6164560914039612,
+                    "rightHandSpeedMetresPerSecond": 0.014723662286996842
+                },
+                {
+                    "frame": 114,
+                    "seconds": 5.699999809265137,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14299310743808747,
+                    "rightHandChestHeightMetres": -0.3308555483818054,
+                    "rightHandFaceDistanceMetres": 0.6163748502731323,
+                    "rightHandSpeedMetresPerSecond": 0.01077482383698225
+                },
+                {
+                    "frame": 115,
+                    "seconds": 5.75,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14309924840927125,
+                    "rightHandChestHeightMetres": -0.33079230785369875,
+                    "rightHandFaceDistanceMetres": 0.616381049156189,
+                    "rightHandSpeedMetresPerSecond": 0.00887085497379303
+                },
+                {
+                    "frame": 116,
+                    "seconds": 5.800000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14321410655975343,
+                    "rightHandChestHeightMetres": -0.33071160316467287,
+                    "rightHandFaceDistanceMetres": 0.6163579821586609,
+                    "rightHandSpeedMetresPerSecond": 0.006287558004260063
+                },
+                {
+                    "frame": 117,
+                    "seconds": 5.849999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14365951716899873,
+                    "rightHandChestHeightMetres": -0.33056730031967165,
+                    "rightHandFaceDistanceMetres": 0.6163169145584106,
+                    "rightHandSpeedMetresPerSecond": 0.009419332258403302
+                },
+                {
+                    "frame": 118,
+                    "seconds": 5.900000095367432,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14347779750823975,
+                    "rightHandChestHeightMetres": -0.330524206161499,
+                    "rightHandFaceDistanceMetres": 0.6162868738174439,
+                    "rightHandSpeedMetresPerSecond": 0.011275338008999825
+                },
+                {
+                    "frame": 119,
+                    "seconds": 5.949999809265137,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14336606860160829,
+                    "rightHandChestHeightMetres": -0.3305104970932007,
+                    "rightHandFaceDistanceMetres": 0.6162988543510437,
+                    "rightHandSpeedMetresPerSecond": 0.010257145389914513
+                },
+                {
+                    "frame": 120,
+                    "seconds": 6.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14325188100337983,
+                    "rightHandChestHeightMetres": -0.33051133155822756,
+                    "rightHandFaceDistanceMetres": 0.6162953972816467,
+                    "rightHandSpeedMetresPerSecond": 0.004901816602796316
+                },
+                {
+                    "frame": 121,
+                    "seconds": 6.050000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14832326769828797,
+                    "rightHandChestHeightMetres": -0.33236563205718996,
+                    "rightHandFaceDistanceMetres": 0.6186285018920898,
+                    "rightHandSpeedMetresPerSecond": 0.17280785739421845
+                },
+                {
+                    "frame": 122,
+                    "seconds": 6.099999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.1578361988067627,
+                    "rightHandChestHeightMetres": -0.3358747363090515,
+                    "rightHandFaceDistanceMetres": 0.6230155825614929,
+                    "rightHandSpeedMetresPerSecond": 0.40293771028518679
+                },
+                {
+                    "frame": 123,
+                    "seconds": 6.150000095367432,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.16297173500061036,
+                    "rightHandChestHeightMetres": -0.3381308317184448,
+                    "rightHandFaceDistanceMetres": 0.6254969239234924,
+                    "rightHandSpeedMetresPerSecond": 0.4655998945236206
+                },
+                {
+                    "frame": 124,
+                    "seconds": 6.199999809265137,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.15969176590442658,
+                    "rightHandChestHeightMetres": -0.33791977167129519,
+                    "rightHandFaceDistanceMetres": 0.6242334842681885,
+                    "rightHandSpeedMetresPerSecond": 0.41900917887687685
+                },
+                {
+                    "frame": 125,
+                    "seconds": 6.25,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.15165016055107118,
+                    "rightHandChestHeightMetres": -0.3361324071884155,
+                    "rightHandFaceDistanceMetres": 0.6207215785980225,
+                    "rightHandSpeedMetresPerSecond": 0.31503182649612429
+                },
+                {
+                    "frame": 126,
+                    "seconds": 6.300000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.12977442145347596
+                },
+                {
+                    "frame": 127,
+                    "seconds": 6.349999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 128,
+                    "seconds": 6.400000095367432,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 129,
+                    "seconds": 6.449999809265137,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 130,
+                    "seconds": 6.5,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 131,
+                    "seconds": 6.550000190734863,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 132,
+                    "seconds": 6.599999904632568,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                }
+            ]
+        },
+        {
+            "id": "nod",
+            "sourceJsonPath": "Assets/AIChatTookit/Resources/ARDY/nod.json",
+            "sourceJsonSha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+            "motionText": "Controlled conversational preview: one gentle 8-degree nod, then return to the current neutral pose.",
+            "fps": 20.0,
+            "samples": [
+                {
+                    "frame": 0,
+                    "seconds": 0.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 1,
+                    "seconds": 0.05000000074505806,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 2,
+                    "seconds": 0.10000000149011612,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187092661857605,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 3,
+                    "seconds": 0.15000000596046449,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6186798810958862,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 4,
+                    "seconds": 0.20000000298023225,
+                    "headAngleDegrees": 0.4111684560775757,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6185705065727234,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 5,
+                    "seconds": 0.25,
+                    "headAngleDegrees": 1.0711770057678223,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6183391213417053,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 6,
+                    "seconds": 0.30000001192092898,
+                    "headAngleDegrees": 1.9703296422958375,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6180128455162048,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 7,
+                    "seconds": 0.3499999940395355,
+                    "headAngleDegrees": 2.943065643310547,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6176460385322571,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 8,
+                    "seconds": 0.4000000059604645,
+                    "headAngleDegrees": 3.999955654144287,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6172305941581726,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 9,
+                    "seconds": 0.44999998807907107,
+                    "headAngleDegrees": 5.0569562911987309,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.616797924041748,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 10,
+                    "seconds": 0.5,
+                    "headAngleDegrees": 6.029085636138916,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6163849830627441,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 11,
+                    "seconds": 0.550000011920929,
+                    "headAngleDegrees": 6.8423895835876469,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6160284280776978,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 12,
+                    "seconds": 0.6000000238418579,
+                    "headAngleDegrees": 7.444202899932861,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6157580614089966,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 13,
+                    "seconds": 0.6499999761581421,
+                    "headAngleDegrees": 7.813910484313965,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6155892610549927,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 14,
+                    "seconds": 0.699999988079071,
+                    "headAngleDegrees": 7.9736714363098148,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6155155301094055,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 15,
+                    "seconds": 0.75,
+                    "headAngleDegrees": 7.999857425689697,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6155034303665161,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 16,
+                    "seconds": 0.800000011920929,
+                    "headAngleDegrees": 7.992804527282715,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6155067086219788,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 17,
+                    "seconds": 0.8500000238418579,
+                    "headAngleDegrees": 7.9477925300598148,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6155275702476502,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 18,
+                    "seconds": 0.8999999761581421,
+                    "headAngleDegrees": 7.836333274841309,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6155788898468018,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 19,
+                    "seconds": 0.949999988079071,
+                    "headAngleDegrees": 7.640678405761719,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6156684756278992,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 20,
+                    "seconds": 1.0,
+                    "headAngleDegrees": 7.351778507232666,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6157997846603394,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 21,
+                    "seconds": 1.0499999523162842,
+                    "headAngleDegrees": 6.968615531921387,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.615972101688385,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 22,
+                    "seconds": 1.100000023841858,
+                    "headAngleDegrees": 6.49622917175293,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6161812543869019,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 23,
+                    "seconds": 1.149999976158142,
+                    "headAngleDegrees": 5.946042060852051,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6164206266403198,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 24,
+                    "seconds": 1.2000000476837159,
+                    "headAngleDegrees": 5.333794593811035,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6166818141937256,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 25,
+                    "seconds": 1.25,
+                    "headAngleDegrees": 4.678001403808594,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6169549226760864,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 26,
+                    "seconds": 1.2999999523162842,
+                    "headAngleDegrees": 3.999955654144287,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6172305941581726,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 27,
+                    "seconds": 1.350000023841858,
+                    "headAngleDegrees": 3.3219008445739748,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6174991130828857,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 28,
+                    "seconds": 1.399999976158142,
+                    "headAngleDegrees": 2.6656157970428469,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6177520155906677,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 29,
+                    "seconds": 1.4500000476837159,
+                    "headAngleDegrees": 2.0535831451416017,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6179822087287903,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 30,
+                    "seconds": 1.5,
+                    "headAngleDegrees": 1.5034687519073487,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6181840300559998,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 31,
+                    "seconds": 1.5499999523162842,
+                    "headAngleDegrees": 1.0302057266235352,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6183534860610962,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 32,
+                    "seconds": 1.600000023841858,
+                    "headAngleDegrees": 0.6464930772781372,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6184885501861572,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 33,
+                    "seconds": 1.649999976158142,
+                    "headAngleDegrees": 0.3560822904109955,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6185886859893799,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 34,
+                    "seconds": 1.7000000476837159,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.618655800819397,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 35,
+                    "seconds": 1.75,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6186937093734741,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 36,
+                    "seconds": 1.7999999523162842,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187090277671814,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 37,
+                    "seconds": 1.850000023841858,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 38,
+                    "seconds": 1.899999976158142,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 39,
+                    "seconds": 1.9500000476837159,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 40,
+                    "seconds": 2.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 41,
+                    "seconds": 2.049999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 42,
+                    "seconds": 2.0999999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 43,
+                    "seconds": 2.1500000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 44,
+                    "seconds": 2.200000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 45,
+                    "seconds": 2.25,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 46,
+                    "seconds": 2.299999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 47,
+                    "seconds": 2.3499999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 48,
+                    "seconds": 2.4000000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 49,
+                    "seconds": 2.450000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                }
+            ]
+        },
+        {
+            "id": "shake-head",
+            "sourceJsonPath": "Assets/AIChatTookit/Resources/ARDY/shake-head.json",
+            "sourceJsonSha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+            "motionText": "Controlled conversational preview: one gentle left-right head shake, 6 degrees each way, then return to the current neutral pose.",
+            "fps": 20.0,
+            "samples": [
+                {
+                    "frame": 0,
+                    "seconds": 0.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 1,
+                    "seconds": 0.05000000074505806,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 2,
+                    "seconds": 0.10000000149011612,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187102198600769,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 3,
+                    "seconds": 0.15000000596046449,
+                    "headAngleDegrees": 0.1724584698677063,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6186951398849487,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 4,
+                    "seconds": 0.20000000298023225,
+                    "headAngleDegrees": 0.7241538166999817,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6186431646347046,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 5,
+                    "seconds": 0.25,
+                    "headAngleDegrees": 1.763200044631958,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6185453534126282,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 6,
+                    "seconds": 0.30000001192092898,
+                    "headAngleDegrees": 2.9999654293060304,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6184289455413818,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 7,
+                    "seconds": 0.3499999940395355,
+                    "headAngleDegrees": 4.095114707946777,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.61832594871521,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 8,
+                    "seconds": 0.4000000059604645,
+                    "headAngleDegrees": 5.021376609802246,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6182389855384827,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 9,
+                    "seconds": 0.44999998807907107,
+                    "headAngleDegrees": 5.652370929718018,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6181797981262207,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 10,
+                    "seconds": 0.5,
+                    "headAngleDegrees": 5.948543548583984,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6181520223617554,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 11,
+                    "seconds": 0.550000011920929,
+                    "headAngleDegrees": 5.999922752380371,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6181471943855286,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 12,
+                    "seconds": 0.6000000238418579,
+                    "headAngleDegrees": 5.967863082885742,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6181501746177673,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 13,
+                    "seconds": 0.6499999761581421,
+                    "headAngleDegrees": 5.76918888092041,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.618168830871582,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 14,
+                    "seconds": 0.699999988079071,
+                    "headAngleDegrees": 5.305092811584473,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6182123422622681,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 15,
+                    "seconds": 0.75,
+                    "headAngleDegrees": 4.537487506866455,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6182844042778015,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 16,
+                    "seconds": 0.800000011920929,
+                    "headAngleDegrees": 3.481151580810547,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6183836460113525,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 17,
+                    "seconds": 0.8500000238418579,
+                    "headAngleDegrees": 2.1904308795928957,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6185051202774048,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 18,
+                    "seconds": 0.8999999761581421,
+                    "headAngleDegrees": 0.7465062141418457,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6186410188674927,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 19,
+                    "seconds": 0.949999988079071,
+                    "headAngleDegrees": 0.7465062141418457,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187819838523865,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 20,
+                    "seconds": 1.0,
+                    "headAngleDegrees": 2.1904308795928957,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6189179420471191,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 21,
+                    "seconds": 1.0499999523162842,
+                    "headAngleDegrees": 3.481151580810547,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6190394759178162,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 22,
+                    "seconds": 1.100000023841858,
+                    "headAngleDegrees": 4.537487506866455,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.619138777256012,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 23,
+                    "seconds": 1.149999976158142,
+                    "headAngleDegrees": 5.305092811584473,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6192108988761902,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 24,
+                    "seconds": 1.2000000476837159,
+                    "headAngleDegrees": 5.76918888092041,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6192545294761658,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 25,
+                    "seconds": 1.25,
+                    "headAngleDegrees": 5.967863082885742,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6192731261253357,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 26,
+                    "seconds": 1.2999999523162842,
+                    "headAngleDegrees": 5.999922752380371,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6192761659622192,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 27,
+                    "seconds": 1.350000023841858,
+                    "headAngleDegrees": 5.983849048614502,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6192746758460999,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 28,
+                    "seconds": 1.399999976158142,
+                    "headAngleDegrees": 5.8846211433410648,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6192653179168701,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 29,
+                    "seconds": 1.4500000476837159,
+                    "headAngleDegrees": 5.652370929718018,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6192435622215271,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 30,
+                    "seconds": 1.5,
+                    "headAngleDegrees": 5.268810272216797,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.619207501411438,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 31,
+                    "seconds": 1.5499999523162842,
+                    "headAngleDegrees": 4.740510940551758,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6191579103469849,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 32,
+                    "seconds": 1.600000023841858,
+                    "headAngleDegrees": 4.095114707946777,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6190972328186035,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 33,
+                    "seconds": 1.649999976158142,
+                    "headAngleDegrees": 3.3738086223602297,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6190293431282044,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 34,
+                    "seconds": 1.7000000476837159,
+                    "headAngleDegrees": 2.625972270965576,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6189589500427246,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 35,
+                    "seconds": 1.75,
+                    "headAngleDegrees": 1.904065728187561,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6188909411430359,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 36,
+                    "seconds": 1.7999999523162842,
+                    "headAngleDegrees": 1.2586358785629273,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.618830144405365,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 37,
+                    "seconds": 1.850000023841858,
+                    "headAngleDegrees": 0.7295379042625427,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187803745269775,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 38,
+                    "seconds": 1.899999976158142,
+                    "headAngleDegrees": 0.3471788167953491,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187442541122437,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 39,
+                    "seconds": 1.9500000476837159,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187223792076111,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 40,
+                    "seconds": 2.0,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187130212783814,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 41,
+                    "seconds": 2.049999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 42,
+                    "seconds": 2.0999999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 43,
+                    "seconds": 2.1500000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 44,
+                    "seconds": 2.200000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 45,
+                    "seconds": 2.25,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 46,
+                    "seconds": 2.299999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 47,
+                    "seconds": 2.3499999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 48,
+                    "seconds": 2.4000000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 49,
+                    "seconds": 2.450000047683716,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 50,
+                    "seconds": 2.5,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 51,
+                    "seconds": 2.549999952316284,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 52,
+                    "seconds": 2.5999999046325685,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                },
+                {
+                    "frame": 53,
+                    "seconds": 2.6500000953674318,
+                    "headAngleDegrees": 0.0,
+                    "rightHandChestSideMetres": 0.14718282222747804,
+                    "rightHandChestHeightMetres": -0.33502113819122317,
+                    "rightHandFaceDistanceMetres": 0.6187114715576172,
+                    "rightHandSpeedMetresPerSecond": 0.0
+                }
+            ]
+        }
+    ]
+}

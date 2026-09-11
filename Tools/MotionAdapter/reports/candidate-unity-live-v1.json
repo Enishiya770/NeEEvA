@@ -1,0 +1,33 @@
+{
+    "status": "passed",
+    "method": "Real Unity PlayMode, real Animator, live HTTP Qwen feature + MLP + ARDY, real UnityWebRequest and motion controller. No manual Tick or Animator.Update.",
+    "limitation": "Isolated real NEVA avatar with original Animator; no private scene, live microphone, TTS or subjective naturalness rating. Dialogue parsing has its separate real ChatSample regression.",
+    "unityVersion": "2022.3.22f1",
+    "error": "",
+    "description": "While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.",
+    "checks": 46865,
+    "sampledFrames": 33841,
+    "receivedChunks": 3,
+    "timelineFrames": 120,
+    "firstWindowSeconds": 0.9682044982910156,
+    "allWindowsSeconds": 1.480834722518921,
+    "finalReturnErrorDegrees": 0.0,
+    "cancelledReturnErrorDegrees": 0.0,
+    "initialWristBelowShoulderMetres": 0.37032949924468996,
+    "dynamicUpperBodyExcursionDegrees": 82.63335418701172,
+    "historyCapturedFromAnimator": true,
+    "lateResponseRejected": true,
+    "preResponseCancelStayedIdle": true,
+    "diagnosticTracePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\ardy-live\\ardy-motion-20260910T062623279-62750c6fd4944194b1f1672cfe621d4a.json",
+    "diagnosticRequests": 3,
+    "diagnosticResponses": 3,
+    "initialHistoryFrames": 16,
+    "serviceUrl": "http://127.0.0.1:8095",
+    "initialConditioningFrames": 16,
+    "lastWindowTimings": {
+        "queueMs": 0.0,
+        "featureMs": 0.0,
+        "generationMs": 213.4259033203125,
+        "totalMs": 235.0
+    }
+}

@@ -1,0 +1,2031 @@
+{
+  "schema": 1,
+  "method": "Fixed text, explicit seed, initial history and pinned ARDY; only the text condition changes. Reuses unchanged previously measured live-Qwen trajectories and saved features; CPU-only postprocessing.",
+  "inputs": {
+    "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\generated-motion-qwen-condition-ablation.json": "63bc45feea1c1975ffaaeabb0e5c17cec06d1e4f5fbce3bf90e63e5968762f78",
+    "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\generated-motion-teacher-condition-ablation.json": "c743e8a25d27c0f722099eb5092c3f769999050cf210544bcecce63900cff3c7",
+    "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\qwen-features.npz": "0ddeae717f98b819f972bc6e7b424081b1f0381c0dc40a2be2f0c2ec995f8c04"
+  },
+  "teacherControlChecks": [
+    {
+      "id": "motion-00004",
+      "cosine": 1.0000001192092896,
+      "relativeL2": 0.0
+    },
+    {
+      "id": "motion-00053",
+      "cosine": 1.0,
+      "relativeL2": 0.0
+    }
+  ],
+  "pairs": [
+    {
+      "promptId": "raise-actual",
+      "historyKind": "cold",
+      "seed": 0,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\raise-actual-live-qwen-adapter-cold-seed0.json",
+        "spineTiltMaxDegrees": 23.530214034186834,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6162780523300171,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              30.38712506895658,
+              47.383932328596984,
+              69.38555653915729
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.12355225662960706,
+              0.4288543411817222,
+              0.7718230866748497
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              -0.05095620659489053,
+              0.05987086961893805,
+              0.2000593774372268
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              29.125334771528202,
+              51.842025057667556,
+              91.69532101349164
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.11270271998085425,
+              0.5036803735989881,
+              0.9519249970592273
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              -0.04637077755095361,
+              0.0909566923932863,
+              0.22137371590352867
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\raise-actual-offline-teacher-feature-cold-seed0.json",
+        "spineTiltMaxDegrees": 18.146920103049172,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.925,
+            "firstObservedSeconds": 0.45,
+            "longestContinuousSeconds": 5.55
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.9166666666666666,
+            "firstObservedSeconds": 0.5,
+            "longestContinuousSeconds": 5.5
+          },
+          "maximumSimultaneousHeightMarginMeters": 0.3137030601501465,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              30.554299460698815,
+              32.43297942078088,
+              109.48063446667871
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.13379052924042084,
+              0.19004897617628813,
+              0.978942646580319
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.15011262268649989,
+              0.16045278815889036,
+              0.33879546784906345
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              26.98925268079398,
+              31.02087616360494,
+              117.22417402364542
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.04001608524827319,
+              0.16544752721839343,
+              0.8947627015764371
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.1028227470007621,
+              0.13868896899088407,
+              0.3447150569208366
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "raise-actual",
+      "historyKind": "cold",
+      "seed": 1,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\raise-actual-live-qwen-adapter-cold-seed1.json",
+        "spineTiltMaxDegrees": 21.858753923724585,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6110175848007202,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              20.363361938450225,
+              29.35479439432362,
+              38.69637815456892
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.17138392200228228,
+              0.3863438014784037,
+              0.5101134027819153
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              -0.016379044207099125,
+              0.11707599929919016,
+              0.1547337971786304
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              31.32977498396116,
+              67.06092219291253,
+              107.99828807833472
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.27397419200086415,
+              0.47233696485853305,
+              0.9792777976530109
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.006667260756660909,
+              0.1351381107337427,
+              0.3452105655251786
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\raise-actual-offline-teacher-feature-cold-seed1.json",
+        "spineTiltMaxDegrees": 5.877732439740095,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.925,
+            "firstObservedSeconds": 0.45,
+            "longestContinuousSeconds": 5.55
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.9166666666666666,
+            "firstObservedSeconds": 0.5,
+            "longestContinuousSeconds": 5.5
+          },
+          "maximumSimultaneousHeightMarginMeters": 0.3658052682876587,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              6.854097911224642,
+              8.958670823405498,
+              69.69175195262584
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.22628145949554165,
+              0.2676908284882818,
+              0.8031713908068451
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.16702761967597599,
+              0.19263436433458198,
+              0.2982890537175752
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              10.65584378173557,
+              15.569752704912773,
+              101.99836700266727
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.21313694040632963,
+              0.3002379290098777,
+              0.9883783330679393
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.15442421794994204,
+              0.17904178499343615,
+              0.34428377601706533
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "raise-actual",
+      "historyKind": "grounded-unity-idle16",
+      "seed": 0,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\raise-actual-live-qwen-adapter-grounded-unity-idle16-seed0.json",
+        "spineTiltMaxDegrees": 1.640917489076681,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6795972585678101,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              18.33462188579037,
+              23.66019281882994,
+              122.44775477555322
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.24038070129322195,
+              0.3110244630585117,
+              0.9978420899531906
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.11376794005881917,
+              0.13166558912117754,
+              0.35653967352943927
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              16.322939131164446,
+              17.109743548860678,
+              22.20954624595325
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.23046348837921993,
+              0.24878798726121953,
+              0.46403412324299287
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.11132717358479499,
+              0.12602950538660296,
+              0.30124068667387627
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\raise-actual-offline-teacher-feature-grounded-unity-idle16-seed0.json",
+        "spineTiltMaxDegrees": 7.546236478507299,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.26666666666666666,
+            "firstObservedSeconds": 4.4,
+            "longestContinuousSeconds": 1.6
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.25833333333333336,
+            "firstObservedSeconds": 4.45,
+            "longestContinuousSeconds": 1.55
+          },
+          "maximumSimultaneousHeightMarginMeters": 0.3275916576385498,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              18.052320522384605,
+              24.036787733349172,
+              91.54946793247248
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.29490625852955654,
+              0.43244047577386524,
+              0.9813241167214538
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.1967588222111765,
+              0.26333496826351743,
+              0.34294768850785456
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              11.024779896368102,
+              16.92427682972425,
+              88.92641644881843
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.22097888258062787,
+              0.28825830287935816,
+              0.9468227274779838
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.1387086591373715,
+              0.16964018340527487,
+              0.3014930599755767
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "raise-actual",
+      "historyKind": "grounded-unity-idle16",
+      "seed": 1,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\raise-actual-live-qwen-adapter-grounded-unity-idle16-seed1.json",
+        "spineTiltMaxDegrees": 4.157887765440014,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6799675226211548,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              18.009946742280647,
+              20.183143253842374,
+              26.559140471183696
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.2785293275844566,
+              0.35591132966684325,
+              0.5555803657818198
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.12063051447686812,
+              0.18126600010873212,
+              0.3200466131578953
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              14.777989392399718,
+              19.47351415195176,
+              61.48560938630814
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.31745449287427285,
+              0.35432199144208265,
+              0.8132970121882552
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.18952294493513291,
+              0.2218469151151256,
+              0.4159752897607141
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\raise-actual-offline-teacher-feature-grounded-unity-idle16-seed1.json",
+        "spineTiltMaxDegrees": 3.0146728064251227,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.4745553731918335,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              19.071921008168488,
+              20.65447863295637,
+              87.52899808367671
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.5223476164771956,
+              0.5579780858553154,
+              0.9501398720191975
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.29648562705898085,
+              0.3127130679612977,
+              0.38160183241753376
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              16.602037650137618,
+              18.66461445604301,
+              80.50662975618714
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.45003758895244195,
+              0.47196546697924513,
+              0.9417823499103006
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.28111287669749946,
+              0.2937343307144612,
+              0.3908575927409547
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "explain-actual",
+      "historyKind": "cold",
+      "seed": 0,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\explain-actual-live-qwen-adapter-cold-seed0.json",
+        "spineTiltMaxDegrees": 12.125674761745065,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.5718451738357544,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              15.643386851594443,
+              20.033867239613684,
+              25.891349817213836
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              -0.08386688145161678,
+              0.05513793245225031,
+              0.2594691977862635
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              -0.09120243668186012,
+              -0.032980424645094014,
+              0.05521128755335758
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              9.898583839338187,
+              11.253869050933346,
+              22.857966898699402
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              -0.2114174968461846,
+              -0.09261843005253599,
+              0.14914373973537312
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              -0.12994523675031072,
+              -0.06467181883985974,
+              0.013344395433469769
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\explain-actual-offline-teacher-feature-cold-seed0.json",
+        "spineTiltMaxDegrees": 30.308119293320544,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.07052946090698242,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              79.35255362136061,
+              86.41525822621206,
+              106.16756453957456
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.5350244301605387,
+              0.5769381456648699,
+              0.8690277635913048
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.08141750408039054,
+              0.10470925187601668,
+              0.17829543986121182
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              82.30749790110225,
+              84.83064894447006,
+              98.1381073329336
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.5141537449833614,
+              0.543906979812435,
+              0.736359331387348
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.053683549849156076,
+              0.06566119860397816,
+              0.10065921898448343
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "explain-actual",
+      "historyKind": "cold",
+      "seed": 1,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\explain-actual-live-qwen-adapter-cold-seed1.json",
+        "spineTiltMaxDegrees": 7.051712713047051,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.46228623390197754,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              15.67911049186688,
+              28.83104490904796,
+              40.92955735333783
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.3269681035109941,
+              0.39498119921565356,
+              0.4375738750837416
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.07473719819536107,
+              0.1478569952786518,
+              0.1723762033877881
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              15.24410309461922,
+              30.604165729700895,
+              32.27624954929249
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.23388581846369094,
+              0.3020124946521755,
+              0.3467702404541244
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.06598669469345644,
+              0.10079393275516071,
+              0.13828677147643995
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\explain-actual-offline-teacher-feature-cold-seed1.json",
+        "spineTiltMaxDegrees": 2.701173655413032,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.25992703437805176,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              88.5927249603518,
+              89.90467133422135,
+              91.21550087334212
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.7697767351215608,
+              0.7844217919557231,
+              0.794947236192628
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.26975857462782943,
+              0.2826729126651455,
+              0.29303408467371855
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              83.04784223728757,
+              84.2395574046185,
+              85.67511588719509
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.7874463268504925,
+              0.8098118386376492,
+              0.8249879651349193
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.30017294666057903,
+              0.3090908621736698,
+              0.31541572542538027
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "explain-actual",
+      "historyKind": "grounded-unity-idle16",
+      "seed": 0,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\explain-actual-live-qwen-adapter-grounded-unity-idle16-seed0.json",
+        "spineTiltMaxDegrees": 1.4178932894654708,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6800841093063354,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              18.773098250660865,
+              21.4793375488384,
+              131.19600625477364
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.29898422187531803,
+              0.4689338357319811,
+              0.9984932718133024
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.1443903081348883,
+              0.21511111406030842,
+              0.319964965863664
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              12.562159118728061,
+              16.762929146316438,
+              24.3213276895965
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.20992562307905244,
+              0.2823461682286159,
+              0.4604462134811798
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.08415223954965023,
+              0.14178850295557627,
+              0.3015176398720495
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\explain-actual-offline-teacher-feature-grounded-unity-idle16-seed0.json",
+        "spineTiltMaxDegrees": 5.575345161146236,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.356518030166626,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              18.536196667545,
+              58.21690035437166,
+              62.93382175957065
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.35154631071692183,
+              0.6001347858443459,
+              0.8602631594933381
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.14469886705190882,
+              0.21060796729729753,
+              0.32007320594753613
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              15.146894078272453,
+              42.25248355227981,
+              51.35847603180406
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.3045202357988817,
+              0.3754428267497,
+              0.6764378410085603
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.13061279505429055,
+              0.14960837474693606,
+              0.30179127186837845
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "explain-actual",
+      "historyKind": "grounded-unity-idle16",
+      "seed": 1,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\explain-actual-live-qwen-adapter-grounded-unity-idle16-seed1.json",
+        "spineTiltMaxDegrees": 4.197640063461144,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6798558235168457,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              18.679887401076485,
+              20.671042698007057,
+              24.158301610303567
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.3409072531808407,
+              0.552381256029739,
+              0.5659106154434497
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.16237183026619367,
+              0.30050617206203434,
+              0.3199896690019928
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              16.205060601329535,
+              17.950942060061394,
+              22.25346120112522
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.3191325176356039,
+              0.46172025150786655,
+              0.4783750311053969
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.16849353670345255,
+              0.2847060819613098,
+              0.3016334892265544
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\explain-actual-offline-teacher-feature-grounded-unity-idle16-seed1.json",
+        "spineTiltMaxDegrees": 5.102001130802199,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6137692928314209,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              18.197603481244897,
+              21.252933606325243,
+              34.68810292438749
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.3499122595886237,
+              0.5601361323304916,
+              0.7404910574844794
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.18143702206795156,
+              0.31778529963304947,
+              0.3639319808832407
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              15.19256324074334,
+              21.706108280705976,
+              42.78165476751707
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.370127639975943,
+              0.479366392137757,
+              0.760498193845157
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.19058917231378525,
+              0.2882365431291686,
+              0.36885310106690816
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "raise-style",
+      "historyKind": "cold",
+      "seed": 0,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\raise-style-live-qwen-adapter-cold-seed0.json",
+        "spineTiltMaxDegrees": 9.979868545927449,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.748633623123169,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              19.894492187657306,
+              27.12214030939657,
+              31.495707123638965
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.17750808586465003,
+              0.33949784212606726,
+              0.41261517951836135
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.04111471309749576,
+              0.11710100640148335,
+              0.14717661832242873
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              7.573379052429544,
+              14.975155926322927,
+              31.235184975470958
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.13625435999405128,
+              0.2984886876418146,
+              0.6275178270878792
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.08702220013204012,
+              0.15012959515152918,
+              0.278860692380531
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\raise-style-offline-teacher-feature-cold-seed0.json",
+        "spineTiltMaxDegrees": 13.499812547555155,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.5416666666666666,
+            "firstObservedSeconds": 0.8,
+            "longestContinuousSeconds": 3.25
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.525,
+            "firstObservedSeconds": 0.85,
+            "longestContinuousSeconds": 3.15
+          },
+          "maximumSimultaneousHeightMarginMeters": 0.21879076957702637,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              27.09450526997395,
+              47.40146152285428,
+              84.19817585288057
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.18074543833349352,
+              0.43172989199481837,
+              0.9994408263761236
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.08659136034984855,
+              0.16095116890268368,
+              0.32158007205801215
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              28.649418936590024,
+              53.28657725870714,
+              103.67381137334327
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.2689804156567545,
+              0.39166959356350517,
+              0.9987607160786081
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.08180093436467094,
+              0.1287288664180923,
+              0.30340480564780914
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "raise-style",
+      "historyKind": "cold",
+      "seed": 1,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\raise-style-live-qwen-adapter-cold-seed1.json",
+        "spineTiltMaxDegrees": 6.235110153994515,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.7353319525718689,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              22.896859419162183,
+              24.99266431918909,
+              26.874535247947023
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.34450744902250513,
+              0.38519686350817967,
+              0.4183957435043387
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.13235467155415792,
+              0.14452238777650223,
+              0.16796563365403017
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              14.95302396481003,
+              30.476947658228127,
+              59.4973346558055
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.3353439939319423,
+              0.4303892009214364,
+              0.8815900539829626
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.11189645308020739,
+              0.1992516309974199,
+              0.28448462754530124
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\raise-style-offline-teacher-feature-cold-seed1.json",
+        "spineTiltMaxDegrees": 4.645110723433734,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.875,
+            "firstObservedSeconds": 0.75,
+            "longestContinuousSeconds": 5.25
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.875,
+            "firstObservedSeconds": 0.75,
+            "longestContinuousSeconds": 5.25
+          },
+          "maximumSimultaneousHeightMarginMeters": 0.2752896547317505,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              9.006307910380968,
+              12.603546063162085,
+              104.33929728224064
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.25183498151236855,
+              0.308501287880112,
+              0.9845438405507915
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.15305349673343,
+              0.19696118282042932,
+              0.2724808875959355
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              19.594605431787016,
+              21.96420929687666,
+              98.97996221098099
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.3555459160424779,
+              0.3875578224408155,
+              0.9599933639576225
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.15906657331832505,
+              0.21461670916897194,
+              0.3191645388657501
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "raise-style",
+      "historyKind": "grounded-unity-idle16",
+      "seed": 0,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\raise-style-live-qwen-adapter-grounded-unity-idle16-seed0.json",
+        "spineTiltMaxDegrees": 3.370632938075524,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6797261238098145,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              14.693331049969288,
+              19.49714384836541,
+              21.127499769376413
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.1870470823997281,
+              0.2887424424384732,
+              0.5366499483777141
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.09808953347669679,
+              0.1267661633533298,
+              0.32029704475150433
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              2.630322090503256,
+              7.757373826338451,
+              22.221643139799767
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.1734065508478907,
+              0.4540000536324097,
+              0.5303713629578756
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.10668545836902237,
+              0.29212357504452563,
+              0.3239092818526046
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\raise-style-offline-teacher-feature-grounded-unity-idle16-seed0.json",
+        "spineTiltMaxDegrees": 6.859726362146556,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.65,
+            "firstObservedSeconds": 2.1,
+            "longestContinuousSeconds": 3.9
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.6416666666666667,
+            "firstObservedSeconds": 2.15,
+            "longestContinuousSeconds": 3.85
+          },
+          "maximumSimultaneousHeightMarginMeters": 0.3287545442581177,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              18.97063830173974,
+              21.55472356467203,
+              30.41338128443232
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.23967706737014288,
+              0.30210488954865955,
+              0.7115629548281395
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.15468198686880896,
+              0.19758074074757978,
+              0.3289411741401081
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              11.87597094406189,
+              17.058485042337495,
+              22.810931780847994
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.08472381332204781,
+              0.18895069229538536,
+              0.7218637797255034
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.10141385249081022,
+              0.13609632215988038,
+              0.3743484910254696
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "raise-style",
+      "historyKind": "grounded-unity-idle16",
+      "seed": 1,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\raise-style-live-qwen-adapter-grounded-unity-idle16-seed1.json",
+        "spineTiltMaxDegrees": 4.844441169712055,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6798771619796753,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              14.348453346008057,
+              16.57213595137685,
+              21.36938108256186
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.30767500106748946,
+              0.3520494992691137,
+              0.5547762867290251
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.15046583769524063,
+              0.18868380881933383,
+              0.320048899729889
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              10.7232246680706,
+              15.876297384647572,
+              18.35882346263159
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.3254549423352072,
+              0.4626935966928807,
+              0.6056162726575889
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.1999763162669166,
+              0.26233231517985295,
+              0.32791124958471307
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\raise-style-offline-teacher-feature-grounded-unity-idle16-seed1.json",
+        "spineTiltMaxDegrees": 4.543682952112098,
+        "overheadNecessaryEvent": {
+          "applicable": true,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.3,
+            "firstObservedSeconds": 4.2,
+            "longestContinuousSeconds": 1.8
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.2916666666666667,
+            "firstObservedSeconds": 4.25,
+            "longestContinuousSeconds": 1.75
+          },
+          "maximumSimultaneousHeightMarginMeters": 0.3278909921646118,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              19.425235473635524,
+              28.187625819952927,
+              79.05147961061917
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              -0.047581066200136996,
+              0.5623904188560075,
+              0.9817315804197936
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.10831491885820653,
+              0.32236083100452617,
+              0.5024712514993471
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              16.619792112398898,
+              23.393319405666432,
+              85.63100432078649
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.04943034727093141,
+              0.47894262087833567,
+              0.887801982099879
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.09871675093873825,
+              0.30923984155332523,
+              0.49081788017640815
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "explain-style",
+      "historyKind": "cold",
+      "seed": 0,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\explain-style-live-qwen-adapter-cold-seed0.json",
+        "spineTiltMaxDegrees": 3.0719864907563412,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.19459128379821777,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              13.90172899562782,
+              20.106043229461548,
+              28.928801634753768
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.028506182988274016,
+              0.23872727711731667,
+              0.3823441198564763
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              -0.019141901442143137,
+              0.08176971995040304,
+              0.12590321486759362
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              6.529570435841805,
+              13.64637646954968,
+              25.510938275374713
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              -0.2720554314681332,
+              0.13653312540847992,
+              0.4219921729094275
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              -0.127883175931119,
+              0.04851312274174202,
+              0.15935448939983304
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\explain-style-offline-teacher-feature-cold-seed0.json",
+        "spineTiltMaxDegrees": 5.5557668694589895,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.5747220516204834,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              25.345515233944354,
+              73.53039699576038,
+              85.83190110893496
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.41381031112320965,
+              0.9371655811731028,
+              0.978812970146421
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.16307755483716044,
+              0.27885808772330656,
+              0.32569597527018823
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              23.88184789251011,
+              64.48995925551966,
+              75.41096038412434
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.37903582986625195,
+              0.8823252202062795,
+              0.9469828037177035
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.16548632902153657,
+              0.2546843057480507,
+              0.28848237904363333
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "explain-style",
+      "historyKind": "cold",
+      "seed": 1,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\explain-style-live-qwen-adapter-cold-seed1.json",
+        "spineTiltMaxDegrees": 5.478687949013508,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.5462942123413086,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              21.27591513834946,
+              24.60373788562353,
+              28.62048587025984
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.1697702505350347,
+              0.29613466840245084,
+              0.41161809226375434
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.019692353003741742,
+              0.09373711409469242,
+              0.14267140943828474
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              12.002158371840721,
+              21.066738316642628,
+              29.79641211888324
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.003915635716846472,
+              0.23113299751354383,
+              0.4100362749757015
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              -0.014998162575701482,
+              0.0619452021020777,
+              0.14496833174146817
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\explain-style-offline-teacher-feature-cold-seed1.json",
+        "spineTiltMaxDegrees": 25.071689689637996,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.5351117849349976,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              18.60967326961932,
+              66.02806870516662,
+              79.15629003356158
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.3874341054539187,
+              0.9804257544510948,
+              0.9966002389242732
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.17677496767181583,
+              0.43864518867855323,
+              0.4605285804165632
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              22.682282986556714,
+              66.97064022605429,
+              72.25337605815125
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.45510557303997345,
+              0.9662413109665562,
+              0.9887213808352774
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.2045961172592195,
+              0.47356103803723804,
+              0.5048028539112857
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "explain-style",
+      "historyKind": "grounded-unity-idle16",
+      "seed": 0,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\explain-style-live-qwen-adapter-grounded-unity-idle16-seed0.json",
+        "spineTiltMaxDegrees": 4.111422104620915,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.35806095600128174,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              13.54545815635882,
+              18.780570081691877,
+              27.941695294549334
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.07148115195124503,
+              0.307613919524145,
+              0.5606782521253018
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.02911111251381255,
+              0.14181337681209766,
+              0.31997217476533846
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              5.968128655716328,
+              12.9790772507003,
+              21.528361826744913
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.10206828415118724,
+              0.22072534515768083,
+              0.46241892417944946
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.08925864235253923,
+              0.13377603657987452,
+              0.30147090479271527
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\explain-style-offline-teacher-feature-grounded-unity-idle16-seed0.json",
+        "spineTiltMaxDegrees": 2.314183893667969,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6800225973129272,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              19.493392218864926,
+              27.987130239812927,
+              39.2583937548396
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.492863761586136,
+              0.5933895776979071,
+              0.7400304464395578
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.2640464164489612,
+              0.29076236144597645,
+              0.3201295022014453
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              13.250777656632977,
+              16.259914410776844,
+              24.65247985623688
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.38615889305283374,
+              0.43032524709308134,
+              0.47498068421628115
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.23385389313025168,
+              0.2434198211141641,
+              0.3016384019410877
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    },
+    {
+      "promptId": "explain-style",
+      "historyKind": "grounded-unity-idle16",
+      "seed": 1,
+      "qwen": {
+        "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\generated-condition-qwen-diagnosis\\explain-style-live-qwen-adapter-grounded-unity-idle16-seed1.json",
+        "spineTiltMaxDegrees": 3.510507255784035,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.41175365447998047,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              17.14490629530087,
+              20.15486298348985,
+              26.25683849792472
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              -0.0009041548584199435,
+              0.5278490411782062,
+              0.5622701745174047
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              -0.02928725292331975,
+              0.2906990853819862,
+              0.3199936124296321
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              16.251046020213437,
+              17.72055880118252,
+              34.51610700289956
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.15032595755966427,
+              0.4462359402459988,
+              0.47424523616065545
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.04431725349236297,
+              0.2754935821318809,
+              0.30162100666783254
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      },
+      "teacher": {
+        "clip": "Server\\ARDY\\runtime\\generated-condition-teacher-diagnosis\\explain-style-offline-teacher-feature-grounded-unity-idle16-seed1.json",
+        "spineTiltMaxDegrees": 5.2619805576161065,
+        "overheadNecessaryEvent": {
+          "applicable": false,
+          "bothWristsAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "bothWristsAtLeast5CmAboveHead": {
+            "frameFraction": 0.0,
+            "firstObservedSeconds": null,
+            "longestContinuousSeconds": 0.0
+          },
+          "maximumSimultaneousHeightMarginMeters": -0.6359732151031494,
+          "note": "Source skeleton necessary height event only; not full palm/posture/naturalness success."
+        },
+        "forearms": {
+          "left": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              20.429494701251997,
+              28.585193349279535,
+              52.5726761919132
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.5214570039467409,
+              0.7592341546224715,
+              0.8344729185110723
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.28674046996215,
+              0.3388854240232197,
+              0.38437430221550495
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          },
+          "right": {
+            "elbowFlexionMinMedianMaxDegrees": [
+              15.115812217046965,
+              39.19699514407685,
+              47.27455550232651
+            ],
+            "chestLocalForwardCosineMinMedianMax": [
+              0.4507865239405407,
+              0.8301326574654898,
+              0.8538795937384506
+            ],
+            "wristChestLocalZMinMedianMaxMeters": [
+              0.30093269146313784,
+              0.3314671923937734,
+              0.39623459912237646
+            ],
+            "assessment": "Descriptive geometry only. Neither forward wrist position nor elbow flexion establishes a palms-up explanatory gesture."
+          }
+        },
+        "palmOrientationEvaluated": false,
+        "naturalnessEvaluated": false
+      }
+    }
+  ],
+  "featureErrors": [
+    {
+      "promptId": "raise-actual",
+      "cosine": 0.6821174025535583,
+      "relativeL2": 0.7709361910820007,
+      "predictedToTeacherNormRatio": 0.9263026118278503
+    },
+    {
+      "promptId": "explain-actual",
+      "cosine": 0.7095919847488403,
+      "relativeL2": 0.7390481233596802,
+      "predictedToTeacherNormRatio": 0.9325554370880127
+    },
+    {
+      "promptId": "raise-style",
+      "cosine": 0.7916579842567444,
+      "relativeL2": 0.629038393497467,
+      "predictedToTeacherNormRatio": 0.9413624405860901
+    },
+    {
+      "promptId": "explain-style",
+      "cosine": 0.7799496054649353,
+      "relativeL2": 0.6474733948707581,
+      "predictedToTeacherNormRatio": 0.9459104537963867
+    }
+  ],
+  "languageModelsLoaded": false,
+  "gpuUsedForThisComparison": false,
+  "overheadSummary": {
+    "caseCount": 8,
+    "qwenCasesWithBothWristsAboveHead": 0,
+    "teacherCasesWithBothWristsAboveHead": 7
+  },
+  "interpretation": [
+    "The conditioned feature path is a material bottleneck for these overhead prompts: direct teacher conditioning unlocks a capability missed by the current Qwen-adapter output.",
+    "This does not prove that the small MLP alone, rather than its training coverage or Qwen representation plus mapping, causes every failure.",
+    "Teacher conditioning still fails one actual-prompt/grounded-history seed. History and stochastic generation remain relevant.",
+    "Explanatory motions receive forearm/elbow descriptors only; palm orientation and overall semantics remain unscored pending visual assessment.",
+    "Four prompts, two seeds and one captured idle history do not establish broad action generalization."
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "caseSha256": "9293dc03ed813db7a6b18ac7737a3d9c6637a4076ad24a8ded11ff4cdbdf0f12",
+  "contractSha256": "b204c4de7b4cf3371eef93c43dc2c7067859e4f4d33f7f010b4df88e207a46e6",
+  "report": "Tools\\MotionAdapter\\reports\\palm-purpose-new-expressions-v1.json",
+  "scope": "One model evaluation of the frozen four new expressions"
+}

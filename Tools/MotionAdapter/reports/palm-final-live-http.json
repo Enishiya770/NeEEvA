@@ -1,0 +1,83 @@
+{
+    "status": "passed",
+    "method": "Real Unity PlayMode, real Animator, live HTTP Qwen feature + MLP + ARDY, real UnityWebRequest and motion controller. No manual Tick or Animator.Update.",
+    "limitation": "Isolated real NEVA avatar with original Animator; no private scene, live microphone, TTS or subjective naturalness rating. Dialogue parsing has its separate real ChatSample regression.",
+    "unityVersion": "2022.3.22f1",
+    "error": "",
+    "description": "While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.",
+    "checks": 46763,
+    "sampledFrames": 32260,
+    "receivedChunks": 3,
+    "timelineFrames": 120,
+    "firstWindowSeconds": 0.9907474517822266,
+    "allWindowsSeconds": 1.3794667720794678,
+    "finalReturnErrorDegrees": 0.0,
+    "cancelledReturnErrorDegrees": 0.0,
+    "initialWristBelowShoulderMetres": 0.3703376054763794,
+    "dynamicUpperBodyExcursionDegrees": 81.44866943359375,
+    "historyCapturedFromAnimator": true,
+    "lateResponseRejected": true,
+    "preResponseCancelStayedIdle": true,
+    "diagnosticTracePath": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation\\Logs\\ardy-live\\ardy-motion-20260910T093021506-fcab6713bd73416493b62e65ee0f4686.json",
+    "diagnosticRequests": 3,
+    "diagnosticResponses": 3,
+    "initialHistoryFrames": 16,
+    "serviceUrl": "http://127.0.0.1:8093",
+    "initialConditioningFrames": 16,
+    "motionContextBoundIdle": true,
+    "motionContextGenerating": true,
+    "motionContextPlaying": true,
+    "motionContextCompletedIdle": true,
+    "motionContextCancelledBeforeResponse": true,
+    "motionContextCancelledWhilePlaying": true,
+    "motionContextCancelledIdle": true,
+    "motionContextRebindCleared": true,
+    "motionContextFacts": [
+        {
+            "checkpoint": "bound-idle",
+            "json": "{\"phase\":\"idle-Animator\",\"name\":\"\",\"description\":\"\",\"lastRequestedName\":\"\",\"lastRequestedDescription\":\"\",\"lastEndReason\":\"\",\"endPolicy\":\"return-to-current-Animator\",\"previousRequestedPoseHeld\":false,\"observation\":\"Controller lifecycle only; requested poses are not measured success. Use current initialHistory for a new action.\",\"executionSource\":\"clip-or-Animator\",\"controlPlan\":null,\"measuredConstraintState\":null,\"lastControlPlan\":null,\"lastControlObservation\":null,\"lastControlError\":\"\"}"
+        },
+        {
+            "checkpoint": "generating-first-request",
+            "json": "{\"phase\":\"generating-or-buffering\",\"name\":\"generate\",\"description\":\"While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.\",\"lastRequestedName\":\"generate\",\"lastRequestedDescription\":\"While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.\",\"lastEndReason\":\"\",\"endPolicy\":\"return-to-current-Animator\",\"previousRequestedPoseHeld\":false,\"observation\":\"Controller lifecycle only; requested poses are not measured success. Use current initialHistory for a new action.\",\"executionSource\":\"clip-or-Animator\",\"controlPlan\":null,\"measuredConstraintState\":null,\"lastControlPlan\":null,\"lastControlObservation\":null,\"lastControlError\":\"\"}"
+        },
+        {
+            "checkpoint": "playing-complete-buffer",
+            "json": "{\"phase\":\"playing\",\"name\":\"generate\",\"description\":\"While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.\",\"lastRequestedName\":\"generate\",\"lastRequestedDescription\":\"While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.\",\"lastEndReason\":\"\",\"endPolicy\":\"return-to-current-Animator\",\"previousRequestedPoseHeld\":false,\"observation\":\"Controller lifecycle only; requested poses are not measured success. Use current initialHistory for a new action.\",\"executionSource\":\"clip-or-Animator\",\"controlPlan\":null,\"measuredConstraintState\":null,\"lastControlPlan\":null,\"lastControlObservation\":null,\"lastControlError\":\"\"}"
+        },
+        {
+            "checkpoint": "naturally-completed-idle",
+            "json": "{\"phase\":\"idle-Animator\",\"name\":\"\",\"description\":\"\",\"lastRequestedName\":\"generate\",\"lastRequestedDescription\":\"While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.\",\"lastEndReason\":\"completed-and-returned-to-Animator\",\"endPolicy\":\"return-to-current-Animator\",\"previousRequestedPoseHeld\":false,\"observation\":\"Controller lifecycle only; requested poses are not measured success. Use current initialHistory for a new action.\",\"executionSource\":\"clip-or-Animator\",\"controlPlan\":null,\"measuredConstraintState\":null,\"lastControlPlan\":null,\"lastControlObservation\":null,\"lastControlError\":\"\"}"
+        },
+        {
+            "checkpoint": "cancelled-before-response",
+            "json": "{\"phase\":\"idle-Animator\",\"name\":\"\",\"description\":\"\",\"lastRequestedName\":\"generate\",\"lastRequestedDescription\":\"While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.\",\"lastEndReason\":\"regression-before-first-response\",\"endPolicy\":\"return-to-current-Animator\",\"previousRequestedPoseHeld\":false,\"observation\":\"Controller lifecycle only; requested poses are not measured success. Use current initialHistory for a new action.\",\"executionSource\":\"clip-or-Animator\",\"controlPlan\":null,\"measuredConstraintState\":null,\"lastControlPlan\":null,\"lastControlObservation\":null,\"lastControlError\":\"\"}"
+        },
+        {
+            "checkpoint": "cancelled-before-response-still-idle",
+            "json": "{\"phase\":\"idle-Animator\",\"name\":\"\",\"description\":\"\",\"lastRequestedName\":\"generate\",\"lastRequestedDescription\":\"While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.\",\"lastEndReason\":\"regression-before-first-response\",\"endPolicy\":\"return-to-current-Animator\",\"previousRequestedPoseHeld\":false,\"observation\":\"Controller lifecycle only; requested poses are not measured success. Use current initialHistory for a new action.\",\"executionSource\":\"clip-or-Animator\",\"controlPlan\":null,\"measuredConstraintState\":null,\"lastControlPlan\":null,\"lastControlObservation\":null,\"lastControlError\":\"\"}"
+        },
+        {
+            "checkpoint": "cancelled-playback-returning",
+            "json": "{\"phase\":\"returning-to-Animator\",\"name\":\"\",\"description\":\"\",\"lastRequestedName\":\"generate\",\"lastRequestedDescription\":\"While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.\",\"lastEndReason\":\"regression-interrupt-playing\",\"endPolicy\":\"return-to-current-Animator\",\"previousRequestedPoseHeld\":false,\"observation\":\"Controller lifecycle only; requested poses are not measured success. Use current initialHistory for a new action.\",\"executionSource\":\"clip-or-Animator\",\"controlPlan\":null,\"measuredConstraintState\":null,\"lastControlPlan\":null,\"lastControlObservation\":null,\"lastControlError\":\"\"}"
+        },
+        {
+            "checkpoint": "cancelled-playback-idle",
+            "json": "{\"phase\":\"idle-Animator\",\"name\":\"\",\"description\":\"\",\"lastRequestedName\":\"generate\",\"lastRequestedDescription\":\"While standing in place, a person slowly extends both forearms forward with palms facing upward, as if calmly explaining something.\",\"lastEndReason\":\"regression-interrupt-playing\",\"endPolicy\":\"return-to-current-Animator\",\"previousRequestedPoseHeld\":false,\"observation\":\"Controller lifecycle only; requested poses are not measured success. Use current initialHistory for a new action.\",\"executionSource\":\"clip-or-Animator\",\"controlPlan\":null,\"measuredConstraintState\":null,\"lastControlPlan\":null,\"lastControlObservation\":null,\"lastControlError\":\"\"}"
+        },
+        {
+            "checkpoint": "basic-nod-requested",
+            "json": "{\"phase\":\"playing\",\"name\":\"nod\",\"description\":\"\",\"lastRequestedName\":\"nod\",\"lastRequestedDescription\":\"\",\"lastEndReason\":\"\",\"endPolicy\":\"return-to-current-Animator\",\"previousRequestedPoseHeld\":false,\"observation\":\"Controller lifecycle only; requested poses are not measured success. Use current initialHistory for a new action.\",\"executionSource\":\"clip-or-Animator\",\"controlPlan\":null,\"measuredConstraintState\":null,\"lastControlPlan\":null,\"lastControlObservation\":null,\"lastControlError\":\"\"}"
+        },
+        {
+            "checkpoint": "rebound-clears-previous-request",
+            "json": "{\"phase\":\"idle-Animator\",\"name\":\"\",\"description\":\"\",\"lastRequestedName\":\"\",\"lastRequestedDescription\":\"\",\"lastEndReason\":\"\",\"endPolicy\":\"return-to-current-Animator\",\"previousRequestedPoseHeld\":false,\"observation\":\"Controller lifecycle only; requested poses are not measured success. Use current initialHistory for a new action.\",\"executionSource\":\"clip-or-Animator\",\"controlPlan\":null,\"measuredConstraintState\":null,\"lastControlPlan\":null,\"lastControlObservation\":null,\"lastControlError\":\"\"}"
+        }
+    ],
+    "lastWindowTimings": {
+        "queueMs": 0.0,
+        "featureMs": 0.0,
+        "generationMs": 163.47030639648438,
+        "totalMs": 172.0
+    }
+}

@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "passed": true,
+  "utc": "2026-09-10T05:55:21.735102+00:00",
+  "scope": "Four already-seen issue examples plus two old-cache controls. Descriptive feature comparison, not a held-out evaluation or action success rate.",
+  "source_sha256": {
+    "selection": "0e3592520ffcc4cd3572cf556893f69ba034d010738ec80f17f7989b19287bd3",
+    "candidate": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+    "baseline": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa",
+    "prompts": "03a6e7c3128417f00c49d015e0d346e9aae555c6cbbee08d1f3b77c9bab6f4c3",
+    "qwen": "7082f6b01e9352088e695d6dc27be6daecf403c56f19e00392fa4ec0f077eba1",
+    "teacher": "e5296e1c48bb8a935502f6185d1b294a60e367b81083e6e75aced01ad8f874bf"
+  },
+  "qwen_contract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+  "teacher_diagnostic_contract": "17ffd90eb39b4edb8673737eac7a23690f4ef3cd57407a09cee0ce9fa3d608f3",
+  "teacher_old_contract": "5179f91dcafe261730bd9adf2bc5f1d3fe77b7befe28b2c6ced6987d81ba8a30",
+  "teacher_training_composite_contract": "4931fa72fb55a5e633e8dedc2fbac8d3bf15f8a8baa2cb4130ef0072845b474a",
+  "exact_cache_controls": [
+    {
+      "id": "motion-00004",
+      "text": "While standing in place, a standing person waves the right hand with moderate movements at a moderate pace.",
+      "teacher_max_abs_error": 0.0,
+      "qwen_max_abs_error": 0.0
+    },
+    {
+      "id": "motion-00053",
+      "text": "While standing in place, a person who is standing waves the left hand with moderate movements at a moderate pace.",
+      "teacher_max_abs_error": 0.0,
+      "qwen_max_abs_error": 0.0
+    }
+  ],
+  "normalization": "Frozen original baseline target_std for every error",
+  "per_record": [
+    {
+      "id": "raise-actual",
+      "text": "Raise both arms straight up above the head, palms facing forward",
+      "role": "already-seen-diagnostic",
+      "baseline": {
+        "standardized_mse": 2.266949984757165,
+        "cosine": 0.6821172658824199,
+        "norm_ratio": 0.9263024421061096,
+        "relative_l2": 0.7709360776825058
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.8288508174751421,
+        "cosine": 0.8870439519714588,
+        "norm_ratio": 0.9207751678788829,
+        "relative_l2": 0.46291556702864245
+      },
+      "standardized_mse_improvement_percent": 63.43762222156267
+    },
+    {
+      "id": "explain-actual",
+      "text": "Extend both forearms slightly forward with palms facing up, in an explanatory gesture",
+      "role": "already-seen-diagnostic",
+      "baseline": {
+        "standardized_mse": 1.8669936361315664,
+        "cosine": 0.7095919095465895,
+        "norm_ratio": 0.9325553412116269,
+        "relative_l2": 0.7390480456410627
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.970991672299863,
+        "cosine": 0.8533436132430403,
+        "norm_ratio": 0.9310574983245853,
+        "relative_l2": 0.5271092160755493
+      },
+      "standardized_mse_improvement_percent": 47.991698873073304
+    },
+    {
+      "id": "raise-style",
+      "text": "While standing in place, a person raises both arms straight upward until both hands are above the head.",
+      "role": "already-seen-diagnostic",
+      "baseline": {
+        "standardized_mse": 1.4915646808197276,
+        "cosine": 0.7916579279934304,
+        "norm_ratio": 0.9413621833140721,
+        "relative_l2": 0.6290382254730286
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.7980271073980836,
+        "cosine": 0.8906957543925654,
+        "norm_ratio": 0.8880353065327261,
+        "relative_l2": 0.4546076892111195
+      },
+      "standardized_mse_improvement_percent": 46.49731804057553
+    },
+    {
+      "id": "explain-style",
+      "text": "While standing in place, a person extends both forearms forward, turning both palms upward as if explaining something.",
+      "role": "already-seen-diagnostic",
+      "baseline": {
+        "standardized_mse": 1.5340164688657851,
+        "cosine": 0.7799495431837472,
+        "norm_ratio": 0.9459103183110825,
+        "relative_l2": 0.6474733113946323
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.9847417506931199,
+        "cosine": 0.8591803013872172,
+        "norm_ratio": 0.9040253242068172,
+        "relative_l2": 0.513634389210712
+      },
+      "standardized_mse_improvement_percent": 35.80631168704373
+    },
+    {
+      "id": "motion-00004",
+      "text": "While standing in place, a standing person waves the right hand with moderate movements at a moderate pace.",
+      "role": "old-cache-control",
+      "baseline": {
+        "standardized_mse": 0.08188567309938034,
+        "cosine": 0.9890961036180943,
+        "norm_ratio": 0.9987998520675122,
+        "relative_l2": 0.14759085520950685
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.07297425014291038,
+        "cosine": 0.9904665306165391,
+        "norm_ratio": 0.991970133719957,
+        "relative_l2": 0.1377617964122462
+      },
+      "standardized_mse_improvement_percent": 10.882762050028749
+    },
+    {
+      "id": "motion-00053",
+      "text": "While standing in place, a person who is standing waves the left hand with moderate movements at a moderate pace.",
+      "role": "old-cache-control",
+      "baseline": {
+        "standardized_mse": 0.08185503623920495,
+        "cosine": 0.989332783229049,
+        "norm_ratio": 1.0091767897577142,
+        "relative_l2": 0.14701846354582013
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.07579958520472005,
+        "cosine": 0.9901280118271951,
+        "norm_ratio": 0.9983227387760709,
+        "relative_l2": 0.14040539072589908
+      },
+      "standardized_mse_improvement_percent": 7.397774544731817
+    }
+  ],
+  "prediction_sha256": {
+    "baseline": "cc5c73babc136ad0dc38a01388b76564afffca1221acb6c62539d043732a2bd0",
+    "locked_candidate": "ef776dfa7856340b0e87a786d2df942bc9df406d97dcf6aad2507a00190e0d51"
+  },
+  "final80_opened": false,
+  "used_for_selection": false,
+  "gpu_used": false,
+  "approved_for_runtime": false
+}

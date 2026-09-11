@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "createdUtc": "2026-09-10T09:19:03.953764+00:00",
+  "selection": "Exact first tested full contract restored into GeneratedOutputContract; no additional prompt edits or model calls after the selection.",
+  "selectedContractSha256": "2e0a7326c68054c9c05798e97f855982896d40679b5ca3b4428730893c4ddaee",
+  "compiledContractSha256": "2e0a7326c68054c9c05798e97f855982896d40679b5ca3b4428730893c4ddaee",
+  "exactByteEqualityConfirmed": true,
+  "routingIntegration": "Generated-capable Chat and read_contract() select the complete GeneratedOutputContract once. Basic-only Chat continues using the original BasicOutputContract. The complete selected contract includes its basic vocabulary internally; it must not be prefixed a second time.",
+  "executionSemantics": "New palm fields, palm-normal validation and derived automatic elbows remain. The selected contract text is not rewritten to advertise the new solver: parser omission semantics grant freedom only for unspecified directional-palm elbows, while explicit numerical/current/no-palm plans retain strict behavior.",
+  "reason": "Preserve the preselected first genuine Qwen bilateral greeting with elbow-solving freedom and the original valid free-generation route. The later candidate improved some cases but introduced explicit zero elbows on this primary request, so it was not adopted.",
+  "validation": {
+    "cSharpCompilerExitCode": 0,
+    "pureAssertions": 783,
+    "selectedOriginalModelTags": 14,
+    "acceptedTagsUnderFinalProductionParser": 14,
+    "ordinaryReplyWithoutAction": 1,
+    "cSharpAssertionsIncludingTags": 797,
+    "cSharpExitCode": 0,
+    "newModelRequestsForRollback": 0,
+    "newExpressionsNotRerun": true,
+    "diffCheckExitCode": 0,
+    "actualUnity": "Parent owns current execution and final regression reports; not claimed by this CPU artifact."
+  },
+  "limits": [
+    "This is a selection between development candidates, not proof of stable autonomous planning or motion generalization.",
+    "Selected v1 still loses single-arm forward constraints, can over-retain model-inferred old palms, and can map a Japanese lateral static display to the wrong forward/dynamic goal.",
+    "Natural extended/平伸 phrases can still become explicit zero elbows, so automatic solving cannot repair every model interpretation without violating that emitted plan.",
+    "The four new expressions were evaluated once against v5 only. They must not be presented as held-out evidence for the restored v1. No second evaluation was run.",
+    "Structural validity does not show geometric feasibility, naturalness, or dialogue-purpose completeness."
+  ],
+  "firstExecutionFixture": {
+    "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-first-qwen-plan-v2.json",
+    "sha256": "9a106eb49df777c7f22762f0dc0bf9c8de0523a224c98bbfefc5493f9fe532b9",
+    "unchanged": true
+  },
+  "candidateReports": {
+    "selectedV1": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v1.json",
+      "sha256": "32cfa5de52ecb564e6c1fccf311c230a89fd4ee49fbfc329b1e027d22d349f85"
+    },
+    "rejectedV5": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v5-single-contract.json",
+      "sha256": "153ca645ba948bf8cbbbf5d7c26aeb2a0daeab0f8a5ceae4882cf9f0beb36b1d"
+    },
+    "newExpressionsAgainstV5Only": {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-new-expressions-v1.json",
+      "sha256": "ebbb4fd1c20c2cb7c57b80640723d3e6a5452f0f58ef39d2f17b93c1b0bb70a1"
+    }
+  },
+  "caseComparison": [
+    {
+      "caseId": "zh-independent-greeting",
+      "selectedV1Tags": [
+        "<motion name=\"right-wave\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"right-wave\"/>"
+      ],
+      "assessment": "Both correctly route the independent right-hand greeting to basic right-wave."
+    },
+    {
+      "caseId": "ja-independent-farewell",
+      "selectedV1Tags": [
+        "<motion name=\"left-wave\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"left-wave\"/>"
+      ],
+      "assessment": "Both correctly route the independent left-hand farewell to basic left-wave."
+    },
+    {
+      "caseId": "zh-forward-greeting",
+      "selectedV1Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"idle\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" leftBend=\"0\" rightBend=\"0\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"hold\"/>"
+      ],
+      "assessment": "Select v1: it leaves elbow angles unspecified while choosing partner palms and palm-normal wrists. V5 adds explicit zero elbows, preventing the new solver from selecting a reachable elbow angle."
+    },
+    {
+      "caseId": "zh-single-forward-greeting-render-fixture",
+      "selectedV1Tags": [
+        "<motion name=\"right-wave\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"compose\" left=\"none\" right=\"forward\" rightPalm=\"partner\"/>"
+      ],
+      "assessment": "V1 wrongly picks basic right-wave and loses forward pose. V5 retains forward pose via compose but omits the local wrist greeting. Neither completely satisfies this case."
+    },
+    {
+      "caseId": "en-forward-farewell",
+      "selectedV1Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" leftBend=\"0\" rightBend=\"0\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"15\" cycles=\"2\" seconds=\"3\" end=\"hold\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" leftBend=\"0\" rightBend=\"0\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"3\" seconds=\"3\"/>"
+      ],
+      "assessment": "Both explicitly choose zero elbows for the natural forward farewell, which can make it unreachable. V1 is not a global fix for greeting interpretation."
+    },
+    {
+      "caseId": "ja-static-palm-display",
+      "selectedV1Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" leftBend=\"0\" rightBend=\"0\" end=\"hold\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" leftBend=\"0\" rightBend=\"0\" joint=\"none\" end=\"hold\"/>"
+      ],
+      "assessment": "Both correctly encode static partner-facing palms, but choose zero elbows; geometric reachability is not established by this planning check."
+    },
+    {
+      "caseId": "en-explicit-palms-down",
+      "selectedV1Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"down\" rightPalm=\"down\" leftBend=\"0\" rightBend=\"0\" joint=\"none\" end=\"hold\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"down\" rightPalm=\"down\" leftBend=\"0\" rightBend=\"0\" joint=\"none\" end=\"hold\"/>"
+      ],
+      "assessment": "Both preserve explicitly straight arms, down palms and static holding."
+    },
+    {
+      "caseId": "zh-down-palm-overrides-farewell-default",
+      "selectedV1Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"down\" rightPalm=\"down\" leftBend=\"0\" rightBend=\"0\" joint=\"wrists\" axis=\"up\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"hold\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"down\" rightPalm=\"down\" leftBend=\"0\" rightBend=\"0\" joint=\"wrists\" axis=\"up\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"idle\"/>"
+      ],
+      "assessment": "Both honor explicit down-facing palms rather than forcing partner-facing palms."
+    },
+    {
+      "caseId": "zh-correction-preserves-forward-hold",
+      "selectedV1Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftBend=\"40\" rightBend=\"40\" leftPalm=\"down\" rightPalm=\"down\" joint=\"wrists\" axis=\"up\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"hold\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"hold\"/>"
+      ],
+      "assessment": "V5 improves the intended purpose change to partner palms and palm-normal motion; selected v1 over-retains the prior model-selected down palms. This remains a known limitation."
+    },
+    {
+      "caseId": "ja-single-side-palm-display",
+      "selectedV1Tags": [
+        "<motion name=\"compose\" left=\"forward\" leftPalm=\"partner\" leftBend=\"0\" joint=\"left-wrist\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"1\" seconds=\"2\" end=\"hold\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"compose\" left=\"forward\" leftPalm=\"partner\" leftBend=\"0\" right=\"current\" rightPalm=\"keep\" joint=\"none\"/>"
+      ],
+      "assessment": "Both lose the requested left lateral direction. V1 also unnecessarily adds wrist motion; V5 removes it and preserves the right arm via current. V1 is weaker here."
+    },
+    {
+      "caseId": "en-ordinary-no-forced-motion",
+      "selectedV1Tags": [],
+      "rejectedV5Tags": [],
+      "assessment": "Both answer the arithmetic question without a motion tag."
+    },
+    {
+      "caseId": "zh-independent-nod-regression",
+      "selectedV1Tags": [
+        "<motion name=\"nod\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"nod\"/>"
+      ],
+      "assessment": "Both preserve the basic nod route."
+    },
+    {
+      "caseId": "zh-open-upper-body-dance-regression",
+      "selectedV1Tags": [
+        "<motion name=\"generate\" text=\"Stand still with feet planted, gently sway torso and swing arms in loose, alternating arcs to the rhythm, keeping movements fluid and relaxed.\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"generate\" text=\"Alternating arms drawing arcs with slight torso sway, free upper body dance, feet stationary\"/>"
+      ],
+      "assessment": "Both v1 and v5 use generate within 240 characters. Intermediate v2/v3 wrongly used compose and remain rejected candidates."
+    },
+    {
+      "caseId": "zh-failed-straight-goal-relaxed-to-greeting",
+      "selectedV1Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"idle\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"partner\" rightPalm=\"partner\" joint=\"wrists\" axis=\"palm-normal\" amplitude=\"10\" cycles=\"2\" seconds=\"3.2\" end=\"hold\"/>"
+      ],
+      "assessment": "Both leave elbows unspecified with partner palms after the user relaxes the straight-elbow condition; final parser can derive Auto."
+    },
+    {
+      "caseId": "en-failed-straight-goal-still-required",
+      "selectedV1Tags": [
+        "<motion name=\"shake-head\"/>"
+      ],
+      "rejectedV5Tags": [
+        "<motion name=\"none\"/>"
+      ],
+      "assessment": "Both give a correct limitation response. V1 pairs it with a reasonable shake-head; V5 emits none. V1 is not a semantic failure merely because the narrow expected list omitted shake-head."
+    }
+  ],
+  "sourceSha256": {
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "b66004fee7c13d01ce43d614a2c1e19b43e29839dc059b33cde443af5c87f90f",
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "cc1b7f8395ec34c60d20348efdaf10edcba728a3dd781e49852af88aa832e31b",
+    "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs": "986ef4790e05865496e3e9ecd34d261bd0971ab46d03fef2f761b3e5c041cbfb",
+    "Assets/Editor/ArdyDialogueMotionRegression.cs": "fec9d8cc7754588a89a0c7765ceb325d4db349f0517af7ce8370e5f8c313d268",
+    "Tools/MotionAdapter/validate_dialogue_motion.py": "62612e4546f1399607c1f8b991412e41d442ec088dcec6a8a848eee9f6a2f829",
+    "Tools/MotionAdapter/validate_purpose_motion_planning.py": "0da6cf6c447125fa76fcafa6f704555f61bd1f8f16ca70170236120b7e5e0e48",
+    "Tools/MotionAdapter/data/palm-purpose-new-expressions-v1.json": "ba2481d83a9b67ffce65aae456f5407fa5b0167feffe74c738b8b2f3f579659e",
+    "Server/ARDY/runtime/palm-protocol-check/Program.cs": "315e9675b8cb6a2ff3e0208a4cca8e6784346a5a9124c10c4ef6e50ff9d96699"
+  }
+}

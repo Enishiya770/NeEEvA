@@ -1,0 +1,264 @@
+{
+  "status": "passed",
+  "checkedAtUtc": "2026-09-10T04:04:07.8945659Z",
+  "unityVersion": "2022.3.22f1",
+  "isolatedProject": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation",
+  "sourceFiles": [
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.cs",
+      "sourceSha256": "129db1dbd249a8a00a460079cff268d075ef1619093138b22b12fc588862be86",
+      "isolatedSha256": "129db1dbd249a8a00a460079cff268d075ef1619093138b22b12fc588862be86",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs",
+      "sourceSha256": "47de74daee552dcab4bab02ed9619935331566de5ef606938976c15939b27f2c",
+      "isolatedSha256": "47de74daee552dcab4bab02ed9619935331566de5ef606938976c15939b27f2c",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs",
+      "sourceSha256": "a2bafcbe02618ae27eda3dff2d6fed942b21d37cb860f9a7eec31a5b9c26e7f1",
+      "isolatedSha256": "a2bafcbe02618ae27eda3dff2d6fed942b21d37cb860f9a7eec31a5b9c26e7f1",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/RoleOutputChannels.cs",
+      "sourceSha256": "6c434e2c73cbdb805cc9fe798b8579436e3266ac393432fa557a8387bac8a0f4",
+      "isolatedSha256": "6c434e2c73cbdb805cc9fe798b8579436e3266ac393432fa557a8387bac8a0f4",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/SpeechText.cs",
+      "sourceSha256": "a2f88c73aa98c34814b953b9ab9fe43cf9c1e51758b70976dc70e48b93cdf820",
+      "isolatedSha256": "a2f88c73aa98c34814b953b9ab9fe43cf9c1e51758b70976dc70e48b93cdf820",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ArdyDialogueMotionBridge.cs",
+      "sourceSha256": "fca0706c3e032b39ed08cbd75ae99e73405d0b16709091a89ad76c39db8e8bc0",
+      "isolatedSha256": "fca0706c3e032b39ed08cbd75ae99e73405d0b16709091a89ad76c39db8e8bc0",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyAvatarRestPose.cs",
+      "sourceSha256": "ad7220769faeee95c2a3128c3fa52cebd75b52c3be1ce1b1e16274bcde095916",
+      "isolatedSha256": "ad7220769faeee95c2a3128c3fa52cebd75b52c3be1ce1b1e16274bcde095916",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionClip.cs",
+      "sourceSha256": "f2b32c0bb4e1456e55a04e3ecb8a2b594a490ba8bbef22f3dfdca829cd8a4375",
+      "isolatedSha256": "f2b32c0bb4e1456e55a04e3ecb8a2b594a490ba8bbef22f3dfdca829cd8a4375",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs",
+      "sourceSha256": "444b9d8fb00ed8055e2a82c6bdc5344544642182783c4dfdbb4f7abae0049654",
+      "isolatedSha256": "444b9d8fb00ed8055e2a82c6bdc5344544642182783c4dfdbb4f7abae0049654",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveProtocol.cs",
+      "sourceSha256": "c27e60a13e4ea81aacb89a3eabb8eca975f2a3504423220e2e0cdd5f78cfca5e",
+      "isolatedSha256": "c27e60a13e4ea81aacb89a3eabb8eca975f2a3504423220e2e0cdd5f78cfca5e",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.cs",
+      "sourceSha256": "243770c7d4639e5f7ac91cb17f0f4016cd6210587a455289d4bb321a01530529",
+      "isolatedSha256": "243770c7d4639e5f7ac91cb17f0f4016cd6210587a455289d4bb321a01530529",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/NeEEvA.Motion.asmdef",
+      "sourceSha256": "705629ac81435dba9d604bf3cdf536f8651c309162e51705c9a9682aed393720",
+      "isolatedSha256": "705629ac81435dba9d604bf3cdf536f8651c309162e51705c9a9682aed393720",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyDialogueMotionWindow.cs",
+      "sourceSha256": "8e2d2dbb1cd11f319dbafd8f2912009f377d652e82ba516b26a7c5ea27338ef1",
+      "isolatedSha256": "8e2d2dbb1cd11f319dbafd8f2912009f377d652e82ba516b26a7c5ea27338ef1",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyDialogueMotionRegression.cs",
+      "sourceSha256": "d9d1b16c31af8511d143cdafc3bd3bcdc52c85fbae0d944973fc3784bb62f0ff",
+      "isolatedSha256": "d9d1b16c31af8511d143cdafc3bd3bcdc52c85fbae0d944973fc3784bb62f0ff",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyStreamRegression.cs",
+      "sourceSha256": "2f29fc327f567ed86a42631a0c8c019e7b34b1073ff756161b8851c1548af02f",
+      "isolatedSha256": "2f29fc327f567ed86a42631a0c8c019e7b34b1073ff756161b8851c1548af02f",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyLivePlayModeRegression.cs",
+      "sourceSha256": "e594c87153d1ae3f32a091deae991db78deb89c49f0dc091067de04da234a596",
+      "isolatedSha256": "e594c87153d1ae3f32a091deae991db78deb89c49f0dc091067de04da234a596",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyMotionAnchorRegression.cs",
+      "sourceSha256": "3a0dbd0ffaee8f105fff77c5327e74eab10bb689c246df655934f84232452a2b",
+      "isolatedSha256": "3a0dbd0ffaee8f105fff77c5327e74eab10bb689c246df655934f84232452a2b",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyMotionRegression.cs",
+      "sourceSha256": "f0c4519e7b058189ea6565d13965709a4c422dd7f74a40815376f49b2cbc0d17",
+      "isolatedSha256": "f0c4519e7b058189ea6565d13965709a4c422dd7f74a40815376f49b2cbc0d17",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyMotionPlayModeRegression.cs",
+      "sourceSha256": "9ba1dc2dfdc2b1657e49a9b18a607c6affe547ef4b1c6fda5bac28c9d2a0c775",
+      "isolatedSha256": "9ba1dc2dfdc2b1657e49a9b18a607c6affe547ef4b1c6fda5bac28c9d2a0c775",
+      "match": true
+    }
+  ],
+  "acceptedBaselineReference": "Tools/MotionAdapter/reports/unity-naturalness-source-verification.json",
+  "baselines": [
+    {
+      "id": "left-wave",
+      "path": "Assets/AIChatTookit/Resources/ARDY/left-wave.json",
+      "acceptedSha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d",
+      "sourceSha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d",
+      "isolatedSha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d",
+      "unchanged": true
+    },
+    {
+      "id": "right-wave",
+      "path": "Assets/AIChatTookit/Resources/ARDY/right-wave.json",
+      "acceptedSha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+      "sourceSha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+      "isolatedSha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+      "unchanged": true
+    },
+    {
+      "id": "nod",
+      "path": "Assets/AIChatTookit/Resources/ARDY/nod.json",
+      "acceptedSha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+      "sourceSha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+      "isolatedSha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+      "unchanged": true
+    },
+    {
+      "id": "shake-head",
+      "path": "Assets/AIChatTookit/Resources/ARDY/shake-head.json",
+      "acceptedSha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+      "sourceSha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+      "isolatedSha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+      "unchanged": true
+    }
+  ],
+  "regressions": [
+    {
+      "name": "dialogue",
+      "status": "passed",
+      "checks": 155,
+      "method": "ArdyDialogueMotionRegression.RunBatch",
+      "actualExitCode": 0,
+      "executionEvidence": "Start-Process -PassThru / WaitForExit / Process.ExitCode observed in this task",
+      "report": "Tools/MotionAdapter/reports/dialogue-motion-regression.json",
+      "reportSha256": "ca40c0cc28bfb00a06605284e39c9c872b787933149ffad2f97bbd6914b78471",
+      "log": "Server/ARDY/runtime/unity-naturalness-validation/Logs/dialogue-pure-motion.log",
+      "logSha256": "95d37bbbd4b14722bfc12f4dcf336e4ad5289f692c89dc52ce858ac5ae8aea37",
+      "compilerErrors": 0,
+      "originalLog": "Server/ARDY/runtime/unity-naturalness-validation/Logs/dialogue-pure-motion.log",
+      "originalReport": "Server/ARDY/runtime/unity-naturalness-validation/Tools/MotionAdapter/reports/dialogue-motion-regression.json"
+    },
+    {
+      "name": "stream",
+      "status": "passed",
+      "checks": 162704,
+      "method": "ArdyStreamRegression.RunBatch",
+      "actualExitCode": 0,
+      "executionEvidence": "Start-Process -PassThru / WaitForExit / Process.ExitCode observed in this task",
+      "report": "Tools/MotionAdapter/reports/unity-stream-regression.json",
+      "reportSha256": "46e6df0318ce8990af28fe24cf1b910b61412763aa76a632cd80a6bb9b5b5dc5",
+      "log": "Server/ARDY/runtime/unity-naturalness-validation/Logs/stream-serialization.log",
+      "logSha256": "45985989fb174dc0cdfacd3474fa242f7b1682874bc9e72494721c2e24e205ef",
+      "compilerErrors": 0,
+      "previousCopiedReport": "Tools/MotionAdapter/reports/stream-regression.json",
+      "originalLog": "Server/ARDY/runtime/unity-naturalness-validation/Logs/stream-serialization.log",
+      "originalReport": "Server/ARDY/runtime/unity-naturalness-validation/Tools/MotionAdapter/reports/stream-regression.json"
+    },
+    {
+      "name": "anchor",
+      "status": "passed",
+      "checks": 15794,
+      "method": "ArdyMotionAnchorRegression.RunBatch",
+      "actualExitCode": 0,
+      "executionEvidence": "Start-Process -PassThru / WaitForExit / Process.ExitCode observed in this task",
+      "report": "Tools/MotionAdapter/reports/unity-naturalness-anchor.json",
+      "reportSha256": "903c665f74680805062ec7bfd27e3af3196416935ea8e664a173ce3e9a29b523",
+      "log": "Server/ARDY/runtime/unity-naturalness-validation/Logs/anchor-live-baseline.log",
+      "logSha256": "1b52a74933bbb8b5641502e1b5dba26dec7604149cf634908bb409658834fa69",
+      "compilerErrors": 0,
+      "previousCopiedReport": "Tools/MotionAdapter/reports/unity-live-baseline-anchor.json",
+      "originalLog": "Server/ARDY/runtime/unity-naturalness-validation/Logs/anchor-live-baseline.log",
+      "originalReport": "Server/ARDY/runtime/unity-naturalness-validation/Logs/ardy-naturalness/anchor-regression.json"
+    },
+    {
+      "name": "edit",
+      "status": "passed",
+      "checks": 1762152,
+      "method": "ArdyMotionRegression.RunBatch",
+      "actualExitCode": 0,
+      "executionEvidence": "Start-Process -PassThru / WaitForExit / Process.ExitCode observed in this task",
+      "report": "Tools/MotionAdapter/reports/unity-playback-regression.json",
+      "reportSha256": "c3f751006e04235b165ef4d9d7535ea05b662c7bfafcae60987d032fe005d038",
+      "log": "Server/ARDY/runtime/unity-naturalness-validation/Logs/edit-live-baseline.log",
+      "logSha256": "8c144ef15bcbc93c0b572c13ecac6a77fc3316aad9666dd945a769d15f09d965",
+      "compilerErrors": 0,
+      "previousCopiedReport": "Tools/MotionAdapter/reports/unity-live-baseline-edit.json",
+      "originalLog": "Server/ARDY/runtime/unity-naturalness-validation/Logs/edit-live-baseline.log",
+      "originalReport": "Server/ARDY/runtime/unity-naturalness-validation/Logs/ardy-motion-preview/regression.json"
+    },
+    {
+      "name": "playMode",
+      "status": "passed",
+      "checks": 783314,
+      "method": "ArdyMotionPlayModeRegression.RunBatch",
+      "actualExitCode": 0,
+      "executionEvidence": "Start-Process -PassThru / WaitForExit / Process.ExitCode observed in this task",
+      "report": "Tools/MotionAdapter/reports/unity-playmode-regression.json",
+      "reportSha256": "2cdf2613fb20de80d8ab6762b34462675059b14ee1853c8fcbf67fbdd6dfa735",
+      "log": "Server/ARDY/runtime/unity-naturalness-validation/Logs/playmode-live-baseline.log",
+      "logSha256": "c86a2e262c83054878645b2590c99c191a513acc62d0e20db322046960dc2dd3",
+      "compilerErrors": 0,
+      "previousCopiedReport": "Tools/MotionAdapter/reports/unity-live-baseline-playmode.json",
+      "originalLog": "Server/ARDY/runtime/unity-naturalness-validation/Logs/playmode-live-baseline.log",
+      "originalReport": "Server/ARDY/runtime/unity-naturalness-validation/Logs/ardy-motion-preview/playmode-regression.json"
+    },
+    {
+      "name": "livePlayMode",
+      "status": "passed",
+      "checks": 45654,
+      "method": "ArdyLivePlayModeRegression.RunBatch",
+      "actualExitCode": 0,
+      "executionEvidence": "Start-Process -PassThru / WaitForExit / Process.ExitCode observed in this task",
+      "report": "Tools/MotionAdapter/reports/unity-live-playmode.json",
+      "reportSha256": "1ff4c028a8733f98e98d60de535e4b7d8115740514e6c00e35fa7ce5fc72f5f6",
+      "log": "Server/ARDY/runtime/unity-naturalness-validation/Logs/live-http-serialization.log",
+      "logSha256": "0fd24be8ed48c3e1b650d6c19fe40bef5c4bddc8bd525c8d6a10f0e30d1504e7",
+      "compilerErrors": 0,
+      "originalLog": "Server/ARDY/runtime/unity-naturalness-validation/Logs/live-http-serialization.log",
+      "originalReport": "Server/ARDY/runtime/unity-naturalness-validation/Logs/ardy-live-playmode.json"
+    }
+  ],
+  "liveExecution": {
+    "actionService": "http://127.0.0.1:8093",
+    "featureEndpointDuringThisRun": "http://127.0.0.1:18082",
+    "notes": "The same loaded Qwen feature service was used during this execution. Subsequent production endpoint switch to 8080 is a separate service validation."
+  },
+  "originalProject": "No original Editor, private scene, microphone or ChatSample Awake/Start was launched. Validation only launched/exited its own isolated Unity processes.",
+  "assertionCounts": "Counts include repeated per-joint and per-frame checks, not distinct test scenarios.",
+  "failureEvidencePreserved": [
+    "Server/ARDY/runtime/unity-naturalness-validation/Logs/live-http-playmode.log"
+  ],
+  "notes": "Initial real HTTP continuation exposed Unity null nested-class serialization; SerializeRequest fix was covered by new JSON omission assertions and successful real HTTP replay. Baseline Anchor/Edit/PlayMode each passed once with the current unchanged player; later changes affected Protocol/Controller and dialogue only."
+}

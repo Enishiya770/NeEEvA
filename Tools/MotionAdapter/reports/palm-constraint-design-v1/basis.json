@@ -1,0 +1,272 @@
+{
+  "schema": 1,
+  "method": "CPU hierarchy reconstruction using source VRM0\u2192Unity Z reflection; no Unity process or runtime pose inference",
+  "models": [
+    {
+      "path": "Assets/Model/NEVA.vrm",
+      "sha256": "d02820de92e697d8dd37fea4e993a2127c36684e19ebff8cffbc0b999dd25551",
+      "hands": [
+        {
+          "side": "left",
+          "allFiveProximalsPresent": true,
+          "proximalParents": [
+            "J_Bip_L_Hand",
+            "J_Bip_L_Hand",
+            "J_Bip_L_Hand",
+            "J_Bip_L_Hand",
+            "J_Bip_L_Hand"
+          ],
+          "localOffsetsMeters": {
+            "leftHand": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "leftIndexProximal": [
+              -0.06458317999999996,
+              0.007350087000000061,
+              0.0195761323
+            ],
+            "leftMiddleProximal": [
+              -0.06546288999999994,
+              0.007350206379999946,
+              0.0020386055099999995
+            ],
+            "leftRingProximal": [
+              -0.06471711400000002,
+              0.007350087000000061,
+              -0.013532333100000002
+            ],
+            "leftLittleProximal": [
+              -0.060261189999999965,
+              0.0073499679999999845,
+              -0.029055982799999998
+            ],
+            "leftThumbProximal": [
+              -0.0034753084199999895,
+              -0.00996720799999995,
+              0.0158978775
+            ]
+          },
+          "fingerForwardLocal": [
+            -0.9901212535263736,
+            0.11414559846000348,
+            -0.08142902226829539
+          ],
+          "coreMiddlePalmNormalLocal": [
+            -0.11187955937602223,
+            -0.993672054585449,
+            -0.009940429053084773
+          ],
+          "independentTrianglePalmNormalLocal": [
+            -0.11615994418863221,
+            -0.993176896517537,
+            -0.010320832809779749
+          ],
+          "triangleVsMiddleBasisDegrees": 0.24784389886545372,
+          "indexLittleSpanMeters": 0.04882378740607809,
+          "wristToFourProximalCentroidMeters": 0.06439220779569067,
+          "triangleAreaSquareMeters": 0.001538602441297714
+        },
+        {
+          "side": "right",
+          "allFiveProximalsPresent": true,
+          "proximalParents": [
+            "J_Bip_R_Hand",
+            "J_Bip_R_Hand",
+            "J_Bip_R_Hand",
+            "J_Bip_R_Hand",
+            "J_Bip_R_Hand"
+          ],
+          "localOffsetsMeters": {
+            "rightHand": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rightIndexProximal": [
+              0.06458317999999996,
+              0.007350087000000061,
+              0.0195761323
+            ],
+            "rightMiddleProximal": [
+              0.06546288999999994,
+              0.007350206379999946,
+              0.0020386055099999995
+            ],
+            "rightRingProximal": [
+              0.06471711400000002,
+              0.007350087000000061,
+              -0.013532333100000002
+            ],
+            "rightLittleProximal": [
+              0.060261189999999965,
+              0.0073499679999999845,
+              -0.029055982799999998
+            ],
+            "rightThumbProximal": [
+              0.0034753084199999895,
+              -0.00996720799999995,
+              0.0158978775
+            ]
+          },
+          "fingerForwardLocal": [
+            0.9901212535263736,
+            0.11414559846000348,
+            -0.08142902226829539
+          ],
+          "coreMiddlePalmNormalLocal": [
+            0.11187955937602223,
+            -0.993672054585449,
+            -0.009940429053084773
+          ],
+          "independentTrianglePalmNormalLocal": [
+            0.11615994418863221,
+            -0.993176896517537,
+            -0.010320832809779749
+          ],
+          "triangleVsMiddleBasisDegrees": 0.24784389886545372,
+          "indexLittleSpanMeters": 0.04882378740607809,
+          "wristToFourProximalCentroidMeters": 0.06439220779569067,
+          "triangleAreaSquareMeters": 0.001538602441297714
+        }
+      ]
+    },
+    {
+      "path": "Assets/Model/NeEEvA.vrm",
+      "sha256": "6996cfddbf852cd5fbe992ee801e6769824679774686eb5cdb3f1628e57af69b",
+      "hands": [
+        {
+          "side": "left",
+          "allFiveProximalsPresent": true,
+          "proximalParents": [
+            "J_Bip_L_Hand",
+            "J_Bip_L_Hand",
+            "J_Bip_L_Hand",
+            "J_Bip_L_Hand",
+            "J_Bip_L_Hand"
+          ],
+          "localOffsetsMeters": {
+            "leftHand": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "leftIndexProximal": [
+              -0.06458317999999996,
+              0.0073499679999999845,
+              0.0195761286
+            ],
+            "leftMiddleProximal": [
+              -0.06546288999999994,
+              0.007350087000000061,
+              0.0020386055099999995
+            ],
+            "leftRingProximal": [
+              -0.06471711400000002,
+              0.007350087000000061,
+              -0.013532333100000002
+            ],
+            "leftLittleProximal": [
+              -0.060261189999999965,
+              0.0073499679999999845,
+              -0.029055975399999996
+            ],
+            "leftThumbProximal": [
+              -0.0034753084199999895,
+              -0.00996720799999995,
+              0.01589787
+            ]
+          },
+          "fingerForwardLocal": [
+            -0.9901213592823099,
+            0.1141446851517398,
+            -0.08142901660072481
+          ],
+          "coreMiddlePalmNormalLocal": [
+            -0.11187783751657407,
+            -0.9936722256334295,
+            -0.009942709757493891
+          ],
+          "independentTrianglePalmNormalLocal": [
+            -0.11615883304009994,
+            -0.9931770022190357,
+            -0.010323166663958884
+          ],
+          "triangleVsMiddleBasisDegrees": 0.24787922001956175,
+          "indexLittleSpanMeters": 0.04882377634950942,
+          "wristToFourProximalCentroidMeters": 0.06439220091788911,
+          "triangleAreaSquareMeters": 0.0015386019246994135
+        },
+        {
+          "side": "right",
+          "allFiveProximalsPresent": true,
+          "proximalParents": [
+            "J_Bip_R_Hand",
+            "J_Bip_R_Hand",
+            "J_Bip_R_Hand",
+            "J_Bip_R_Hand",
+            "J_Bip_R_Hand"
+          ],
+          "localOffsetsMeters": {
+            "rightHand": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rightIndexProximal": [
+              0.06458317999999996,
+              0.0073499679999999845,
+              0.0195761286
+            ],
+            "rightMiddleProximal": [
+              0.06546288999999994,
+              0.007350087000000061,
+              0.0020386055099999995
+            ],
+            "rightRingProximal": [
+              0.06471711400000002,
+              0.007350087000000061,
+              -0.013532333100000002
+            ],
+            "rightLittleProximal": [
+              0.060261189999999965,
+              0.0073499679999999845,
+              -0.029055975399999996
+            ],
+            "rightThumbProximal": [
+              0.0034753084199999895,
+              -0.00996720799999995,
+              0.01589787
+            ]
+          },
+          "fingerForwardLocal": [
+            0.9901213592823099,
+            0.1141446851517398,
+            -0.08142901660072481
+          ],
+          "coreMiddlePalmNormalLocal": [
+            0.11187783751657407,
+            -0.9936722256334295,
+            -0.009942709757493891
+          ],
+          "independentTrianglePalmNormalLocal": [
+            0.11615883304009994,
+            -0.9931770022190357,
+            -0.010323166663958884
+          ],
+          "triangleVsMiddleBasisDegrees": 0.24787922001956175,
+          "indexLittleSpanMeters": 0.04882377634950942,
+          "wristToFourProximalCentroidMeters": 0.06439220091788911,
+          "triangleAreaSquareMeters": 0.0015386019246994135
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Bone landmarks supply a stable skeletal palm plane; subjective palm surface appearance still requires rendered mesh review.",
+    "Mirrored/negative or nonuniform root scaling and missing or degenerate finger mapping must be explicitly unsupported.",
+    "If forearm is parallel to partner-facing normal, finger-forward must be approximately perpendicular to forearm, demanding a large wrist swing; do not silently change explicit elbow constraints.",
+    "For omitted elbow degrees with explicit palm goals, the new parser allows a bounded entry-time elbow solution; this is execution-side freedom and not a second model output."
+  ]
+}

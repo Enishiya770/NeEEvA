@@ -1781,6 +1781,7 @@ public static partial class SkillRoutingRegression
             Type type = typeof(ChatSample);
             type.GetField("m_PreparedSingingBridgeClip", flags).SetValue(chat, audio);
             type.GetField("m_PreparedSingingBridgeText", flags).SetValue(chat, "わかったわ。");
+            type.GetField("m_PreparedSingingBridgeLanguage", flags).SetValue(chat, "ja");
             type.GetField("m_PreparedBridgeSourceTranscript", flags).SetValue(chat, "不完整的原先发言");
             string hint = (string)type.GetMethod("FinalizeSpeculativeTurn", flags).Invoke(chat,
                 new object[] { "不，我改变主意了。" });
@@ -1788,9 +1789,10 @@ public static partial class SkillRoutingRegression
                 type.GetField("m_PreparedSingingBridgeClip", flags).GetValue(chat) != audio || chat.IsAISpeaking)
                 throw new InvalidOperationException("An unchosen candidate was played/destroyed before the final model could decide.");
             MethodInfo take = type.GetMethod("TakePreparedFormalReply", flags);
-            if (take.Invoke(chat, new object[] { "今回はやめましょう。" }) != null ||
-                take.Invoke(chat, new object[] { "わかったわ。" }) != audio ||
-                take.Invoke(chat, new object[] { "わかったわ。" }) != null)
+            if (take.Invoke(chat, new object[] { "今回はやめましょう。", "ja" }) != null ||
+                take.Invoke(chat, new object[] { "わかったわ。", "en" }) != null ||
+                take.Invoke(chat, new object[] { "わかったわ。", "ja" }) != audio ||
+                take.Invoke(chat, new object[] { "わかったわ。", "ja" }) != null)
                 throw new InvalidOperationException("Prepared audio was substituted for different words or consumed twice.");
         }
         finally
@@ -2927,7 +2929,8 @@ public static partial class SkillRoutingRegression
             !frame.Contains("本地程序") ||
             !frame.Contains("程序不替你决定") ||
             !frame.Contains("同轮必须提交可验证的工具请求") ||
-            !frame.Contains("‹silent/› 或 ‹silence/›") ||
+            !frame.Contains("参数修正可以用 silent 在内部进行") ||
+            frame.Contains("本轮不要用") ||
             frame.Contains("<skill_request>"))
             throw new InvalidOperationException(
                 "Structured tool correction feedback lost facts or failed to neutralize tag-like text.");
@@ -2935,6 +2938,7 @@ public static partial class SkillRoutingRegression
         TextAsset behavior = AssetDatabase.LoadAssetAtPath<TextAsset>(
             "Assets/AIChatTookit/Prompts/behavior.txt");
         if (behavior == null || !behavior.text.Contains("工具纠错事实") ||
+            !behavior.text.Contains("内部纠错可用") || behavior.text.Contains("纠错轮禁止 `<silent/>`") ||
             !behavior.text.Contains("真实用户刚说完的回复中禁止"))
             throw new InvalidOperationException(
                 "Behavior prompt is missing the user-turn tool correction protocol.");
@@ -3157,8 +3161,10 @@ public static partial class SkillRoutingRegression
             "Assets/AIChatTookit/Prompts/behavior.txt");
         if (prompt == null || behavior == null ||
             !prompt.text.Contains("<singing_policy value=\"enable|disable|suppress_autonomy\"") ||
-            !prompt.text.Contains("普通点歌、回唱和练唱直接") ||
-            !prompt.text.Contains("程序不会再用关键词或逐字引文重新裁决语义") ||
+            !prompt.text.Contains("普通点歌、回唱和练唱按对应协议") ||
+            !prompt.text.Contains("程序不会用关键词代替对完整语境的判断") ||
+            !prompt.text.Contains("origin=\"user_request\"") ||
+            !prompt.text.Contains("origin=\"autonomous\"") ||
             !prompt.text.Contains("<singing_stop") ||
             !prompt.text.Contains("先停旧动作再保留新动作") ||
             prompt.text.Contains("<singing_policy value=\"enable|disable|suppress_autonomy\" evidence") ||

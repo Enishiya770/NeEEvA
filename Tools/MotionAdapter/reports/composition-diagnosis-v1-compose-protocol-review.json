@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "checkedAtUtc": "2026-09-10T08:10:48.878240+00:00",
+  "scope": "Structured compose plan/data/parser/planning diagnostics. No executor, Controller, Bridge, Player, service or model weight modifications by this subtask.",
+  "implementation": {
+    "ArdyControlPlan": "Pure System serializable class with public frozen fields, finite bounds/enums/dependencies validation, Copy(), invariant summary.",
+    "DialogueMotionIntent": "Existing four-argument constructor retained; five-argument constructor copies nullable ControlPlan. compose description is empty.",
+    "routing": "Independent basic gestures keep priority. Explicit directional holds/local curves use compose. Open motion uses generate.",
+    "provenance": "compose is geometric/controlled local motion, not ARDY native quality improvement.",
+    "heldPose": "current means measured current pose; cannot recover historical idle pose. Hold is executor-bounded at 30 seconds, not indefinite text state.",
+    "numericParsing": "InvariantCulture float/int parsing; nonfinite, invalid enums, wrong-route attributes, unknown attributes, duplicate attributes and missing wrist-arm targets rejected."
+  },
+  "productionCpuValidation": {
+    "environment": "Actual production ArdyControlPlan/DialogueMotionProtocol/RoleOutputChannels/SpeechText compiled with Unity Roslyn+Mono C#9; exact pure methods extracted from Editor regression, no stubs.",
+    "compileExitCode": 0,
+    "runExitCode": 0,
+    "pureAssertions": 359,
+    "actualQwenTagsAccepted": 8,
+    "actualQwenTagsRejected": 0,
+    "totalChecks": 367
+  },
+  "contractBinding": {
+    "compiledCSharpSha256": "553155e1253c733aed1e81d74084afe6e014161c1c6f0c2ea187146fa63d2f0f",
+    "pythonReadContractSha256": "553155e1253c733aed1e81d74084afe6e014161c1c6f0c2ea187146fa63d2f0f",
+    "recordedPlanningContractSha256": "553155e1253c733aed1e81d74084afe6e014161c1c6f0c2ea187146fa63d2f0f",
+    "allEqual": true
+  },
+  "realPlanning": {
+    "report": "Tools\\MotionAdapter\\reports\\composition-diagnosis-v1-compose-planning-r4.json",
+    "tags": "Tools\\MotionAdapter\\reports\\composition-diagnosis-v1-compose-planning-r4.tags.txt",
+    "realRequests": 8,
+    "parametersMatched": 8,
+    "composeCases": 5,
+    "independentBasicCases": 2,
+    "openGenerateCases": 1,
+    "busyGuard": "Only sequential calls when all existing /slots is_processing false; no service startup/stop or ARDY calls.",
+    "observedComposeTargets": [
+      "Both forward, both wrists/up/10 degrees/2 cycles/3.2 seconds/hold",
+      "Both outward, head/right/8 degrees/1 cycle/idle",
+      "Left current, right forward/hold",
+      "Idle follow-up restores forward goals and straight bends, rather than using historical current",
+      "Both forward with zero elbow bends and no local motion/hold"
+    ]
+  },
+  "editorRegression": {
+    "entryPoint": "ArdyDialogueMotionRegression.RunBatch",
+    "prepared": true,
+    "executedHere": false,
+    "additionalCoverage": [
+      "Real same-plan dedup vs different numeric plan dispatch",
+      "Basic-only capability suppresses compose advertisement and dispatch",
+      "Actual holding facts and bounded hold text delivered in request context",
+      "Compose numeric fields excluded from real ChatSample TTS queue",
+      "Silent pure compose callback dispatches without empty-LLM-response failure"
+    ]
+  },
+  "retainedDevelopmentEvidence": {
+    "initial": "composition-diagnosis-v1-compose-planning.json",
+    "second": "composition-diagnosis-v1-compose-planning-r2.json",
+    "oldVsNewFree": "composition-diagnosis-v1-compose-free-regression.json",
+    "toolReadIssueAttempt": "composition-diagnosis-v1-compose-planning-r3.json",
+    "notes": [
+      "Initial and second free generate descriptions were 243/251 characters and were rejected by real parser; not truncated or counted as executable passes.",
+      "A focused previous-contract comparison showed a 202-character valid free description. Added a general one-short-sentence/25-word plus 240-character output constraint.",
+      "Attempt r3 used the old naive C# constant reader, which truncated a string at an internal ASCII semicolon; retained but excluded as exact-contract evidence. Reader now parses entire literal concatenations; final r4 contract hash verified against the compiled C# constant."
+    ]
+  },
+  "sourceSha256": {
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "96f9132756143e815fab9d5fd02bcaa85f3cb86e1324058ff057b73eab5367df",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs.meta": "124fd8aac7a39fcfeab59df373ca28b0b1d89294998f9f552038d24d81fa0d7f",
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "e111c93e13c7b84238e76ec445a7f0eb0777fefa4a498ef8f045aed284ab1374",
+    "Assets/Editor/ArdyDialogueMotionRegression.cs": "c5947d507de3cf89d662d8b9a78f4dceefcf620a274e9e2bd01af58ea7e9999c",
+    "Tools/MotionAdapter/validate_compose_planning.py": "12964c77cc51e88ff5ac299a224b3e9ddd16ec150d00bb3f35d40c190816c9ea",
+    "Tools/MotionAdapter/validate_dialogue_motion.py": "accbcbf596cf2c68e065e8aec928acce0afff7fce5d7d2bcbc8f22daf91618cc",
+    "Server/ARDY/runtime/compose-protocol-check/Program.cs": "ba6d2a848b39804c820d9d9088b9e816f876df2f96118890920e00851e1e8c39"
+  },
+  "limits": [
+    "These development requests test structured intent selection and real parser acceptance, not unseen-action generalization.",
+    "No physical wrist isolation, transition smoothness, pose matching, interruption or hold timeout was tested by this subtask; executor and real Unity validation belong to root/shared agent.",
+    "Actual controlled motion is not evidence that the ARDY generator learned independent wrist control."
+  ]
+}

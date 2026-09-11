@@ -1,0 +1,11 @@
+{
+  "matrixId": "intent-generalization-native-v1",
+  "matrixSignatureSha256": "734eec6869611b442890af6c978590c27da65b90da684ffab899f572b1c408d4",
+  "previousHarnessSha256": "a88d6c3384fd5f18ca0a8f7990d384db66a0496db13b1bf5701e76ce50de8d72",
+  "correctedHarnessSha256": "2c279d64ac77a1ce440e842e9066d0b46226be989d4b8c80455356d7ba2df10e",
+  "change": "Resolve relative asset/source hash paths against the isolated Unity project's Application.dataPath parent, not the process working directory.",
+  "matrixDescriptionsGoalsHistoriesSeedsUnchanged": true,
+  "realUnityReferencesCompilePassed": true,
+  "unityOrModelStartedByThisAgent": false,
+  "frozenMatrixFilePreserved": true
+}

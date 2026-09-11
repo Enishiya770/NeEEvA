@@ -1,0 +1,14 @@
+<motion name="right-wave"/>
+<motion name="left-wave"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" leftBend="0" rightBend="0" joint="wrists" axis="palm-normal" amplitude="10" cycles="2" seconds="3.2" end="hold"/>
+<motion name="compose" left="none" right="forward" rightPalm="partner"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" leftBend="0" rightBend="0" joint="wrists" axis="palm-normal" amplitude="10" cycles="3" seconds="3"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" leftBend="0" rightBend="0" joint="none" end="hold"/>
+<motion name="compose" left="forward" right="forward" leftPalm="down" rightPalm="down" leftBend="0" rightBend="0" joint="none" end="hold"/>
+<motion name="compose" left="forward" right="forward" leftPalm="down" rightPalm="down" leftBend="0" rightBend="0" joint="wrists" axis="up" amplitude="10" cycles="2" seconds="3.2" end="idle"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" joint="wrists" axis="palm-normal" amplitude="10" cycles="2" seconds="3.2" end="hold"/>
+<motion name="compose" left="forward" leftPalm="partner" leftBend="0" right="current" rightPalm="keep" joint="none"/>
+<motion name="nod"/>
+<motion name="generate" text="Alternating arms drawing arcs with slight torso sway, free upper body dance, feet stationary"/>
+<motion name="compose" left="forward" right="forward" leftPalm="partner" rightPalm="partner" joint="wrists" axis="palm-normal" amplitude="10" cycles="2" seconds="3.2" end="hold"/>
+<motion name="none"/>

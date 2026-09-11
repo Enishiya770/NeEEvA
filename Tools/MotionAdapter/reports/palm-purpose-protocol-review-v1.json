@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "createdUtc": "2026-09-10T09:06:33.190985+00:00",
+  "status": "protocol_implemented_planning_not_accepted",
+  "scope": "Pure-System production C# plan/parser and exact extracted Editor regression methods; public Qwen planning only. No Unity/GPU/service launched and no motion request sent by this agent. Parent runs actual execution separately.",
+  "changes": [
+    "leftPalm/rightPalm strict keep/partner/up/down/inward/outward; keep preserves prior behavior",
+    "palm-normal wrist axis requires a palm goal for each moving hand",
+    "Unspecified directional palm-goal elbows derive BendAuto=true in the parser; explicit numeric/current/no-palm behavior is unchanged; models cannot inject internal Auto attributes",
+    "Snapshot copying, every-split channel isolation, quote/private handling, invalid plan rejection, same-plan deduplication and changed-palm dispatch checks updated"
+  ],
+  "cpuChecks": {
+    "compiler": "Unity-bundled Mono C# compiler, actual production files, not UnityEngine or parser stubs",
+    "compileExitCode": 0,
+    "pureEditorMethodAssertions": 783,
+    "compiledContractSha256": "0ce7efef8eb0d8f2e199ae90911bdacb90f1bbbea7060c2393f219ffe35cd191",
+    "productionConstantMatchesFinalProbe": true,
+    "diffCheckExitCode": 0,
+    "unityExecution": "Parent scheduled separately; not claimed by this report"
+  },
+  "planningRuns": [
+    {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v1.json",
+      "sha256": "32cfa5de52ecb564e6c1fccf311c230a89fd4ee49fbfc329b1e027d22d349f85",
+      "status": "completed",
+      "modelRequests": 15,
+      "contractSha256": "2e0a7326c68054c9c05798e97f855982896d40679b5ca3b4428730893c4ddaee",
+      "modelIds": [
+        "qwen36.gguf"
+      ],
+      "productionCSharpRejectedCaseIds": [],
+      "productionCSharpActualTagExitCode": 0,
+      "allPlanningAndSyntaxChecksAccepted": false
+    },
+    {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v2.json",
+      "sha256": "a8c9d1ca64e50acaf00903bf8cf9b7d3357b4c38e247749973e20d451b9e5280",
+      "status": "completed",
+      "modelRequests": 15,
+      "contractSha256": "b1c8ed0c6158b890709ceeac73958dbc315d8bfb159058581d5a1f2f53a0ec02",
+      "modelIds": [
+        "qwen36.gguf"
+      ],
+      "productionCSharpRejectedCaseIds": [
+        "ja-static-palm-display",
+        "zh-open-upper-body-dance-regression"
+      ],
+      "productionCSharpActualTagExitCode": 1,
+      "allPlanningAndSyntaxChecksAccepted": false
+    },
+    {
+      "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-planning-v3-restored.json",
+      "sha256": "b22f2c0794d1dcee7c280c515f4034342fd461e179d95b8b31d56e4c339195d2",
+      "status": "completed",
+      "modelRequests": 15,
+      "contractSha256": "0ce7efef8eb0d8f2e199ae90911bdacb90f1bbbea7060c2393f219ffe35cd191",
+      "modelIds": [
+        "qwen36.gguf"
+      ],
+      "productionCSharpRejectedCaseIds": [
+        "zh-correction-preserves-forward-hold",
+        "zh-open-upper-body-dance-regression"
+      ],
+      "productionCSharpActualTagExitCode": 1,
+      "allPlanningAndSyntaxChecksAccepted": false
+    }
+  ],
+  "interpretationChanges": "Run 1 used fixed default elbows; later runs derive elbow auto-solving when unspecified. Thus run-level parameter-match counts cannot be compared as a shared success metric. All public user prompts remain identical; synthetic DTOs gain the new false-default internal fields.",
+  "firstRealPlanFixture": {
+    "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-first-qwen-plan-v2.json",
+    "sha256": "9a106eb49df777c7f22762f0dc0bf9c8de0523a224c98bbfefc5493f9fe532b9",
+    "rawTagSelection": "Case zh-forward-greeting selected before results; original first-run tag preserved exactly. New parser exports BendAuto=true. No manual elbow/axis/amplitude or seed edits. Version-1 fixed-default interpretation remains archived."
+  },
+  "finalIndependentFindings": [
+    {
+      "case": "zh-single-forward-greeting-render-fixture",
+      "finding": "Single-arm forward posture is repeatedly lost to the basic right-wave route."
+    },
+    {
+      "case": "ja-single-side-palm-display",
+      "finding": "Requested lateral static palm display becomes forward motion with an unnecessary local wrist wave; spoken text claims lateral despite the tag."
+    },
+    {
+      "case": "zh-correction-preserves-forward-hold",
+      "finding": "Final contract omits both palm attributes while selecting palm-normal; the production validator correctly rejects the tag."
+    },
+    {
+      "case": "zh-open-upper-body-dance-regression",
+      "finding": "Final restored contract still routes the previously supported free dance to compose and emits cycles=4; the production validator rejects it. Free-generate regression remains unresolved."
+    },
+    {
+      "case": "en-failed-straight-goal-still-required",
+      "finding": "Final run retains explicit zero elbow angles and does not turn on Auto, but explains the failed wave then retries a static palm goal under the same arm constraints. Do not count this as achieved reachability or a complete refusal."
+    },
+    {
+      "case": "en-failed-straight-goal-still-required run1",
+      "finding": "The first-run shake-head plus correct limitation explanation is a reasonable refusal, despite the narrow original route expectation; do not force none just to improve the score."
+    }
+  ],
+  "conclusion": "The new representation can express palm orientation and leave unspecified elbow geometry to the executor, but autonomous routing, static-versus-moving intent and retention of explicit constraints remain unreliable in these development cases. Neither universal natural intent completion nor non-regression of free generated motion is established.",
+  "sourceSha256": {
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "b66004fee7c13d01ce43d614a2c1e19b43e29839dc059b33cde443af5c87f90f",
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "7e391607afc1796ecd65e7b31a3ec0ae2f6bb065a6531111c7e8e7aeb5ba2d28",
+    "Assets/Editor/ArdyDialogueMotionRegression.cs": "abb98b0eaa47e8351f6bfed50344ffde9067d131480c4886155be20389c21d33",
+    "Tools/MotionAdapter/validate_purpose_motion_planning.py": "a92205d0d5e049da871fb78ba4173e25b9f6866a1bbd5cc819a156fd26c62418",
+    "Server/ARDY/runtime/palm-protocol-check/Program.cs": "d205470d2700f626437d39789839ee144bccb419832d9eeda0e8bbc1f70e6d47"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "tests": 7,
+  "scope": "CPU synthetic statistical/loss sanity plus real original/generic teacher component compatibility inspection; no genuine candidate training and no final-test outputs evaluated",
+  "checks": [
+    "old MSE +5 percent gate",
+    "old cosine drop .001 gate",
+    "new MSE 10 percent improvement gate",
+    "equal-domain relative-MSE selection score",
+    "semantic-group bootstrap weighting",
+    "NaN metrics never qualify",
+    "scratch/fine-tune preserve old mean/std and never read poisoned synthetic test targets"
+  ],
+  "real_teacher_compatibility_controls": 2,
+  "training_started": false,
+  "test_metrics_computed": false
+}

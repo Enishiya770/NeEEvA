@@ -1,0 +1,4745 @@
+{
+  "schema": 1,
+  "purpose": "Two reported prompts, paired history ablation at effective seeds 0 and 1; no production mutation",
+  "prompts": {
+    "both-arms-overhead": "Raise both arms straight up above the head, palms facing forward",
+    "explanatory-palms-up": "Extend both forearms slightly forward with palms facing up, in an explanatory gesture"
+  },
+  "seeds": [
+    0,
+    1
+  ],
+  "historyFile": "Server\\ARDY\\runtime\\generate-diagnostics\\animator-idle-history.json",
+  "sourceLimits": [
+    "No exact replay of the user's failed request: old service did not save request/history/response.",
+    "Input/output rotation roundtrip proves representation consistency, not history likelihood under ARDY's learned tokenizer.",
+    "Both tested bilateral combinations are outside the pilot adapter's single-arm raise/extend training templates."
+  ],
+  "backend": {
+    "ready": true,
+    "languageModelsLoaded": false,
+    "adapter": "mlp-seed1",
+    "adapterSha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa",
+    "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+    "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+    "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+    "fps": 20,
+    "newFrames": 40,
+    "historyFrames": 16,
+    "gpuPreflight": {
+      "freeMiB": 23036.0,
+      "totalMiB": 24563.5
+    }
+  },
+  "histories": {
+    "neutral16-grounded": {
+      "headingDegrees": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "canonicalizedNormalizedMaxAbsDifference": 0.0,
+      "normalizedBlocks": {
+        "root_pos": {
+          "absP95": 0.4120256006717682,
+          "absMax": 0.4120256006717682
+        },
+        "global_root_heading": {
+          "absP95": 1.4143431186676025,
+          "absMax": 1.4143431186676025
+        },
+        "local_joints_positions": {
+          "absP95": 2.7963156700134277,
+          "absMax": 2.897404909133911
+        },
+        "global_rot_data": {
+          "absP95": 2.4760305881500244,
+          "absMax": 2.5727157592773438
+        },
+        "velocities": {
+          "absP95": 0.005021729040890932,
+          "absMax": 0.005421806126832962
+        },
+        "foot_contacts": {
+          "absP95": 0.6211416125297546,
+          "absMax": 0.6211416125297546
+        }
+      },
+      "autoencoderReconstruction": {
+        "globalRotationMeanDegrees": 2.5398073196411133,
+        "globalRotationMaxDegrees": 16.039661407470703,
+        "perBoneMaxDegrees": {
+          "Hips": 0.5546137094497681,
+          "Spine": 0.5482263565063477,
+          "Spine1": 0.459701269865036,
+          "Spine2": 0.5467968583106995,
+          "Spine3": 0.7143635153770447,
+          "Neck": 0.6679324507713318,
+          "Head": 0.9938659071922302,
+          "RightShoulder": 0.7198209762573242,
+          "RightArm": 0.9650976657867432,
+          "RightForeArm": 1.700193166732788,
+          "RightHand": 5.6936774253845215,
+          "RightHandEnd": 5.684513568878174,
+          "RightHandThumb1": 16.039661407470703,
+          "LeftShoulder": 1.0667954683303833,
+          "LeftArm": 2.877391815185547,
+          "LeftForeArm": 3.3214242458343506,
+          "LeftHand": 9.609097480773926,
+          "LeftHandEnd": 9.59947681427002,
+          "LeftHandThumb1": 12.515279769897461,
+          "RightUpLeg": 0.6898379325866699,
+          "RightLeg": 0.6052260398864746,
+          "RightFoot": 0.459701269865036,
+          "RightToeBase": 0.5980709791183472,
+          "LeftUpLeg": 0.4673001766204834,
+          "LeftLeg": 0.44499385356903076,
+          "LeftFoot": 0.5271186232566833,
+          "LeftToeBase": 0.4731261134147644
+        },
+        "positionsMeanMeters": 0.0023905092384666204
+      },
+      "rootWorldYMinMax": [
+        0.9544128252334833,
+        0.9544128252334833
+      ],
+      "feetWorldYMinMax": {
+        "LeftFoot": [
+          0.05847492523348319,
+          0.05847492523348319
+        ],
+        "LeftToeBase": [
+          0.0,
+          0.0
+        ],
+        "RightFoot": [
+          0.0584749252334833,
+          0.0584749252334833
+        ],
+        "RightToeBase": [
+          0.0,
+          0.0
+        ]
+      },
+      "physicalAuditMethod": "Input source FK; root and leg global rotations identity in projected histories; native history uses original decoded NPZ positions."
+    },
+    "unity-idle16-grounded": {
+      "headingDegrees": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "canonicalizedNormalizedMaxAbsDifference": 4.589557647705078e-06,
+      "normalizedBlocks": {
+        "root_pos": {
+          "absP95": 0.4120256006717682,
+          "absMax": 0.4120256006717682
+        },
+        "global_root_heading": {
+          "absP95": 1.4143431186676025,
+          "absMax": 1.4143431186676025
+        },
+        "local_joints_positions": {
+          "absP95": 1.229710429906845,
+          "absMax": 1.416002631187439
+        },
+        "global_rot_data": {
+          "absP95": 1.4314861118793487,
+          "absMax": 1.71622633934021
+        },
+        "velocities": {
+          "absP95": 0.01866885367780924,
+          "absMax": 0.04963941499590874
+        },
+        "foot_contacts": {
+          "absP95": 0.6211416125297546,
+          "absMax": 0.6211416125297546
+        }
+      },
+      "autoencoderReconstruction": {
+        "globalRotationMeanDegrees": 3.456770658493042,
+        "globalRotationMaxDegrees": 16.131317138671875,
+        "perBoneMaxDegrees": {
+          "Hips": 0.37115025520324707,
+          "Spine": 0.406382292509079,
+          "Spine1": 0.36903539299964905,
+          "Spine2": 0.7475579380989075,
+          "Spine3": 0.48537477850914,
+          "Neck": 0.8943808674812317,
+          "Head": 1.6115550994873047,
+          "RightShoulder": 1.2517954111099243,
+          "RightArm": 6.0801215171813965,
+          "RightForeArm": 6.305028438568115,
+          "RightHand": 5.758846759796143,
+          "RightHandEnd": 5.773055553436279,
+          "RightHandThumb1": 16.131317138671875,
+          "LeftShoulder": 1.1839903593063354,
+          "LeftArm": 9.21869945526123,
+          "LeftForeArm": 10.976551055908203,
+          "LeftHand": 8.641860961914062,
+          "LeftHandEnd": 8.645813941955566,
+          "LeftHandThumb1": 13.271320343017578,
+          "RightUpLeg": 1.2608295679092407,
+          "RightLeg": 1.228441596031189,
+          "RightFoot": 0.2769530415534973,
+          "RightToeBase": 0.18974561989307404,
+          "LeftUpLeg": 0.5395922660827637,
+          "LeftLeg": 0.6667596101760864,
+          "LeftFoot": 0.7348863482475281,
+          "LeftToeBase": 0.7636141777038574
+        },
+        "positionsMeanMeters": 0.0030744154937565327
+      },
+      "rootWorldYMinMax": [
+        0.9544128252334833,
+        0.9544128252334833
+      ],
+      "feetWorldYMinMax": {
+        "LeftFoot": [
+          0.05847492523348319,
+          0.05847492523348319
+        ],
+        "LeftToeBase": [
+          0.0,
+          0.0
+        ],
+        "RightFoot": [
+          0.0584749252334833,
+          0.0584749252334833
+        ],
+        "RightToeBase": [
+          0.0,
+          0.0
+        ]
+      },
+      "physicalAuditMethod": "Input source FK; root and leg global rotations identity in projected histories; native history uses original decoded NPZ positions."
+    },
+    "unity-idle-hips-relative16-grounded": {
+      "headingDegrees": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "canonicalizedNormalizedMaxAbsDifference": 3.516674041748047e-06,
+      "normalizedBlocks": {
+        "root_pos": {
+          "absP95": 0.4120256006717682,
+          "absMax": 0.4120256006717682
+        },
+        "global_root_heading": {
+          "absP95": 1.4143431186676025,
+          "absMax": 1.4143431186676025
+        },
+        "local_joints_positions": {
+          "absP95": 1.2398833811283112,
+          "absMax": 1.416002631187439
+        },
+        "global_rot_data": {
+          "absP95": 1.4312334895133971,
+          "absMax": 1.727368712425232
+        },
+        "velocities": {
+          "absP95": 0.01788535201922059,
+          "absMax": 0.048413459211587906
+        },
+        "foot_contacts": {
+          "absP95": 0.6211416125297546,
+          "absMax": 0.6211416125297546
+        }
+      },
+      "autoencoderReconstruction": {
+        "globalRotationMeanDegrees": 3.444017171859741,
+        "globalRotationMaxDegrees": 15.835068702697754,
+        "perBoneMaxDegrees": {
+          "Hips": 0.6667596101760864,
+          "Spine": 0.2373882532119751,
+          "Spine1": 0.376385360956192,
+          "Spine2": 0.5546137094497681,
+          "Spine3": 0.6398022174835205,
+          "Neck": 0.47146889567375183,
+          "Head": 1.762585997581482,
+          "RightShoulder": 1.095751166343689,
+          "RightArm": 5.833848476409912,
+          "RightForeArm": 6.662736892700195,
+          "RightHand": 5.697324752807617,
+          "RightHandEnd": 5.696637153625488,
+          "RightHandThumb1": 15.835068702697754,
+          "LeftShoulder": 1.093963861465454,
+          "LeftArm": 8.984630584716797,
+          "LeftForeArm": 11.16746997833252,
+          "LeftHand": 8.692216873168945,
+          "LeftHandEnd": 8.695606231689453,
+          "LeftHandThumb1": 13.426572799682617,
+          "RightUpLeg": 1.4008145332336426,
+          "RightLeg": 1.3047630786895752,
+          "RightFoot": 0.3189810514450073,
+          "RightToeBase": 0.3238512873649597,
+          "LeftUpLeg": 1.2470967769622803,
+          "LeftLeg": 1.1419243812561035,
+          "LeftFoot": 0.5315545201301575,
+          "LeftToeBase": 0.44499385356903076
+        },
+        "positionsMeanMeters": 0.0029792168643325567
+      },
+      "rootWorldYMinMax": [
+        0.9544128252334833,
+        0.9544128252334833
+      ],
+      "feetWorldYMinMax": {
+        "LeftFoot": [
+          0.05847492523348319,
+          0.05847492523348319
+        ],
+        "LeftToeBase": [
+          0.0,
+          0.0
+        ],
+        "RightFoot": [
+          0.0584749252334833,
+          0.0584749252334833
+        ],
+        "RightToeBase": [
+          0.0,
+          0.0
+        ]
+      },
+      "physicalAuditMethod": "Input source FK; root and leg global rotations identity in projected histories; native history uses original decoded NPZ positions."
+    },
+    "projected-left-tail16-grounded": {
+      "headingDegrees": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "canonicalizedNormalizedMaxAbsDifference": 4.887580871582031e-06,
+      "normalizedBlocks": {
+        "root_pos": {
+          "absP95": 0.4120256006717682,
+          "absMax": 0.4120256006717682
+        },
+        "global_root_heading": {
+          "absP95": 1.4143431186676025,
+          "absMax": 1.4143431186676025
+        },
+        "local_joints_positions": {
+          "absP95": 1.3282087743282318,
+          "absMax": 1.416002631187439
+        },
+        "global_rot_data": {
+          "absP95": 1.4299906611442565,
+          "absMax": 1.517281174659729
+        },
+        "velocities": {
+          "absP95": 0.01581676909700036,
+          "absMax": 0.03562774509191513
+        },
+        "foot_contacts": {
+          "absP95": 0.6211416125297546,
+          "absMax": 0.6211416125297546
+        }
+      },
+      "autoencoderReconstruction": {
+        "globalRotationMeanDegrees": 0.584132730960846,
+        "globalRotationMaxDegrees": 2.657559394836426,
+        "perBoneMaxDegrees": {
+          "Hips": 1.503240704536438,
+          "Spine": 2.657559394836426,
+          "Spine1": 2.474487781524658,
+          "Spine2": 0.29870712757110596,
+          "Spine3": 0.4092611074447632,
+          "Neck": 0.7423043847084045,
+          "Head": 0.8645666241645813,
+          "RightShoulder": 0.8908734321594238,
+          "RightArm": 0.7241573929786682,
+          "RightForeArm": 0.6818493604660034,
+          "RightHand": 0.6731849908828735,
+          "RightHandEnd": 0.66910320520401,
+          "RightHandThumb1": 0.6864256262779236,
+          "LeftShoulder": 0.5595313310623169,
+          "LeftArm": 0.8996164202690125,
+          "LeftForeArm": 0.6249497532844543,
+          "LeftHand": 0.8132510781288147,
+          "LeftHandEnd": 0.828507125377655,
+          "LeftHandThumb1": 0.6537193655967712,
+          "RightUpLeg": 1.5440833568572998,
+          "RightLeg": 1.6037646532058716,
+          "RightFoot": 0.32625913619995117,
+          "RightToeBase": 0.25487783551216125,
+          "LeftUpLeg": 1.3510361909866333,
+          "LeftLeg": 1.3842320442199707,
+          "LeftFoot": 0.5574290752410889,
+          "LeftToeBase": 0.5706122517585754
+        },
+        "positionsMeanMeters": 0.0011316494783386588
+      },
+      "rootWorldYMinMax": [
+        0.9544128252334833,
+        0.9544128252334833
+      ],
+      "feetWorldYMinMax": {
+        "LeftFoot": [
+          0.05847492523348319,
+          0.05847492523348319
+        ],
+        "LeftToeBase": [
+          0.0,
+          0.0
+        ],
+        "RightFoot": [
+          0.0584749252334833,
+          0.0584749252334833
+        ],
+        "RightToeBase": [
+          0.0,
+          0.0
+        ]
+      },
+      "physicalAuditMethod": "Input source FK; root and leg global rotations identity in projected histories; native history uses original decoded NPZ positions."
+    }
+  },
+  "results": [
+    {
+      "id": "both-arms-overhead-neutral16-grounded-seed0",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-neutral16-grounded-seed0.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 151.7500000190921
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 114.83080001198687
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 114.60539998370223
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 1.4272385945155999,
+            "tiltMaxDegrees": 2.362646072393111,
+            "pitchMinMaxDegrees": [
+              -2.3313997541094094,
+              -0.054733208491006796
+            ],
+            "rollMinMaxDegrees": [
+              -0.4900100254086418,
+              0.12792746417043838
+            ],
+            "yawMinMaxDegrees": [
+              -0.41684533456759687,
+              0.6725980489843557
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.01026330388995345,
+            "tiltMaxDegrees": 0.04731718962877684,
+            "pitchMinMaxDegrees": [
+              -1.6674039845301356e-07,
+              1.7188212934593317e-07
+            ],
+            "rollMinMaxDegrees": [
+              -6.001596773611381e-08,
+              4.4611938375147064e-08
+            ],
+            "yawMinMaxDegrees": [
+              -3.7753820779323004e-08,
+              4.299247501372796e-08
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 1.5142864122685102,
+            "tiltMaxDegrees": 2.426160953082231,
+            "pitchMinMaxDegrees": [
+              -2.416682783963792,
+              0.16026930489064928
+            ],
+            "rollMinMaxDegrees": [
+              -0.3305291426563967,
+              -0.003502578043278142
+            ],
+            "yawMinMaxDegrees": [
+              -0.35177908748096354,
+              0.6281365396243167
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.2012933937876808,
+            "tiltMaxDegrees": 0.42430205608349625,
+            "pitchMinMaxDegrees": [
+              -0.27410011311312854,
+              0.34186693327748585
+            ],
+            "rollMinMaxDegrees": [
+              -0.19511463601483603,
+              0.41640485800478266
+            ],
+            "yawMinMaxDegrees": [
+              -0.16647306297304065,
+              0.08745622927148625
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 1.3868441725452159,
+            "tiltMaxDegrees": 2.051281709475331,
+            "pitchMinMaxDegrees": [
+              -2.049597909163899,
+              0.22905293769445373
+            ],
+            "rollMinMaxDegrees": [
+              -0.46006127921837736,
+              0.26506532108089603
+            ],
+            "yawMinMaxDegrees": [
+              -0.7961413188237313,
+              0.4048353924674427
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.3547294136969976,
+            "tiltMaxDegrees": 0.7816738972429111,
+            "pitchMinMaxDegrees": [
+              -0.28276091700112743,
+              0.41877531045631006
+            ],
+            "rollMinMaxDegrees": [
+              -0.4902782687048649,
+              0.7070512883744297
+            ],
+            "yawMinMaxDegrees": [
+              -1.0402268601612232,
+              0.28634273364340296
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 0.7363334155579717,
+            "tiltMaxDegrees": 1.1206486270734424,
+            "pitchMinMaxDegrees": [
+              -0.7492188368861712,
+              0.4093101223753337
+            ],
+            "rollMinMaxDegrees": [
+              -0.974072497094973,
+              0.10108278416592387
+            ],
+            "yawMinMaxDegrees": [
+              -0.4830806307652944,
+              0.9939106687771868
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.3625809082817668,
+            "tiltMaxDegrees": 2.3413886525751213,
+            "pitchMinMaxDegrees": [
+              0.011440450059396744,
+              2.290926132229458
+            ],
+            "rollMinMaxDegrees": [
+              -0.8041740959119095,
+              0.04100998521886615
+            ],
+            "yawMinMaxDegrees": [
+              -0.5913088125329037,
+              1.0238437726311354
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 1.3247184345815488,
+            "tiltMaxDegrees": 2.246114806313682,
+            "pitchMinMaxDegrees": [
+              -0.3352936493333913,
+              1.7782136108534907
+            ],
+            "rollMinMaxDegrees": [
+              -1.7406091918777133,
+              -0.05000335172050173
+            ],
+            "yawMinMaxDegrees": [
+              -2.5863366705230617,
+              -0.20513926561321685
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 2.5041220692480266,
+            "tiltMaxDegrees": 3.992420876055992,
+            "pitchMinMaxDegrees": [
+              0.2600072205654805,
+              3.8747753875211024
+            ],
+            "rollMinMaxDegrees": [
+              -1.5923348374802573,
+              -0.08417775903848534
+            ],
+            "yawMinMaxDegrees": [
+              -2.7271949499055403,
+              -0.393385028018007
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.3215905427932739,
+            -0.20794689655303955
+          ],
+          [
+            -0.297086238861084,
+            -0.2066969871520996
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 1.4132431234173488,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.017434684401902878,
+            0.11903326533764529,
+            0.06820295218124191
+          ],
+          [
+            0.008716941788015964,
+            0.08780286251792262,
+            0.023980428707092237
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.03348803366468396,
+            0.10169098584592587
+          ],
+          [
+            0.03692217618212065,
+            0.06090260488921289
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.007283821341270633,
+            0.060919130839971275
+          ],
+          [
+            -0.021296597644861,
+            0.0026838310622312386
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.004290399607270956,
+        0.0015491843223571777,
+        0.014817401766777039
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "both-arms-overhead",
+      "history": "neutral16-grounded",
+      "effectiveSeed": 0,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": true,
+        "bothWristsAboveHeadObserved": false,
+        "assessment": "Both wrists above the head is a necessary diagnostic for this command; it does not establish full pose, palm orientation or naturalness."
+      }
+    },
+    {
+      "id": "both-arms-overhead-neutral16-grounded-seed1",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-neutral16-grounded-seed1.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 107.46289999224246
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 102.4189000017941
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 107.7180000138469
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 0.4026426573704446,
+            "tiltMaxDegrees": 0.7016503021699302,
+            "pitchMinMaxDegrees": [
+              -0.2028887802601986,
+              0.6574213566907212
+            ],
+            "rollMinMaxDegrees": [
+              -0.4729007672567563,
+              0.2847088408013266
+            ],
+            "yawMinMaxDegrees": [
+              -0.6258130480831912,
+              2.566275349466686
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.01096416165614928,
+            "tiltMaxDegrees": 0.039770053591740843,
+            "pitchMinMaxDegrees": [
+              -5.0383837899612406e-08,
+              5.1679675532165485e-08
+            ],
+            "rollMinMaxDegrees": [
+              -3.776100031138641e-08,
+              3.3925653149849804e-08
+            ],
+            "yawMinMaxDegrees": [
+              -2.7396580947154637e-07,
+              2.3637773243702118e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 0.41180835221739803,
+            "tiltMaxDegrees": 0.8572934932045495,
+            "pitchMinMaxDegrees": [
+              -0.510753585364621,
+              0.8156566943125937
+            ],
+            "rollMinMaxDegrees": [
+              -0.2784428049425614,
+              0.35122996950782615
+            ],
+            "yawMinMaxDegrees": [
+              -0.6086747062269767,
+              2.487257028033713
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.2837996426325651,
+            "tiltMaxDegrees": 0.5603306991284602,
+            "pitchMinMaxDegrees": [
+              -0.5570583293259483,
+              0.39573664899361244
+            ],
+            "rollMinMaxDegrees": [
+              -0.14542927854558557,
+              0.4133147891219271
+            ],
+            "yawMinMaxDegrees": [
+              -0.19128986555113447,
+              0.029166539832922434
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 0.6206059738963664,
+            "tiltMaxDegrees": 1.023928940841777,
+            "pitchMinMaxDegrees": [
+              -0.4499207916932979,
+              1.0236242924651158
+            ],
+            "rollMinMaxDegrees": [
+              -0.43807120747849787,
+              0.616247537743645
+            ],
+            "yawMinMaxDegrees": [
+              -1.1291051961411358,
+              0.8153457729655758
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.38263333719883635,
+            "tiltMaxDegrees": 1.1370662944233865,
+            "pitchMinMaxDegrees": [
+              -0.33022654000273344,
+              0.6550365507038637
+            ],
+            "rollMinMaxDegrees": [
+              -0.28113186651580113,
+              0.9846010651559849
+            ],
+            "yawMinMaxDegrees": [
+              -2.0976960064652275,
+              -0.04553298198573172
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 0.7249016429020079,
+            "tiltMaxDegrees": 1.3794172358801187,
+            "pitchMinMaxDegrees": [
+              -1.3186108056174741,
+              1.2851547868563338
+            ],
+            "rollMinMaxDegrees": [
+              -0.42728978620297786,
+              0.4712306218335542
+            ],
+            "yawMinMaxDegrees": [
+              -1.2860657723985836,
+              0.2593696741101787
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.5161014440536112,
+            "tiltMaxDegrees": 1.2428586551785952,
+            "pitchMinMaxDegrees": [
+              -1.207375220481003,
+              0.8905957617642811
+            ],
+            "rollMinMaxDegrees": [
+              -0.3385162308272182,
+              0.8499217642368924
+            ],
+            "yawMinMaxDegrees": [
+              -2.966822333091565,
+              0.8204296690140618
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 1.3327085897993025,
+            "tiltMaxDegrees": 2.7250543873760624,
+            "pitchMinMaxDegrees": [
+              -0.1831030976750555,
+              2.5710698777596024
+            ],
+            "rollMinMaxDegrees": [
+              -1.1676025028226353,
+              0.32333138345374546
+            ],
+            "yawMinMaxDegrees": [
+              -2.6293510615768865,
+              0.362404880300905
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.0570590337701824,
+            "tiltMaxDegrees": 2.120038601349272,
+            "pitchMinMaxDegrees": [
+              -0.3156374207258991,
+              2.0598694448943444
+            ],
+            "rollMinMaxDegrees": [
+              -1.241140379663021,
+              0.14447434707320533
+            ],
+            "yawMinMaxDegrees": [
+              -4.9000337274603725,
+              0.9237221865346916
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.3076775074005127,
+            -0.20798981189727783
+          ],
+          [
+            -0.2807002067565918,
+            -0.20639169216156006
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 1.4172959917182502,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.01604978469390661,
+            0.10462634624134591,
+            0.07082815274116391
+          ],
+          [
+            0.005901689937607646,
+            0.06632902507307038,
+            0.024605465196016585
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.041506875384774884,
+            0.1123350281259388
+          ],
+          [
+            0.052697795755959564,
+            0.07730326095197615
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            0.0,
+            0.07082815274116391
+          ],
+          [
+            -0.004745696478264068,
+            0.019859768717752517
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.010975474491715431,
+        0.0004913210868835449,
+        0.014445544220507145
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "both-arms-overhead",
+      "history": "neutral16-grounded",
+      "effectiveSeed": 1,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": true,
+        "bothWristsAboveHeadObserved": false,
+        "assessment": "Both wrists above the head is a necessary diagnostic for this command; it does not establish full pose, palm orientation or naturalness."
+      }
+    },
+    {
+      "id": "both-arms-overhead-unity-idle16-grounded-seed0",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-unity-idle16-grounded-seed0.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 101.8980999942869
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 103.2126999925822
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 97.40439997403882
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 2.4438403103376403,
+            "tiltMaxDegrees": 3.6916756182705956,
+            "pitchMinMaxDegrees": [
+              -3.6765504678263117,
+              0.22730196836914443
+            ],
+            "rollMinMaxDegrees": [
+              -0.6301756631953328,
+              0.2975401507661411
+            ],
+            "yawMinMaxDegrees": [
+              -0.2518172985299485,
+              2.8413843433009314
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.008425385925235196,
+            "tiltMaxDegrees": 0.044207890763349654,
+            "pitchMinMaxDegrees": [
+              -2.138332235145761e-07,
+              2.387788147406079e-07
+            ],
+            "rollMinMaxDegrees": [
+              -3.8190404025005865e-08,
+              5.050611070552922e-08
+            ],
+            "yawMinMaxDegrees": [
+              -2.781465322959252e-07,
+              1.9957129916220303e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 2.133041136875925,
+            "tiltMaxDegrees": 3.2003893114774358,
+            "pitchMinMaxDegrees": [
+              -3.1865960764366155,
+              0.23888245163920574
+            ],
+            "rollMinMaxDegrees": [
+              -0.5276916821804578,
+              0.6029439051902211
+            ],
+            "yawMinMaxDegrees": [
+              -0.2744598852798566,
+              2.7905382576175164
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.5515362742425016,
+            "tiltMaxDegrees": 0.8771512026244398,
+            "pitchMinMaxDegrees": [
+              -0.2904448389904074,
+              0.7688080333951189
+            ],
+            "rollMinMaxDegrees": [
+              -0.6867500552753201,
+              0.7221484978911551
+            ],
+            "yawMinMaxDegrees": [
+              -0.10815165602846233,
+              0.153970002433787
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 0.829196010506558,
+            "tiltMaxDegrees": 1.4956711734959287,
+            "pitchMinMaxDegrees": [
+              -1.0710749669052344,
+              1.3962998005170602
+            ],
+            "rollMinMaxDegrees": [
+              -0.8338616269270389,
+              1.04953084963759
+            ],
+            "yawMinMaxDegrees": [
+              -0.5510616647922101,
+              3.6746425861599166
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 2.2705111514393255,
+            "tiltMaxDegrees": 3.4941371877436342,
+            "pitchMinMaxDegrees": [
+              0.5347416495147623,
+              3.492241218025036
+            ],
+            "rollMinMaxDegrees": [
+              -0.9349344100972675,
+              1.647166121378543
+            ],
+            "yawMinMaxDegrees": [
+              -1.0963263996777848,
+              1.5991936387303303
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 2.694174413444375,
+            "tiltMaxDegrees": 4.336618397226928,
+            "pitchMinMaxDegrees": [
+              -0.03989466283074637,
+              2.8861839785830927
+            ],
+            "rollMinMaxDegrees": [
+              -4.273909857113087,
+              1.1993712340187799
+            ],
+            "yawMinMaxDegrees": [
+              -0.38546254100205457,
+              5.350660850422233
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 4.515951945882915,
+            "tiltMaxDegrees": 5.850954185062575,
+            "pitchMinMaxDegrees": [
+              1.6428165604490477,
+              5.4581738421097885
+            ],
+            "rollMinMaxDegrees": [
+              -4.03170407184447,
+              1.093225210564903
+            ],
+            "yawMinMaxDegrees": [
+              -1.7055250797025934,
+              3.6551684311485833
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 5.953798447764029,
+            "tiltMaxDegrees": 8.756093994505829,
+            "pitchMinMaxDegrees": [
+              1.4202568055642921,
+              8.755774142997987
+            ],
+            "rollMinMaxDegrees": [
+              -2.5386500991808463,
+              3.3729517247740484
+            ],
+            "yawMinMaxDegrees": [
+              -2.511187156258277,
+              5.397740945560035
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 8.313404117496933,
+            "tiltMaxDegrees": 11.31212131282139,
+            "pitchMinMaxDegrees": [
+              3.8132788692634385,
+              11.31194442356307
+            ],
+            "rollMinMaxDegrees": [
+              -2.2359887989765417,
+              3.2561525141905823
+            ],
+            "yawMinMaxDegrees": [
+              -4.152909809037778,
+              4.6762465015741075
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7368941307067871,
+            -0.1283811330795288
+          ],
+          [
+            -0.7373623847961426,
+            -0.6796383857727051
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.24980979676146722,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.21183461486393113,
+            0.6026947330055227,
+            0.2323609908638703
+          ],
+          [
+            0.16974127795553925,
+            0.06072986830927957,
+            0.1930579648532518
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.1135657977399339,
+            0.3459267886038042
+          ],
+          [
+            0.10825087600413832,
+            0.3013088408573901
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.20675889907220318,
+            0.025602091791667114
+          ],
+          [
+            -0.1930579648532518,
+            0.0
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.011858458630740643,
+        0.0011747479438781738,
+        0.02192908525466919
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "both-arms-overhead",
+      "history": "unity-idle16-grounded",
+      "effectiveSeed": 0,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": true,
+        "bothWristsAboveHeadObserved": false,
+        "assessment": "Both wrists above the head is a necessary diagnostic for this command; it does not establish full pose, palm orientation or naturalness."
+      }
+    },
+    {
+      "id": "both-arms-overhead-unity-idle16-grounded-seed1",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-unity-idle16-grounded-seed1.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 107.30329999933019
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 114.95990000548773
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 100.74870000244118
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 1.4473673000198315,
+            "tiltMaxDegrees": 2.6363361924492033,
+            "pitchMinMaxDegrees": [
+              0.20519744118697497,
+              2.626195478342794
+            ],
+            "rollMinMaxDegrees": [
+              -0.8627474633841635,
+              0.38010268432551725
+            ],
+            "yawMinMaxDegrees": [
+              -0.23440349834390234,
+              13.509830896578395
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.010396255650824353,
+            "tiltMaxDegrees": 0.04452208392905833,
+            "pitchMinMaxDegrees": [
+              -1.8645274290817025e-07,
+              2.2440431146421738e-07
+            ],
+            "rollMinMaxDegrees": [
+              -4.6523947068033435e-08,
+              4.513876041009591e-08
+            ],
+            "yawMinMaxDegrees": [
+              -7.646305473546116e-07,
+              9.007446506743072e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 0.9240472502807352,
+            "tiltMaxDegrees": 1.8486444187686453,
+            "pitchMinMaxDegrees": [
+              -0.7309448182486367,
+              1.8433597765152365
+            ],
+            "rollMinMaxDegrees": [
+              -0.8606699006358948,
+              0.3855368787847694
+            ],
+            "yawMinMaxDegrees": [
+              -0.2939140237643737,
+              13.367514491918165
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.838730597530451,
+            "tiltMaxDegrees": 1.4643328857569153,
+            "pitchMinMaxDegrees": [
+              -1.4567153498055987,
+              0.24199023346867962
+            ],
+            "rollMinMaxDegrees": [
+              -0.650211136818867,
+              0.17657102543003397
+            ],
+            "yawMinMaxDegrees": [
+              -0.20872889330032499,
+              0.1411426270693389
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 2.3315098222078867,
+            "tiltMaxDegrees": 4.118751034284352,
+            "pitchMinMaxDegrees": [
+              0.30703835967235715,
+              4.113928746858729
+            ],
+            "rollMinMaxDegrees": [
+              -2.1930036767528818,
+              0.2980113722439011
+            ],
+            "yawMinMaxDegrees": [
+              -0.8695243608100838,
+              13.16950931189224
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.0459585271979575,
+            "tiltMaxDegrees": 2.1533891346424006,
+            "pitchMinMaxDegrees": [
+              -0.8294818849399693,
+              2.135381282815255
+            ],
+            "rollMinMaxDegrees": [
+              -1.7448574569640105,
+              0.809425299535847
+            ],
+            "yawMinMaxDegrees": [
+              -1.3330621704251806,
+              0.4795491883992657
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 2.2902662801852145,
+            "tiltMaxDegrees": 7.627791075270545,
+            "pitchMinMaxDegrees": [
+              -1.333045355343279,
+              3.6254021444874804
+            ],
+            "rollMinMaxDegrees": [
+              -1.9336923319447634,
+              7.231234577312918
+            ],
+            "yawMinMaxDegrees": [
+              0.25836159287276833,
+              10.875505666348754
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 2.154303265200304,
+            "tiltMaxDegrees": 8.228398829832965,
+            "pitchMinMaxDegrees": [
+              -2.6452313445501057,
+              1.9701989566383653
+            ],
+            "rollMinMaxDegrees": [
+              -1.9239665687612038,
+              8.22430051424134
+            ],
+            "yawMinMaxDegrees": [
+              -4.0631321109613445,
+              1.7367442654286984
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 5.379722071414509,
+            "tiltMaxDegrees": 12.01891719600775,
+            "pitchMinMaxDegrees": [
+              0.9532904507229071,
+              11.942357792248357
+            ],
+            "rollMinMaxDegrees": [
+              -5.366808968550215,
+              3.1910396856733954
+            ],
+            "yawMinMaxDegrees": [
+              1.7032322286097374,
+              9.073609647266117
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 4.504057909452373,
+            "tiltMaxDegrees": 11.21156325007128,
+            "pitchMinMaxDegrees": [
+              -0.3449245332677969,
+              11.200323144288744
+            ],
+            "rollMinMaxDegrees": [
+              -4.132980999572397,
+              3.0807200302109097
+            ],
+            "yawMinMaxDegrees": [
+              -5.290025196878477,
+              3.688621362609633
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7314404249191284,
+            -0.6588554382324219
+          ],
+          [
+            -0.7403891682624817,
+            0.13924169540405273
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.2494427069302614,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.14910165911745318,
+            0.06970102536727923,
+            0.20262264816502623
+          ],
+          [
+            0.4720411434282682,
+            0.874916224786576,
+            0.2243896519833411
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.11742432309365053,
+            0.32004697125867676
+          ],
+          [
+            0.1901787395849182,
+            0.4145683915682593
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.20262264816502623,
+            0.0
+          ],
+          [
+            -0.11138784696740295,
+            0.11300180501593815
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.011385097168385983,
+        0.0016474127769470215,
+        0.021846294403076172
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "both-arms-overhead",
+      "history": "unity-idle16-grounded",
+      "effectiveSeed": 1,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": true,
+        "bothWristsAboveHeadObserved": false,
+        "assessment": "Both wrists above the head is a necessary diagnostic for this command; it does not establish full pose, palm orientation or naturalness."
+      }
+    },
+    {
+      "id": "both-arms-overhead-unity-idle-hips-relative16-grounded-seed0",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-unity-idle-hips-relative16-grounded-seed0.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 104.21439999481663
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 109.5148999884259
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 107.0389999949839
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 2.20512127572422,
+            "tiltMaxDegrees": 3.3437486331894393,
+            "pitchMinMaxDegrees": [
+              -3.329243002817605,
+              0.1737920159033268
+            ],
+            "rollMinMaxDegrees": [
+              -0.5906221685443709,
+              0.26490036805447775
+            ],
+            "yawMinMaxDegrees": [
+              -0.10972843500581098,
+              3.619522921813748
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.008602093373312884,
+            "tiltMaxDegrees": 0.043758226284680665,
+            "pitchMinMaxDegrees": [
+              -2.7189435590068275e-07,
+              1.9490657494957876e-07
+            ],
+            "rollMinMaxDegrees": [
+              -2.1658653249895506e-08,
+              4.434944695903288e-08
+            ],
+            "yawMinMaxDegrees": [
+              -2.3561069050382384e-07,
+              2.029091357238118e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 2.1062748835830094,
+            "tiltMaxDegrees": 2.8913725713750402,
+            "pitchMinMaxDegrees": [
+              -2.887063995359956,
+              -0.11378152624602457
+            ],
+            "rollMinMaxDegrees": [
+              -0.244363714111745,
+              0.8354500631773417
+            ],
+            "yawMinMaxDegrees": [
+              -0.16336395146252064,
+              3.575911496911274
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.3147351186163237,
+            "tiltMaxDegrees": 0.9748903647101584,
+            "pitchMinMaxDegrees": [
+              -0.42046613561900914,
+              0.5350477348747557
+            ],
+            "rollMinMaxDegrees": [
+              -0.3511853006735594,
+              0.9307780727988194
+            ],
+            "yawMinMaxDegrees": [
+              -0.12125051598475792,
+              0.12460336422294242
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 0.9031224654600503,
+            "tiltMaxDegrees": 1.3308978420604407,
+            "pitchMinMaxDegrees": [
+              -1.2636872399947325,
+              1.1549906729466537
+            ],
+            "rollMinMaxDegrees": [
+              -0.651661460090347,
+              1.1296974593744535
+            ],
+            "yawMinMaxDegrees": [
+              -0.657915340611566,
+              4.268922985709059
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.9536965930360222,
+            "tiltMaxDegrees": 3.3145856561223153,
+            "pitchMinMaxDegrees": [
+              0.24302468505781583,
+              3.2933598161824613
+            ],
+            "rollMinMaxDegrees": [
+              -0.7762415255682314,
+              1.7428210885881061
+            ],
+            "yawMinMaxDegrees": [
+              -1.2881626625948768,
+              1.631063030515196
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 2.7426975645040432,
+            "tiltMaxDegrees": 5.760344396447056,
+            "pitchMinMaxDegrees": [
+              0.2945730474261472,
+              2.052647387828569
+            ],
+            "rollMinMaxDegrees": [
+              -5.682109207389923,
+              1.4779629505469687
+            ],
+            "yawMinMaxDegrees": [
+              -0.19947428085176794,
+              6.718213543133893
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 4.257288104453429,
+            "tiltMaxDegrees": 6.944516932238193,
+            "pitchMinMaxDegrees": [
+              1.011054669055348,
+              4.619448986902864
+            ],
+            "rollMinMaxDegrees": [
+              -5.460245360372483,
+              1.4037366477062792
+            ],
+            "yawMinMaxDegrees": [
+              -1.5536144543729842,
+              4.315832300390769
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 5.38775565403476,
+            "tiltMaxDegrees": 7.537545944881813,
+            "pitchMinMaxDegrees": [
+              1.6563107344963621,
+              7.530874901296886
+            ],
+            "rollMinMaxDegrees": [
+              -4.0131325018982515,
+              3.418797162050929
+            ],
+            "yawMinMaxDegrees": [
+              -1.6728256569335784,
+              7.264625967898065
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 7.393620780840508,
+            "tiltMaxDegrees": 9.849330416533116,
+            "pitchMinMaxDegrees": [
+              3.293187825505454,
+              9.84601841423485
+            ],
+            "rollMinMaxDegrees": [
+              -3.6824922866677827,
+              3.339423909017787
+            ],
+            "yawMinMaxDegrees": [
+              -3.497515224488533,
+              5.141783181233263
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7363284826278687,
+            -0.043772220611572266
+          ],
+          [
+            -0.7380113005638123,
+            -0.6795555353164673
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.24855436945208456,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.21557677501160102,
+            0.6884579609704717,
+            0.24632164112993193
+          ],
+          [
+            0.17034081772682597,
+            0.060929239569480986,
+            0.1915204366980866
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.10927330838719491,
+            0.35559494951712683
+          ],
+          [
+            0.10990442262892874,
+            0.30142485932701535
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.2089187654544305,
+            0.037402875675501435
+          ],
+          [
+            -0.1915204366980866,
+            0.0
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.012340211309492588,
+        0.0014160871505737305,
+        0.02179183065891266
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "both-arms-overhead",
+      "history": "unity-idle-hips-relative16-grounded",
+      "effectiveSeed": 0,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": true,
+        "bothWristsAboveHeadObserved": false,
+        "assessment": "Both wrists above the head is a necessary diagnostic for this command; it does not establish full pose, palm orientation or naturalness."
+      }
+    },
+    {
+      "id": "both-arms-overhead-unity-idle-hips-relative16-grounded-seed1",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-unity-idle-hips-relative16-grounded-seed1.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 118.1098000088241
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 108.06330002378672
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 114.54650000086986
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 1.6324639113420232,
+            "tiltMaxDegrees": 2.562618616644584,
+            "pitchMinMaxDegrees": [
+              0.19804613999231213,
+              2.5487457680763037
+            ],
+            "rollMinMaxDegrees": [
+              -1.000713673166484,
+              0.4310058540915001
+            ],
+            "yawMinMaxDegrees": [
+              -0.17617801018300902,
+              13.338745836349837
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.009219805603038232,
+            "tiltMaxDegrees": 0.040179428338673884,
+            "pitchMinMaxDegrees": [
+              -1.1162796349316737e-07,
+              2.204679123712949e-07
+            ],
+            "rollMinMaxDegrees": [
+              -4.7373644379340883e-08,
+              7.448363435143587e-08
+            ],
+            "yawMinMaxDegrees": [
+              -1.0139135109904446e-06,
+              9.359014472556648e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 0.8482989947247961,
+            "tiltMaxDegrees": 1.8730438504992304,
+            "pitchMinMaxDegrees": [
+              -0.4280100428330701,
+              1.8528115305649842
+            ],
+            "rollMinMaxDegrees": [
+              -0.8880999491320453,
+              0.48083324572027364
+            ],
+            "yawMinMaxDegrees": [
+              -0.24095878044732072,
+              13.417066613288565
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.9691793178179314,
+            "tiltMaxDegrees": 1.6716901701250877,
+            "pitchMinMaxDegrees": [
+              -1.6416864411237362,
+              -0.17030669662880427
+            ],
+            "rollMinMaxDegrees": [
+              -0.3718866776904997,
+              0.3574915161840976
+            ],
+            "yawMinMaxDegrees": [
+              -0.19560195545863715,
+              0.20595146940216194
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 2.3512948871585504,
+            "tiltMaxDegrees": 4.018928479375346,
+            "pitchMinMaxDegrees": [
+              0.3908745816884959,
+              4.017079401439469
+            ],
+            "rollMinMaxDegrees": [
+              -2.3889597198460515,
+              0.5431483146287291
+            ],
+            "yawMinMaxDegrees": [
+              -0.9480620122123379,
+              12.87813574422244
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.894450864136932,
+            "tiltMaxDegrees": 1.8265990828770253,
+            "pitchMinMaxDegrees": [
+              -1.0028515701227483,
+              1.7751703603665014
+            ],
+            "rollMinMaxDegrees": [
+              -1.70991479767364,
+              0.4648719769940317
+            ],
+            "yawMinMaxDegrees": [
+              -1.3150272557775082,
+              0.3542689496349695
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 2.258312747288315,
+            "tiltMaxDegrees": 7.595123845499005,
+            "pitchMinMaxDegrees": [
+              -1.1158743053111626,
+              3.690787350360404
+            ],
+            "rollMinMaxDegrees": [
+              -2.0126433731798317,
+              7.042478865964435
+            ],
+            "yawMinMaxDegrees": [
+              0.30015449770298747,
+              10.21571906083544
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 2.2056270384024392,
+            "tiltMaxDegrees": 8.158492331634863,
+            "pitchMinMaxDegrees": [
+              -2.8771604569752207,
+              1.640743686028971
+            ],
+            "rollMinMaxDegrees": [
+              -1.9286760969242644,
+              8.149029230564299
+            ],
+            "yawMinMaxDegrees": [
+              -4.306380199355916,
+              1.8399249231660337
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 5.515136095942152,
+            "tiltMaxDegrees": 13.477250299217696,
+            "pitchMinMaxDegrees": [
+              1.1635482943008377,
+              13.46308355319206
+            ],
+            "rollMinMaxDegrees": [
+              -5.747695503601947,
+              3.4211067190672457
+            ],
+            "yawMinMaxDegrees": [
+              2.742870220981332,
+              10.030793943997965
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 4.6355835862720856,
+            "tiltMaxDegrees": 12.350374822299024,
+            "pitchMinMaxDegrees": [
+              -1.2606086023075043,
+              12.350234215878396
+            ],
+            "rollMinMaxDegrees": [
+              -4.314595212238163,
+              3.3433687768626967
+            ],
+            "yawMinMaxDegrees": [
+              -5.32236781239255,
+              4.149843717635719
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.73155677318573,
+            -0.6568682193756104
+          ],
+          [
+            -0.7387758493423462,
+            0.13623547554016113
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.24766417128460674,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.1531357480319797,
+            0.06761961142856532,
+            0.19054421052038756
+          ],
+          [
+            0.48285474648735627,
+            0.8699567331351741,
+            0.19780358757479188
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.12758554571607084,
+            0.3181297562364584
+          ],
+          [
+            0.19364686267375197,
+            0.39145045024854386
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.19054421052038756,
+            0.0
+          ],
+          [
+            -0.10748140971904607,
+            0.09032217785574581
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.012265730649232864,
+        0.0015102028846740723,
+        0.02142449840903282
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "both-arms-overhead",
+      "history": "unity-idle-hips-relative16-grounded",
+      "effectiveSeed": 1,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": true,
+        "bothWristsAboveHeadObserved": false,
+        "assessment": "Both wrists above the head is a necessary diagnostic for this command; it does not establish full pose, palm orientation or naturalness."
+      }
+    },
+    {
+      "id": "both-arms-overhead-projected-left-tail16-grounded-seed0",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-projected-left-tail16-grounded-seed0.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 123.10969998361543
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 106.13210001611151
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 111.28469998948276
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 0.5125154316388868,
+            "tiltMaxDegrees": 1.4842445059552474,
+            "pitchMinMaxDegrees": [
+              -1.482798831294539,
+              0.3115836283321002
+            ],
+            "rollMinMaxDegrees": [
+              -0.2890462978657148,
+              0.24345327285437593
+            ],
+            "yawMinMaxDegrees": [
+              -3.4108212867889796,
+              0.6290968491733229
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.007340660797588653,
+            "tiltMaxDegrees": 0.03951023037982412,
+            "pitchMinMaxDegrees": [
+              -8.509335858816055e-08,
+              1.0198071000695912e-07
+            ],
+            "rollMinMaxDegrees": [
+              -1.1797582887404663e-08,
+              1.788644167926658e-08
+            ],
+            "yawMinMaxDegrees": [
+              -1.9584116587789303e-07,
+              2.3463942439755115e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 4.53939335161687,
+            "tiltMaxDegrees": 5.502921892348839,
+            "pitchMinMaxDegrees": [
+              -5.493756206903086,
+              -3.587386590082743
+            ],
+            "rollMinMaxDegrees": [
+              -0.41851070184857203,
+              0.1431258815253586
+            ],
+            "yawMinMaxDegrees": [
+              -3.248660626398075,
+              0.5656206763774226
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 4.089494373779411,
+            "tiltMaxDegrees": 4.847511367778587,
+            "pitchMinMaxDegrees": [
+              -4.84289541753192,
+              -3.225480109921106
+            ],
+            "rollMinMaxDegrees": [
+              -0.5642515635104343,
+              0.464983790540781
+            ],
+            "yawMinMaxDegrees": [
+              -0.22883654823088206,
+              0.1989823315637046
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 3.3998111622360456,
+            "tiltMaxDegrees": 6.055146990727063,
+            "pitchMinMaxDegrees": [
+              -1.9078509998766546,
+              1.032829848574316
+            ],
+            "rollMinMaxDegrees": [
+              1.1638340948335786,
+              6.000307367232087
+            ],
+            "yawMinMaxDegrees": [
+              -4.703550660093424,
+              -1.3171497242156394
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 3.3760078545248633,
+            "tiltMaxDegrees": 6.249325238390993,
+            "pitchMinMaxDegrees": [
+              -1.416361958579846,
+              1.0899535400879736
+            ],
+            "rollMinMaxDegrees": [
+              1.1755623808586064,
+              6.219325601430885
+            ],
+            "yawMinMaxDegrees": [
+              -3.8621026592981234,
+              1.0613956217928515
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 6.93886414125084,
+            "tiltMaxDegrees": 8.02159647634637,
+            "pitchMinMaxDegrees": [
+              -4.391257205255371,
+              -1.4088633322593134
+            ],
+            "rollMinMaxDegrees": [
+              -7.774425590485127,
+              -5.060848325003767
+            ],
+            "yawMinMaxDegrees": [
+              0.08928094784951572,
+              5.595840994394533
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 6.731971276725726,
+            "tiltMaxDegrees": 8.031225505688731,
+            "pitchMinMaxDegrees": [
+              -3.7486894605847914,
+              -0.7700283021838892
+            ],
+            "rollMinMaxDegrees": [
+              -7.971182360383712,
+              -4.975090325421597
+            ],
+            "yawMinMaxDegrees": [
+              0.8548681740459242,
+              7.70424355892526
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 6.761843378810156,
+            "tiltMaxDegrees": 8.857873475237673,
+            "pitchMinMaxDegrees": [
+              -4.975181932818466,
+              -1.2940139970675952
+            ],
+            "rollMinMaxDegrees": [
+              -8.684088121418892,
+              -3.9432411067462447
+            ],
+            "yawMinMaxDegrees": [
+              0.388220420293465,
+              8.205476425754075
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 6.529237989239568,
+            "tiltMaxDegrees": 8.917377998892787,
+            "pitchMinMaxDegrees": [
+              -4.907052562783982,
+              -0.6626817054841935
+            ],
+            "rollMinMaxDegrees": [
+              -8.879674539496085,
+              -3.857448109652978
+            ],
+            "yawMinMaxDegrees": [
+              0.2658354183982217,
+              9.88651975974043
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7420142889022827,
+            -0.014753103256225586
+          ],
+          [
+            -0.7473639845848083,
+            -0.7345611453056335
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.49363894839905187,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.26892574093700183,
+            0.6824413332383278,
+            0.2226794851536443
+          ],
+          [
+            0.06714263172905549,
+            0.024812695466839563,
+            0.04506210530208565
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.12381250753930037,
+            0.3464919926929447
+          ],
+          [
+            0.08285712928159772,
+            0.12791923458368337
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.020563103924897908,
+            0.2021163812287464
+          ],
+          [
+            -0.04213635081605428,
+            0.0029257544860313706
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.01647878997027874,
+        0.0015208125114440918,
+        0.0224933959543705
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "both-arms-overhead",
+      "history": "projected-left-tail16-grounded",
+      "effectiveSeed": 0,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": true,
+        "bothWristsAboveHeadObserved": false,
+        "assessment": "Both wrists above the head is a necessary diagnostic for this command; it does not establish full pose, palm orientation or naturalness."
+      }
+    },
+    {
+      "id": "both-arms-overhead-projected-left-tail16-grounded-seed1",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\both-arms-overhead-projected-left-tail16-grounded-seed1.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 120.08310001692735
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 111.48960000718944
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 112.13329999009147
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 1.9325628129526662,
+            "tiltMaxDegrees": 4.158829687024659,
+            "pitchMinMaxDegrees": [
+              0.0971714061616887,
+              4.0967497369821695
+            ],
+            "rollMinMaxDegrees": [
+              -0.36779810640058097,
+              1.3342883174353193
+            ],
+            "yawMinMaxDegrees": [
+              -2.8398611114865506,
+              6.699524167361411
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.008244977721103452,
+            "tiltMaxDegrees": 0.0414237065280442,
+            "pitchMinMaxDegrees": [
+              -2.6692009461384285e-07,
+              2.3276174777006472e-07
+            ],
+            "rollMinMaxDegrees": [
+              -9.80578000496646e-08,
+              6.471022881581957e-08
+            ],
+            "yawMinMaxDegrees": [
+              -4.55514249961312e-07,
+              4.616008617309244e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 2.996455458214656,
+            "tiltMaxDegrees": 4.569004021834181,
+            "pitchMinMaxDegrees": [
+              -4.560855434906571,
+              2.866482585260876
+            ],
+            "rollMinMaxDegrees": [
+              -0.3658041719388914,
+              2.2970959837128544
+            ],
+            "yawMinMaxDegrees": [
+              -3.0589749671501956,
+              6.452361319289156
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 3.3021291137090096,
+            "tiltMaxDegrees": 5.118451629015609,
+            "pitchMinMaxDegrees": [
+              -5.116734571477177,
+              -0.5718330213711964
+            ],
+            "rollMinMaxDegrees": [
+              -0.3491457297385924,
+              1.472608032005345
+            ],
+            "yawMinMaxDegrees": [
+              -0.6067119185298393,
+              -0.08310823893922553
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 5.111952988603703,
+            "tiltMaxDegrees": 10.451483116528875,
+            "pitchMinMaxDegrees": [
+              -0.26270185696054055,
+              6.04500537520662
+            ],
+            "rollMinMaxDegrees": [
+              1.204661338068937,
+              9.323998879915866
+            ],
+            "yawMinMaxDegrees": [
+              -5.730683738669942,
+              4.296045846032629
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 4.288970434806221,
+            "tiltMaxDegrees": 8.888853709773876,
+            "pitchMinMaxDegrees": [
+              -1.6092221652666798,
+              3.107440122771166
+            ],
+            "rollMinMaxDegrees": [
+              1.180764473559734,
+              8.670434033262854
+            ],
+            "yawMinMaxDegrees": [
+              -6.9829047284924615,
+              -2.3978427920770358
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 6.136562258113504,
+            "tiltMaxDegrees": 10.985319142196175,
+            "pitchMinMaxDegrees": [
+              -9.680169923024785,
+              -0.13003592272985515
+            ],
+            "rollMinMaxDegrees": [
+              -7.7495732025688016,
+              -1.0247621750432778
+            ],
+            "yawMinMaxDegrees": [
+              -0.017024630172264636,
+              5.9217449055926235
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 7.587068621375924,
+            "tiltMaxDegrees": 12.218282524145447,
+            "pitchMinMaxDegrees": [
+              -11.069020277110557,
+              -3.5488543753824695
+            ],
+            "rollMinMaxDegrees": [
+              -9.034372762288866,
+              -1.948125627558207
+            ],
+            "yawMinMaxDegrees": [
+              -3.992106631825532,
+              4.967221350110978
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 7.967444277687613,
+            "tiltMaxDegrees": 13.929667524512995,
+            "pitchMinMaxDegrees": [
+              -12.608211055912161,
+              -2.2367007344314236
+            ],
+            "rollMinMaxDegrees": [
+              -7.333590311497758,
+              -1.5568189616328254
+            ],
+            "yawMinMaxDegrees": [
+              -2.438064224611388,
+              9.671213709792752
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 9.673510435941246,
+            "tiltMaxDegrees": 15.633063549838035,
+            "pitchMinMaxDegrees": [
+              -14.246600849258082,
+              -4.561029822117747
+            ],
+            "rollMinMaxDegrees": [
+              -8.689594788546396,
+              -3.2007997815041302
+            ],
+            "yawMinMaxDegrees": [
+              -6.658390989788075,
+              12.59573937744241
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7401227951049805,
+            0.07819080352783203
+          ],
+          [
+            -0.7695440649986267,
+            -0.7420722246170044
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.4919779325735774,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.3148878328491903,
+            0.7628266378555553,
+            0.3143440879757173
+          ],
+          [
+            0.04305475341808834,
+            0.017823163466252234,
+            0.05813230306332537
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.058142395045231776,
+            0.37248648302094906
+          ],
+          [
+            0.09461208537989671,
+            0.15274438844322208
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.08629714284918374,
+            0.22804694512653353
+          ],
+          [
+            -0.03041592956111705,
+            0.02771637350220832
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.03132498636841774,
+        0.0023373961448669434,
+        0.014946593903005123
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "both-arms-overhead",
+      "history": "projected-left-tail16-grounded",
+      "effectiveSeed": 1,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": true,
+        "bothWristsAboveHeadObserved": false,
+        "assessment": "Both wrists above the head is a necessary diagnostic for this command; it does not establish full pose, palm orientation or naturalness."
+      }
+    },
+    {
+      "id": "explanatory-palms-up-neutral16-grounded-seed0",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\explanatory-palms-up-neutral16-grounded-seed0.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 107.73930000141263
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 106.2386000121478
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 111.56099999789149
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 1.313090697614336,
+            "tiltMaxDegrees": 2.0258404179325584,
+            "pitchMinMaxDegrees": [
+              -2.0011077538121187,
+              -0.03480722166102178
+            ],
+            "rollMinMaxDegrees": [
+              -0.5025690733234727,
+              0.13178049930411728
+            ],
+            "yawMinMaxDegrees": [
+              -0.6244640001762302,
+              0.5597648485901211
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.010205072967032592,
+            "tiltMaxDegrees": 0.036427651449722584,
+            "pitchMinMaxDegrees": [
+              -2.089950931786754e-07,
+              1.5507500031333388e-07
+            ],
+            "rollMinMaxDegrees": [
+              -3.0136000012043914e-08,
+              2.6479668187488234e-08
+            ],
+            "yawMinMaxDegrees": [
+              -4.7954606164573825e-08,
+              5.030933139918098e-08
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 1.2956343948819211,
+            "tiltMaxDegrees": 2.175108808652116,
+            "pitchMinMaxDegrees": [
+              -2.1599406925927362,
+              0.15513242208239078
+            ],
+            "rollMinMaxDegrees": [
+              -0.41020880601671245,
+              -0.028266821028706406
+            ],
+            "yawMinMaxDegrees": [
+              -0.5906349941609036,
+              0.5277130683301801
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.19224581883027794,
+            "tiltMaxDegrees": 0.3887875954174306,
+            "pitchMinMaxDegrees": [
+              -0.21440291605353254,
+              0.3462142191144278
+            ],
+            "rollMinMaxDegrees": [
+              -0.24259930692114232,
+              0.1238857347002672
+            ],
+            "yawMinMaxDegrees": [
+              -0.17716706493409895,
+              0.04864646096846008
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 1.478520237588802,
+            "tiltMaxDegrees": 2.265981460021119,
+            "pitchMinMaxDegrees": [
+              -2.2659069943736307,
+              0.21132951778126813
+            ],
+            "rollMinMaxDegrees": [
+              -0.42091645638682373,
+              0.18514007266323385
+            ],
+            "yawMinMaxDegrees": [
+              -1.1920134266872164,
+              0.34646600009330497
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.3310734545474569,
+            "tiltMaxDegrees": 0.5705887544294377,
+            "pitchMinMaxDegrees": [
+              -0.4810510719550715,
+              0.28776788121681873
+            ],
+            "rollMinMaxDegrees": [
+              -0.4399639449946003,
+              0.4269512540898282
+            ],
+            "yawMinMaxDegrees": [
+              -1.118858113841249,
+              0.05630344716169586
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 0.9872102025989397,
+            "tiltMaxDegrees": 2.080178243406305,
+            "pitchMinMaxDegrees": [
+              -2.02623358364051,
+              0.13934093334697573
+            ],
+            "rollMinMaxDegrees": [
+              -0.6077113124762565,
+              0.08970776236096667
+            ],
+            "yawMinMaxDegrees": [
+              -1.3881344963791258,
+              -0.08558527597824817
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.5040276850220985,
+            "tiltMaxDegrees": 1.0392639702997075,
+            "pitchMinMaxDegrees": [
+              -0.19576275094183546,
+              0.9734453649026676
+            ],
+            "rollMinMaxDegrees": [
+              -0.6259372299533378,
+              0.25688649728878526
+            ],
+            "yawMinMaxDegrees": [
+              -0.9194555708710117,
+              0.2595331169176568
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 0.7226547531706496,
+            "tiltMaxDegrees": 1.1836598555770963,
+            "pitchMinMaxDegrees": [
+              -0.09437850809357708,
+              1.0207879878920953
+            ],
+            "rollMinMaxDegrees": [
+              -0.8353488169118521,
+              0.035237809012983894
+            ],
+            "yawMinMaxDegrees": [
+              -3.920384953700229,
+              -0.43573046881006977
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.820723570152526,
+            "tiltMaxDegrees": 2.490639394334773,
+            "pitchMinMaxDegrees": [
+              0.18589274922537474,
+              2.410246583907435
+            ],
+            "rollMinMaxDegrees": [
+              -0.7287455024280202,
+              0.18876958445884348
+            ],
+            "yawMinMaxDegrees": [
+              -3.7217992777694913,
+              -0.6355653607650794
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.31690919399261475,
+            -0.2079310417175293
+          ],
+          [
+            -0.27776026725769043,
+            -0.20674991607666016
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 1.4168704079079635,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.016191627521185414,
+            0.11202192368303115,
+            0.06268787125046008
+          ],
+          [
+            0.006115524094310043,
+            0.07029022663687275,
+            0.0236880459517715
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.04035662739233926,
+            0.10304449864279933
+          ],
+          [
+            0.04189464472539986,
+            0.06558269067717136
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -5.351216080722032e-05,
+            0.06263435908965284
+          ],
+          [
+            -0.01653261291610921,
+            0.007155433035662288
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.004062552470713854,
+        0.0012854933738708496,
+        0.019863219931721687
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "explanatory-palms-up",
+      "history": "neutral16-grounded",
+      "effectiveSeed": 0,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": false,
+        "bothWristsAboveHeadObserved": null,
+        "assessment": "Explanatory gesture semantics require visual assessment of both forearms and palm orientation. Above-head fraction is not a success criterion; chest-local forward measurements are descriptive only."
+      }
+    },
+    {
+      "id": "explanatory-palms-up-neutral16-grounded-seed1",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\explanatory-palms-up-neutral16-grounded-seed1.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 107.89739998290315
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 115.88189998292364
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 110.51179998321459
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 0.2969081379390491,
+            "tiltMaxDegrees": 0.6170725127222179,
+            "pitchMinMaxDegrees": [
+              -0.20843798133232805,
+              0.5900423406677398
+            ],
+            "rollMinMaxDegrees": [
+              -0.24237362576728053,
+              0.2283869736731674
+            ],
+            "yawMinMaxDegrees": [
+              -0.5250074872529906,
+              2.280299618968606
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.011371824835984092,
+            "tiltMaxDegrees": 0.03959599149675244,
+            "pitchMinMaxDegrees": [
+              -3.6921078464891646e-08,
+              3.58886026694791e-08
+            ],
+            "rollMinMaxDegrees": [
+              -1.2558877996119634e-08,
+              1.56412688082699e-08
+            ],
+            "yawMinMaxDegrees": [
+              -2.781975873477806e-07,
+              1.726953470874967e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 0.30791549820619285,
+            "tiltMaxDegrees": 0.6437658677170703,
+            "pitchMinMaxDegrees": [
+              -0.21805343786032397,
+              0.6196139076775151
+            ],
+            "rollMinMaxDegrees": [
+              -0.28161994430002457,
+              0.23818844576851964
+            ],
+            "yawMinMaxDegrees": [
+              -0.5679607450403201,
+              2.162615471344205
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.12879509255660773,
+            "tiltMaxDegrees": 0.2591474453236182,
+            "pitchMinMaxDegrees": [
+              -0.19458855952182097,
+              0.22333875488307708
+            ],
+            "rollMinMaxDegrees": [
+              -0.22121727212098846,
+              0.11040707263378001
+            ],
+            "yawMinMaxDegrees": [
+              -0.17652928878882324,
+              0.05042801774367714
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 0.3206469478658145,
+            "tiltMaxDegrees": 0.6355061491481365,
+            "pitchMinMaxDegrees": [
+              -0.23742839362595494,
+              0.6331533798926634
+            ],
+            "rollMinMaxDegrees": [
+              -0.4407848548461717,
+              0.32534253099201754
+            ],
+            "yawMinMaxDegrees": [
+              -1.040184857682585,
+              0.7251305646761909
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.2798630055784301,
+            "tiltMaxDegrees": 0.6118398267425621,
+            "pitchMinMaxDegrees": [
+              -0.40664224109599123,
+              0.30481999938016635
+            ],
+            "rollMinMaxDegrees": [
+              -0.4534606003710418,
+              0.5741625925190537
+            ],
+            "yawMinMaxDegrees": [
+              -1.6941578028333084,
+              0.0947460420178257
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 0.4492281572591672,
+            "tiltMaxDegrees": 1.0588786112578004,
+            "pitchMinMaxDegrees": [
+              -1.0461342340088016,
+              0.45838386592208535
+            ],
+            "rollMinMaxDegrees": [
+              -0.39214232299359825,
+              0.3616771783756927
+            ],
+            "yawMinMaxDegrees": [
+              -0.8205373755606471,
+              0.674891593348036
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.5641254947982663,
+            "tiltMaxDegrees": 1.2170591540103988,
+            "pitchMinMaxDegrees": [
+              -1.2005902160426567,
+              0.2999113037270878
+            ],
+            "rollMinMaxDegrees": [
+              -0.46362034278036623,
+              0.580611761848003
+            ],
+            "yawMinMaxDegrees": [
+              -2.1988581773071267,
+              0.4433588586876293
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 0.8533527356230552,
+            "tiltMaxDegrees": 1.832802865630226,
+            "pitchMinMaxDegrees": [
+              -0.23399101632946231,
+              1.6915342103195143
+            ],
+            "rollMinMaxDegrees": [
+              -1.0204185293138623,
+              0.189594686952542
+            ],
+            "yawMinMaxDegrees": [
+              -2.224327805346261,
+              -0.02490202566846709
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.7947850033907414,
+            "tiltMaxDegrees": 1.6447782759128757,
+            "pitchMinMaxDegrees": [
+              -0.5932690745326129,
+              1.5333034031743609
+            ],
+            "rollMinMaxDegrees": [
+              -1.069535897576154,
+              0.07934576910458024
+            ],
+            "yawMinMaxDegrees": [
+              -4.287507048146966,
+              0.16600027662181122
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.29510486125946045,
+            -0.2083531618118286
+          ],
+          [
+            -0.2629427909851074,
+            -0.20673751831054688
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 1.4214517517699148,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.013367281752026838,
+            0.09217432789595478,
+            0.06942976687687372
+          ],
+          [
+            0.004184718589466119,
+            0.05224544553943254,
+            0.02176967134678562
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.040339734268411226,
+            0.10976950114528494
+          ],
+          [
+            0.0579607738472864,
+            0.07973044519407202
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            0.0,
+            0.06942976687687372
+          ],
+          [
+            -0.0006185578220685439,
+            0.021151113524717075
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.009856617078185081,
+        0.000536799430847168,
+        0.019364450126886368
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "explanatory-palms-up",
+      "history": "neutral16-grounded",
+      "effectiveSeed": 1,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": false,
+        "bothWristsAboveHeadObserved": null,
+        "assessment": "Explanatory gesture semantics require visual assessment of both forearms and palm orientation. Above-head fraction is not a success criterion; chest-local forward measurements are descriptive only."
+      }
+    },
+    {
+      "id": "explanatory-palms-up-unity-idle16-grounded-seed0",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\explanatory-palms-up-unity-idle16-grounded-seed0.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 104.28709999541752
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 102.35120001016185
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 103.80739998072386
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 1.6056619002747154,
+            "tiltMaxDegrees": 2.813551355525182,
+            "pitchMinMaxDegrees": [
+              -2.7977042022728655,
+              0.15359061125482829
+            ],
+            "rollMinMaxDegrees": [
+              -0.6756340863461572,
+              0.21992735923915838
+            ],
+            "yawMinMaxDegrees": [
+              -1.7720196424006929,
+              1.4736768155017461
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.007269723295769301,
+            "tiltMaxDegrees": 0.039003338422787415,
+            "pitchMinMaxDegrees": [
+              -2.1592229352363108e-07,
+              1.7618840255195853e-07
+            ],
+            "rollMinMaxDegrees": [
+              -3.793291509292319e-08,
+              5.006316129933876e-08
+            ],
+            "yawMinMaxDegrees": [
+              -1.78716809253611e-07,
+              1.6783374562333562e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 1.8705082895983574,
+            "tiltMaxDegrees": 3.059214840490707,
+            "pitchMinMaxDegrees": [
+              -3.042565994024692,
+              0.2420007498866379
+            ],
+            "rollMinMaxDegrees": [
+              -0.5134142189727589,
+              0.48141724523654295
+            ],
+            "yawMinMaxDegrees": [
+              -1.7730754074039374,
+              1.4426442361965384
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.495422293532263,
+            "tiltMaxDegrees": 1.0562526546007385,
+            "pitchMinMaxDegrees": [
+              -0.9813584077189496,
+              0.256214637322523
+            ],
+            "rollMinMaxDegrees": [
+              -0.6557055210772379,
+              0.5951198578693425
+            ],
+            "yawMinMaxDegrees": [
+              -0.11081298138053071,
+              0.20427371231546962
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 0.8831431808806596,
+            "tiltMaxDegrees": 1.5431960420593793,
+            "pitchMinMaxDegrees": [
+              -1.5227098902523442,
+              1.0703745122286006
+            ],
+            "rollMinMaxDegrees": [
+              -0.8197205717643007,
+              0.6573738489848184
+            ],
+            "yawMinMaxDegrees": [
+              -0.8395700524066352,
+              2.0317046721988192
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.220600573255084,
+            "tiltMaxDegrees": 2.383848573635798,
+            "pitchMinMaxDegrees": [
+              0.31007539618079505,
+              2.380029796623141
+            ],
+            "rollMinMaxDegrees": [
+              -0.9600148303778411,
+              0.5721873337798773
+            ],
+            "yawMinMaxDegrees": [
+              -1.5471399210324166,
+              2.3445447856142043
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 2.65858337239068,
+            "tiltMaxDegrees": 4.904645441051845,
+            "pitchMinMaxDegrees": [
+              0.7536732581333524,
+              2.7780668888570865
+            ],
+            "rollMinMaxDegrees": [
+              -4.446844084586031,
+              1.144192196317501
+            ],
+            "yawMinMaxDegrees": [
+              -0.1481287365526612,
+              4.329471868785567
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 3.906361923567857,
+            "tiltMaxDegrees": 6.297860020438294,
+            "pitchMinMaxDegrees": [
+              1.6625630038241914,
+              5.284975518976701
+            ],
+            "rollMinMaxDegrees": [
+              -4.370397033107406,
+              1.0443318533051467
+            ],
+            "yawMinMaxDegrees": [
+              -0.9656383805326916,
+              4.556161701691869
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 6.615164327135431,
+            "tiltMaxDegrees": 8.912288352715237,
+            "pitchMinMaxDegrees": [
+              2.778870789319176,
+              8.911743802112628
+            ],
+            "rollMinMaxDegrees": [
+              -5.008002353949856,
+              3.2939319220744983
+            ],
+            "yawMinMaxDegrees": [
+              -2.4492108925146074,
+              4.300833514787825
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 8.03084580908847,
+            "tiltMaxDegrees": 10.343860388937912,
+            "pitchMinMaxDegrees": [
+              3.9587317659300614,
+              10.34356888707025
+            ],
+            "rollMinMaxDegrees": [
+              -4.981823804941859,
+              3.182543318792644
+            ],
+            "yawMinMaxDegrees": [
+              -0.9755051735853885,
+              3.65652260020562
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7317551970481873,
+            -0.30241072177886963
+          ],
+          [
+            -0.7413502335548401,
+            -0.6800706386566162
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.2496300265484801,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.3202907766357307,
+            0.432896508672178,
+            0.17687631592031927
+          ],
+          [
+            0.2549994398991528,
+            0.060872056370409044,
+            0.21386515807745324
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.1430891604795856,
+            0.31996547639990486
+          ],
+          [
+            0.08772521929184526,
+            0.3015903773692985
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.17687631592031927,
+            0.0
+          ],
+          [
+            -0.21386515807745324,
+            0.0
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.008399246260523796,
+        0.0010429620742797852,
+        0.010443072766065598
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "explanatory-palms-up",
+      "history": "unity-idle16-grounded",
+      "effectiveSeed": 0,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": false,
+        "bothWristsAboveHeadObserved": null,
+        "assessment": "Explanatory gesture semantics require visual assessment of both forearms and palm orientation. Above-head fraction is not a success criterion; chest-local forward measurements are descriptive only."
+      }
+    },
+    {
+      "id": "explanatory-palms-up-unity-idle16-grounded-seed1",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\explanatory-palms-up-unity-idle16-grounded-seed1.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 110.91210000449792
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 103.89960001339205
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 105.2868000115268
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 0.8686457705382015,
+            "tiltMaxDegrees": 1.7850927925156241,
+            "pitchMinMaxDegrees": [
+              0.19871491137108616,
+              1.7742757538765954
+            ],
+            "rollMinMaxDegrees": [
+              -0.20968766699535166,
+              0.25826570893238415
+            ],
+            "yawMinMaxDegrees": [
+              -0.1965785651908618,
+              7.481108200190696
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.009537835731483181,
+            "tiltMaxDegrees": 0.04428951766726076,
+            "pitchMinMaxDegrees": [
+              -1.0863572130244321e-07,
+              9.753001528687155e-08
+            ],
+            "rollMinMaxDegrees": [
+              -1.6271700442740752e-08,
+              1.4829484846790979e-08
+            ],
+            "yawMinMaxDegrees": [
+              -8.336439104772862e-07,
+              1.118257509663333e-06
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 0.7554715332030518,
+            "tiltMaxDegrees": 1.5529297952081773,
+            "pitchMinMaxDegrees": [
+              -0.6726068477952802,
+              1.5481064000102207
+            ],
+            "rollMinMaxDegrees": [
+              -0.496606702800994,
+              0.12305647193479571
+            ],
+            "yawMinMaxDegrees": [
+              -0.28618236737149827,
+              7.331639125921971
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.49546198276975983,
+            "tiltMaxDegrees": 1.0341955868884602,
+            "pitchMinMaxDegrees": [
+              -1.023947890865446,
+              0.042478586423459315
+            ],
+            "rollMinMaxDegrees": [
+              -0.5402852889234133,
+              0.15428741186719847
+            ],
+            "yawMinMaxDegrees": [
+              -0.1971040293162094,
+              -0.03341102299742338
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 2.073623410673469,
+            "tiltMaxDegrees": 4.112231782567477,
+            "pitchMinMaxDegrees": [
+              0.2910170416571667,
+              3.843222683115355
+            ],
+            "rollMinMaxDegrees": [
+              -2.2408051619000493,
+              -0.2148200960288444
+            ],
+            "yawMinMaxDegrees": [
+              -0.8589399397525251,
+              5.8556213493041875
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.3435896522022668,
+            "tiltMaxDegrees": 3.0821619139831387,
+            "pitchMinMaxDegrees": [
+              -0.0351496262716001,
+              2.7363708548748806
+            ],
+            "rollMinMaxDegrees": [
+              -2.030779009368474,
+              0.051660205973459605
+            ],
+            "yawMinMaxDegrees": [
+              -2.211568825522543,
+              -0.09127535369405829
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 2.3380823394496386,
+            "tiltMaxDegrees": 4.50241259047955,
+            "pitchMinMaxDegrees": [
+              -0.5204662266175109,
+              4.501962220015825
+            ],
+            "rollMinMaxDegrees": [
+              -1.1288098624729073,
+              1.577944286785873
+            ],
+            "yawMinMaxDegrees": [
+              0.3518503244352075,
+              4.838006966554543
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.7094838556344334,
+            "tiltMaxDegrees": 3.342563094733739,
+            "pitchMinMaxDegrees": [
+              -0.8448067247142067,
+              3.3379586960107237
+            ],
+            "rollMinMaxDegrees": [
+              -0.8799374134407597,
+              1.3989838928216152
+            ],
+            "yawMinMaxDegrees": [
+              -3.567295312461472,
+              1.052742442704336
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 5.654960871481486,
+            "tiltMaxDegrees": 8.843912441393892,
+            "pitchMinMaxDegrees": [
+              2.8911753520072505,
+              8.793826913456721
+            ],
+            "rollMinMaxDegrees": [
+              -1.843897823964029,
+              3.2344184055887575
+            ],
+            "yawMinMaxDegrees": [
+              0.18372954309668582,
+              4.033258735681125
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 4.838726864376068,
+            "tiltMaxDegrees": 7.712478556903129,
+            "pitchMinMaxDegrees": [
+              2.0427496192357713,
+              7.6771519373927255
+            ],
+            "rollMinMaxDegrees": [
+              -1.0056055337436023,
+              3.1270483913313227
+            ],
+            "yawMinMaxDegrees": [
+              -5.780836037744892,
+              3.2021603262452656
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7333179712295532,
+            -0.6588366031646729
+          ],
+          [
+            -0.7422159910202026,
+            -0.679842472076416
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.2494743240302183,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.10830390771321005,
+            0.0709002153125382,
+            0.15441377282738689
+          ],
+          [
+            0.08846740276541579,
+            0.05784382936463961,
+            0.13220365655832195
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.1655762172409056,
+            0.3199899900682925
+          ],
+          [
+            0.1695026103261033,
+            0.30170626688442526
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.15441377282738689,
+            0.0
+          ],
+          [
+            -0.13220365655832195,
+            0.0
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.008740510791540146,
+        0.0007910728454589844,
+        0.007901388220489025
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "explanatory-palms-up",
+      "history": "unity-idle16-grounded",
+      "effectiveSeed": 1,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": false,
+        "bothWristsAboveHeadObserved": null,
+        "assessment": "Explanatory gesture semantics require visual assessment of both forearms and palm orientation. Above-head fraction is not a success criterion; chest-local forward measurements are descriptive only."
+      }
+    },
+    {
+      "id": "explanatory-palms-up-unity-idle-hips-relative16-grounded-seed0",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\explanatory-palms-up-unity-idle-hips-relative16-grounded-seed0.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 110.07710002013482
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 106.24799999641255
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 108.9806999952998
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 1.2259478394967482,
+            "tiltMaxDegrees": 2.465136493671359,
+            "pitchMinMaxDegrees": [
+              -2.4562941330559,
+              0.6054619757147828
+            ],
+            "rollMinMaxDegrees": [
+              -0.8325250670020441,
+              0.27936591309855174
+            ],
+            "yawMinMaxDegrees": [
+              -1.7731346528983136,
+              1.5542148912145743
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.007918204498916769,
+            "tiltMaxDegrees": 0.040192675362731856,
+            "pitchMinMaxDegrees": [
+              -1.4786894895292163e-07,
+              1.021925618476467e-07
+            ],
+            "rollMinMaxDegrees": [
+              -3.8874698080662834e-08,
+              4.7996109648407645e-08
+            ],
+            "yawMinMaxDegrees": [
+              -1.4605699745905455e-07,
+              1.2912050607033252e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 1.6327042870749446,
+            "tiltMaxDegrees": 2.527781314733714,
+            "pitchMinMaxDegrees": [
+              -2.527699281314389,
+              0.27658072080411383
+            ],
+            "rollMinMaxDegrees": [
+              -0.9935853241831829,
+              0.25390269169435326
+            ],
+            "yawMinMaxDegrees": [
+              -1.6369214758570616,
+              1.5631050749822124
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.55931035764383,
+            "tiltMaxDegrees": 1.538221164407881,
+            "pitchMinMaxDegrees": [
+              -1.5212609745891417,
+              0.43863562650593746
+            ],
+            "rollMinMaxDegrees": [
+              -0.39355448965299134,
+              0.3106156403353684
+            ],
+            "yawMinMaxDegrees": [
+              -0.12846919744921992,
+              0.18071878516976586
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 0.8319254606994828,
+            "tiltMaxDegrees": 1.7686823114691272,
+            "pitchMinMaxDegrees": [
+              -1.4559624385582783,
+              1.670881641994207
+            ],
+            "rollMinMaxDegrees": [
+              -1.202326478709416,
+              0.8449442746833946
+            ],
+            "yawMinMaxDegrees": [
+              -1.954191716189575,
+              1.2128373129086614
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.8728404068012883,
+            "tiltMaxDegrees": 2.343148222326775,
+            "pitchMinMaxDegrees": [
+              0.07362862385379773,
+              2.3007247442973147
+            ],
+            "rollMinMaxDegrees": [
+              -0.8084127828003336,
+              0.904811855522235
+            ],
+            "yawMinMaxDegrees": [
+              -1.3131228702745739,
+              0.372254057241155
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 2.6176694585930864,
+            "tiltMaxDegrees": 6.802561045047173,
+            "pitchMinMaxDegrees": [
+              0.21023616895685304,
+              6.502762719681401
+            ],
+            "rollMinMaxDegrees": [
+              -3.134043323363812,
+              1.5293508660897017
+            ],
+            "yawMinMaxDegrees": [
+              -2.1207140730208223,
+              2.95616643591389
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 3.584371912214711,
+            "tiltMaxDegrees": 7.6719733655627405,
+            "pitchMinMaxDegrees": [
+              0.5441916948891059,
+              7.327842555369518
+            ],
+            "rollMinMaxDegrees": [
+              -3.0249903582982003,
+              1.4670254424006737
+            ],
+            "yawMinMaxDegrees": [
+              -0.9400195632127386,
+              2.0485756209249386
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 6.771921229790022,
+            "tiltMaxDegrees": 9.022733025779266,
+            "pitchMinMaxDegrees": [
+              3.188088362085242,
+              9.022611612644049
+            ],
+            "rollMinMaxDegrees": [
+              -3.902746642235627,
+              3.495746041648662
+            ],
+            "yawMinMaxDegrees": [
+              -3.174782360066586,
+              4.0304934026361865
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 7.840610461694825,
+            "tiltMaxDegrees": 10.57793484197041,
+            "pitchMinMaxDegrees": [
+              3.199227088244129,
+              10.545830654841879
+            ],
+            "rollMinMaxDegrees": [
+              -3.1582575469279677,
+              3.4349050407271675
+            ],
+            "yawMinMaxDegrees": [
+              -2.496679061719471,
+              4.1258255257439895
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7305552959442139,
+            -0.33558833599090576
+          ],
+          [
+            -0.7424583435058594,
+            -0.3429591655731201
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.2483472721157533,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.49110639017802615,
+            0.3959813791204853,
+            0.17153038897877312
+          ],
+          [
+            0.5184171394643744,
+            0.3942019539757989,
+            0.26283598688477267
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.14670570488392046,
+            0.3182360938626936
+          ],
+          [
+            0.03861346694172879,
+            0.30144945382650146
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.17153038897877312,
+            0.0
+          ],
+          [
+            -0.26283598688477267,
+            0.0
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.008603767491877079,
+        0.0021590590476989746,
+        0.009848268702626228
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "explanatory-palms-up",
+      "history": "unity-idle-hips-relative16-grounded",
+      "effectiveSeed": 0,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": false,
+        "bothWristsAboveHeadObserved": null,
+        "assessment": "Explanatory gesture semantics require visual assessment of both forearms and palm orientation. Above-head fraction is not a success criterion; chest-local forward measurements are descriptive only."
+      }
+    },
+    {
+      "id": "explanatory-palms-up-unity-idle-hips-relative16-grounded-seed1",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\explanatory-palms-up-unity-idle-hips-relative16-grounded-seed1.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 102.4436000152491
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 103.76440000254661
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 110.51149998093024
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 1.000960957948789,
+            "tiltMaxDegrees": 2.044974973750565,
+            "pitchMinMaxDegrees": [
+              0.23427830445412737,
+              2.0065817778626314
+            ],
+            "rollMinMaxDegrees": [
+              -0.07567403032597447,
+              0.2855481909457165
+            ],
+            "yawMinMaxDegrees": [
+              -0.029321093877084977,
+              6.12683629043264
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.008128691462885767,
+            "tiltMaxDegrees": 0.04983953579266482,
+            "pitchMinMaxDegrees": [
+              -1.4759032361500706e-07,
+              8.57048555299531e-08
+            ],
+            "rollMinMaxDegrees": [
+              -1.9949163773526834e-08,
+              2.0708197392149645e-08
+            ],
+            "yawMinMaxDegrees": [
+              -5.292991778724791e-07,
+              5.59402414138733e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 0.6839471687768574,
+            "tiltMaxDegrees": 1.649125964267524,
+            "pitchMinMaxDegrees": [
+              -0.7683985689631392,
+              1.535549977014106
+            ],
+            "rollMinMaxDegrees": [
+              -0.06720895863628046,
+              0.660854467638859
+            ],
+            "yawMinMaxDegrees": [
+              -0.09495118430288305,
+              5.9640504048152465
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.753324298006062,
+            "tiltMaxDegrees": 1.349982210795951,
+            "pitchMinMaxDegrees": [
+              -1.3430516405332196,
+              -0.31480178494520056
+            ],
+            "rollMinMaxDegrees": [
+              -0.09738818611455236,
+              0.3594353623115951
+            ],
+            "yawMinMaxDegrees": [
+              -0.1963210968468498,
+              -0.026835483648867238
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 1.756480150299129,
+            "tiltMaxDegrees": 4.17743607754393,
+            "pitchMinMaxDegrees": [
+              0.08123791596628935,
+              3.827360018069653
+            ],
+            "rollMinMaxDegrees": [
+              -2.203610421982722,
+              0.20398723158123194
+            ],
+            "yawMinMaxDegrees": [
+              -0.6457937118232061,
+              4.610462548619147
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.0263592270687738,
+            "tiltMaxDegrees": 3.049020291868481,
+            "pitchMinMaxDegrees": [
+              -0.43453265836284066,
+              2.5241521462266574
+            ],
+            "rollMinMaxDegrees": [
+              -2.2355768914038423,
+              0.08217967393920869
+            ],
+            "yawMinMaxDegrees": [
+              -2.0308047805131353,
+              -0.1920787047961892
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 2.073316175237334,
+            "tiltMaxDegrees": 3.866701225129755,
+            "pitchMinMaxDegrees": [
+              -1.4468850616815658,
+              3.8335175559287085
+            ],
+            "rollMinMaxDegrees": [
+              -1.1872277553843065,
+              1.7511763141435637
+            ],
+            "yawMinMaxDegrees": [
+              0.34089658762613045,
+              3.7092863475920432
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.6203638780211052,
+            "tiltMaxDegrees": 2.4207176654128504,
+            "pitchMinMaxDegrees": [
+              -2.029220668570228,
+              2.337354286538881
+            ],
+            "rollMinMaxDegrees": [
+              -1.2183258485185195,
+              1.585412437292489
+            ],
+            "yawMinMaxDegrees": [
+              -3.2117728318961785,
+              1.3866501568320142
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 4.841598043472335,
+            "tiltMaxDegrees": 8.066428613023882,
+            "pitchMinMaxDegrees": [
+              1.5420642443102663,
+              8.03100255327242
+            ],
+            "rollMinMaxDegrees": [
+              -1.804826469658571,
+              3.4543487874636742
+            ],
+            "yawMinMaxDegrees": [
+              -0.00660727985838845,
+              4.568869142423546
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 3.932253899046892,
+            "tiltMaxDegrees": 6.921433392234491,
+            "pitchMinMaxDegrees": [
+              0.9535972610595266,
+              6.869009592277351
+            ],
+            "rollMinMaxDegrees": [
+              -1.374166643638359,
+              3.427103875383733
+            ],
+            "yawMinMaxDegrees": [
+              -4.935545153514521,
+              3.95012551611673
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7348939776420593,
+            -0.6567797660827637
+          ],
+          [
+            -0.7418361902236938,
+            -0.679129958152771
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.2480806579861112,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.11378254841500639,
+            0.06999029802113177,
+            0.1550251058093976
+          ],
+          [
+            0.08817597099120607,
+            0.05870068321185801,
+            0.13660390661895913
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.16324542802621111,
+            0.3182705338356087
+          ],
+          [
+            0.16667291806529835,
+            0.3032768246842575
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.1550251058093976,
+            0.0
+          ],
+          [
+            -0.13450334346650247,
+            0.002100563152456658
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.009082956239581108,
+        0.0007086396217346191,
+        0.007591284811496735
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "explanatory-palms-up",
+      "history": "unity-idle-hips-relative16-grounded",
+      "effectiveSeed": 1,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": false,
+        "bothWristsAboveHeadObserved": null,
+        "assessment": "Explanatory gesture semantics require visual assessment of both forearms and palm orientation. Above-head fraction is not a success criterion; chest-local forward measurements are descriptive only."
+      }
+    },
+    {
+      "id": "explanatory-palms-up-projected-left-tail16-grounded-seed0",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\explanatory-palms-up-projected-left-tail16-grounded-seed0.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 116.65099998936057
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 100.60530001646839
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 103.36809998261742
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 0.2861934495052205,
+            "tiltMaxDegrees": 0.5388665621908757,
+            "pitchMinMaxDegrees": [
+              -0.5388798526655643,
+              0.13071701410746422
+            ],
+            "rollMinMaxDegrees": [
+              -0.10389467214888183,
+              0.1229279968826893
+            ],
+            "yawMinMaxDegrees": [
+              -1.4861862696999426,
+              -0.058753806606745486
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.00586692809809356,
+            "tiltMaxDegrees": 0.036161268544785304,
+            "pitchMinMaxDegrees": [
+              -2.722212084811955e-08,
+              4.12008905064717e-08
+            ],
+            "rollMinMaxDegrees": [
+              -4.8317294562919754e-09,
+              1.3298210076923418e-08
+            ],
+            "yawMinMaxDegrees": [
+              -1.3443102314599439e-07,
+              1.2925383918891789e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 4.558593151853444,
+            "tiltMaxDegrees": 4.95558934268418,
+            "pitchMinMaxDegrees": [
+              -4.949911245183739,
+              -4.205702761087932
+            ],
+            "rollMinMaxDegrees": [
+              -0.4074984761045611,
+              -0.14916595025989884
+            ],
+            "yawMinMaxDegrees": [
+              -1.568891780250041,
+              -0.2787223440063199
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 4.298938924643551,
+            "tiltMaxDegrees": 4.756791213801246,
+            "pitchMinMaxDegrees": [
+              -4.751937334720034,
+              -3.9319024516229493
+            ],
+            "rollMinMaxDegrees": [
+              -0.43089198287920055,
+              -0.04445200820250986
+            ],
+            "yawMinMaxDegrees": [
+              -0.23720064625265083,
+              -0.04570427992931882
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 1.5242333342658716,
+            "tiltMaxDegrees": 1.7320096122288893,
+            "pitchMinMaxDegrees": [
+              0.09956021997990801,
+              1.0956418283618248
+            ],
+            "rollMinMaxDegrees": [
+              1.1751134285154716,
+              1.6887152709825912
+            ],
+            "yawMinMaxDegrees": [
+              -4.741330770787065,
+              -3.1744890152129748
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.6097878097486564,
+            "tiltMaxDegrees": 1.971325265541489,
+            "pitchMinMaxDegrees": [
+              0.291244024947512,
+              1.1409322351728417
+            ],
+            "rollMinMaxDegrees": [
+              1.1454024737400004,
+              1.7209227472829114
+            ],
+            "yawMinMaxDegrees": [
+              -3.984841868974167,
+              -2.115530712327972
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 7.334254662780334,
+            "tiltMaxDegrees": 8.330460218235034,
+            "pitchMinMaxDegrees": [
+              -4.1133043332427714,
+              -2.9417115128892255
+            ],
+            "rollMinMaxDegrees": [
+              -7.127118256856786,
+              -5.4318512850060925
+            ],
+            "yawMinMaxDegrees": [
+              0.05608416724499767,
+              2.922320422060555
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 7.215611339833433,
+            "tiltMaxDegrees": 8.101718837807054,
+            "pitchMinMaxDegrees": [
+              -3.8572322376249146,
+              -2.5512695731709165
+            ],
+            "rollMinMaxDegrees": [
+              -7.035981901587659,
+              -5.353919285748623
+            ],
+            "yawMinMaxDegrees": [
+              0.9244102590527983,
+              3.8178260526159793
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 6.917100695080441,
+            "tiltMaxDegrees": 8.106365935139776,
+            "pitchMinMaxDegrees": [
+              -4.984553128404739,
+              -1.8036313500551004
+            ],
+            "rollMinMaxDegrees": [
+              -6.86144277112564,
+              -4.406575916678308
+            ],
+            "yawMinMaxDegrees": [
+              2.5362467207352903,
+              5.656924255460986
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 6.7940599922006415,
+            "tiltMaxDegrees": 7.850936019951195,
+            "pitchMinMaxDegrees": [
+              -5.111179240556698,
+              -1.5687284110149902
+            ],
+            "rollMinMaxDegrees": [
+              -6.686542002360533,
+              -4.30903492529972
+            ],
+            "yawMinMaxDegrees": [
+              2.9111376210515147,
+              6.459829825487154
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7432396411895752,
+            -0.7386534214019775
+          ],
+          [
+            -0.7451816201210022,
+            -0.7401449680328369
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.4920217746248887,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.009081006685342258,
+            0.006175606301070613,
+            0.01507787185391235
+          ],
+          [
+            0.011639115788914411,
+            0.0038649553840337525,
+            0.013096741197400605
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.12951653375587963,
+            0.14459440560979198
+          ],
+          [
+            0.11553664560032419,
+            0.1286333867977248
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.01507787185391235,
+            0.0
+          ],
+          [
+            -0.009585194716769094,
+            0.003511546480631511
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.007668741978704929,
+        0.0010210275650024414,
+        0.005178835242986679
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "explanatory-palms-up",
+      "history": "projected-left-tail16-grounded",
+      "effectiveSeed": 0,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": false,
+        "bothWristsAboveHeadObserved": null,
+        "assessment": "Explanatory gesture semantics require visual assessment of both forearms and palm orientation. Above-head fraction is not a success criterion; chest-local forward measurements are descriptive only."
+      }
+    },
+    {
+      "id": "explanatory-palms-up-projected-left-tail16-grounded-seed1",
+      "clip": "Server\\ARDY\\runtime\\generated-motion-diagnosis-grounded\\explanatory-palms-up-projected-left-tail16-grounded-seed1.json",
+      "windows": [
+        {
+          "window": 0,
+          "historyFrames": 16,
+          "milliseconds": 101.29160000360571
+        },
+        {
+          "window": 1,
+          "historyFrames": 16,
+          "milliseconds": 103.4108999883756
+        },
+        {
+          "window": 2,
+          "historyFrames": 16,
+          "milliseconds": 107.3294999951031
+        }
+      ],
+      "frames": 120,
+      "bones": {
+        "Hips": {
+          "global": {
+            "tiltMeanDegrees": 1.2571475335350593,
+            "tiltMaxDegrees": 1.8762800969214435,
+            "pitchMinMaxDegrees": [
+              0.0898552286891764,
+              1.863467318992951
+            ],
+            "rollMinMaxDegrees": [
+              -0.01462895233731493,
+              0.2454345025225326
+            ],
+            "yawMinMaxDegrees": [
+              -0.990861518143857,
+              2.3546753621150414
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 0.008794174686805156,
+            "tiltMaxDegrees": 0.03646670691449965,
+            "pitchMinMaxDegrees": [
+              -1.3822830847760997e-07,
+              2.2508108599003545e-07
+            ],
+            "rollMinMaxDegrees": [
+              -1.9819134491005928e-08,
+              2.3313936242545468e-08
+            ],
+            "yawMinMaxDegrees": [
+              -2.5638848691029333e-07,
+              3.171257039659991e-07
+            ]
+          }
+        },
+        "Spine": {
+          "global": {
+            "tiltMeanDegrees": 3.3738601879343793,
+            "tiltMaxDegrees": 4.554404586005448,
+            "pitchMinMaxDegrees": [
+              -4.5473538604407295,
+              -2.5369165535083162
+            ],
+            "rollMinMaxDegrees": [
+              -0.3510824024755413,
+              0.21017953604184994
+            ],
+            "yawMinMaxDegrees": [
+              -1.2243370890384346,
+              2.1582378867780894
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 4.62539164698866,
+            "tiltMaxDegrees": 5.086625444993097,
+            "pitchMinMaxDegrees": [
+              -5.082989281228031,
+              -4.288856111952776
+            ],
+            "rollMinMaxDegrees": [
+              -0.3419886147082479,
+              -0.05779168162866018
+            ],
+            "yawMinMaxDegrees": [
+              -0.278017364977151,
+              -0.15673619681456136
+            ]
+          }
+        },
+        "Spine3": {
+          "global": {
+            "tiltMeanDegrees": 2.418146610214437,
+            "tiltMaxDegrees": 3.5157460528904427,
+            "pitchMinMaxDegrees": [
+              0.7997424704304954,
+              2.60141394305747
+            ],
+            "rollMinMaxDegrees": [
+              1.1901469796831063,
+              2.4570874174675374
+            ],
+            "yawMinMaxDegrees": [
+              -4.84890136266347,
+              -0.8784713615977704
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 1.6794199353325845,
+            "tiltMaxDegrees": 2.4608934856139353,
+            "pitchMinMaxDegrees": [
+              0.11685170498838549,
+              0.9432316156673639
+            ],
+            "rollMinMaxDegrees": [
+              0.9710579945879244,
+              2.3786078409299973
+            ],
+            "yawMinMaxDegrees": [
+              -3.91505967342645,
+              -3.1661249136656466
+            ]
+          }
+        },
+        "Neck": {
+          "global": {
+            "tiltMeanDegrees": 6.893453073253919,
+            "tiltMaxDegrees": 7.868586269230666,
+            "pitchMinMaxDegrees": [
+              -5.060938783765369,
+              -2.8522076008602486
+            ],
+            "rollMinMaxDegrees": [
+              -6.546528441311593,
+              -5.027332048808906
+            ],
+            "yawMinMaxDegrees": [
+              -0.07933752350763396,
+              4.600211922964362
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 7.734404440818888,
+            "tiltMaxDegrees": 8.81808355108591,
+            "pitchMinMaxDegrees": [
+              -6.26459720700729,
+              -3.6275540056071085
+            ],
+            "rollMinMaxDegrees": [
+              -6.949207449955452,
+              -5.140695430385636
+            ],
+            "yawMinMaxDegrees": [
+              0.8758504092928764,
+              2.6077577095955893
+            ]
+          }
+        },
+        "Head": {
+          "global": {
+            "tiltMeanDegrees": 7.443318568234404,
+            "tiltMaxDegrees": 8.457282966677186,
+            "pitchMinMaxDegrees": [
+              -5.272286730610033,
+              -3.0298599671260713
+            ],
+            "rollMinMaxDegrees": [
+              -7.289606349350646,
+              -4.4130447893063325
+            ],
+            "yawMinMaxDegrees": [
+              2.8062100414043063,
+              6.8352538618577565
+            ]
+          },
+          "relativeHips": {
+            "tiltMeanDegrees": 8.332842647699957,
+            "tiltMaxDegrees": 9.506841569509657,
+            "pitchMinMaxDegrees": [
+              -6.5979019246760675,
+              -4.295946261838926
+            ],
+            "rollMinMaxDegrees": [
+              -7.613163416706871,
+              -4.316331571715216
+            ],
+            "yawMinMaxDegrees": [
+              3.3786090793076617,
+              6.051615344040276
+            ]
+          }
+        }
+      },
+      "hands": {
+        "aboveHeadMinMaxMeters": [
+          [
+            -0.7431575655937195,
+            -0.738582193851471
+          ],
+          [
+            -0.7481750249862671,
+            -0.7416853904724121
+          ]
+        ],
+        "bothAboveHeadFraction": 0.0,
+        "leftAcrossChestMidlineFraction": 0.0,
+        "rightAcrossChestMidlineFraction": 0.0,
+        "minimumWristSeparationMeters": 0.4842448985819513,
+        "chestRelativeRangeXYZMeters": [
+          [
+            0.012442353190163541,
+            0.003984726283176254,
+            0.008915359188991279
+          ],
+          [
+            0.00834289652918399,
+            0.0023468346907707383,
+            0.011222688398819958
+          ]
+        ],
+        "chestLocalForwardZMinMaxMeters": [
+          [
+            0.14161084767848417,
+            0.15052620686747545
+          ],
+          [
+            0.1255814276410827,
+            0.13680411603990267
+          ]
+        ],
+        "chestLocalForwardDisplacementFromFirstFrameMinMaxMeters": [
+          [
+            -0.0023805996575003985,
+            0.00653475953149088
+          ],
+          [
+            0.0,
+            0.011222688398819958
+          ]
+        ],
+        "forwardMeasurementConvention": "Left, right order; Core27 chest-local +Z is forward; displacement is relative to the first generated frame, not the input history."
+      },
+      "rootRangeXYZMeters": [
+        0.005194507539272308,
+        0.0009840726852416992,
+        0.007983190007507801
+      ],
+      "limitations": "Source Core27 geometry; hand-side and height diagnostics are not human naturalness or target-avatar collision judgments.",
+      "prompt": "explanatory-palms-up",
+      "history": "projected-left-tail16-grounded",
+      "effectiveSeed": 1,
+      "semanticEvaluation": {
+        "overheadCriterionApplicable": false,
+        "bothWristsAboveHeadObserved": null,
+        "assessment": "Explanatory gesture semantics require visual assessment of both forearms and palm orientation. Above-head fraction is not a success criterion; chest-local forward measurements are descriptive only."
+      }
+    }
+  ],
+  "featureDiagnostics": {
+    "both-arms-overhead": {
+      "featureSource": "frozen-previously-measured-live-feature-for-paired-ablation",
+      "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+      "qwenNorm": 111.65637969970703,
+      "adaptedNorm": 121.43268585205078,
+      "nearestCachedQwen": [
+        {
+          "id": "motion-01904",
+          "text": "A person who is standing extends the right arm outward with a small movement and brings it back at a moderate pace.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.9078921675682068
+        },
+        {
+          "id": "motion-00464",
+          "text": "An individual extends the right arm outward with a small movement and brings it back at a moderate pace.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.9014026522636414
+        },
+        {
+          "id": "motion-01429",
+          "text": "A person who is standing extends the right arm outward with a large movement and brings it back quickly.",
+          "family": "extend_arm",
+          "split": "test",
+          "cosine": 0.8973720073699951
+        },
+        {
+          "id": "motion-00175",
+          "text": "A standing person extends the right arm outward with a large movement and brings it back slowly.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.8969713449478149
+        },
+        {
+          "id": "motion-01717",
+          "text": "A standing person extends the right arm outward with a large movement and brings it back quickly.",
+          "family": "extend_arm",
+          "split": "test",
+          "cosine": 0.8949626684188843
+        }
+      ],
+      "nearestCachedTeacherToAdapterOutput": [
+        {
+          "id": "motion-00445",
+          "text": "A person standing upright raises and lowers the right arm with large movements quickly.",
+          "family": "raise_arm",
+          "split": "train",
+          "cosine": 0.9104271531105042
+        },
+        {
+          "id": "motion-01477",
+          "text": "A person standing upright raises and lowers the right arm with moderate movements quickly.",
+          "family": "raise_arm",
+          "split": "train",
+          "cosine": 0.9101192951202393
+        },
+        {
+          "id": "motion-00469",
+          "text": "A standing person raises and lowers the right arm with moderate movements quickly.",
+          "family": "raise_arm",
+          "split": "train",
+          "cosine": 0.9087983965873718
+        },
+        {
+          "id": "motion-00301",
+          "text": "A standing person raises and lowers the right arm with large movements quickly.",
+          "family": "raise_arm",
+          "split": "train",
+          "cosine": 0.9084564447402954
+        },
+        {
+          "id": "motion-00877",
+          "text": "A person raises and lowers the right arm with large movements quickly.",
+          "family": "raise_arm",
+          "split": "train",
+          "cosine": 0.9073172211647034
+        }
+      ],
+      "limitation": "Nearest template proximity does not identify the correct unseen teacher feature or prove adapter causality."
+    },
+    "explanatory-palms-up": {
+      "featureSource": "frozen-previously-measured-live-feature-for-paired-ablation",
+      "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+      "qwenNorm": 110.3972396850586,
+      "adaptedNorm": 115.71647644042969,
+      "nearestCachedQwen": [
+        {
+          "id": "motion-00464",
+          "text": "An individual extends the right arm outward with a small movement and brings it back at a moderate pace.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.935695230960846
+        },
+        {
+          "id": "motion-01904",
+          "text": "A person who is standing extends the right arm outward with a small movement and brings it back at a moderate pace.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.9316186904907227
+        },
+        {
+          "id": "motion-01040",
+          "text": "A person extends the right arm outward with a small movement and brings it back at a moderate pace.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.93100506067276
+        },
+        {
+          "id": "motion-00179",
+          "text": "A person who is standing extends the right arm outward with a small movement and brings it back quickly.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.9248236417770386
+        },
+        {
+          "id": "motion-01429",
+          "text": "A person who is standing extends the right arm outward with a large movement and brings it back quickly.",
+          "family": "extend_arm",
+          "split": "test",
+          "cosine": 0.9238598346710205
+        }
+      ],
+      "nearestCachedTeacherToAdapterOutput": [
+        {
+          "id": "motion-00452",
+          "text": "A person extends the right arm outward with a small movement and brings it back slowly.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.939052164554596
+        },
+        {
+          "id": "motion-00740",
+          "text": "An individual extends the right arm outward with a small movement and brings it back slowly.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.9377059936523438
+        },
+        {
+          "id": "motion-00164",
+          "text": "Someone extends the right arm outward with a small movement and brings it back slowly.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.9360909461975098
+        },
+        {
+          "id": "motion-01535",
+          "text": "A person extends the right arm outward with a moderate movement and brings it back slowly.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.9349766969680786
+        },
+        {
+          "id": "motion-00383",
+          "text": "Someone extends the right arm outward with a moderate movement and brings it back slowly.",
+          "family": "extend_arm",
+          "split": "train",
+          "cosine": 0.9329437017440796
+        }
+      ],
+      "limitation": "Nearest template proximity does not identify the correct unseen teacher feature or prove adapter causality."
+    }
+  },
+  "sourceNeutralHips": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "groundedSourcePelvisHeightMeters": 0.9544128252334833,
+  "heightAblation": true,
+  "frozenFeaturesDirectory": "Server\\ARDY\\runtime\\generated-motion-diagnosis",
+  "complete": true,
+  "scriptSha256": "67c1a2f8ab5b41b96004d05188946d00d26c2bb82c490351db4648d493e35b16",
+  "semanticMetricPostprocessing": {
+    "method": "CPU remeasurement from unchanged saved source Core27 NPZ; no regenerated motion. Overhead gate applies only to overhead prompts; explanation metrics are descriptive only.",
+    "scriptSha256": "139f4d9e8c4d695520287d74c867565bbf1d9d679e8f80f54d3f3a6c0d3eac46",
+    "utc": "2026-09-10T05:03:05.673206+00:00"
+  }
+}

@@ -29,7 +29,7 @@ public partial class ChatSample
         return $"\n[Sing/Execution] request_submitted_since_user_turn={m_SingingRequestSubmittedSinceUserTurn.ToString().ToLowerInvariant()} " +
             $"work_active={active.ToString().ToLowerInvariant()} state={state} " +
             $"continuations_without_work={m_NoSingingWorkContinuations}\n" +
-            "以上只表示程序执行状态；提交过不等于成功，idle不表示素材丢失。口头说准备好、look、continue都不会启动演唱。是否行动、询问或安静仍由你决定。\n";
+            "以上只表示程序执行状态；提交过不等于成功，idle不表示素材丢失。口头说准备好、look、continue都不会启动演唱。是否行动、询问或安静仍由你决定。\n" + BuildSingingGoalContext();
     }
 
     private string BuildSingingClipOverview(SenseVoiceSpeechToText sense)
@@ -65,6 +65,7 @@ public partial class ChatSample
 
     private void CapturePracticePlaybackFacts(SenseVoiceSpeechToText sense, List<int> indices)
     {
+        CaptureSingingGoalPlayback(sense, indices);
         var phrases = sense.DescribePracticePhrases();
         var sb = new StringBuilder();
         int position = 0;
@@ -82,6 +83,7 @@ public partial class ChatSample
 
     private void RecordPracticePlaybackOutcome(bool practice, bool completed)
     {
+        CompleteSingingGoalPlayback(practice, completed);
         m_LatestSingingOutcome = (practice ? "practice" : "other") + (completed ? ":completed" : ":incomplete");
         if (practice && completed && m_PendingPracticePlaybackFacts.Length > 0)
         {
@@ -106,7 +108,8 @@ public partial class ChatSample
             // Use exactly the same range semantics as sing, but do not schedule audio.
             ConfigureUnifiedSing(request, attrs + " refs=\"" + ReadToolAttribute(attrs, "ref") + "\"");
             string failure = "语音模块不可用。";
-            if (sense == null || !TryResolveUnifiedSing(request, out failure))
+            if (sense == null || !TryValidateSingingGoalPreparation(request.ClipRefs, out failure) ||
+                !TryResolveUnifiedSingCore(request, out failure, true))
             {
                 RecordPracticeEditFailureForLlm("clip_revise 未完成；" + failure,
                     "clip_revision_failed", "只准备范围，不会播放；原录音保留，可询问用户。", "clip_revise");
@@ -167,6 +170,11 @@ public partial class ChatSample
             }
             clip = sense.CanonicalSingingClipReference(clip);
             string range = ReadToolAttribute(attrs, "range");
+            if (!string.IsNullOrWhiteSpace(range) && !TryValidateSingingGoalPreparation(clip, out string goalFailure))
+            {
+                RecordPracticeEditFailureForLlm(goalFailure, "singing_goal_needs_review", "先核对目标，再准备该范围。");
+                return;
+            }
             int oldRevision = sense.DescribePracticePhrases().Find(p => p.StableId == stable)?.Revision ?? -1;
             string failure = "";
             string status = "ready";
@@ -181,7 +189,7 @@ public partial class ChatSample
             if (!string.IsNullOrWhiteSpace(range) && oldRevision >= 0 &&
                 sense.DescribePracticePhrases().Find(p => p.StableId == stable)?.Revision != oldRevision)
                 m_PracticePitchStates.Remove(stable);
-            RecordPracticeEditResult($"{clip} source=confirmed_user playback={status} played=false。" +
+            RecordPracticeEditResult($"{clip} source=confirmed_user playback={status} confirmation_action_played=false；此次只确认/准备，历史播放记录未改变。" +
                 (status == "ready" ? $"若决定演唱，用 <sing refs=\"{clip}\"/>。" :
                  "只确认了来源，仍需根据边界证据选择 sing 的 range=clean/expanded；也可询问。"), false);
         }
@@ -238,6 +246,9 @@ public partial class ChatSample
     }
 
     private bool TryResolveUnifiedSing(AgentHumBackRequest request, out string failure)
+        => TryResolveUnifiedSingCore(request, out failure, false);
+
+    private bool TryResolveUnifiedSingCore(AgentHumBackRequest request, out string failure, bool preparationOnly)
     {
         failure = request.SourceValidationError;
         if (!string.IsNullOrEmpty(failure)) return false;
@@ -267,6 +278,7 @@ public partial class ChatSample
                 "可逐段 clip_revise 后 sing 当前版本；统一 range=clean/expanded 可直接用于多 refs。"; return false; }
         if (request.Range != "current" && request.Range != "clean" && request.Range != "expanded")
         { failure = "range 只能为 current、clean、expanded；没有准备或播放任何片段。"; return false; }
+        if (!preparationOnly && !TryValidateSingingGoalRequest(request, sense, out failure)) return false;
         var order = new List<string>();
         var prepared = new List<string>();
         foreach (string clip in refs)
@@ -305,6 +317,8 @@ public partial class ChatSample
     private string BuildUnifiedClipFacts(SenseVoiceSpeechToText sense)
     {
         var sb = new StringBuilder("\n[演唱素材主接口：sing refs=具体引用；不填 source/mode/order。clip 身份在确认、修订后不变；range默认current；起止秒数统一基于原始录音。]\n");
+        sb.Append(SingingGoalContract);
+        sb.Append(BuildSingingGoalContext());
         sb.Append(BuildSingingClipOverview(sense));
         var phrases = sense.DescribePracticePhrases();
         var pending = sense.DescribeQuarantinedSingingCandidates();
@@ -342,7 +356,7 @@ public partial class ChatSample
             AppendExpansionEffect(sb, p.CleanStartSeconds, p.CleanEndSeconds,
                 p.ExpandedStartSeconds, p.ExpandedEndSeconds);
             sb.AppendLine($"{p.ClipRef} source={p.SourceStatus} playback={p.PlaybackStatus} evidence=current_version " +
-                $"current={p.CurrentCapture} " +
+                $"current={p.CurrentCapture} revision=pending " +
                 (p.PlaybackStatus == "ready" ? $"current_raw=[{p.CurrentStartSeconds:F2},{p.CurrentEndSeconds:F2}] " : "") +
                 $"raw={p.RawSeconds:F2}s clean=[{p.CleanStartSeconds:F2},{p.CleanEndSeconds:F2}] expanded=[{p.ExpandedStartSeconds:F2},{p.ExpandedEndSeconds:F2}] " +
                 $"recorded_ago={p.AgoSeconds:F1}s lyrics=\"{TruncateForFrame(p.SingingSegmentText, 100)}\" " +

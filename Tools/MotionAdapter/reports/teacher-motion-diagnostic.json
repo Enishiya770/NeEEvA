@@ -1,0 +1,121 @@
+{
+  "passed": true,
+  "rows": 6,
+  "dimension": 4096,
+  "contract": "17ffd90eb39b4edb8673737eac7a23690f4ef3cd57407a09cee0ce9fa3d608f3",
+  "baseline_resources": {
+    "available_ram_bytes": 19166334976,
+    "cuda_api_free_bytes": 24154996736,
+    "nvidia_smi_used_bytes": 4327473152,
+    "nvidia_smi_free_bytes": 20984102912
+  },
+  "observed_peaks": {
+    "rss_bytes": 2794139648,
+    "cuda_allocated_bytes": 15654200320,
+    "cuda_reserved_bytes": 16252928000
+  },
+  "resource_minima": {
+    "system_available_ram_bytes": 17106493440,
+    "cuda_api_free_bytes": 5643001856,
+    "nvidia_smi_free_bytes": 4649385984
+  },
+  "load_seconds": 23.75,
+  "encode_timings": [
+    {
+      "id": "motion-00004",
+      "seconds": 0.39100000000325963
+    },
+    {
+      "id": "motion-00053",
+      "seconds": 0.062000000005355105
+    },
+    {
+      "id": "raise-actual",
+      "seconds": 0.0779999999795109
+    },
+    {
+      "id": "explain-actual",
+      "seconds": 0.0629999999946449
+    },
+    {
+      "id": "raise-style",
+      "seconds": 0.07800000000861473
+    },
+    {
+      "id": "explain-style",
+      "seconds": 0.062000000005355105
+    }
+  ],
+  "cached_comparisons": [
+    {
+      "id": "motion-00004",
+      "cosine": 1.0000001192092896,
+      "relative_l2": 0.0,
+      "max_abs_error": 0.0
+    },
+    {
+      "id": "motion-00053",
+      "cosine": 1.0,
+      "relative_l2": 0.0,
+      "max_abs_error": 0.0
+    }
+  ],
+  "provenance": {
+    "ardy_revision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+    "device": "bounded-bf16-full-cuda",
+    "effective_model_name": "meta-llama/Meta-Llama-3-8B-Instruct",
+    "max_length": 512,
+    "output_scale": "raw",
+    "packages": {
+      "peft": "0.19.1",
+      "torch": "2.11.0+cu128",
+      "transformers": "5.8.1"
+    },
+    "pooling": "official-wrapper",
+    "pooling_mode": "mean",
+    "preset": {
+      "kwargs": {
+        "base_model_name_or_path": "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp",
+        "device": "auto",
+        "dtype": "bfloat16",
+        "llm_dim": 4096,
+        "peft_model_name_or_path": "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised"
+      },
+      "target": "ardy.model.LLM2VecEncoder"
+    },
+    "repos": {
+      "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp": "31474e395ada192e8ed1586db6be79fb3b70c9c0",
+      "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised": "baa8ebf04a1c2500e61288e7dad65e8ae42601a7",
+      "meta-llama/Meta-Llama-3-8B-Instruct": "8afb486c1db24fe5011ec46dfbe5b5dccdb575c2"
+    },
+    "placement_only_change": "Official factory and encode(batch_size=1), direct full-CUDA construction",
+    "model_snapshot_paths": {
+      "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\models\\hf-cache\\hub\\models--McGill-NLP--LLM2Vec-Meta-Llama-3-8B-Instruct-mntp\\snapshots\\31474e395ada192e8ed1586db6be79fb3b70c9c0",
+      "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\models\\hf-cache\\hub\\models--McGill-NLP--LLM2Vec-Meta-Llama-3-8B-Instruct-mntp-supervised\\snapshots\\baa8ebf04a1c2500e61288e7dad65e8ae42601a7",
+      "meta-llama/Meta-Llama-3-8B-Instruct": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\models\\hf-cache\\hub\\models--meta-llama--Meta-Llama-3-8B-Instruct\\snapshots\\8afb486c1db24fe5011ec46dfbe5b5dccdb575c2"
+    },
+    "device_map": {},
+    "loading_io": "sequential exact tensor copy with per-tensor safetensors mapping release",
+    "allocator_warmup": "disabled unnecessary model-sized preallocation during adapter load",
+    "construction": "unchanged official LLM2Vec.from_pretrained factory",
+    "max_weight_memory_bytes": null,
+    "hard_process_rss_limit_bytes": 8589934592,
+    "hard_cuda_allocator_limit_bytes": 18836619264,
+    "new_diagnostic_contract": true,
+    "cached_teacher_comparisons": [
+      {
+        "id": "motion-00004",
+        "cosine": 1.0000001192092896,
+        "relative_l2": 0.0,
+        "max_abs_error": 0.0
+      },
+      {
+        "id": "motion-00053",
+        "cosine": 1.0,
+        "relative_l2": 0.0,
+        "max_abs_error": 0.0
+      }
+    ]
+  },
+  "output": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\teacher-motion-diagnostic\\teacher-six.npz"
+}

@@ -1,0 +1,18 @@
+<motion name="right-wave"/>
+<motion name="nod"/>
+<motion name="plan" purpose="other" mode="oscillate" scope="new" joint="head" axis="right" tempo="gentle" size="small" repeat="twice" lock="tempo,size,repeat" userTurn="2" evidence="Nod slowly twice with a small movement, keeping your arms still."/>
+<motion name="plan" purpose="display" mode="free" scope="new" text="Arms swing in alternating arcs while torso sways gently, creating a continuous upper body dance."/>
+<motion name="plan" purpose="greet" mode="oscillate" scope="new" left="forward" right="forward" leftPalm="partner" rightPalm="partner" joint="wrists" tempo="natural" repeat="twice" end="idle" lock="left,right,leftPalm,rightPalm" userTurn="2" evidence="双臂朝正前方平举着，自然地用两只手跟我打个招呼。"/>
+<motion name="plan" purpose="display" mode="hold" scope="new" left="outward" leftPalm="partner" end="hold" lock="left,leftPalm" userTurn="2" evidence="左腕だけ横に伸ばして、左の手のひらをこちらに見せたまま静かに止まって。"/>
+<motion name="plan" purpose="display" mode="hold" scope="new" left="forward" right="forward" leftPalm="down" rightPalm="down" end="hold" lock="left,right,leftPalm,rightPalm" userTurn="2" evidence="Keep both arms straight forward, elbows fully straight, palms down, without waving."/>
+<motion name="plan" purpose="other" mode="oscillate" scope="continue" joint="wrists" tempo="gentle" repeat="twice" release="cycles" lock="tempo,repeat" userTurn="3" evidence="手臂方向别变，只让双手手腕慢慢摆两次。"/>
+<motion name="plan" purpose="other" mode="oscillate" scope="continue" joint="right-wrist" repeat="thrice" release="cycles" lock="repeat" userTurn="3" evidence="Keep the pose but replace the previous count: make it three times now."/>
+<motion name="plan" purpose="other" mode="oscillate" scope="continue" joint="right-wrist" amplitude="large" release="amplitude" lock="amplitude" userTurn="3" evidence="角度の指定は取り消すね。同じ姿勢のまま、今度は大きめに手首を振って。"/>
+<motion name="plan" purpose="display" mode="hold" scope="new" right="forward" rightPalm="keep" end="hold" lock="right,rightPalm" userTurn="2" evidence="左臂就保持当前实际姿势别变，右臂朝正前方伸出，静静保持。"/>
+<motion name="plan" purpose="display" mode="hold" scope="new" left="forward" right="forward" leftPalm="up" rightPalm="up" end="hold" lock="left,right,leftPalm,rightPalm" userTurn="2" evidence="Show me both palms with your arms held in front of you; stay still so I can look."/>
+<motion name="plan" purpose="farewell" mode="oscillate" scope="new" joint="wrists" left="forward" right="forward" leftPalm="down" rightPalm="down" size="small" lock="left,right,leftPalm,rightPalm,size" userTurn="2" evidence="双臂向前平举，掌心保持朝下，用双手手腕小幅摆动，跟我道别。"/>
+<motion name="plan" purpose="explain" mode="free" scope="new" text="Swing both arms in large alternating arcs with slight upper body coordination, feet stationary."/>
+<motion name="plan" purpose="other" mode="oscillate" scope="new" joint="head" axis="up" tempo="gentle" size="medium" repeat="thrice" lock="tempo,size,repeat" userTurn="2" evidence="Shake your head slowly from side to side three times, with a medium-sized movement."/>
+<motion name="plan" purpose="display" mode="oscillate" scope="new" right="forward" rightPalm="partner" joint="right-wrist" seconds="3" lock="seconds" userTurn="2" evidence="右臂朝前伸着、掌心朝我，只让右手腕摆动，摆动这一步用3秒。"/>
+<motion name="plan" purpose="display" mode="hold" scope="new" left="outward" right="outward" end="hold" lock="left,right" userTurn="3" evidence="前のポーズはやめて、新しく両腕を左右に開いてそのまま保って。"/>
+<motion name="plan" purpose="greet" mode="hold" scope="new" right="forward" rightPalm="partner" end="hold" lock="right,rightPalm" userTurn="2" evidence="Reach your right arm forward and greet me naturally so I can see your palm."/>

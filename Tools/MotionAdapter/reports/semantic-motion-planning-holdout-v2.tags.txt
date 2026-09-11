@@ -1,0 +1,5 @@
+<motion name="plan" purpose="greet" mode="oscillate" scope="new" left="forward" right="forward" leftPalm="up" rightPalm="up" joint="wrists" tempo="gentle" repeat="twice" lock="left,right,leftPalm,rightPalm,tempo,repeat" userTurn="2" evidence="面朝我，把两只前臂放在身前，让我看见你的掌心，悠悠地晃动双腕欢迎我。"/>
+<motion name="plan" purpose="display" mode="hold" scope="new" right="forward" left="forward" rightPalm="down" leftPalm="down" end="hold" lock="right,left,rightPalm,leftPalm" userTurn="2" evidence="両手を身体の前に出し、掌を床へ向けた状態で待っていて。"/>
+<motion name="plan" purpose="display" mode="hold" scope="new" right="outward" rightPalm="down" end="hold" lock="right,rightPalm" userTurn="2" evidence="Open your right arm out to your own right and let me inspect that palm, holding it steady."/>
+<motion name="plan" purpose="agree" mode="oscillate" scope="new" joint="head" axis="right" tempo="gentle" size="small" repeat="twice" lock="tempo,size,repeat" userTurn="2" evidence="表示认同就好，头部用很轻的幅度缓缓上下动两回，身体其他部位别参与。"/>
+<motion name="plan" purpose="display" mode="free" scope="new" text="Improvise a fluid upper-body flourish with arms tracing different sweeping curves as the torso follows."/>

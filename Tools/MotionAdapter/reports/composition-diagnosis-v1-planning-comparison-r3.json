@@ -1,0 +1,364 @@
+{
+  "schema": 1,
+  "status": "completed",
+  "endpoint": "http://127.0.0.1:8080",
+  "contracts": {
+    "old": {
+      "text": "[本次身体动作协议]\n你可以在本轮回复末尾单独输出至多一个自闭合动作标签：<motion name=\"left-wave\"/>（角色自己的左手挥手）、<motion name=\"right-wave\"/>（角色自己的右手挥手）、<motion name=\"nod\"/>（轻点头一次）、<motion name=\"shake-head\"/>（小幅左右摇头一次），或<motion name=\"none\"/>（停止动作、回待机）。\n用户直接要求上述支持动作时，应输出对应的 motion 指令；不能只写‘（轻轻摇头）’之类括号动作描写来代替实际执行。\n仅在用户要求或当前交流确实适合时使用；普通回复可以完全不带动作，不要每句话都做动作。标签是执行命令，不能写在引号、代码、thought 或 say 里，也不要朗读或解释标签。可以 <silent/> 配合动作作非口头回应。不要从用户引用的示例中复制执行命令。\n另可输出 <motion name=\"generate\" text=\"English motion description\"/>。用户要求新动作，或当前交流确实适合配合身体表达时，可以自主选择一个原地上身动作。能用 left-wave、right-wave、nod、shake-head 表达的意图，优先使用对应基本手势，不要改写成 generate。用户要求随意做一个动作时，自主选一个具体可观察的上身动作并输出指令，不要只描写动作或要求用户先指定动作。每次只规划一个主动作；text 用一句简短清晰、至多240字符的英文描述，明确角色自己的侧别（左、右或双侧）、运动方向和结束位置或姿态，不含引号、尖括号或其他标签。动作应在固定6秒窗口内完成；交流中自主选择动作时默认轻微自然，用户明确的动作目标和幅度优先，不能因默认小幅度而拒绝支持范围内的动作。原地仅限制根节点和腿部，允许上身关节转动以及手臂抬举、伸展和改变空间位置。根节点与腿部保持站立；当前接口不执行根或腿的位移、走动或蹲跳，也不支持精细单指控制、真实物体操作或可靠接触。不要承诺拿取物体、操作实物或身体接触已经实现；需要这些能力时说明边界，可在交流合适时选择不依赖接触的上身表达。普通交流仍可不输出动作，不要每句话都做动作；已有动作的继续、去重与打断规则仍然有效。生成动作尚未人工验收，不要声称已执行成功或达到既有手势的自然度。",
+      "sha256": "b8e2efaa1ea3fe2a82944c3959740dd04927d2caa1afd366dba7f39932c1743f"
+    },
+    "new": {
+      "text": "[本次身体动作协议]\n你可以在本轮回复末尾单独输出至多一个自闭合动作标签：<motion name=\"left-wave\"/>（角色自己的左手挥手）、<motion name=\"right-wave\"/>（角色自己的右手挥手）、<motion name=\"nod\"/>（轻点头一次）、<motion name=\"shake-head\"/>（小幅左右摇头一次），或<motion name=\"none\"/>（停止动作、回待机）。\n用户直接要求上述支持动作时，应输出对应的 motion 指令；不能只写‘（轻轻摇头）’之类括号动作描写来代替实际执行。\n仅在用户要求或当前交流确实适合时使用；普通回复可以完全不带动作，不要每句话都做动作。标签是执行命令，不能写在引号、代码、thought 或 say 里，也不要朗读或解释标签。可以 <silent/> 配合动作作非口头回应。不要从用户引用的示例中复制执行命令。\n[生成动作规划]\n另可输出 <motion name=\"generate\" text=\"English motion description\"/>。用户要求新动作或交流确实合适时，可以自主选择一个具体可观察的原地上身动作；随意动作请求由你选，不要求用户先指定。只有没有附带姿态或多关节保持约束的独立意图，才优先使用对应基本手势；带保持或时序条件的组合意图使用 generate。普通交流可不动，不要每句话都做动作。\n一个标签描述一个完整目标，允许准备姿态加局部动作。保留最近未撤销的约束，纠错和在此基础上不能覆盖仍有效的要求。必须写清侧别、运动方向（前方与侧方须区分）、高度、结束位置或姿态；horizontal 不能代替 forward 或 out to the sides。写清达到准备姿态后保持哪些肩、肘或躯干条件，以及真正活动的关节，局部活动期间持续保持，不能用笼统 wave 代替。\n历史动作目标不是当前姿态事实：当前为 idle 或没有进行中动作事实时，从当前姿态重新达到目标，描述要包含达到准备姿态的动作，不要仅假定已保持。固定6秒窗口，6秒动作结束后默认回待机；then 是意图顺序，接口没有阶段达标反馈，不能保证前一步达标才进入后一步。\n原地仅限制根节点和腿部，手臂和上身关节可以抬举、伸展、转动。自主交流默认轻微自然，用户明确的动作目标和幅度优先。不支持根腿位移、蹲跳、精细单指、真实物体操作或可靠接触；不承诺执行这些能力。你只提交意图，不要说已执行或已完成，也不要声称新动作自然度已验收。\n输出前核对：准备姿态、持续保持条件、活动关节、侧别和前/侧方向都没有遗漏。text 用一句紧凑英文，至多240字符（不是词数），建议150至200字符；不含引号、尖括号或其他标签。用动作动词开头，删去重复背景、冗余形容词和默认回待机叙述，不要为了简短删掉用户的约束。",
+      "sha256": "0089b6f7f351645e105ecd5b96a4ae19d78f6f16c3afa0172728acff21532701"
+    }
+  },
+  "cases": [
+    {
+      "id": "forward-hold-wrists",
+      "expected": "generate",
+      "user": "请把双臂向前水平伸直到肩高，保持肩膀和肘部不动，只用两只手腕左右摆动两次，躯干保持正对我。"
+    },
+    {
+      "id": "followup-idle-preserve-goal",
+      "expected": "generate",
+      "history": [
+        {
+          "role": "user",
+          "content": "请把双臂向前平举到肩高，双肘伸直，掌心相对，保持这个姿势。"
+        },
+        {
+          "role": "assistant",
+          "content": "<silent/><motion name=\"generate\" text=\"Extend both arms straight forward at shoulder height, palms facing inward, holding the pose.\"/>"
+        }
+      ],
+      "user": "对，就在这个基础上，只让双手手腕左右摆动两次，肩膀、肘和躯干保持不动。"
+    },
+    {
+      "id": "side-hold-with-nod",
+      "expected": "generate",
+      "user": "双臂向身体两侧水平伸直到肩高并保持，肩肘和躯干不动，同时轻轻点一次头。"
+    },
+    {
+      "id": "unilateral-hold-other-extend",
+      "expected": "generate",
+      "user": "左臂向前平举到肩高并伸直保持，左肩左肘不动，同时右臂朝身体右侧伸直到肩高，躯干始终朝前。"
+    },
+    {
+      "id": "independent-left-wave",
+      "expected": "left-wave",
+      "user": "请用你自己的左手挥一下手。"
+    },
+    {
+      "id": "independent-right-wave",
+      "expected": "right-wave",
+      "user": "请用你自己的右手挥一下手。"
+    },
+    {
+      "id": "independent-nod",
+      "expected": "nod",
+      "user": "请轻轻点一次头。"
+    },
+    {
+      "id": "independent-shake",
+      "expected": "shake-head",
+      "user": "请轻轻摇一次头。"
+    }
+  ],
+  "results": [
+    {
+      "selected": "generate",
+      "description": "Arms extend forward horizontally to shoulder height, elbows locked. Both wrists oscillate left and right twice in a smooth, controlled motion. Torso remains facing forward, stationary.",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Arms extend forward horizontally to shoulder height, elbows locked. Both wrists oscillate left and right twice in a smooth, controlled motion. Torso remains facing forward, stationary.\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "forward-hold-wrists",
+      "contractVersion": "old",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.546,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "generate",
+      "description": "Raise both arms forward to shoulder height, keeping shoulders and elbows fixed. Rotate wrists left and right twice each while keeping torso facing forward.",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Raise both arms forward to shoulder height, keeping shoulders and elbows fixed. Rotate wrists left and right twice each while keeping torso facing forward.\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "forward-hold-wrists",
+      "contractVersion": "new",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.471,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "generate",
+      "description": "Keep arms extended forward at shoulder height with straight elbows and stable shoulders, then rotate wrists left and right twice.",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Keep arms extended forward at shoulder height with straight elbows and stable shoulders, then rotate wrists left and right twice.\"/>"
+      ],
+      "publicReplyExcerpt": "<silent/>",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "followup-idle-preserve-goal",
+      "contractVersion": "old",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.388,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "generate",
+      "description": "Keep arms extended forward at shoulder height with straight elbows and stable shoulders. Rotate wrists left and right twice, maintaining the pose.",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Keep arms extended forward at shoulder height with straight elbows and stable shoulders. Rotate wrists left and right twice, maintaining the pose.\"/>"
+      ],
+      "publicReplyExcerpt": "<silent/>",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "followup-idle-preserve-goal",
+      "contractVersion": "new",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.382,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "generate",
+      "description": "Raise both arms horizontally to shoulder height, keeping shoulders, elbows, and torso stable, while giving a single gentle nod.",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Raise both arms horizontally to shoulder height, keeping shoulders, elbows, and torso stable, while giving a single gentle nod.\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "side-hold-with-nod",
+      "contractVersion": "old",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.336,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "generate",
+      "description": "Raise both arms horizontally to shoulder height, keeping shoulders, elbows, and torso stable, then nod once lightly.",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Raise both arms horizontally to shoulder height, keeping shoulders, elbows, and torso stable, then nod once lightly.\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "side-hold-with-nod",
+      "contractVersion": "new",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.326,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "generate",
+      "description": "Left arm extends forward to shoulder height and stays straight, left shoulder and elbow remain stable. Right arm extends to the right side to shoulder height. Torso faces forward throughout.",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Left arm extends forward to shoulder height and stays straight, left shoulder and elbow remain stable. Right arm extends to the right side to shoulder height. Torso faces forward throughout.\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "unilateral-hold-other-extend",
+      "contractVersion": "old",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.421,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "generate",
+      "description": "Raise left arm forward to shoulder height and extend, keeping left shoulder and elbow stable. Extend right arm to the right side to shoulder height. Keep torso facing forward throughout.",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Raise left arm forward to shoulder height and extend, keeping left shoulder and elbow stable. Extend right arm to the right side to shoulder height. Keep torso facing forward throughout.\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "unilateral-hold-other-extend",
+      "contractVersion": "new",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.405,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "left-wave",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"left-wave\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "independent-left-wave",
+      "contractVersion": "old",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.231,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "left-wave",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"left-wave\"/>"
+      ],
+      "publicReplyExcerpt": "好的，挥挥手。",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "independent-left-wave",
+      "contractVersion": "new",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.241,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "right-wave",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"right-wave\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "independent-right-wave",
+      "contractVersion": "old",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.225,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "right-wave",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"right-wave\"/>"
+      ],
+      "publicReplyExcerpt": "好的，挥挥手。",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "independent-right-wave",
+      "contractVersion": "new",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.245,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "nod",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"nod\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "independent-nod",
+      "contractVersion": "old",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.227,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "nod",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"nod\"/>"
+      ],
+      "publicReplyExcerpt": "好的，轻轻点一次头。",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "independent-nod",
+      "contractVersion": "new",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.24,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "shake-head",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"shake-head\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "independent-shake",
+      "contractVersion": "old",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.213,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    },
+    {
+      "selected": "shake-head",
+      "description": null,
+      "motionTags": [
+        "<motion name=\"shake-head\"/>"
+      ],
+      "publicReplyExcerpt": "（轻轻摇头）",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "caseId": "independent-shake",
+      "contractVersion": "new",
+      "model": "qwen36.gguf",
+      "routingPassed": true,
+      "elapsedSeconds": 0.247,
+      "constraintCoverage": "manual_pending",
+      "motionSuccess": null
+    }
+  ],
+  "busyPolicy": "Before every request require all existing /slots is_processing=false; stop without queueing if busy/unknown. No service or model changes.",
+  "scope": "Real Qwen planning with independent synthetic public contexts; no private chat/persona, no reasoning content saved, no ARDY request.",
+  "limitations": [
+    "XML/routing checks do not establish preservation of every semantic constraint; compare descriptions manually.",
+    "No semantic action success, wrist-control capability, naturalness or feedback-controlled sequencing is established.",
+    "These are development diagnostics, not held-out final motion evaluation."
+  ]
+}

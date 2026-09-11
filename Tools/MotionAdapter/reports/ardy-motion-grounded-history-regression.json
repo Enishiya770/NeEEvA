@@ -1,0 +1,286 @@
+{
+  "schema": 1,
+  "mode": "live-qwen-and-real-ardy-http",
+  "languageModelsLoadedByArdyService": false,
+  "featureSource": "live-qwen",
+  "initialHistoryFixture": "synthetic upper-arm curve; conversion test, not a Unity playback capture",
+  "assertions": [
+    "resident ARDY ready with no LM",
+    "chunk 0: exactly 40 new frames, no returned history appended",
+    "chunk 0: 16 normalized history frames supplied",
+    "chunk 0: correct final flag",
+    "chunk 0: honest feature provenance",
+    "chunk 0: native dynamics distinct from baseline",
+    "projected upper-body history pads 5 to 16 and roundtrips through official representation",
+    "projected source pelvis stands above ground and synthetic feet are not buried",
+    "source foot/toe support plane is exactly ground Y=0",
+    "other character cold start owns separate history",
+    "chunk 1: exactly 40 new frames, no returned history appended",
+    "chunk 1: 16 normalized history frames supplied",
+    "chunk 1: correct final flag",
+    "chunk 1: honest feature provenance",
+    "chunk 1: native dynamics distinct from baseline",
+    "interleaving other character leaves exact per-revision RNG continuation reproducible",
+    "backend restores process CPU and CUDA RNG after isolated inference",
+    "chunk 2: exactly 40 new frames, no returned history appended",
+    "chunk 2: 16 normalized history frames supplied",
+    "chunk 2: correct final flag",
+    "chunk 2: honest feature provenance",
+    "chunk 2: native dynamics distinct from baseline",
+    "last request replay is idempotent",
+    "cross-session explicit-seed pair generated",
+    "same explicit seed and inputs produce exact motion across different character/revision identities",
+    "effective seed equals the explicit requested seed",
+    "cancellation fixture entered actual ARDY backend",
+    "running generation cancels promptly without publishing a chunk",
+    "cancelled revision cannot be resurrected",
+    "new revision does not inherit unplayed cancelled future motion",
+    "completed cancelled GPU result was discarded"
+  ],
+  "chunks": [
+    {
+      "requestId": "http-neva-1-0",
+      "chunkIndex": 0,
+      "historySource": "unity-upper-body-projection-v1",
+      "historyFrames": 16,
+      "timings": {
+        "queueMs": 0.0,
+        "featureMs": 391.00000000325963,
+        "generationMs": 300.8063000161201,
+        "totalMs": 891.0000000032596
+      },
+      "provenance": {
+        "mode": "dynamic-ardy-native",
+        "featureSource": "live-qwen",
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+        "historySource": "unity-upper-body-projection-v1",
+        "conditionReusedWithinRevision": false,
+        "featureRequestId": "http-neva-1-0",
+        "initialHistoryProjection": {
+          "suppliedFrames": 5,
+          "paddedFrames": 11,
+          "rotationRoundtripMaxAbs": 7.483158204202311e-08,
+          "rootPositionMeters": [
+            0.0,
+            0.9544128252334833,
+            0.0
+          ],
+          "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+          "projectedFootWorldY": {
+            "LeftFoot": 0.05847492523348319,
+            "LeftToeBase": 0.0,
+            "RightFoot": 0.0584749252334833,
+            "RightToeBase": 0.0
+          },
+          "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+          "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+        },
+        "derivedSeed": 42,
+        "languageModelsLoaded": false
+      }
+    },
+    {
+      "requestId": "http-neva-1-1",
+      "chunkIndex": 1,
+      "historySource": "ardy-self-history-last-16",
+      "historyFrames": 16,
+      "timings": {
+        "queueMs": 0.0,
+        "featureMs": 0.0,
+        "generationMs": 131.63170000188984,
+        "totalMs": 139.999999984866
+      },
+      "provenance": {
+        "mode": "dynamic-ardy-native",
+        "featureSource": "live-condition-reused",
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+        "historySource": "ardy-self-history-last-16",
+        "conditionReusedWithinRevision": true,
+        "featureRequestId": "http-neva-1-0",
+        "initialHistoryProjection": null,
+        "derivedSeed": 42,
+        "languageModelsLoaded": false
+      }
+    },
+    {
+      "requestId": "http-neva-1-2",
+      "chunkIndex": 2,
+      "historySource": "ardy-self-history-last-16",
+      "historyFrames": 16,
+      "timings": {
+        "queueMs": 0.0,
+        "featureMs": 0.0,
+        "generationMs": 103.8364999985788,
+        "totalMs": 110.00000001513399
+      },
+      "provenance": {
+        "mode": "dynamic-ardy-native",
+        "featureSource": "live-condition-reused",
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+        "historySource": "ardy-self-history-last-16",
+        "conditionReusedWithinRevision": true,
+        "featureRequestId": "http-neva-1-0",
+        "initialHistoryProjection": null,
+        "derivedSeed": 42,
+        "languageModelsLoaded": false
+      }
+    }
+  ],
+  "backend": {
+    "ready": true,
+    "languageModelsLoaded": false,
+    "adapter": "mlp-seed1",
+    "adapterSha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa",
+    "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+    "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+    "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+    "fps": 20,
+    "newFrames": 40,
+    "historyFrames": 16,
+    "gpuPreflight": {
+      "freeMiB": 23036.0,
+      "totalMiB": 24563.5
+    }
+  },
+  "cancelResponseMs": 4.348100017523393,
+  "finalHealth": {
+    "service": "neeeva-ardy-motion",
+    "ready": true,
+    "backend": {
+      "ready": true,
+      "languageModelsLoaded": false,
+      "adapter": "mlp-seed1",
+      "adapterSha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa",
+      "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+      "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+      "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+      "fps": 20,
+      "newFrames": 40,
+      "historyFrames": 16,
+      "gpuPreflight": {
+        "freeMiB": 23036.0,
+        "totalMiB": 24563.5
+      }
+    },
+    "features": {
+      "source": "live-qwen",
+      "verified": true,
+      "baseUrl": "http://127.0.0.1:8080",
+      "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+      "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4"
+    },
+    "queue": {
+      "waiting": 0,
+      "limit": 4,
+      "running": 0
+    },
+    "characters": {
+      "count": 5,
+      "limit": 64
+    },
+    "counters": {
+      "submitted": 8,
+      "completed": 7,
+      "cancelled": 1,
+      "failed": 0,
+      "staleResultsDiscarded": 1,
+      "queueRejected": 0
+    },
+    "baselineResourcesModified": false
+  },
+  "backendRuns": [
+    {
+      "requestId": "http-neva-1-0",
+      "generationMs": 300.8063000161201,
+      "peakTorchAllocatedMiB": 932.91259765625,
+      "historyFrames": 16,
+      "projection": {
+        "suppliedFrames": 5,
+        "paddedFrames": 11,
+        "rotationRoundtripMaxAbs": 7.483158204202311e-08,
+        "rootPositionMeters": [
+          0.0,
+          0.9544128252334833,
+          0.0
+        ],
+        "rootHeightSource": "negative minimum neutral foot/toe Y relative to Hips; synthetic support plane Y=0",
+        "projectedFootWorldY": {
+          "LeftFoot": 0.05847492523348319,
+          "LeftToeBase": 0.0,
+          "RightFoot": 0.0584749252334833,
+          "RightToeBase": 0.0
+        },
+        "lowerBody": "synthetic neutral Core27 legs with pelvis above the source foot/toe support plane; not observed Unity legs",
+        "footContacts": "ARDY source-FK height/velocity heuristic on synthetic stationary feet"
+      }
+    },
+    {
+      "requestId": "http-other-1-0",
+      "generationMs": 138.89130001189187,
+      "peakTorchAllocatedMiB": 932.91259765625,
+      "historyFrames": 0,
+      "projection": null
+    },
+    {
+      "requestId": "http-neva-1-1",
+      "generationMs": 131.63170000188984,
+      "peakTorchAllocatedMiB": 932.91259765625,
+      "historyFrames": 16,
+      "projection": null
+    },
+    {
+      "requestId": "http-neva-1-1",
+      "generationMs": 114.9405000032857,
+      "peakTorchAllocatedMiB": 932.91259765625,
+      "historyFrames": 16,
+      "projection": null
+    },
+    {
+      "requestId": "http-neva-1-2",
+      "generationMs": 103.8364999985788,
+      "peakTorchAllocatedMiB": 932.91259765625,
+      "historyFrames": 16,
+      "projection": null
+    },
+    {
+      "requestId": "http-seed-a-1-0",
+      "generationMs": 104.80810000444762,
+      "peakTorchAllocatedMiB": 932.91259765625,
+      "historyFrames": 0,
+      "projection": null
+    },
+    {
+      "requestId": "http-seed-b-9-0",
+      "generationMs": 123.01199999637902,
+      "peakTorchAllocatedMiB": 932.91259765625,
+      "historyFrames": 0,
+      "projection": null
+    },
+    {
+      "requestId": "http-cancel-1-0",
+      "generationMs": 119.54350001178682,
+      "peakTorchAllocatedMiB": 932.91259765625,
+      "historyFrames": 0,
+      "projection": null
+    },
+    {
+      "requestId": "http-cancel-2-0",
+      "generationMs": 112.02760000014678,
+      "peakTorchAllocatedMiB": 932.91259765625,
+      "historyFrames": 0,
+      "projection": null
+    }
+  ],
+  "passed": true,
+  "assertionCount": 31,
+  "moduleSha256": {
+    "app.py": "b23bde8324df0187b6a4fca90e92e721defb3a34253d5055d2762dac2edccb97",
+    "backend.py": "806d7099f568f82e926075743708ea681b5307cc6642af555f9fe0da4fe76e34",
+    "protocol.py": "58bcd7c8d5cdac14a30a744c598fc0932492d02dbd67bb09cc8c584460fd3685",
+    "service.py": "516c12af6a6caa9f2d22a1dcc7f860f89a94fbca219d6aa1fe3fcc797f68ed9d",
+    "__init__.py": "a35db85c2bef6f89bdde2226670b7a3126cfb5b3e8c5e447c5e0f1f668d39d70"
+  }
+}

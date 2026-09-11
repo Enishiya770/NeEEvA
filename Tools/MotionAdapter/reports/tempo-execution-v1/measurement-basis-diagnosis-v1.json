@@ -1,0 +1,268 @@
+{
+  "status": "measurement-basis-error-confirmed",
+  "archive": "Server/ARDY/runtime/semantic-tempo-v1/tempo-failed-v1",
+  "rawReports": [
+    {
+      "path": "Server/ARDY/runtime/semantic-tempo-v1/tempo-failed-v1/constraint-regression.json",
+      "sha256": "be170d92011d8c1d26dd5fdc7aa3aafd03652e9e14b2297f14eec4255206de2c",
+      "bytes": 42529266
+    },
+    {
+      "path": "Server/ARDY/runtime/semantic-tempo-v1/tempo-failed-v1/tempo-regression.json",
+      "sha256": "994b046b8dcfaafd0e113c2cdeaa7309a16886328409cccd828f24e82943845e",
+      "bytes": 4766206
+    }
+  ],
+  "script": {
+    "path": "Tools/MotionAdapter/diagnose_tempo_basis.py",
+    "sha256": "dc77c43b3403f32aaf8b1c2ef2685bdc3a9725968679bda2281b2956919c67f6",
+    "bytes": 7274
+  },
+  "fixture": {
+    "id": "fixture-2",
+    "avatar": "Assets/Model/NEVA.vrm",
+    "avatarSha256": "d02820de92e697d8dd37fea4e993a2127c36684e19ebff8cffbc0b999dd25551",
+    "branch": "Real ControlRig with real Animator and VRM LateUpdate",
+    "yaw": 65.00000762939453,
+    "scale": 1.2000000476837158
+  },
+  "case": "adaptive-hold-source",
+  "plan": {
+    "left": "forward",
+    "right": "forward",
+    "leftBend": 40.0,
+    "rightBend": 40.0,
+    "leftBendAuto": false,
+    "rightBendAuto": false,
+    "leftPalm": "partner",
+    "rightPalm": "partner",
+    "joint": "wrists",
+    "axis": "palm-normal",
+    "amplitude": 10.0,
+    "cycles": 2,
+    "seconds": 3.200000047683716,
+    "end": "hold",
+    "timingPolicy": "adaptive-v1",
+    "tempo": "natural",
+    "timingDurationFixed": false
+  },
+  "originalFailure": "failed: left wrist did not make the requested number of cycles: sign changes=4 expected=3",
+  "testedSourceHashes": {
+    "playerSha256": "708a6bf1e7f6650eb77c3f55f2b37424cdefbaf85f5670e1d5c6c6bd3f993344",
+    "planSha256": "82b4a83ce6ccb73ee1ccc81a9e5e46e9d8b23b71f4161e54a5a1e4cdd95a14cc",
+    "sessionSha256": "15dade49424443bd2b50fd40af91df19c914ffb194a08ec43bf366c4cbe05792",
+    "observerSha256": "b4bc0f114a5063e6f96077a32cc1ecc0b468a162ccec9b8dbc0bf9c0a5dbc446",
+    "harnessSha256": "2e7eead838d041965dae672cc0f06895f3f3a7729f7fd61680a285fa6296ff8e",
+    "controllerSha256": "a4d6decb91e85385dc010b0c44ac7ecf0c24c15ec226c614dd852eb18a565d66",
+    "bridgeSha256": "72116744e4c005e9ef145acd5c58c2a20d6e6cb09fee375290fb3b57caba20c2",
+    "palmHarnessSha256": "d4a978b0de221897fae910f7ecb040f1e936ebaa474ffbd6d0d750f5ceb8d14a",
+    "palmGeometrySha256": "e78ac5872c58bce4e65ea36e77b95ff12845aefbffa963456b8e5af795410764",
+    "parserSha256": "3a79c4492d97ffc02e04fc5c8748715f3d5be888829e58d800bb13d7904768a9"
+  },
+  "tempoHarnessSha256": "ce90839f017d7132ba5bd30e936ea04bc80d13a52577bc9899fabde2e64a7620",
+  "timingSourceSha256": "79aa8926926531f7370693c98454a09d7f32a5965d6f4050f66e4fa4fd8a6f72",
+  "expectedInternalSignChanges": 3,
+  "fixedRootChangesAtOriginalPoint5Threshold": [
+    {
+      "frame": 5171,
+      "gameTime": 30.578231811523438,
+      "secondsFromActing": 0.4906617360286205,
+      "angle": -0.81036376953125
+    },
+    {
+      "frame": 5318,
+      "gameTime": 31.044681549072266,
+      "secondsFromActing": 0.9571114735774486,
+      "angle": 0.6901868581771851
+    },
+    {
+      "frame": 5463,
+      "gameTime": 31.534255981445312,
+      "secondsFromActing": 1.4466859059504955,
+      "angle": -0.58929443359375
+    },
+    {
+      "frame": 5586,
+      "gameTime": 31.947668075561523,
+      "secondsFromActing": 1.8600980000667064,
+      "angle": 0.6012473106384277
+    }
+  ],
+  "relativeChangesAtIndependentPoint15Threshold": [
+    {
+      "frame": 5171,
+      "gameTime": 30.578232375494814,
+      "secondsFromActing": 0.4906622999999968,
+      "angle": -0.953179657459259
+    },
+    {
+      "frame": 5318,
+      "gameTime": 31.04468137549481,
+      "secondsFromActing": 0.957111299999994,
+      "angle": 0.31177201867103577
+    },
+    {
+      "frame": 5459,
+      "gameTime": 31.521243675494816,
+      "secondsFromActing": 1.4336735999999988,
+      "angle": -0.3361779451370239
+    }
+  ],
+  "relativeChangesAtSamePoint5Threshold": [
+    {
+      "frame": 5171,
+      "gameTime": 30.578232375494814,
+      "secondsFromActing": 0.4906622999999968,
+      "angle": -0.953179657459259
+    },
+    {
+      "frame": 5322,
+      "gameTime": 31.058022175494813,
+      "secondsFromActing": 0.9704520999999957,
+      "angle": 1.189103364944458
+    },
+    {
+      "frame": 5463,
+      "gameTime": 31.534256375494813,
+      "secondsFromActing": 1.446686299999996,
+      "angle": -1.1918781995773315
+    }
+  ],
+  "pairedFrameCount": 137,
+  "maximumActualRelativeMinusCommandDegrees": 2.574920654296875e-05,
+  "actualForearmRollFirstLast": [
+    12.101602554321289,
+    12.816760063171387
+  ],
+  "tailActualSamples": [
+    {
+      "frame": 5551,
+      "gameTime": 31.83340072631836,
+      "localGameTimeDouble": 31.833401375494816,
+      "secondsFromActing": 1.745831299999999,
+      "fixedRootAngle": -4.56243896484375,
+      "actualRelativeAngle": -5.240522861480713,
+      "commandDiagnosticOnly": -5.240523338317871,
+      "actualForearmRoll": 12.805923461914062
+    },
+    {
+      "frame": 5556,
+      "gameTime": 31.848953247070312,
+      "localGameTimeDouble": 31.848952875494817,
+      "secondsFromActing": 1.7613827999999998,
+      "fixedRootAngle": -3.40380859375,
+      "actualRelativeAngle": -4.083517074584961,
+      "commandDiagnosticOnly": -4.083523273468018,
+      "actualForearmRoll": 12.807865142822266
+    },
+    {
+      "frame": 5561,
+      "gameTime": 31.8646183013916,
+      "localGameTimeDouble": 31.864618475494815,
+      "secondsFromActing": 1.7770483999999982,
+      "fixedRootAngle": -2.314727783203125,
+      "actualRelativeAngle": -2.9961159229278564,
+      "commandDiagnosticOnly": -2.9960954189300537,
+      "actualForearmRoll": 12.809370994567871
+    },
+    {
+      "frame": 5565,
+      "gameTime": 31.877429962158203,
+      "localGameTimeDouble": 31.877429975494813,
+      "secondsFromActing": 1.7898598999999962,
+      "fixedRootAngle": -1.525665283203125,
+      "actualRelativeAngle": -2.20853853225708,
+      "commandDiagnosticOnly": -2.2085378170013428,
+      "actualForearmRoll": 12.810855865478516
+    },
+    {
+      "frame": 5569,
+      "gameTime": 31.89071273803711,
+      "localGameTimeDouble": 31.890712175494812,
+      "secondsFromActing": 1.8031420999999952,
+      "fixedRootAngle": -0.8330078125,
+      "actualRelativeAngle": -1.5166096687316895,
+      "commandDiagnosticOnly": -1.5166141986846924,
+      "actualForearmRoll": 12.811653137207031
+    },
+    {
+      "frame": 5573,
+      "gameTime": 31.905441284179688,
+      "localGameTimeDouble": 31.905440775494817,
+      "secondsFromActing": 1.8178707000000003,
+      "fixedRootAngle": -0.229095458984375,
+      "actualRelativeAngle": -0.9145596027374268,
+      "commandDiagnosticOnly": -0.9145605564117432,
+      "actualForearmRoll": 12.813543319702148
+    },
+    {
+      "frame": 5578,
+      "gameTime": 31.92096710205078,
+      "localGameTimeDouble": 31.920967675494815,
+      "secondsFromActing": 1.8333975999999979,
+      "fixedRootAngle": 0.21785947680473328,
+      "actualRelativeAngle": -0.46866434812545776,
+      "commandDiagnosticOnly": -0.4686700701713562,
+      "actualForearmRoll": 12.8147554397583
+    },
+    {
+      "frame": 5582,
+      "gameTime": 31.93433380126953,
+      "localGameTimeDouble": 31.93433357549481,
+      "secondsFromActing": 1.8467634999999945,
+      "fixedRootAngle": 0.46224305033683777,
+      "actualRelativeAngle": -0.2250560224056244,
+      "commandDiagnosticOnly": -0.2250499427318573,
+      "actualForearmRoll": 12.815502166748047
+    },
+    {
+      "frame": 5586,
+      "gameTime": 31.947668075561523,
+      "localGameTimeDouble": 31.947667375494817,
+      "secondsFromActing": 1.8600972999999996,
+      "fixedRootAngle": 0.6012473106384277,
+      "actualRelativeAngle": -0.08663520216941833,
+      "commandDiagnosticOnly": -0.0866183415055275,
+      "actualForearmRoll": 12.816156387329102
+    },
+    {
+      "frame": 5590,
+      "gameTime": 31.960508346557617,
+      "localGameTimeDouble": 31.960507575494816,
+      "secondsFromActing": 1.872937499999999,
+      "fixedRootAngle": 0.6637926697731018,
+      "actualRelativeAngle": -0.024235812947154045,
+      "commandDiagnosticOnly": -0.02422761730849743,
+      "actualForearmRoll": 12.816366195678711
+    },
+    {
+      "frame": 5594,
+      "gameTime": 31.973194122314453,
+      "localGameTimeDouble": 31.973193875494815,
+      "secondsFromActing": 1.8856237999999976,
+      "fixedRootAngle": 0.6850799322128296,
+      "actualRelativeAngle": -0.0034052433911710978,
+      "commandDiagnosticOnly": -0.0034202197566628456,
+      "actualForearmRoll": 12.816689491271973
+    },
+    {
+      "frame": 5598,
+      "gameTime": 31.987564086914062,
+      "localGameTimeDouble": 31.987564475494814,
+      "secondsFromActing": 1.899994399999997,
+      "fixedRootAngle": 0.6885512471199036,
+      "actualRelativeAngle": -4.452148459677119e-06,
+      "commandDiagnosticOnly": -1.4346796888276003e-05,
+      "actualForearmRoll": 12.816760063171387
+    }
+  ],
+  "geometry": {
+    "maximumDirectionError": 0.0,
+    "maximumBendError": 0.0002288818359375,
+    "maximumShoulderVariation": 3.5246528113930253e-06,
+    "maximumElbowVariation": 8.69823395532876e-07,
+    "maximumArmRotationVariation": 0.0
+  },
+  "interpretation": "Actual forearm axial roll is permitted for constrained palms. A fixed root-space neutral includes that parent rotation, so its late +0.68855deg reading is not an extra wrist oscillation. The independently measured hand-relative-forearm curve completes exactly3 internal sign changes and approaches zero.",
+  "testCorrection": "Only Tempo completion uses the already independently sampled relative-joint angle. Exact sign changes remain2*cycles-1, amplitude tolerances remain1.5deg wrists/2.5deg head. Old fixed-root samples/statistics, failed reports, core and old Palm/legacy checks remain unchanged."
+}

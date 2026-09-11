@@ -1,0 +1,133 @@
+{
+  "status": "passed",
+  "checkedAt": "2026-09-10T03:18:26.870908+00:00",
+  "isolatedProject": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\unity-naturalness-validation",
+  "sourceFiles": [
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/left-wave.json",
+      "sourceSha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d",
+      "isolatedSha256": "3e2db188fded18110d2c48520824a75348dd9b1e955869643ac39a9fbb725d5d",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/right-wave.json",
+      "sourceSha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+      "isolatedSha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/nod.json",
+      "sourceSha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+      "isolatedSha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Resources/ARDY/shake-head.json",
+      "sourceSha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+      "isolatedSha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs",
+      "sourceSha256": "e4f3d5c475961d26bdfa79348003502109be73a4059b19e3236d09b1872eb63e",
+      "isolatedSha256": "e4f3d5c475961d26bdfa79348003502109be73a4059b19e3236d09b1872eb63e",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionClip.cs",
+      "sourceSha256": "f2b32c0bb4e1456e55a04e3ecb8a2b594a490ba8bbef22f3dfdca829cd8a4375",
+      "isolatedSha256": "f2b32c0bb4e1456e55a04e3ecb8a2b594a490ba8bbef22f3dfdca829cd8a4375",
+      "match": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyAvatarRestPose.cs",
+      "sourceSha256": "ad7220769faeee95c2a3128c3fa52cebd75b52c3be1ce1b1e16274bcde095916",
+      "isolatedSha256": "ad7220769faeee95c2a3128c3fa52cebd75b52c3be1ce1b1e16274bcde095916",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyMotionAnchorRegression.cs",
+      "sourceSha256": "3a0dbd0ffaee8f105fff77c5327e74eab10bb689c246df655934f84232452a2b",
+      "isolatedSha256": "3a0dbd0ffaee8f105fff77c5327e74eab10bb689c246df655934f84232452a2b",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyMotionRegression.cs",
+      "sourceSha256": "f0c4519e7b058189ea6565d13965709a4c422dd7f74a40815376f49b2cbc0d17",
+      "isolatedSha256": "f0c4519e7b058189ea6565d13965709a4c422dd7f74a40815376f49b2cbc0d17",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyMotionPlayModeRegression.cs",
+      "sourceSha256": "9ba1dc2dfdc2b1657e49a9b18a607c6affe547ef4b1c6fda5bac28c9d2a0c775",
+      "isolatedSha256": "9ba1dc2dfdc2b1657e49a9b18a607c6affe547ef4b1c6fda5bac28c9d2a0c775",
+      "match": true
+    },
+    {
+      "path": "Assets/Editor/ArdyMotionPreviewWindow.cs",
+      "sourceSha256": "93aa3530842a29f6a45c0fd6678b379977bd250c0b7bf7aef2f7b970745e89ee",
+      "isolatedSha256": "93aa3530842a29f6a45c0fd6678b379977bd250c0b7bf7aef2f7b970745e89ee",
+      "match": true
+    }
+  ],
+  "renderedInputs": [
+    {
+      "id": "right-wave",
+      "sourceSha256": "4e3ba22781267ad28545d8c378d368418f21fff0d583c44aa8e0f435f4332ebd",
+      "sourceHashMatchesRenderedInput": true,
+      "frames": 133,
+      "fps": 20.0
+    },
+    {
+      "id": "nod",
+      "sourceSha256": "0bd23666a39374af9429427859094c957b3c0747e0bf04eebbd9675b8d4a1d77",
+      "sourceHashMatchesRenderedInput": true,
+      "frames": 50,
+      "fps": 20.0
+    },
+    {
+      "id": "shake-head",
+      "sourceSha256": "b225180aa39be223b29edfee6e737f94f26b8ac65f0d8395ee8cbd4275b75946",
+      "sourceHashMatchesRenderedInput": true,
+      "frames": 54,
+      "fps": 20.0
+    }
+  ],
+  "regressions": {
+    "anchor": {
+      "status": "passed",
+      "checks": 15794,
+      "reportSha256": "903c665f74680805062ec7bfd27e3af3196416935ea8e664a173ce3e9a29b523"
+    },
+    "editMode": {
+      "status": "passed",
+      "checks": 1762152,
+      "reportSha256": "c3f751006e04235b165ef4d9d7535ea05b662c7bfafcae60987d032fe005d038"
+    },
+    "playMode": {
+      "status": "passed",
+      "checks": 774054,
+      "reportSha256": "11f5bb7e86db48070561423c5e811775d1a792055d820fca5e9701fbffb9f935"
+    }
+  },
+  "formalRightExactlyMatchesReviewedMirrorFrames": true,
+  "rightWaveProvenance": "Approved left-wave mirrored for right-hand demonstration; not an independent success of the original right-hand text condition.",
+  "playModeScope": "Ran against final unchanged runtime and unchanged left-wave input before formal right-wave resource substitution. PlayMode suite does not play right-wave; right-wave substitution is covered by final Anchor and EditMode suites.",
+  "camera": {
+    "orthographicSize": 0.6,
+    "centreY": 1.4,
+    "keyIntensity": 0.7,
+    "fillIntensity": 0.25,
+    "width": 960,
+    "height": 800
+  },
+  "originalUnityProcess": {
+    "pid": 17400,
+    "runningVerified": null,
+    "observationContext": "normal sandbox",
+    "checkResult": "PID 17400 was not observable from the normal sandbox process query. This is not evidence that the user-context Editor exited. Validation only launched/exited its own isolated-project Unity processes; no stop/kill was issued for the original Editor."
+  },
+  "originalEvidencePreserved": "Logs/ardy-naturalness/audit/original-right-before-native-candidates",
+  "candidateEvidencePreserved": "Logs/ardy-naturalness/candidates",
+  "notes": "No final GIFs were modified by source synchronization or report copying."
+}

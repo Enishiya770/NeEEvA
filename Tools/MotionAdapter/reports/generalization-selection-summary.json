@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "passed": true,
+  "utc": "2026-09-10T05:55:21.652769+00:00",
+  "source_sha256": {
+    "selection": "0e3592520ffcc4cd3572cf556893f69ba034d010738ec80f17f7989b19287bd3",
+    "candidate": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+    "baseline": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa"
+  },
+  "candidate_cpu_loader": {
+    "adapter": "finetune-seed0",
+    "adapterMode": "candidate",
+    "candidate": true,
+    "approvedForRuntime": false,
+    "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+    "adapterSelectionSha256": "0e3592520ffcc4cd3572cf556893f69ba034d010738ec80f17f7989b19287bd3",
+    "adapterSelectionLockedUtc": "2026-09-10T05:52:40.504072+00:00",
+    "adapterSelection": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\generalization-v1\\candidates\\selection.json",
+    "teacherContract": "4931fa72fb55a5e633e8dedc2fbac8d3bf15f8a8baa2cb4130ef0072845b474a",
+    "datasetSha256": "76b3da47f1c2400372a5a594e5f496fa0bda4ac8970d4d055519896c462b6091",
+    "candidateUsage": "Explicit isolated HTTP evaluation; feature qualification does not approve motion quality"
+  },
+  "validation_source": "Existing immutable selection lock; no new predictions or model selection",
+  "selected_mode": "finetune",
+  "seed": 0,
+  "epoch": 100,
+  "domains": {
+    "old": {
+      "baseline": {
+        "standardized_mse": 0.10044349730014801,
+        "cosine": 0.9865381121635437,
+        "norm_ratio": 0.9824483394622803
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.09684541076421738,
+        "cosine": 0.9872450828552246,
+        "norm_ratio": 0.9796665906906128
+      },
+      "standardized_mse_improvement_percent": 3.58219957751843,
+      "cosine_delta": 0.0007069706916809082
+    },
+    "new": {
+      "baseline": {
+        "standardized_mse": 1.8893470764160156,
+        "cosine": 0.7339246273040771,
+        "norm_ratio": 0.942095935344696
+      },
+      "locked_candidate": {
+        "standardized_mse": 0.3908557593822479,
+        "cosine": 0.9466623663902283,
+        "norm_ratio": 0.9421880841255188
+      },
+      "standardized_mse_improvement_percent": 79.31265439467697,
+      "cosine_delta": 0.21273773908615112
+    }
+  },
+  "validation_group_improvement_ci": {
+    "lower": 1.4044566704332828,
+    "upper": 1.5958705335436387,
+    "mean_group_improvement": 1.4984914040192963,
+    "groups": 40,
+    "scope": "Validation selection evidence with correlated paraphrases grouped; not a final test confidence claim"
+  },
+  "all_candidates": [
+    {
+      "mode": "scratch",
+      "seed": 0,
+      "epoch": 100,
+      "validation": {
+        "old": {
+          "standardized_mse": 0.1041952595114708,
+          "cosine": 0.9862362146377563,
+          "norm_ratio": 0.9783949851989746
+        },
+        "new": {
+          "standardized_mse": 0.29279375076293945,
+          "cosine": 0.9599652290344238,
+          "norm_ratio": 0.9597105383872986
+        }
+      },
+      "balanced_score": 0.5961614160857373,
+      "new_group_improvement_ci": {
+        "lower": 1.4978505705995484,
+        "upper": 1.6930224016308784,
+        "mean_group_improvement": 1.5965534012764693,
+        "groups": 40,
+        "scope": "Validation selection evidence with correlated paraphrases grouped; not a final test confidence claim"
+      },
+      "eligible": true,
+      "failed_gates": []
+    },
+    {
+      "mode": "scratch",
+      "seed": 1,
+      "epoch": 100,
+      "validation": {
+        "old": {
+          "standardized_mse": 0.10635101050138474,
+          "cosine": 0.9859434366226196,
+          "norm_ratio": 0.9784724712371826
+        },
+        "new": {
+          "standardized_mse": 0.2937866747379303,
+          "cosine": 0.9598243832588196,
+          "norm_ratio": 0.9593505263328552
+        }
+      },
+      "balanced_score": 0.6071553476962458,
+      "new_group_improvement_ci": {
+        "lower": 1.4970884748082607,
+        "upper": 1.6923253610963,
+        "mean_group_improvement": 1.5955604480579495,
+        "groups": 40,
+        "scope": "Validation selection evidence with correlated paraphrases grouped; not a final test confidence claim"
+      },
+      "eligible": false,
+      "failed_gates": [
+        "old-validation-mse-regression"
+      ]
+    },
+    {
+      "mode": "finetune",
+      "seed": 0,
+      "epoch": 100,
+      "validation": {
+        "old": {
+          "standardized_mse": 0.09684541076421738,
+          "cosine": 0.9872450828552246,
+          "norm_ratio": 0.9796665906906128
+        },
+        "new": {
+          "standardized_mse": 0.3908557593822479,
+          "cosine": 0.9466623663902283,
+          "norm_ratio": 0.9421880841255188
+        }
+      },
+      "balanced_score": 0.5855257301390231,
+      "new_group_improvement_ci": {
+        "lower": 1.4044566704332828,
+        "upper": 1.5958705335436387,
+        "mean_group_improvement": 1.4984914040192963,
+        "groups": 40,
+        "scope": "Validation selection evidence with correlated paraphrases grouped; not a final test confidence claim"
+      },
+      "eligible": true,
+      "failed_gates": []
+    },
+    {
+      "mode": "finetune",
+      "seed": 1,
+      "epoch": 100,
+      "validation": {
+        "old": {
+          "standardized_mse": 0.09745027869939804,
+          "cosine": 0.9871506690979004,
+          "norm_ratio": 0.9805757403373718
+        },
+        "new": {
+          "standardized_mse": 0.3952864110469818,
+          "cosine": 0.9459999203681946,
+          "norm_ratio": 0.9416610598564148
+        }
+      },
+      "balanced_score": 0.5897092513097766,
+      "new_group_improvement_ci": {
+        "lower": 1.3987523645581676,
+        "upper": 1.5925792764918878,
+        "mean_group_improvement": 1.4940607057884336,
+        "groups": 40,
+        "scope": "Validation selection evidence with correlated paraphrases grouped; not a final test confidence claim"
+      },
+      "eligible": true,
+      "failed_gates": []
+    }
+  ],
+  "evaluation_scope": {
+    "old_validation_and_test": "Retention audit, not unseen-action generalization: new broad data shares wave/raise/nod and other action semantics with old holdouts.",
+    "new_validation_and_test": "Within-extension configuration/expression splits; shared action atoms are allowed.",
+    "frozen_eval80": "Separate frozen configuration/expression audit with shared action atoms allowed; never used for candidate selection."
+  },
+  "approved_for_runtime": false,
+  "test_metrics_computed_by_this_tool": false,
+  "gpu_used": false,
+  "weights_or_selection_changed": false
+}

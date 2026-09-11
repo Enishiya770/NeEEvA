@@ -1,0 +1,82 @@
+{
+  "status": "approved_for_real_feature_export",
+  "scope": "Independent CPU-only manual configuration/wording review, old-group overlap review and source patch inspection. No model, feature export, training, Unity, network or frozen-test motion outputs used.",
+  "reviewed_draft": "Tools\\MotionAdapter\\runtime\\generalization-v1\\extension-final.jsonl",
+  "reviewed_draft_records_sha256": "76b3f48b3098357ff9dc789ff3103567b66620a7076a7d87f7cdac163d08d01b",
+  "reviewed_generator": "Tools\\MotionAdapter\\generate_generalization_corpus.py",
+  "reviewed_generator_sha256": "a6a322d9b8e9b34cb5770097eee8d948e11a94bce22767b846458d4483840516",
+  "rows": 1984,
+  "groups": 248,
+  "additional_exclusion_keys": [],
+  "resolved_findings": [
+    {
+      "issue": "Near-equivalent both-chest-facing-palms hold",
+      "result": "raise/both/forward/chest/hold excluded with all eight variants."
+    },
+    {
+      "issue": "Lift repeat count ambiguity",
+      "result": "Three full lifts in total explicitly stated."
+    },
+    {
+      "issue": "Single nod grammar",
+      "result": "One slow/gentle/quick nod uses singular form."
+    },
+    {
+      "issue": "Single-arm outward plural direction",
+      "result": "Left/right side is explicit."
+    },
+    {
+      "issue": "Underspecified point endpoint",
+      "result": "Verified generator fixes: up=face/inward palm; down=below waist/downward palm; forward/outward/across=chest/upward palm. Freeze snapshot will be checked separately."
+    },
+    {
+      "issue": "Head/look repeat ambiguity",
+      "result": "Verified generator states three full turns in total. Freeze snapshot will be checked separately."
+    }
+  ],
+  "old_2000_policy": {
+    "retained_unchanged": true,
+    "val_test_meaning": "retention audit, not semantically unseen holdout after this expansion",
+    "overlap_allowed": true,
+    "reason": "Legacy groups partition family/side/amplitude/pace. New descriptions specify target/count/composition but often leave legacy amplitude/pace broad, so compatible semantics can overlap old validation/test groups.",
+    "concrete_examples": [
+      {
+        "new_key": "wave/left/chest/3",
+        "old_group": "wave/left/moderate/at a moderate pace",
+        "old_split": "test",
+        "relationship": "Compatible: new height/count does not exclude old unspecified target/count, and new text omits amplitude/pace."
+      },
+      {
+        "new_keys": "head/nod/*/slow",
+        "old_group": "nod/both/large/slowly",
+        "old_split": "val",
+        "relationship": "Compatible: new count does not define amplitude, while old text leaves count unspecified."
+      },
+      {
+        "new_keys": "shoulders/shrug/*",
+        "old_groups": [
+          "shrug/both/small/at a moderate pace",
+          "shrug/both/large/slowly"
+        ],
+        "relationship": "Compatible: new counts alone do not separate old amplitude/pace configurations."
+      }
+    ],
+    "selection_claim": "Old validation can constrain retention, but improvement on it or old test is not evidence of unseen-action generalization."
+  },
+  "frozen_80_policy": {
+    "meaning": "Isolated complete configurations and expressions; shared primitives and legacy broad descriptions are allowed.",
+    "exclude_complete_configuration_and_paraphrases_from_new_train_val": true,
+    "no_claim_of_unseen_atomic_actions": true,
+    "no_new_direct_equivalent_configuration_found_after_fixes": true,
+    "suite_sha256": "bad7ec319c961c077b8ab92eb39eb8482e847c2ff67d6c39e5a8434b3e197889"
+  },
+  "seen_diagnostics_policy": "Four previously observed failure strings stay excluded verbatim; other overhead/explanation training semantics are allowed. Their improvement is known-issue regression only.",
+  "limits": [
+    "Eight forms per group are surface variants, not 1984 independent actions.",
+    "Data labels specify intended motions, not observed teacher success or motion-capture ground truth.",
+    "Continuous words such as chest/face/shoulder and small/moderate remain fuzzy; final semantic evaluation requires manual review, not only height bands."
+  ],
+  "frozen_snapshot_review": "Tools/MotionAdapter/runtime/generalization-v1/extension-v1.review.json",
+  "frozen_records_sha256": "484a4c8b7d493e763ba26f4070caa3541c4232ae38c7ad8de50fe4b29e03d291",
+  "frozen_source_sha256": "874b3e21067cfd2003f0de3012b17f70a91ba142ef963a0cd2dee71e82f9eb78"
+}

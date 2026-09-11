@@ -1,0 +1,1695 @@
+{
+  "schema": 1,
+  "generatedAtUtc": "2026-09-10T03:11:36.852316+00:00",
+  "scope": "Complete target-rest-hierarchy FK screening only; final candidate selection remains pending Unity visual review.",
+  "analysisScript": "Tools/MotionAdapter/review_unity_right_candidates.py",
+  "analysisScriptSha256": "7b754a19c5f08d11edcb8ee26f220aa86039c7723d1fe53ba6bdd155b3287a5d",
+  "numerics": {
+    "numpy": "2.3.0",
+    "scipy": "1.17.1",
+    "dtype": "float64"
+  },
+  "reproduce": "python -m Tools.MotionAdapter.review_unity_right_candidates --require-all",
+  "method": {
+    "targetGeometry": "Parse every .vrm GLB node, exact rest translations/rotations/scales and intermediate ancestors, convert VRM0 coordinates as UniVRM, and evaluate the complete hierarchy.",
+    "targetCoordinateEvidence": [
+      "Assets/VRM10/vrmlib/Runtime/Model.cs:369-377: VRM0/Unity use ZReverser",
+      "Assets/VRM10/Runtime/IO/Vrm10Importer.cs:40: VRM1 import uses Axes.X"
+    ],
+    "playerTransfer": "Keep target rest torso; desiredGlobal = targetChestCurrent * inverse(targetChestRest) * inverse(sourceSpine3) * sourceBoneGlobal * targetBoneRest. Apply four right-arm global rotations in hierarchy order, preserving all local translations/scales.",
+    "sampling": "60 Hz; independent quaternion SLERP per source joint, same as ArdyMotionClip; clamp to last frame. Metrics begin at 0.3 seconds when the default fade-in has finished.",
+    "raisedPhase": "Wrist chest-local Y >= right-shoulder chest-local Y. This marks a geometric raised phase, not verified waving.",
+    "headDistance": "Euclidean wrist-to-head-bone distance, not face mesh clearance or screen-space occlusion.",
+    "activity": "Raised-phase wrist path length and hand-rotation path length include all adjacent raised samples; they do not by themselves prove a wave."
+  },
+  "demonstrationPreference": {
+    "preferredRaisedWristSideMarginMetres": 0.12,
+    "rationale": "For these two avatars, favour raised-hand lateral room near 12 cm or more and less forward reach to leave visible room beside the face; avoid stationary candidates.",
+    "notUniversalThreshold": true,
+    "finalSelection": null,
+    "finalSelectionAuthority": "User-facing Unity visual inspection; no automatic acceptance by this script."
+  },
+  "priorApproximationCorrection": "An earlier approximation changed only upper/forearm lengths while retaining the wider ARDY shoulder layout. It predicted positive side clearance and was insufficient. This full-target analysis includes the actual narrower shoulders and reproduces the observed small cross-centre excursion.",
+  "unitySeed0Reference": {
+    "target": "NEVA",
+    "reportedMinimumSideMetres": -0.01084,
+    "reportedSideAt07833SecondsMetres": -0.005,
+    "source": "Parent task reported an independent Unity render/regression; this Python run does not perform that Unity check.",
+    "pythonMinimumSideMetres": -0.010839212813800745,
+    "absoluteDifferenceFromRoundedUnityMinimumMetres": 7.871861992560236e-07
+  },
+  "targets": [
+    {
+      "sourcePath": "Assets/Model/NEVA.vrm",
+      "sourceSha256": "d02820de92e697d8dd37fea4e993a2127c36684e19ebff8cffbc0b999dd25551",
+      "nodeCount": 145,
+      "coordinateConversion": "VRM0 -> Unity: reflect Z; confirmed in VrmLib.Model.ConvertCoordinate",
+      "restPositionsMetres": {
+        "upperChest": [
+          9.48362150000006e-18,
+          1.1793317797,
+          0.004492918679999999
+        ],
+        "head": [
+          6.148342386371128e-09,
+          1.3863489697,
+          -0.024237671319999998
+        ],
+        "rightShoulder": [
+          0.02208778450000001,
+          1.2845845227000001,
+          -0.025353067820000002
+        ],
+        "rightUpperArm": [
+          0.10433724450000001,
+          1.2727663522000001,
+          -0.0253530529188388
+        ],
+        "rightLowerArm": [
+          0.32319351949999997,
+          1.2727663522000001,
+          -0.0253530529188388
+        ],
+        "rightHand": [
+          0.5349296025,
+          1.27276873638579,
+          -0.0249786388918388
+        ]
+      },
+      "restRotationsXyzw": {
+        "upperChest": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "head": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rightShoulder": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rightUpperArm": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rightLowerArm": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rightHand": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    },
+    {
+      "sourcePath": "Assets/Model/NeEEvA.vrm",
+      "sourceSha256": "6996cfddbf852cd5fbe992ee801e6769824679774686eb5cdb3f1628e57af69b",
+      "nodeCount": 169,
+      "coordinateConversion": "VRM0 -> Unity: reflect Z; confirmed in VrmLib.Model.ConvertCoordinate",
+      "restPositionsMetres": {
+        "upperChest": [
+          9.48362150000006e-18,
+          1.2073738687,
+          0.004492918679999999
+        ],
+        "head": [
+          6.148342386371128e-09,
+          1.4143910587,
+          -0.02423767882
+        ],
+        "rightShoulder": [
+          0.02208778450000001,
+          1.3126267307,
+          -0.025353067820000002
+        ],
+        "rightUpperArm": [
+          0.10433724450000001,
+          1.3008085602,
+          -0.0253530529188388
+        ],
+        "rightLowerArm": [
+          0.32319351949999997,
+          1.3008085602,
+          -0.0253530529188388
+        ],
+        "rightHand": [
+          0.5349296025,
+          1.3008109443857898,
+          -0.0249786388918388
+        ]
+      },
+      "restRotationsXyzw": {
+        "upperChest": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "head": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rightShoulder": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rightUpperArm": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rightLowerArm": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rightHand": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "name": "native-seed0",
+      "sourcePath": "Server/ARDY/runtime/unity-preview/right-wave.npz",
+      "status": "screened",
+      "sourceSha256": "6c50151257f6e0b82d7c7eb85d0db2444dab21b4ee54e9d2848254bf1dad5816",
+      "rawSourceText": "While standing in place, a standing person waves the right hand with moderate movements at a moderate pace.",
+      "sourceFrameCount": 120,
+      "sourceFps": 20.0,
+      "mirrored": false,
+      "transform": "Native generated rotations; no mirror or postprocessing.",
+      "targets": {
+        "NEVA": {
+          "sampleCountAfterBlendIn": 342,
+          "allAfterBlendIn": {
+            "minimumXyzMetres": [
+              -0.010839212813800745,
+              -0.33267213783358207,
+              0.03990995740108451
+            ],
+            "maximumXyzMetres": [
+              0.19104805537913125,
+              0.2784900388076821,
+              0.40590176576575343
+            ],
+            "minimumSideTimeSeconds": 0.85,
+            "crossCentreCount": 52,
+            "crossCentreFraction": 0.15204678362573099,
+            "belowPreferredSideMarginCount": 157,
+            "belowPreferredSideMarginFraction": 0.4590643274853801
+          },
+          "raisedFrameCount": 204,
+          "raisedFractionAfterBlendIn": 0.5964912280701754,
+          "maximumWristHeightRiseFromSourceStartMetres": 0.6180177485345739,
+          "minimumWristToHeadBoneDistanceMetres": 0.33455907609394486,
+          "raisedAdjacentWristTravelMetres": 0.6606255148357396,
+          "raisedAdjacentHandRotationTravelDegrees": 429.65240173469874,
+          "maximumInterFrameHandRotationDegrees": 6.287938444117897,
+          "raised": {
+            "minimumXyzMetres": [
+              -0.010839212813800745,
+              0.10622879488285975,
+              0.30557516296308174
+            ],
+            "maximumXyzMetres": [
+              0.17676946013403405,
+              0.2784900388076821,
+              0.40590176576575343
+            ],
+            "minimumSideTimeSeconds": 0.85,
+            "crossCentreCount": 52,
+            "crossCentreFraction": 0.2549019607843137,
+            "belowPreferredSideMarginCount": 131,
+            "belowPreferredSideMarginFraction": 0.6421568627450981
+          },
+          "samplesEveryHalfSecond": [
+            {
+              "timeSeconds": 0.0,
+              "wristInChestMetres": [
+                0.15312752309166378,
+                -0.33952770972689184,
+                0.0576915607060802
+              ]
+            },
+            {
+              "timeSeconds": 0.5,
+              "wristInChestMetres": [
+                0.0843414790669682,
+                0.010870589026572786,
+                0.3712320325886643
+              ]
+            },
+            {
+              "timeSeconds": 1.0,
+              "wristInChestMetres": [
+                0.013332096292488054,
+                0.22647978528038726,
+                0.3297871890602867
+              ]
+            },
+            {
+              "timeSeconds": 1.5,
+              "wristInChestMetres": [
+                -0.0012398048078795338,
+                0.20417686675573243,
+                0.33097128816907795
+              ]
+            },
+            {
+              "timeSeconds": 2.0,
+              "wristInChestMetres": [
+                0.001670407810466919,
+                0.21525099697936412,
+                0.3182007201013965
+              ]
+            },
+            {
+              "timeSeconds": 2.5,
+              "wristInChestMetres": [
+                0.008977490450578154,
+                0.22014838891174482,
+                0.3193534144057021
+              ]
+            },
+            {
+              "timeSeconds": 3.0,
+              "wristInChestMetres": [
+                0.1156689174116306,
+                -0.15151424287890491,
+                0.24664496664364705
+              ]
+            },
+            {
+              "timeSeconds": 3.5,
+              "wristInChestMetres": [
+                0.18044318136234277,
+                -0.32985264957797933,
+                0.04145021405379335
+              ]
+            },
+            {
+              "timeSeconds": 4.0,
+              "wristInChestMetres": [
+                0.1614577268289003,
+                -0.33135931495218274,
+                0.04754359382894692
+              ]
+            },
+            {
+              "timeSeconds": 4.5,
+              "wristInChestMetres": [
+                0.18421602108245572,
+                -0.2865535245148165,
+                0.15996450033834708
+              ]
+            },
+            {
+              "timeSeconds": 5.0,
+              "wristInChestMetres": [
+                0.14168456272588223,
+                0.26888407737597864,
+                0.37974664738404096
+              ]
+            },
+            {
+              "timeSeconds": 5.5,
+              "wristInChestMetres": [
+                0.12770803681879356,
+                0.2730973414533877,
+                0.37941222234242444
+              ]
+            }
+          ]
+        },
+        "NeEEvA": {
+          "sampleCountAfterBlendIn": 342,
+          "allAfterBlendIn": {
+            "minimumXyzMetres": [
+              -0.010839212813800745,
+              -0.3326720188335822,
+              0.03990995740108451
+            ],
+            "maximumXyzMetres": [
+              0.19104805537913125,
+              0.2784901578076817,
+              0.40590176576575343
+            ],
+            "minimumSideTimeSeconds": 0.85,
+            "crossCentreCount": 52,
+            "crossCentreFraction": 0.15204678362573099,
+            "belowPreferredSideMarginCount": 157,
+            "belowPreferredSideMarginFraction": 0.4590643274853801
+          },
+          "raisedFrameCount": 204,
+          "raisedFractionAfterBlendIn": 0.5964912280701754,
+          "maximumWristHeightRiseFromSourceStartMetres": 0.6180177485345737,
+          "minimumWristToHeadBoneDistanceMetres": 0.33455908727231637,
+          "raisedAdjacentWristTravelMetres": 0.6606255148357391,
+          "raisedAdjacentHandRotationTravelDegrees": 429.65240173469874,
+          "maximumInterFrameHandRotationDegrees": 6.287938444117897,
+          "raised": {
+            "minimumXyzMetres": [
+              -0.010839212813800745,
+              0.1062289138828596,
+              0.30557516296308174
+            ],
+            "maximumXyzMetres": [
+              0.17676946013403405,
+              0.2784901578076817,
+              0.40590176576575343
+            ],
+            "minimumSideTimeSeconds": 0.85,
+            "crossCentreCount": 52,
+            "crossCentreFraction": 0.2549019607843137,
+            "belowPreferredSideMarginCount": 131,
+            "belowPreferredSideMarginFraction": 0.6421568627450981
+          },
+          "samplesEveryHalfSecond": [
+            {
+              "timeSeconds": 0.0,
+              "wristInChestMetres": [
+                0.15312752309166378,
+                -0.339527590726892,
+                0.0576915607060802
+              ]
+            },
+            {
+              "timeSeconds": 0.5,
+              "wristInChestMetres": [
+                0.0843414790669682,
+                0.010870708026572418,
+                0.3712320325886643
+              ]
+            },
+            {
+              "timeSeconds": 1.0,
+              "wristInChestMetres": [
+                0.013332096292488054,
+                0.2264799042803871,
+                0.3297871890602867
+              ]
+            },
+            {
+              "timeSeconds": 1.5,
+              "wristInChestMetres": [
+                -0.0012398048078795338,
+                0.2041769857557323,
+                0.33097128816907795
+              ]
+            },
+            {
+              "timeSeconds": 2.0,
+              "wristInChestMetres": [
+                0.001670407810466919,
+                0.21525111597936397,
+                0.3182007201013965
+              ]
+            },
+            {
+              "timeSeconds": 2.5,
+              "wristInChestMetres": [
+                0.008977490450578154,
+                0.22014850791174467,
+                0.3193534144057021
+              ]
+            },
+            {
+              "timeSeconds": 3.0,
+              "wristInChestMetres": [
+                0.1156689174116306,
+                -0.15151412387890506,
+                0.24664496664364705
+              ]
+            },
+            {
+              "timeSeconds": 3.5,
+              "wristInChestMetres": [
+                0.18044318136234277,
+                -0.3298525305779795,
+                0.04145021405379335
+              ]
+            },
+            {
+              "timeSeconds": 4.0,
+              "wristInChestMetres": [
+                0.1614577268289003,
+                -0.3313591959521829,
+                0.04754359382894692
+              ]
+            },
+            {
+              "timeSeconds": 4.5,
+              "wristInChestMetres": [
+                0.18421602108245572,
+                -0.2865534055148169,
+                0.15996450033834708
+              ]
+            },
+            {
+              "timeSeconds": 5.0,
+              "wristInChestMetres": [
+                0.14168456272588223,
+                0.2688841963759785,
+                0.37974664738404096
+              ]
+            },
+            {
+              "timeSeconds": 5.5,
+              "wristInChestMetres": [
+                0.12770803681879356,
+                0.27309746045338734,
+                0.37941222234242444
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "mirrored-reviewed-left",
+      "sourcePath": "Server/ARDY/runtime/unity-preview/left-wave.npz",
+      "status": "screened",
+      "sourceSha256": "19945afaf4b96909c22374198fd1f70476c28cffd46bfa9a78ab9dca2e4332f5",
+      "rawSourceText": "While standing in place, a person who is standing waves the left hand with moderate movements at a moderate pace.",
+      "sourceFrameCount": 120,
+      "sourceFps": 20.0,
+      "mirrored": true,
+      "transform": "Reflect global rotations about X and exchange every Left/Right joint index; names/hierarchy stay fixed.",
+      "targets": {
+        "NEVA": {
+          "sampleCountAfterBlendIn": 342,
+          "allAfterBlendIn": {
+            "minimumXyzMetres": [
+              0.13769027067009362,
+              -0.33933059902972995,
+              -0.003056999052002546
+            ],
+            "maximumXyzMetres": [
+              0.4508749497719213,
+              0.2658053984884585,
+              0.2364838554475821
+            ],
+            "minimumSideTimeSeconds": 3.55,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 0,
+            "belowPreferredSideMarginFraction": 0.0
+          },
+          "raisedFrameCount": 138,
+          "raisedFractionAfterBlendIn": 0.40350877192982454,
+          "maximumWristHeightRiseFromSourceStartMetres": 0.6033787011445144,
+          "minimumWristToHeadBoneDistanceMetres": 0.3734687628396281,
+          "raisedAdjacentWristTravelMetres": 0.9425766557329927,
+          "raisedAdjacentHandRotationTravelDegrees": 585.0352768836729,
+          "maximumInterFrameHandRotationDegrees": 8.307884414848044,
+          "raised": {
+            "minimumXyzMetres": [
+              0.2767583444109097,
+              0.11241274095363551,
+              0.17990760426702168
+            ],
+            "maximumXyzMetres": [
+              0.4451847959123094,
+              0.2658053984884585,
+              0.2347313348379037
+            ],
+            "minimumSideTimeSeconds": 0.9,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 0,
+            "belowPreferredSideMarginFraction": 0.0
+          },
+          "samplesEveryHalfSecond": [
+            {
+              "timeSeconds": 0.0,
+              "wristInChestMetres": [
+                0.1391917929750885,
+                -0.3375733026560559,
+                0.050071355545417626
+              ]
+            },
+            {
+              "timeSeconds": 0.5,
+              "wristInChestMetres": [
+                0.4420374251762254,
+                -0.003421960003627822,
+                0.20994168187925788
+              ]
+            },
+            {
+              "timeSeconds": 1.0,
+              "wristInChestMetres": [
+                0.30003164406466903,
+                0.24684735110322809,
+                0.21064817438814498
+              ]
+            },
+            {
+              "timeSeconds": 1.5,
+              "wristInChestMetres": [
+                0.31543684297395064,
+                0.25165938548995936,
+                0.2001016056061074
+              ]
+            },
+            {
+              "timeSeconds": 2.0,
+              "wristInChestMetres": [
+                0.36249566084066576,
+                0.2510425425184084,
+                0.1924056387145262
+              ]
+            },
+            {
+              "timeSeconds": 2.5,
+              "wristInChestMetres": [
+                0.32643607461867963,
+                0.24496968896441884,
+                0.206939896794689
+              ]
+            },
+            {
+              "timeSeconds": 3.0,
+              "wristInChestMetres": [
+                0.32525226736599705,
+                -0.018985465871129703,
+                0.2303028764751761
+              ]
+            },
+            {
+              "timeSeconds": 3.5,
+              "wristInChestMetres": [
+                0.14102636464354817,
+                -0.33933059902972995,
+                0.007708637569431409
+              ]
+            },
+            {
+              "timeSeconds": 4.0,
+              "wristInChestMetres": [
+                0.1562804631877947,
+                -0.32432488148083716,
+                0.06228909478122889
+              ]
+            },
+            {
+              "timeSeconds": 4.5,
+              "wristInChestMetres": [
+                0.14462140373755095,
+                -0.3327881308244762,
+                0.04202990888063257
+              ]
+            },
+            {
+              "timeSeconds": 5.0,
+              "wristInChestMetres": [
+                0.1419552888181252,
+                -0.3303650034713117,
+                0.05395089989962297
+              ]
+            },
+            {
+              "timeSeconds": 5.5,
+              "wristInChestMetres": [
+                0.14236770023791342,
+                -0.33157926281121963,
+                0.05178885009534409
+              ]
+            }
+          ]
+        },
+        "NeEEvA": {
+          "sampleCountAfterBlendIn": 342,
+          "allAfterBlendIn": {
+            "minimumXyzMetres": [
+              0.13769027067009362,
+              -0.3393304800297301,
+              -0.003056999052002546
+            ],
+            "maximumXyzMetres": [
+              0.4508749497719213,
+              0.2658055174884584,
+              0.2364838554475821
+            ],
+            "minimumSideTimeSeconds": 3.55,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 0,
+            "belowPreferredSideMarginFraction": 0.0
+          },
+          "raisedFrameCount": 138,
+          "raisedFractionAfterBlendIn": 0.40350877192982454,
+          "maximumWristHeightRiseFromSourceStartMetres": 0.6033787011445144,
+          "minimumWristToHeadBoneDistanceMetres": 0.37346878021387797,
+          "raisedAdjacentWristTravelMetres": 0.9425766557329924,
+          "raisedAdjacentHandRotationTravelDegrees": 585.0352768836729,
+          "maximumInterFrameHandRotationDegrees": 8.307884414848044,
+          "raised": {
+            "minimumXyzMetres": [
+              0.2767583444109097,
+              0.11241285995363537,
+              0.17990760426702168
+            ],
+            "maximumXyzMetres": [
+              0.4451847959123094,
+              0.2658055174884584,
+              0.2347313348379037
+            ],
+            "minimumSideTimeSeconds": 0.9,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 0,
+            "belowPreferredSideMarginFraction": 0.0
+          },
+          "samplesEveryHalfSecond": [
+            {
+              "timeSeconds": 0.0,
+              "wristInChestMetres": [
+                0.1391917929750885,
+                -0.33757318365605604,
+                0.050071355545417626
+              ]
+            },
+            {
+              "timeSeconds": 0.5,
+              "wristInChestMetres": [
+                0.4420374251762254,
+                -0.003421841003627968,
+                0.20994168187925788
+              ]
+            },
+            {
+              "timeSeconds": 1.0,
+              "wristInChestMetres": [
+                0.30003164406466903,
+                0.24684747010322816,
+                0.21064817438814498
+              ]
+            },
+            {
+              "timeSeconds": 1.5,
+              "wristInChestMetres": [
+                0.31543684297395064,
+                0.2516595044899592,
+                0.2001016056061074
+              ]
+            },
+            {
+              "timeSeconds": 2.0,
+              "wristInChestMetres": [
+                0.36249566084066576,
+                0.25104266151840826,
+                0.1924056387145262
+              ]
+            },
+            {
+              "timeSeconds": 2.5,
+              "wristInChestMetres": [
+                0.32643607461867963,
+                0.2449698079644187,
+                0.206939896794689
+              ]
+            },
+            {
+              "timeSeconds": 3.0,
+              "wristInChestMetres": [
+                0.32525226736599705,
+                -0.01898534687112985,
+                0.2303028764751761
+              ]
+            },
+            {
+              "timeSeconds": 3.5,
+              "wristInChestMetres": [
+                0.14102636464354817,
+                -0.3393304800297301,
+                0.007708637569431409
+              ]
+            },
+            {
+              "timeSeconds": 4.0,
+              "wristInChestMetres": [
+                0.1562804631877947,
+                -0.3243247624808371,
+                0.06228909478122889
+              ]
+            },
+            {
+              "timeSeconds": 4.5,
+              "wristInChestMetres": [
+                0.14462140373755095,
+                -0.33278801182447637,
+                0.04202990888063257
+              ]
+            },
+            {
+              "timeSeconds": 5.0,
+              "wristInChestMetres": [
+                0.1419552888181252,
+                -0.33036488447131185,
+                0.05395089989962297
+              ]
+            },
+            {
+              "timeSeconds": 5.5,
+              "wristInChestMetres": [
+                0.14236770023791342,
+                -0.33157914381122,
+                0.05178885009534409
+              ]
+            }
+          ]
+        }
+      },
+      "unityCandidateExport": {
+        "path": "Server/ARDY/runtime/unity-right-candidates/right-wave-mirrored-left.json",
+        "sha256": "4a712e7e0676f124b626cd0aa8ca870464a62e1dd7fb4d2b16fb5bb784deb236",
+        "id": "right-wave-mirrored-left",
+        "text": "Derived right-hand wave: mirrored reviewed left-hand wave; not a native right-hand-condition sample.",
+        "verificationPath": "Server/ARDY/runtime/unity-right-candidates/right-wave-mirrored-left.mirror-verification.json"
+      }
+    },
+    {
+      "name": "native-seed1",
+      "sourcePath": "Server/ARDY/runtime/unity-right-candidates/right-wave-seed1.npz",
+      "status": "screened",
+      "sourceSha256": "5e0c3908ba8c5feab0df3cedcebe80037e1d1084f15895e5a99469d407ef3344",
+      "rawSourceText": "While standing in place, a standing person waves the right hand with moderate movements at a moderate pace.",
+      "sourceFrameCount": 120,
+      "sourceFps": 20.0,
+      "mirrored": false,
+      "transform": "Native generated rotations; no mirror or postprocessing.",
+      "targets": {
+        "NEVA": {
+          "sampleCountAfterBlendIn": 342,
+          "allAfterBlendIn": {
+            "minimumXyzMetres": [
+              0.03513881351566809,
+              -0.3406058762511326,
+              0.016610046640097693
+            ],
+            "maximumXyzMetres": [
+              0.16022532174744705,
+              0.25728822395505,
+              0.38430167047477104
+            ],
+            "minimumSideTimeSeconds": 3.3,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 212,
+            "belowPreferredSideMarginFraction": 0.6198830409356725
+          },
+          "raisedFrameCount": 167,
+          "raisedFractionAfterBlendIn": 0.48830409356725146,
+          "maximumWristHeightRiseFromSourceStartMetres": 0.5865717225355461,
+          "minimumWristToHeadBoneDistanceMetres": 0.3646145030687311,
+          "raisedAdjacentWristTravelMetres": 0.4723362680264499,
+          "raisedAdjacentHandRotationTravelDegrees": 478.2955895725047,
+          "maximumInterFrameHandRotationDegrees": 8.115816382200856,
+          "raised": {
+            "minimumXyzMetres": [
+              0.03513881351566809,
+              0.1124817809641494,
+              0.3257402806303896
+            ],
+            "maximumXyzMetres": [
+              0.09530804065325905,
+              0.25728822395505,
+              0.383829520882212
+            ],
+            "minimumSideTimeSeconds": 3.3,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 167,
+            "belowPreferredSideMarginFraction": 1.0
+          },
+          "samplesEveryHalfSecond": [
+            {
+              "timeSeconds": 0.0,
+              "wristInChestMetres": [
+                0.14990177740052624,
+                -0.3292834985804961,
+                0.06614668401238925
+              ]
+            },
+            {
+              "timeSeconds": 0.5,
+              "wristInChestMetres": [
+                0.10002966210228507,
+                -0.012657786674740157,
+                0.37009596240713416
+              ]
+            },
+            {
+              "timeSeconds": 1.0,
+              "wristInChestMetres": [
+                0.04723787874239017,
+                0.25247443277173276,
+                0.3340665017997986
+              ]
+            },
+            {
+              "timeSeconds": 1.5,
+              "wristInChestMetres": [
+                0.03515333395424678,
+                0.24171661475133277,
+                0.3343067942651333
+              ]
+            },
+            {
+              "timeSeconds": 2.0,
+              "wristInChestMetres": [
+                0.053149796710627216,
+                0.23977010524918807,
+                0.33516844742867813
+              ]
+            },
+            {
+              "timeSeconds": 2.5,
+              "wristInChestMetres": [
+                0.04015588727587056,
+                0.22014347908155396,
+                0.3457392558172918
+              ]
+            },
+            {
+              "timeSeconds": 3.0,
+              "wristInChestMetres": [
+                0.04625216193407535,
+                0.20461434213084773,
+                0.3470133346775428
+              ]
+            },
+            {
+              "timeSeconds": 3.5,
+              "wristInChestMetres": [
+                0.04792000800381382,
+                0.014880521625970866,
+                0.30953914704704444
+              ]
+            },
+            {
+              "timeSeconds": 4.0,
+              "wristInChestMetres": [
+                0.1373698267464559,
+                -0.3194122892613498,
+                0.09189958367673107
+              ]
+            },
+            {
+              "timeSeconds": 4.5,
+              "wristInChestMetres": [
+                0.15620827793380998,
+                -0.3377442737707823,
+                0.033409260287305106
+              ]
+            },
+            {
+              "timeSeconds": 5.0,
+              "wristInChestMetres": [
+                0.1595560972965936,
+                -0.3336710171714058,
+                0.04897903556758633
+              ]
+            },
+            {
+              "timeSeconds": 5.5,
+              "wristInChestMetres": [
+                0.15485510543328052,
+                -0.3336328400717896,
+                0.048576804904449336
+              ]
+            }
+          ]
+        },
+        "NeEEvA": {
+          "sampleCountAfterBlendIn": 342,
+          "allAfterBlendIn": {
+            "minimumXyzMetres": [
+              0.03513881351566809,
+              -0.34060575725113273,
+              0.016610046640097693
+            ],
+            "maximumXyzMetres": [
+              0.16022532174744705,
+              0.25728834295504965,
+              0.38430167047477104
+            ],
+            "minimumSideTimeSeconds": 3.3,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 212,
+            "belowPreferredSideMarginFraction": 0.6198830409356725
+          },
+          "raisedFrameCount": 167,
+          "raisedFractionAfterBlendIn": 0.48830409356725146,
+          "maximumWristHeightRiseFromSourceStartMetres": 0.5865717225355459,
+          "minimumWristToHeadBoneDistanceMetres": 0.36461452332205013,
+          "raisedAdjacentWristTravelMetres": 0.4723362680264497,
+          "raisedAdjacentHandRotationTravelDegrees": 478.2955895725047,
+          "maximumInterFrameHandRotationDegrees": 8.115816382200856,
+          "raised": {
+            "minimumXyzMetres": [
+              0.03513881351566809,
+              0.11248189996414926,
+              0.3257402806303896
+            ],
+            "maximumXyzMetres": [
+              0.09530804065325905,
+              0.25728834295504965,
+              0.383829520882212
+            ],
+            "minimumSideTimeSeconds": 3.3,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 167,
+            "belowPreferredSideMarginFraction": 1.0
+          },
+          "samplesEveryHalfSecond": [
+            {
+              "timeSeconds": 0.0,
+              "wristInChestMetres": [
+                0.14990177740052624,
+                -0.32928337958049625,
+                0.06614668401238925
+              ]
+            },
+            {
+              "timeSeconds": 0.5,
+              "wristInChestMetres": [
+                0.10002966210228507,
+                -0.01265766767474008,
+                0.37009596240713416
+              ]
+            },
+            {
+              "timeSeconds": 1.0,
+              "wristInChestMetres": [
+                0.04723787874239017,
+                0.2524745517717326,
+                0.3340665017997986
+              ]
+            },
+            {
+              "timeSeconds": 1.5,
+              "wristInChestMetres": [
+                0.03515333395424678,
+                0.24171673375133285,
+                0.3343067942651333
+              ]
+            },
+            {
+              "timeSeconds": 2.0,
+              "wristInChestMetres": [
+                0.053149796710627216,
+                0.23977022424918792,
+                0.33516844742867813
+              ]
+            },
+            {
+              "timeSeconds": 2.5,
+              "wristInChestMetres": [
+                0.04015588727587056,
+                0.22014359808155382,
+                0.3457392558172918
+              ]
+            },
+            {
+              "timeSeconds": 3.0,
+              "wristInChestMetres": [
+                0.04625216193407535,
+                0.20461446113084758,
+                0.3470133346775428
+              ]
+            },
+            {
+              "timeSeconds": 3.5,
+              "wristInChestMetres": [
+                0.04792000800381382,
+                0.01488064062597072,
+                0.30953914704704444
+              ]
+            },
+            {
+              "timeSeconds": 4.0,
+              "wristInChestMetres": [
+                0.1373698267464559,
+                -0.31941217026134994,
+                0.09189958367673107
+              ]
+            },
+            {
+              "timeSeconds": 4.5,
+              "wristInChestMetres": [
+                0.15620827793380998,
+                -0.3377441547707827,
+                0.033409260287305106
+              ]
+            },
+            {
+              "timeSeconds": 5.0,
+              "wristInChestMetres": [
+                0.1595560972965936,
+                -0.3336708981714057,
+                0.04897903556758633
+              ]
+            },
+            {
+              "timeSeconds": 5.5,
+              "wristInChestMetres": [
+                0.15485510543328052,
+                -0.33363272107178976,
+                0.048576804904449336
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "native-seed2",
+      "sourcePath": "Server/ARDY/runtime/unity-right-candidates/right-wave-seed2.npz",
+      "status": "screened",
+      "sourceSha256": "278f085c7f86bc438785e556a7312699aa94e5c9db2c0ea807fdac2132409ffb",
+      "rawSourceText": "While standing in place, a standing person waves the right hand with moderate movements at a moderate pace.",
+      "sourceFrameCount": 120,
+      "sourceFps": 20.0,
+      "mirrored": false,
+      "transform": "Native generated rotations; no mirror or postprocessing.",
+      "targets": {
+        "NEVA": {
+          "sampleCountAfterBlendIn": 342,
+          "allAfterBlendIn": {
+            "minimumXyzMetres": [
+              0.038106275272684,
+              -0.35707124581142813,
+              0.02159799870883601
+            ],
+            "maximumXyzMetres": [
+              0.19282825924207017,
+              0.26803585387905393,
+              0.38549657066466547
+            ],
+            "minimumSideTimeSeconds": 0.85,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 227,
+            "belowPreferredSideMarginFraction": 0.6637426900584795
+          },
+          "raisedFrameCount": 182,
+          "raisedFractionAfterBlendIn": 0.5321637426900585,
+          "maximumWristHeightRiseFromSourceStartMetres": 0.6158779649774885,
+          "minimumWristToHeadBoneDistanceMetres": 0.3043704562934924,
+          "raisedAdjacentWristTravelMetres": 0.956256426651744,
+          "raisedAdjacentHandRotationTravelDegrees": 548.3625453452246,
+          "maximumInterFrameHandRotationDegrees": 8.526470405823398,
+          "raised": {
+            "minimumXyzMetres": [
+              0.038106275272684,
+              0.11006295592005699,
+              0.2704654415222571
+            ],
+            "maximumXyzMetres": [
+              0.1749447955789634,
+              0.26803585387905393,
+              0.38284826189560267
+            ],
+            "minimumSideTimeSeconds": 0.85,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 130,
+            "belowPreferredSideMarginFraction": 0.7142857142857143
+          },
+          "samplesEveryHalfSecond": [
+            {
+              "timeSeconds": 0.0,
+              "wristInChestMetres": [
+                0.11169901731505387,
+                -0.34784211109843455,
+                0.06231730403868534
+              ]
+            },
+            {
+              "timeSeconds": 0.5,
+              "wristInChestMetres": [
+                0.16964719518869645,
+                -0.013445582931975286,
+                0.37606506855446187
+              ]
+            },
+            {
+              "timeSeconds": 1.0,
+              "wristInChestMetres": [
+                0.0917859758444847,
+                0.2627365786570519,
+                0.2977246742040348
+              ]
+            },
+            {
+              "timeSeconds": 1.5,
+              "wristInChestMetres": [
+                0.09261500605139655,
+                0.2418735790282589,
+                0.3144044379850135
+              ]
+            },
+            {
+              "timeSeconds": 2.0,
+              "wristInChestMetres": [
+                0.12876695131163468,
+                0.24784855435027064,
+                0.3186165870468962
+              ]
+            },
+            {
+              "timeSeconds": 2.5,
+              "wristInChestMetres": [
+                0.11991264171207038,
+                0.23304336126476044,
+                0.3200454183309377
+              ]
+            },
+            {
+              "timeSeconds": 3.0,
+              "wristInChestMetres": [
+                0.17742268469981898,
+                -0.3111365843776609,
+                0.15502028068714518
+              ]
+            },
+            {
+              "timeSeconds": 3.5,
+              "wristInChestMetres": [
+                0.11647143838849076,
+                -0.3508264662482363,
+                0.05971714822874766
+              ]
+            },
+            {
+              "timeSeconds": 4.0,
+              "wristInChestMetres": [
+                0.1035700522452487,
+                -0.35143752067445144,
+                0.05871558877720377
+              ]
+            },
+            {
+              "timeSeconds": 4.5,
+              "wristInChestMetres": [
+                0.10820440846124717,
+                -0.35072736805375393,
+                0.06144323513453588
+              ]
+            },
+            {
+              "timeSeconds": 5.0,
+              "wristInChestMetres": [
+                0.08942995294821338,
+                0.03355839475141198,
+                0.35545505045355563
+              ]
+            },
+            {
+              "timeSeconds": 5.5,
+              "wristInChestMetres": [
+                0.07082463758176681,
+                0.16411552513361016,
+                0.36572578296853436
+              ]
+            }
+          ]
+        },
+        "NeEEvA": {
+          "sampleCountAfterBlendIn": 342,
+          "allAfterBlendIn": {
+            "minimumXyzMetres": [
+              0.038106275272684,
+              -0.3570711268114283,
+              0.02159799870883601
+            ],
+            "maximumXyzMetres": [
+              0.19282825924207017,
+              0.2680359728790538,
+              0.38549657066466547
+            ],
+            "minimumSideTimeSeconds": 0.85,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 227,
+            "belowPreferredSideMarginFraction": 0.6637426900584795
+          },
+          "raisedFrameCount": 182,
+          "raisedFractionAfterBlendIn": 0.5321637426900585,
+          "maximumWristHeightRiseFromSourceStartMetres": 0.6158779649774885,
+          "minimumWristToHeadBoneDistanceMetres": 0.3043704785045034,
+          "raisedAdjacentWristTravelMetres": 0.9562564266517439,
+          "raisedAdjacentHandRotationTravelDegrees": 548.3625453452246,
+          "maximumInterFrameHandRotationDegrees": 8.526470405823398,
+          "raised": {
+            "minimumXyzMetres": [
+              0.038106275272684,
+              0.11006307492005707,
+              0.2704654415222571
+            ],
+            "maximumXyzMetres": [
+              0.1749447955789634,
+              0.2680359728790538,
+              0.38284826189560267
+            ],
+            "minimumSideTimeSeconds": 0.85,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 130,
+            "belowPreferredSideMarginFraction": 0.7142857142857143
+          },
+          "samplesEveryHalfSecond": [
+            {
+              "timeSeconds": 0.0,
+              "wristInChestMetres": [
+                0.11169901731505387,
+                -0.3478419920984347,
+                0.06231730403868534
+              ]
+            },
+            {
+              "timeSeconds": 0.5,
+              "wristInChestMetres": [
+                0.16964719518869645,
+                -0.013445463931975432,
+                0.37606506855446187
+              ]
+            },
+            {
+              "timeSeconds": 1.0,
+              "wristInChestMetres": [
+                0.0917859758444847,
+                0.26273669765705177,
+                0.2977246742040348
+              ]
+            },
+            {
+              "timeSeconds": 1.5,
+              "wristInChestMetres": [
+                0.09261500605139655,
+                0.24187369802825875,
+                0.3144044379850135
+              ]
+            },
+            {
+              "timeSeconds": 2.0,
+              "wristInChestMetres": [
+                0.12876695131163468,
+                0.2478486733502705,
+                0.3186165870468962
+              ]
+            },
+            {
+              "timeSeconds": 2.5,
+              "wristInChestMetres": [
+                0.11991264171207038,
+                0.2330434802647603,
+                0.3200454183309377
+              ]
+            },
+            {
+              "timeSeconds": 3.0,
+              "wristInChestMetres": [
+                0.17742268469981898,
+                -0.3111364653776608,
+                0.15502028068714518
+              ]
+            },
+            {
+              "timeSeconds": 3.5,
+              "wristInChestMetres": [
+                0.11647143838849076,
+                -0.35082634724823647,
+                0.05971714822874766
+              ]
+            },
+            {
+              "timeSeconds": 4.0,
+              "wristInChestMetres": [
+                0.1035700522452487,
+                -0.3514374016744516,
+                0.05871558877720377
+              ]
+            },
+            {
+              "timeSeconds": 4.5,
+              "wristInChestMetres": [
+                0.10820440846124717,
+                -0.3507272490537541,
+                0.06144323513453588
+              ]
+            },
+            {
+              "timeSeconds": 5.0,
+              "wristInChestMetres": [
+                0.08942995294821338,
+                0.033558513751411834,
+                0.35545505045355563
+              ]
+            },
+            {
+              "timeSeconds": 5.5,
+              "wristInChestMetres": [
+                0.07082463758176681,
+                0.16411564413361002,
+                0.36572578296853436
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "native-seed3",
+      "sourcePath": "Server/ARDY/runtime/unity-right-candidates/right-wave-seed3.npz",
+      "status": "screened",
+      "sourceSha256": "54f998dbc8ba332988f4cac4f9f50d529ea3abddb9661d94b6272f830ea95cb1",
+      "rawSourceText": "While standing in place, a standing person waves the right hand with moderate movements at a moderate pace.",
+      "sourceFrameCount": 120,
+      "sourceFps": 20.0,
+      "mirrored": false,
+      "transform": "Native generated rotations; no mirror or postprocessing.",
+      "targets": {
+        "NEVA": {
+          "sampleCountAfterBlendIn": 342,
+          "allAfterBlendIn": {
+            "minimumXyzMetres": [
+              0.11418674695760349,
+              -0.32004069947588154,
+              -0.0891705186342589
+            ],
+            "maximumXyzMetres": [
+              0.24082169894313454,
+              0.30930909539358487,
+              0.278117278541527
+            ],
+            "minimumSideTimeSeconds": 2.0,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 14,
+            "belowPreferredSideMarginFraction": 0.04093567251461988
+          },
+          "raisedFrameCount": 146,
+          "raisedFractionAfterBlendIn": 0.4269005847953216,
+          "maximumWristHeightRiseFromSourceStartMetres": 0.6094297294262196,
+          "minimumWristToHeadBoneDistanceMetres": 0.2769626816120485,
+          "raisedAdjacentWristTravelMetres": 0.5671664624516,
+          "raisedAdjacentHandRotationTravelDegrees": 222.28538698683852,
+          "maximumInterFrameHandRotationDegrees": 6.951709257080291,
+          "raised": {
+            "minimumXyzMetres": [
+              0.11418674695760349,
+              0.10939860778065502,
+              0.2075491037875536
+            ],
+            "maximumXyzMetres": [
+              0.23961234672829557,
+              0.30930909539358487,
+              0.2763487954334978
+            ],
+            "minimumSideTimeSeconds": 2.0,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 14,
+            "belowPreferredSideMarginFraction": 0.0958904109589041
+          },
+          "samplesEveryHalfSecond": [
+            {
+              "timeSeconds": 0.0,
+              "wristInChestMetres": [
+                0.18211092035163717,
+                -0.3001206340326348,
+                0.05317788977205806
+              ]
+            },
+            {
+              "timeSeconds": 0.5,
+              "wristInChestMetres": [
+                0.23900874611631168,
+                -0.00679140058551142,
+                0.2393270484177471
+              ]
+            },
+            {
+              "timeSeconds": 1.0,
+              "wristInChestMetres": [
+                0.13713613325117247,
+                0.2782033111826756,
+                0.23051339053896508
+              ]
+            },
+            {
+              "timeSeconds": 1.5,
+              "wristInChestMetres": [
+                0.12851627622634712,
+                0.29300873612107603,
+                0.22466074786915763
+              ]
+            },
+            {
+              "timeSeconds": 2.0,
+              "wristInChestMetres": [
+                0.11418674695760349,
+                0.2955701206841703,
+                0.2075491037875536
+              ]
+            },
+            {
+              "timeSeconds": 2.5,
+              "wristInChestMetres": [
+                0.1321868677245385,
+                0.30523450332279256,
+                0.22440227454867417
+              ]
+            },
+            {
+              "timeSeconds": 3.0,
+              "wristInChestMetres": [
+                0.1612306742495752,
+                0.1421344997703784,
+                0.27396485849298186
+              ]
+            },
+            {
+              "timeSeconds": 3.5,
+              "wristInChestMetres": [
+                0.18455335390567423,
+                -0.3183618800393656,
+                -0.07470030521525227
+              ]
+            },
+            {
+              "timeSeconds": 4.0,
+              "wristInChestMetres": [
+                0.16129578277642093,
+                -0.2624920016886292,
+                0.1341579908551077
+              ]
+            },
+            {
+              "timeSeconds": 4.5,
+              "wristInChestMetres": [
+                0.1876740506032545,
+                -0.314801205031766,
+                -0.0070019075861087535
+              ]
+            },
+            {
+              "timeSeconds": 5.0,
+              "wristInChestMetres": [
+                0.16355564417739327,
+                -0.277888247812103,
+                0.11167485456991244
+              ]
+            },
+            {
+              "timeSeconds": 5.5,
+              "wristInChestMetres": [
+                0.16994900022168336,
+                -0.2880664116326117,
+                0.08955983981233977
+              ]
+            }
+          ]
+        },
+        "NeEEvA": {
+          "sampleCountAfterBlendIn": 342,
+          "allAfterBlendIn": {
+            "minimumXyzMetres": [
+              0.11418674695760349,
+              -0.3200405804758817,
+              -0.0891705186342589
+            ],
+            "maximumXyzMetres": [
+              0.24082169894313454,
+              0.3093092143935847,
+              0.278117278541527
+            ],
+            "minimumSideTimeSeconds": 2.0,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 14,
+            "belowPreferredSideMarginFraction": 0.04093567251461988
+          },
+          "raisedFrameCount": 146,
+          "raisedFractionAfterBlendIn": 0.4269005847953216,
+          "maximumWristHeightRiseFromSourceStartMetres": 0.6094297294262196,
+          "minimumWristToHeadBoneDistanceMetres": 0.2769627260581179,
+          "raisedAdjacentWristTravelMetres": 0.5671664624515997,
+          "raisedAdjacentHandRotationTravelDegrees": 222.28538698683852,
+          "maximumInterFrameHandRotationDegrees": 6.951709257080291,
+          "raised": {
+            "minimumXyzMetres": [
+              0.11418674695760349,
+              0.10939872678065488,
+              0.2075491037875536
+            ],
+            "maximumXyzMetres": [
+              0.23961234672829557,
+              0.3093092143935847,
+              0.2763487954334978
+            ],
+            "minimumSideTimeSeconds": 2.0,
+            "crossCentreCount": 0,
+            "crossCentreFraction": 0.0,
+            "belowPreferredSideMarginCount": 14,
+            "belowPreferredSideMarginFraction": 0.0958904109589041
+          },
+          "samplesEveryHalfSecond": [
+            {
+              "timeSeconds": 0.0,
+              "wristInChestMetres": [
+                0.18211092035163717,
+                -0.3001205150326349,
+                0.05317788977205806
+              ]
+            },
+            {
+              "timeSeconds": 0.5,
+              "wristInChestMetres": [
+                0.23900874611631168,
+                -0.006791281585511566,
+                0.2393270484177471
+              ]
+            },
+            {
+              "timeSeconds": 1.0,
+              "wristInChestMetres": [
+                0.13713613325117247,
+                0.27820343018267546,
+                0.23051339053896508
+              ]
+            },
+            {
+              "timeSeconds": 1.5,
+              "wristInChestMetres": [
+                0.12851627622634712,
+                0.2930088551210759,
+                0.22466074786915763
+              ]
+            },
+            {
+              "timeSeconds": 2.0,
+              "wristInChestMetres": [
+                0.11418674695760349,
+                0.2955702396841702,
+                0.2075491037875536
+              ]
+            },
+            {
+              "timeSeconds": 2.5,
+              "wristInChestMetres": [
+                0.1321868677245385,
+                0.3052346223227924,
+                0.22440227454867417
+              ]
+            },
+            {
+              "timeSeconds": 3.0,
+              "wristInChestMetres": [
+                0.1612306742495752,
+                0.14213461877037825,
+                0.27396485849298186
+              ]
+            },
+            {
+              "timeSeconds": 3.5,
+              "wristInChestMetres": [
+                0.18455335390567423,
+                -0.31836176103936553,
+                -0.07470030521525227
+              ]
+            },
+            {
+              "timeSeconds": 4.0,
+              "wristInChestMetres": [
+                0.16129578277642093,
+                -0.26249188268862933,
+                0.1341579908551077
+              ]
+            },
+            {
+              "timeSeconds": 4.5,
+              "wristInChestMetres": [
+                0.1876740506032545,
+                -0.31480108603176615,
+                -0.0070019075861087535
+              ]
+            },
+            {
+              "timeSeconds": 5.0,
+              "wristInChestMetres": [
+                0.16355564417739327,
+                -0.2778881288121031,
+                0.11167485456991244
+              ]
+            },
+            {
+              "timeSeconds": 5.5,
+              "wristInChestMetres": [
+                0.16994900022168336,
+                -0.28806629263261185,
+                0.08955983981233977
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "No Animator, blend transient, ControlRig, constraints, spring bones, sleeves, fingers, palm mesh, camera projection or render is simulated.",
+    "These specific assets contain the rest geometry used here; scene overrides or non-rest torso deformation can change placement.",
+    "Seed screening and mirroring are explicit demonstration preparation, not adapter generalization evaluation.",
+    "The mirrored candidate is a derived reviewed-left motion, not native right-prompt output. No source NPZ, production JSON, builder or player is changed."
+  ]
+}

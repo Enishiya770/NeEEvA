@@ -1,0 +1,61 @@
+{
+  "sample": "motion-00053",
+  "fps": 20.0,
+  "frames": 40,
+  "comparison": "Same-frame, root-translation-aligned, mean Euclidean distance over all 27 joints.",
+  "initial_history": "None for both; no shared initial full-body pose constraint. Same random seed does not fix initial pose or action phase.",
+  "all_frames_mean_cm": 6.817612648010254,
+  "descriptive_phase_split_s": 0.75,
+  "before_split_mean_cm": 9.70508098602295,
+  "from_split_mean_cm": 5.08513069152832,
+  "before_split_fraction_of_total_distance_sum": 0.5338240265846252,
+  "sampled_hand_heights": [
+    {
+      "time_s": 0.0,
+      "teacher_hand_above_shoulder_cm": 19.876968383789062,
+      "student_hand_above_shoulder_cm": -53.87686538696289
+    },
+    {
+      "time_s": 0.15,
+      "teacher_hand_above_shoulder_cm": 19.20120620727539,
+      "student_hand_above_shoulder_cm": -51.94573974609375
+    },
+    {
+      "time_s": 0.35,
+      "teacher_hand_above_shoulder_cm": 18.8723201751709,
+      "student_hand_above_shoulder_cm": -34.103763580322266
+    },
+    {
+      "time_s": 0.55,
+      "teacher_hand_above_shoulder_cm": 21.93518829345703,
+      "student_hand_above_shoulder_cm": -0.20966529846191406
+    },
+    {
+      "time_s": 0.75,
+      "teacher_hand_above_shoulder_cm": 22.030757904052734,
+      "student_hand_above_shoulder_cm": 20.61978530883789
+    },
+    {
+      "time_s": 1.0,
+      "teacher_hand_above_shoulder_cm": 18.614173889160156,
+      "student_hand_above_shoulder_cm": 23.169422149658203
+    },
+    {
+      "time_s": 1.3,
+      "teacher_hand_above_shoulder_cm": 24.559032440185547,
+      "student_hand_above_shoulder_cm": 26.801990509033203
+    },
+    {
+      "time_s": 1.55,
+      "teacher_hand_above_shoulder_cm": 21.343481063842773,
+      "student_hand_above_shoulder_cm": 25.379634857177734
+    },
+    {
+      "time_s": 1.95,
+      "teacher_hand_above_shoulder_cm": 20.219398498535156,
+      "student_hand_above_shoulder_cm": 24.72307586669922
+    }
+  ],
+  "interpretation": "The student includes a low-hand-to-raised-hand transition; the teacher starts with the hand raised. The raw paired discrepancy includes this onset/phase difference and is not a quality ranking.",
+  "limitation": "The 0.75-second split is a post-hoc description of this clip, not an optimized alignment or replacement benchmark. This sample alone does not establish overall model superiority."
+}

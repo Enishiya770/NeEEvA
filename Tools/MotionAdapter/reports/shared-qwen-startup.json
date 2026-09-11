@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "date": "2026-09-10",
+  "checks": {
+    "passed": true,
+    "checks": 6,
+    "scope": "Mocked process snapshots; no process mutations",
+    "legacy_feature_switch": "refused while legacy active",
+    "duplicate_model": "refused",
+    "existing_feature": "reused"
+  },
+  "actual_checks": [
+    {
+      "result": "reused",
+      "qwen_pid": 9032,
+      "remote_port": 8082,
+      "action": "remote ordinary start-llm"
+    },
+    {
+      "result": "reused",
+      "qwen_pid": 9032,
+      "remote_port": 8082,
+      "action": "remote start-llm-feature"
+    },
+    {
+      "result": "reused existing 8082 instance",
+      "qwen_pid": 9032,
+      "action": "native start -Port 8080"
+    },
+    {
+      "result": "created normal local 8080 forwarding to remote 8082; feature readiness passed; BGE ready",
+      "qwen_pid": 9032,
+      "tunnel_pid": 21424,
+      "action": "local start -Mode feature"
+    },
+    {
+      "result": "reused same Qwen, tunnel and BGE; feature readiness passed",
+      "qwen_pid": 9032,
+      "tunnel_pid": 21424,
+      "action": "local ordinary start"
+    }
+  ],
+  "listeners": [
+    {
+      "LocalAddress": "::1",
+      "LocalPort": 8090,
+      "OwningProcess": 21424
+    },
+    {
+      "LocalAddress": "127.0.0.1",
+      "LocalPort": 18082,
+      "OwningProcess": 7496
+    },
+    {
+      "LocalAddress": "127.0.0.1",
+      "LocalPort": 8090,
+      "OwningProcess": 21424
+    },
+    {
+      "LocalAddress": "127.0.0.1",
+      "LocalPort": 8080,
+      "OwningProcess": 21424
+    }
+  ],
+  "preserved_validation_tunnel_pid": 7496,
+  "preserved_qwen_pid": 9032,
+  "chat_url": "http://127.0.0.1:8080",
+  "feature_url": "http://127.0.0.1:8080/neeeva/motion-features",
+  "original_production_binary_modified": false,
+  "cold_start_port8080": "Implemented; not exercised while the validated 8082 instance remains in use",
+  "simultaneous_cold_start_race": "Shared startup mutex implemented; not stress-tested",
+  "source_hashes": {
+    "native_launcher": "AC1B02AF04C0D825D2603E8639A2522F5D39B19E10309313819F5A37C22AB432",
+    "local_wrapper": "AA41D1118A4D573E6D02E58CB0BE6E0DA1397DC8A9ECDF6C2C4F0C1A1EAC37D2",
+    "remote_controller": "FC6353C0180D7EC5A8ECF53BF2C44E01ED2C447CA8366406C8A8DCA8C5D95C90"
+  },
+  "health": {
+    "8080": {
+      "status": "ok"
+    },
+    "8090": {
+      "status": "ok"
+    },
+    "18082": {
+      "status": "ok"
+    }
+  }
+}

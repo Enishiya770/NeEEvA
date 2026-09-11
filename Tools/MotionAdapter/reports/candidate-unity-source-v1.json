@@ -1,0 +1,56 @@
+{
+  "passed": true,
+  "checkedUtc": "2026-09-10T06:27:33.5612444Z",
+  "files": [
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs",
+      "sha256": "444b9d8fb00ed8055e2a82c6bdc5344544642182783c4dfdbb4f7abae0049654",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveProtocol.cs",
+      "sha256": "b3bb9ead21d30d3afcb277a46d2ebdf69d6c0edd8696c836c5b708672fee244d",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveMotionController.cs",
+      "sha256": "4312c81366e5393c71dd4c14f00e761c76b044b46c16af082a9b3d2cb69288c4",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionTrace.cs",
+      "sha256": "8b2669e72d39e8f0272f2beba87180b51cf390b9c9e073fd7308f20b009e20fd",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs",
+      "sha256": "908e96168e5ab92b9afc64bc2d949a0d0937b5cd76fafd610e9c02ceda4b5a1a",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs",
+      "sha256": "723a285a315ae6d6ee25a4fab985013f2308f75e1c34226db0bc87fcbd980a7a",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.cs",
+      "sha256": "d6a53dc766903db3c093afe97bbd4d8af98d4b4c92d51e5799d29c6a1b580424",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/Editor/ArdyLivePlayModeRegression.cs",
+      "sha256": "f7557a0756c0ceb90d52da9b70a9633819739571cf3c5ec0087eb40ccf6366ca",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/Editor/ArdyStreamRegression.cs",
+      "sha256": "058a2b34d364d7a5f72c56a206fdbe20ea4186cbfc8b2e500b6a7e0ed26bc282",
+      "isolatedMatches": true
+    },
+    {
+      "path": "Assets/Editor/ArdyDialogueMotionRegression.cs",
+      "sha256": "f57b8ab8a05d532095f74a06bcb434d2a4f5cf9f8d853f6f8f7e0f212ad34e36",
+      "isolatedMatches": true
+    }
+  ]
+}

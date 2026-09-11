@@ -1,0 +1,25 @@
+{
+  "date": "2026-09-10",
+  "native": {
+    "schema": 1,
+    "feature_contract": "qwen-motion-raw-last-v1",
+    "model_load_count": 1,
+    "context_count": 2,
+    "dimension": 2048,
+    "rows": 8,
+    "chat_interleave_equal": true,
+    "repeat_max_abs": 0,
+    "encode_p50_ms": 37.0728,
+    "encode_p95_ms": 46.3368
+  },
+  "provenance": {
+    "model": "Qwen3.6-35B-A3B",
+    "model_sha256": "071EE2A008EC51372F990D8EFBEA92EC9DD0137974110EF68FBFDE429C8C6DD4",
+    "llama_dll_sha256": "DEE469CE5C79CCFF1830FA37E3ABACE5254A02E89218C64C56624F073B7C6162",
+    "runtime": "b8919-cuda131-sm120",
+    "pooling": "last_input_token_raw",
+    "template": "Motion description: {text}\nRepresentation:",
+    "input_context": "512 tokens; reset recurrent/KV state per prompt"
+  },
+  "limitation": "Native C API pilot only; production server routing, vision and long-context concurrency are not yet validated."
+}

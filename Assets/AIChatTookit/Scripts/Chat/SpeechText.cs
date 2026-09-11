@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+public enum SpeechActionDependency { Unspecified, Independent, AfterAction }
+
 /// <summary>Spoken text and its request-local language intent. Null means legacy detection.</summary>
 public readonly struct SpeechText
 {
@@ -13,17 +15,23 @@ public readonly struct SpeechText
         "先理解内容，再按要说的语言组织文字。\n" +
         "发声前先输出 <lang code=\"ja\"/>、<lang code=\"zh\"/> 或 <lang code=\"en\"/>，切换语种时再声明。" +
         "只有汉字的短句也必须声明；‘只说某几个字’限制的是可见台词，内部标记仍需提供。" +
-        "心里话和工具按原规则处理。";
+        "心里话和工具按原规则处理。\n" +
+        "正文前声明一次发声阶段：<speech mode=\"independent\"/> 表示台词不依赖本轮待验证的演唱或素材动作，普通闲聊选它并直接发声；" +
+        "本轮提交演唱、素材变更或承诺其执行时，改用 <speech mode=\"after_action\"/>，台词等待真实动作校验。" +
+        "阶段在正文之前确定，不能中途切换；independent 本轮不能再提交演唱/素材变更标签。";
 
     public readonly string Text;
     public readonly string LanguageCode;
     public readonly string LanguageSource;
+    public readonly SpeechActionDependency ActionDependency;
 
-    public SpeechText(string text, string languageCode = null, string languageSource = null)
+    public SpeechText(string text, string languageCode = null, string languageSource = null,
+        SpeechActionDependency actionDependency = SpeechActionDependency.Unspecified)
     {
         Text = text ?? "";
         LanguageCode = NormalizeLanguage(languageCode);
         LanguageSource = languageSource ?? (LanguageCode == null ? "auto-fallback" : "declared");
+        ActionDependency = actionDependency;
     }
 
     public static string NormalizeLanguage(string code)
@@ -47,6 +55,7 @@ public sealed class SpeechTextBuffer
     private sealed class Run
     {
         public string Language;
+        public SpeechActionDependency Dependency;
         public int Length;
     }
 
@@ -73,9 +82,10 @@ public sealed class SpeechTextBuffer
     {
         if (string.IsNullOrEmpty(value.Text)) return;
         text.Append(value.Text);
-        if (runs.Count > 0 && runs[runs.Count - 1].Language == value.LanguageCode)
+        if (runs.Count > 0 && runs[runs.Count - 1].Language == value.LanguageCode &&
+            runs[runs.Count - 1].Dependency == value.ActionDependency)
             runs[runs.Count - 1].Length += value.Text.Length;
-        else runs.Add(new Run { Language = value.LanguageCode, Length = value.Text.Length });
+        else runs.Add(new Run { Language = value.LanguageCode, Dependency = value.ActionDependency, Length = value.Text.Length });
     }
 
     public void Remove(int start, int count)
@@ -101,7 +111,8 @@ public sealed class SpeechTextBuffer
         int at = 0;
         foreach (Run run in runs)
         {
-            result.Add(new SpeechText(text.ToString(at, run.Length), run.Language));
+            result.Add(new SpeechText(text.ToString(at, run.Length), run.Language,
+                actionDependency: run.Dependency));
             at += run.Length;
         }
         return result;

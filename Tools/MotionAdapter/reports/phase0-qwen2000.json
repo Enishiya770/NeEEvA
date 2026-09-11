@@ -1,0 +1,47 @@
+{
+  "date": "2026-09-10",
+  "native": {
+    "chat_interleave_equal": true,
+    "context_count": 2,
+    "dimension": 2048,
+    "encode_p50_ms": 27.8617,
+    "encode_p95_ms": 32.8566,
+    "feature_contract": "qwen-motion-raw-last-v1",
+    "model_load_count": 1,
+    "repeat_max_abs": 0,
+    "rows": 2000,
+    "schema": 1
+  },
+  "provenance": {
+    "input_context": "512 tokens; reset recurrent/KV state per prompt",
+    "llama_dll_sha256": "DEE469CE5C79CCFF1830FA37E3ABACE5254A02E89218C64C56624F073B7C6162",
+    "model": "Qwen3.6-35B-A3B",
+    "model_sha256": "071EE2A008EC51372F990D8EFBEA92EC9DD0137974110EF68FBFDE429C8C6DD4",
+    "pooling": "last_input_token_raw",
+    "probe_exe_sha256": "2078320cde36c4119e15de7f1eb9769cda5d6eb7c262e307713e5ed8044d541c",
+    "runtime": "b8919-cuda131-sm120",
+    "template": "Motion description: {text}\nRepresentation:"
+  },
+  "feature_contract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+  "dataset_sha256": "f137cc3b104a339350accf185b33bb739b55dc9c53b8af2f992a7cce977b7967",
+  "groups": 144,
+  "splits": {
+    "train": 1556,
+    "val": 223,
+    "test": 221
+  },
+  "raw_feature_norm": {
+    "min": 110.29714965820312,
+    "median": 111.14239501953125,
+    "max": 112.51461029052734
+  },
+  "limitation": "Native C API short-context pilot only; production server routing, vision and long-context concurrency are unvalidated. Synthetic template corpus does not establish motion quality.",
+  "logged_cuda_allocations_mib": {
+    "shared_model_buffer": 18071.34,
+    "feature_context_kv": 10.0,
+    "feature_context_recurrent_state": 62.81,
+    "feature_context_compute": 493.0,
+    "feature_context_sum": 565.81,
+    "limitation": "Logged buffers only; not an end-to-end peak measurement."
+  }
+}

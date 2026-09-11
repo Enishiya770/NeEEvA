@@ -1,0 +1,17 @@
+{
+    "passed": true,
+    "checks": 322,
+    "cases": [
+        "source quotes; transaction; inherited geometry; unilateral replacement; stale turns; reset",
+        "numeric provenance; strict elbows; fixed duration; inherited values; conflicting representations",
+        "generic compilation; purpose does not choose clips; wrist/head timing; static and free routes",
+        "default legacy contract; explicit semantic opt-in; mode change source invalidation; restore default",
+        "actual ChatSample source snapshots; duplicate rejection; continuation; rejection feedback; legacy bypass; user reading; stop; capability reset",
+        "semantic plan streaming at every split; private/quoted/TTS isolation"
+    ],
+    "failure": "",
+    "checkedAtUtc": "2026-09-10T12:19:29.3943723Z",
+    "unityVersion": "2022.3.22f1",
+    "scope": "Production C# parser, requirement provenance and inheritance, compiler, actual inactive ChatSample dispatch/context/lifecycle; no physics or naturalness claim.",
+    "limitation": "Exact quote and numeric-literal checks verify references, not whether an LLM correctly understood the user's intent, negation or which joint a number describes."
+}

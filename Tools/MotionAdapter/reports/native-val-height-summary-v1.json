@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "sourceReport": "Server/ARDY/runtime/generalization-validation-v1/report.json",
+  "basis": "Explicit necessary height observations only, not semantic success; onset and hold medians exclude unreached observations; denominators include separate left/right criteria for alternating motion.",
+  "rows": [
+    {
+      "condition": "candidate",
+      "history": "cold",
+      "necessaryHeightObservationsReached": 27,
+      "denominator": 28,
+      "notReached": 1,
+      "medianFirstTimeReachedOnlySeconds": 0.5,
+      "medianLongestContinuousReachedOnlySeconds": 0.6,
+      "reachedWithin1Second": 25
+    },
+    {
+      "condition": "candidate",
+      "history": "grounded",
+      "necessaryHeightObservationsReached": 23,
+      "denominator": 28,
+      "notReached": 5,
+      "medianFirstTimeReachedOnlySeconds": 1.75,
+      "medianLongestContinuousReachedOnlySeconds": 1.9,
+      "reachedWithin1Second": 9
+    },
+    {
+      "condition": "old",
+      "history": "cold",
+      "necessaryHeightObservationsReached": 16,
+      "denominator": 28,
+      "notReached": 12,
+      "medianFirstTimeReachedOnlySeconds": 0.3,
+      "medianLongestContinuousReachedOnlySeconds": 1.9249999999999998,
+      "reachedWithin1Second": 16
+    },
+    {
+      "condition": "old",
+      "history": "grounded",
+      "necessaryHeightObservationsReached": 15,
+      "denominator": 28,
+      "notReached": 13,
+      "medianFirstTimeReachedOnlySeconds": 0.6,
+      "medianLongestContinuousReachedOnlySeconds": 2.05,
+      "reachedWithin1Second": 11
+    },
+    {
+      "condition": "teacher",
+      "history": "cold",
+      "necessaryHeightObservationsReached": 27,
+      "denominator": 28,
+      "notReached": 1,
+      "medianFirstTimeReachedOnlySeconds": 0.5,
+      "medianLongestContinuousReachedOnlySeconds": 1.65,
+      "reachedWithin1Second": 27
+    },
+    {
+      "condition": "teacher",
+      "history": "grounded",
+      "necessaryHeightObservationsReached": 23,
+      "denominator": 28,
+      "notReached": 5,
+      "medianFirstTimeReachedOnlySeconds": 1.25,
+      "medianLongestContinuousReachedOnlySeconds": 1.95,
+      "reachedWithin1Second": 8
+    }
+  ]
+}

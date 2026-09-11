@@ -1,0 +1,41 @@
+{
+  "scope": "One synthetic free-generation request using previous production and current compose-enabled contracts; planning only, no motion execution.",
+  "user": "双脚留在原地，随音乐自然地交替用双臂画弧线，带一点躯干起伏，做连贯的自由上身舞蹈。",
+  "results": [
+    {
+      "selected": "generate",
+      "description": "Stand with feet planted, sway torso gently side to side while swinging both arms in large, alternating forward arcs from shoulders, maintaining relaxed posture and continuous rhythmic flow for 6 seconds",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Stand with feet planted, sway torso gently side to side while swinging both arms in large, alternating forward arcs from shoulders, maintaining relaxed posture and continuous rhythmic flow for 6 seconds\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [],
+      "syntaxPassed": true,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "version": "pre-compose",
+      "contractSha256": "0089b6f7f351645e105ecd5b96a4ae19d78f6f16c3afa0172728acff21532701",
+      "elapsedSeconds": 0.711,
+      "model": "qwen36.gguf",
+      "descriptionCharacters": 202
+    },
+    {
+      "selected": "generate",
+      "description": "Stand with feet planted. Raise arms to shoulder height, elbows slightly bent. Swing arms in large, smooth alternating arcs forward and back, coordinating with gentle torso sway and vertical bobbing to create a fluid, free-form upper body dance rhythm.",
+      "motionTags": [
+        "<motion name=\"generate\" text=\"Stand with feet planted. Raise arms to shoulder height, elbows slightly bent. Swing arms in large, smooth alternating arcs forward and back, coordinating with gentle torso sway and vertical bobbing to create a fluid, free-form upper body dance rhythm.\"/>"
+      ],
+      "publicReplyExcerpt": "",
+      "syntaxErrors": [
+        "invalid-generated-description"
+      ],
+      "syntaxPassed": false,
+      "limitation": "XML shape only; production C# channel isolation is a separate Unity regression.",
+      "version": "with-compose",
+      "contractSha256": "c69208cce3f3fe845eca7a028a236b551fb06ac84da5b6311de3adf6d2d2437f",
+      "elapsedSeconds": 0.431,
+      "model": "qwen36.gguf",
+      "descriptionCharacters": 251
+    }
+  ],
+  "status": "completed"
+}

@@ -1,0 +1,17 @@
+test_basic_still_uses_its_own_attribute_contract (test_motion_generated_capability.GeneratedCapabilityTests.test_basic_still_uses_its_own_attribute_contract) ... ok
+test_supported_generate_is_not_rejected_for_omitting_goal (test_motion_generated_capability.GeneratedCapabilityTests.test_supported_generate_is_not_rejected_for_omitting_goal) ... ok
+test_unsupported_finger_with_valid_goal_is_rejected (test_motion_generated_capability.GeneratedCapabilityTests.test_unsupported_finger_with_valid_goal_is_rejected) ... ok
+test_unsupported_finger_without_goal_is_rejected (test_motion_generated_capability.GeneratedCapabilityTests.test_unsupported_finger_without_goal_is_rejected) ... FAIL
+
+======================================================================
+FAIL: test_unsupported_finger_without_goal_is_rejected (test_motion_generated_capability.GeneratedCapabilityTests.test_unsupported_finger_without_goal_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\VRproject\VR20250611\NeEEvA\Tools\MotionAdapter\test_motion_generated_capability.py", line 14, in test_unsupported_finger_without_goal_is_rejected
+    self.assertFalse(result["accepted"])
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 4 tests in 1.543s
+
+FAILED (failures=1)

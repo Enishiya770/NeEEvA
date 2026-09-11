@@ -1,0 +1,3223 @@
+{
+  "schema": 1,
+  "sourceTraceReport": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\report.json",
+  "sourceTraceReportSha256": "9cdb92f8540f257b3e789c48af3047cfea10e813286d918893daa0c6f5023374",
+  "sourceHttpReport": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\report.json",
+  "sourceHttpReportSha256": "190e0138bcad9f191c976bc8c143a32fc45ee74c4c644728670c091f416f0618",
+  "summaryScriptSha256": "6aa817245071301001120ae074eff627b8f84d3479c2e769ae1477cd898501d9",
+  "scope": "Eight actual archived motion traces plus exactly eight predeclared current-service HTTP trajectories; no additional text or seed search.",
+  "targetAssetAssumption": "NEVA.vrm is a concrete asset-based CPU mapping reconstruction. These traces do not identify the actual user scene model, and this analysis does not claim to record current VRM output.",
+  "coordinates": "Unity character canonical +Y up, +Z forward, +X character-right; left/right array order. Wrist displacement is measured from its own UpperArm shoulder pivot in chest-motion axes, not arbitrary target bone local axes.",
+  "couplingBasis": "Geodesic relative rotations: chest-to-upper-arm, upper-arm-to-forearm and forearm-to-hand, left/right order. Fixed target-rest conjugations preserve angular distances under the current fully blended UpperBody global-rotation mapping. Travel is the sum of adjacent 20Hz angle increments, not net amplitude or repeated-wave count.",
+  "verifiedHttp": {
+    "trajectories": 8,
+    "successfulGenerationResponses": 24,
+    "successfulPrivateRevisionCancellations": 8,
+    "initialHealth": {
+      "service": "neeeva-ardy-motion",
+      "ready": true,
+      "backend": {
+        "ready": true,
+        "languageModelsLoaded": false,
+        "adapter": "finetune-seed0",
+        "adapterMode": "verified-preview",
+        "candidate": false,
+        "approvedForRuntime": false,
+        "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+        "adapterSelectionSha256": "0e3592520ffcc4cd3572cf556893f69ba034d010738ec80f17f7989b19287bd3",
+        "adapterSelectionLockedUtc": "2026-09-10T05:52:40.504072+00:00",
+        "adapterSelection": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\generalization-v1\\candidates\\selection.json",
+        "teacherContract": "4931fa72fb55a5e633e8dedc2fbac8d3bf15f8a8baa2cb4130ef0072845b474a",
+        "datasetSha256": "76b3da47f1c2400372a5a594e5f496fa0bda4ac8970d4d055519896c462b6091",
+        "candidateUsage": "Evidence-verified motion preview; no guarantee of arbitrary-action success or naturalness",
+        "previewReleaseVerified": true,
+        "releaseId": "ardy-preview-6364a5984590a06a04ff662e",
+        "releaseManifestSha256": "8e2df4f825a62e1fbfd097691d55115cc8923807ea078c8124bf3d966127fb0e",
+        "releaseEvidenceSha256": {
+          "selection": "0e3592520ffcc4cd3572cf556893f69ba034d010738ec80f17f7989b19287bd3",
+          "nativeFinal": "2159fbc3c7aefc569cb409cc57b40e4834ca5d457b4ece9f3d216db0ecf68be9",
+          "featureFinal": "6f6940476e0ae6cbceb3b53723fe0d9811cd02ead0e70b1214f278c7de522846",
+          "httpLive": "d7acb86c25fe42678609eca53f1c186411b2335a59d5592caf68c186302b0f0e",
+          "unityLive": "5a59452fb81db227ed7b08aec79505906f154abc57cb9bda089879dceea85e1c",
+          "unityTrace": "0bd3d14b24999f52cc3769c4363a1869537f9f2072bf8cae94ebc89c5d191703"
+        },
+        "naturalnessAccepted": false,
+        "defaultInitialConditioningFrames": 16,
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+        "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+        "fps": 20,
+        "newFrames": 40,
+        "historyFrames": 16,
+        "gpuPreflight": {
+          "freeMiB": 23036.0,
+          "totalMiB": 24563.5
+        }
+      },
+      "features": {
+        "source": "live-qwen",
+        "verified": true,
+        "baseUrl": "http://127.0.0.1:8080",
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4"
+      },
+      "queue": {
+        "waiting": 0,
+        "limit": 4,
+        "running": 0
+      },
+      "characters": {
+        "count": 3,
+        "limit": 64
+      },
+      "counters": {
+        "submitted": 64,
+        "completed": 64,
+        "cancelled": 0,
+        "failed": 0,
+        "staleResultsDiscarded": 0,
+        "queueRejected": 0
+      },
+      "baselineResourcesModified": false
+    },
+    "finalHealth": {
+      "service": "neeeva-ardy-motion",
+      "ready": true,
+      "backend": {
+        "ready": true,
+        "languageModelsLoaded": false,
+        "adapter": "finetune-seed0",
+        "adapterMode": "verified-preview",
+        "candidate": false,
+        "approvedForRuntime": false,
+        "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+        "adapterSelectionSha256": "0e3592520ffcc4cd3572cf556893f69ba034d010738ec80f17f7989b19287bd3",
+        "adapterSelectionLockedUtc": "2026-09-10T05:52:40.504072+00:00",
+        "adapterSelection": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\runtime\\generalization-v1\\candidates\\selection.json",
+        "teacherContract": "4931fa72fb55a5e633e8dedc2fbac8d3bf15f8a8baa2cb4130ef0072845b474a",
+        "datasetSha256": "76b3da47f1c2400372a5a594e5f496fa0bda4ac8970d4d055519896c462b6091",
+        "candidateUsage": "Evidence-verified motion preview; no guarantee of arbitrary-action success or naturalness",
+        "previewReleaseVerified": true,
+        "releaseId": "ardy-preview-6364a5984590a06a04ff662e",
+        "releaseManifestSha256": "8e2df4f825a62e1fbfd097691d55115cc8923807ea078c8124bf3d966127fb0e",
+        "releaseEvidenceSha256": {
+          "selection": "0e3592520ffcc4cd3572cf556893f69ba034d010738ec80f17f7989b19287bd3",
+          "nativeFinal": "2159fbc3c7aefc569cb409cc57b40e4834ca5d457b4ece9f3d216db0ecf68be9",
+          "featureFinal": "6f6940476e0ae6cbceb3b53723fe0d9811cd02ead0e70b1214f278c7de522846",
+          "httpLive": "d7acb86c25fe42678609eca53f1c186411b2335a59d5592caf68c186302b0f0e",
+          "unityLive": "5a59452fb81db227ed7b08aec79505906f154abc57cb9bda089879dceea85e1c",
+          "unityTrace": "0bd3d14b24999f52cc3769c4363a1869537f9f2072bf8cae94ebc89c5d191703"
+        },
+        "naturalnessAccepted": false,
+        "defaultInitialConditioningFrames": 16,
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "ardyRevision": "693f74d13b3d04a0a22ce127ee79c929dd89756b",
+        "coreRevision": "abe6c43beb28c867c950acb824b9c4ef3d63fb76",
+        "fps": 20,
+        "newFrames": 40,
+        "historyFrames": 16,
+        "gpuPreflight": {
+          "freeMiB": 23036.0,
+          "totalMiB": 24563.5
+        }
+      },
+      "features": {
+        "source": "live-qwen",
+        "verified": true,
+        "baseUrl": "http://127.0.0.1:8080",
+        "featureContract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4"
+      },
+      "queue": {
+        "waiting": 0,
+        "limit": 4,
+        "running": 0
+      },
+      "characters": {
+        "count": 4,
+        "limit": 64
+      },
+      "counters": {
+        "submitted": 88,
+        "completed": 88,
+        "cancelled": 0,
+        "failed": 0,
+        "staleResultsDiscarded": 0,
+        "queueRejected": 0
+      },
+      "baselineResourcesModified": false
+    }
+  },
+  "conclusions": [
+    "The archive distinguishes forward from lateral extension: revision42 lateral reach is mostly X, while revision50 forward reach is mostly +Z. It does not support a simple global axis swap as the cause.",
+    "Revision50 completed 12.781 seconds before revision54 began. Revision54 input wrists were near the captured idle posture, not the previous forward-returned endpoint. Separate turns did not preserve the held pose.",
+    "The generated then-wave clips contain wrist-local motion but substantial elbow/arm motion as well; they are not numerically motionless. Wrist rotational travel alone does not prove gentle side-to-side waving.",
+    "Using exactly the last sixteen returned revision50 frames gives a forward input (no peak selection), but original-text generation still bends/lowers the arms. An initial pose is not an enforced six-second pose constraint.",
+    "With the explicit wrist-only text, both idle-start probes end near arms-down, while both generated-history probes have large arm/forearm motion. These eight cases do not show that wording plus carried history reliably produces stationary straight arms and small wrist motion.",
+    "Maintaining an observed held posture and controlling wrist motion separately is therefore a distinct capability to validate, not something established by the current native ARDY endpoint. No production fix or new model selection was made in this diagnosis."
+  ],
+  "limitations": [
+    "No overall semantic or naturalness success score.",
+    "No automatic inference of palm orientation, hand-waving direction or exactly two repetitions.",
+    "No Unity render or blend/Animator replay was performed; returned cancelled future frames are not assumed played.",
+    "No production service, model or Player was edited; the HTTP probes used the already running service and retained exact response provenance."
+  ],
+  "probes": [
+    {
+      "id": "original-archived-idle-seed0",
+      "history": "archived-idle",
+      "seed": 0,
+      "description": "Both arms extend straight forward at shoulder level, palms facing inward, then wave side to side",
+      "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\original-archived-idle-seed0.json",
+      "clipSha256": "37f1c4b3b174fc8d0de572fc7abc7b2e0bd103288e921766cfd22b95f62e2532",
+      "frameMeasurements": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\original-archived-idle-seed0.measurements.json",
+      "initialPoseNEVA": {
+        "frame": 15,
+        "seconds": 0.75,
+        "leftRightWristRelativeShoulderXYZMeters": [
+          [
+            0.06431944878485865,
+            -0.37216727526858767,
+            0.18828267409115151
+          ],
+          [
+            -0.059646901127242545,
+            -0.3836885207821323,
+            0.17221342553602806
+          ]
+        ],
+        "leftRightElbowInteriorAngleDegrees": [
+          157.08457137863792,
+          161.13596308865098
+        ]
+      },
+      "lastTwoSecondsNEVA": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.06176302505413207,
+              -0.41285495118938836,
+              0.09298585232938315
+            ],
+            [
+              0.027654687162607217,
+              -0.4126229018530357,
+              0.05995686302437871
+            ]
+          ],
+          "maximum": [
+            [
+              -0.03163177796951774,
+              -0.11560367600223012,
+              0.25931533955615005
+            ],
+            [
+              0.08406384487188373,
+              -0.13594767777395092,
+              0.28312363304864774
+            ]
+          ],
+          "median": [
+            [
+              -0.03523013730241029,
+              -0.2720784680825301,
+              0.21316107298313663
+            ],
+            [
+              0.06044123454299119,
+              -0.2879703670810678,
+              0.20577462520043316
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.030131247084614336,
+              0.2972512751871582,
+              0.16632948722676688
+            ],
+            [
+              0.056409157709276514,
+              0.27667522407908474,
+              0.22316677002426902
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.4120969192274093,
+            -0.41416553027137193
+          ],
+          "maximum": [
+            -0.08564350173073976,
+            -0.10426721579493714
+          ],
+          "median": [
+            -0.27007709813943426,
+            -0.28930707211752593
+          ],
+          "peakToPeak": [
+            0.32645341749666956,
+            0.3098983144764348
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            81.80771859602291,
+            92.9605827454604
+          ],
+          "maximum": [
+            160.5513068678596,
+            157.16390354396003
+          ],
+          "median": [
+            107.54571699974767,
+            114.25186902644671
+          ],
+          "peakToPeak": [
+            78.7435882718367,
+            64.20332079849963
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.39264273190024473,
+          0.41049412396489815
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.34413084483729484,
+          0.3623249832922293
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          85.98736443495928,
+          78.25476911838271
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          100.34397395996812,
+          98.22172058238729
+        ]
+      },
+      "lastTwoSecondsCore27": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.09471001304556208,
+              -0.5078264761778167,
+              0.10610468590564015
+            ],
+            [
+              0.052979902779858014,
+              -0.5071978631295113,
+              0.0627004997429407
+            ]
+          ],
+          "maximum": [
+            [
+              -0.04396236848782416,
+              -0.17291131412463723,
+              0.30016982757725424
+            ],
+            [
+              0.10842839330086282,
+              -0.19522734610810538,
+              0.3326195952593074
+            ]
+          ],
+          "median": [
+            [
+              -0.05360512644668072,
+              -0.35120381784881516,
+              0.23806007743873808
+            ],
+            [
+              0.0810098900937889,
+              -0.36838017494919817,
+              0.22870298646594012
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.05074764455773792,
+              0.3349151620531795,
+              0.1940651416716141
+            ],
+            [
+              0.055448490521004805,
+              0.31197051702140594,
+              0.2699190955163667
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.5067508106724931,
+            -0.5091646150791018
+          ],
+          "maximum": [
+            -0.13665156478964202,
+            -0.15844405598087263
+          ],
+          "median": [
+            -0.3484029748589107,
+            -0.3704013911584172
+          ],
+          "peakToPeak": [
+            0.37009924588285104,
+            0.3507205590982292
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            81.90903230149314,
+            93.06189839694932
+          ],
+          "maximum": [
+            160.6525577435638,
+            157.26521250220827
+          ],
+          "median": [
+            107.64702517509707,
+            114.35318688808533
+          ],
+          "peakToPeak": [
+            78.74352544207065,
+            64.20331410525895
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.4538057162044814,
+          0.481245393597028
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.40310252361461507,
+          0.429125135941352
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          85.98736443495868,
+          78.25476911838217
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          100.34397395996795,
+          98.2217205823871
+        ]
+      },
+      "angularCoupling": [
+        {
+          "startSeconds": 0.0,
+          "endSecondsInclusive": 1.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              41.532767453774355,
+              41.84350001545085
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              26.449941943399782,
+              28.73875665371649
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              49.69028709830447,
+              48.470950760921625
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              15.401343493610486,
+              16.948077517622245
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              5.166768875538505,
+              6.149289244017724
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              18.76506186105606,
+              20.51934055614232
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              38.23813734134007,
+              35.953539967678275
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              24.85185424887195,
+              25.32352384031042
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              40.399510509806944,
+              54.898543791981204
+            ]
+          }
+        },
+        {
+          "startSeconds": 2.0,
+          "endSecondsInclusive": 3.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              88.7870450674044,
+              85.22064336895043
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              52.078197590415726,
+              47.57345562476437
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              187.06389421034328,
+              135.8179063012218
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              89.97335288532317,
+              98.72057416194383
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              79.16856080337153,
+              81.11473946628051
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              196.549111845796,
+              219.88939317541713
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              123.28418454504131,
+              119.07252421397253
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              69.38626141867492,
+              78.50453375351312
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              226.70360738959573,
+              274.475974098191
+            ]
+          }
+        },
+        {
+          "startSeconds": 4.0,
+          "endSecondsInclusive": 5.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              45.334256650473286,
+              43.61707063712162
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              32.54724596100641,
+              29.66465901347099
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              50.25180460776547,
+              44.50861113803337
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              85.82411555788288,
+              70.34646561578273
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              74.47766373667096,
+              62.66837073292458
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              149.0770095181779,
+              127.43436235102998
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              85.98736443495868,
+              78.25476911838217
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              70.56426480142693,
+              64.54976730993575
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              118.45770162530165,
+              122.12219916764396
+            ]
+          }
+        }
+      ],
+      "semanticPass": null
+    },
+    {
+      "id": "original-archived-idle-seed1",
+      "history": "archived-idle",
+      "seed": 1,
+      "description": "Both arms extend straight forward at shoulder level, palms facing inward, then wave side to side",
+      "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\original-archived-idle-seed1.json",
+      "clipSha256": "6ec9aa68ddb08edfcccf48dbfab5823d18a58fb0d00cfa9d4ce6b85332ba9c42",
+      "frameMeasurements": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\original-archived-idle-seed1.measurements.json",
+      "initialPoseNEVA": {
+        "frame": 15,
+        "seconds": 0.75,
+        "leftRightWristRelativeShoulderXYZMeters": [
+          [
+            0.06431944878485865,
+            -0.37216727526858767,
+            0.18828267409115151
+          ],
+          [
+            -0.059646901127242545,
+            -0.3836885207821323,
+            0.17221342553602806
+          ]
+        ],
+        "leftRightElbowInteriorAngleDegrees": [
+          157.08457137863792,
+          161.13596308865098
+        ]
+      },
+      "lastTwoSecondsNEVA": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.07335236770948134,
+              -0.4241210232564668,
+              0.008879681391276827
+            ],
+            [
+              0.010822135841980005,
+              -0.4218254952827138,
+              0.01673251478477898
+            ]
+          ],
+          "maximum": [
+            [
+              -0.02775971286012722,
+              -0.17078837574120348,
+              0.23721259860853983
+            ],
+            [
+              0.0800342426310131,
+              -0.18047644780034686,
+              0.2347179550115765
+            ]
+          ],
+          "median": [
+            [
+              -0.04250670363346116,
+              -0.4200364796105184,
+              0.04939453742019666
+            ],
+            [
+              0.04813584572661729,
+              -0.4179733178392888,
+              0.04589895306711256
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.04559265484935412,
+              0.2533326475152633,
+              0.228332917217263
+            ],
+            [
+              0.06921210678903308,
+              0.24134904748236694,
+              0.21798544022679753
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.4226394931300361,
+            -0.42443307680563114
+          ],
+          "maximum": [
+            -0.17157139594733395,
+            -0.18214498580833705
+          ],
+          "median": [
+            -0.4173212871157133,
+            -0.4222925268732528
+          ],
+          "peakToPeak": [
+            0.2510680971827022,
+            0.2422880909972941
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            85.27140803908976,
+            86.36896190740605
+          ],
+          "maximum": [
+            165.6598554306596,
+            163.51100574432408
+          ],
+          "median": [
+            164.20883691372663,
+            159.9089639079299
+          ],
+          "peakToPeak": [
+            80.38844739156984,
+            77.14204383691803
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.46767000513570217,
+          0.43950422977308184
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.3262852953264485,
+          0.3192714904304177
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          72.37707934651809,
+          88.56039089361283
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          105.96251158963257,
+          102.09190819788866
+        ]
+      },
+      "lastTwoSecondsCore27": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.09238780123117032,
+              -0.520393205006426,
+              0.0033786576261867485
+            ],
+            [
+              0.03184648974764863,
+              -0.5176511828759801,
+              0.012495136515189041
+            ]
+          ],
+          "maximum": [
+            [
+              -0.049546731442586735,
+              -0.2390491608714677,
+              0.26815572681139305
+            ],
+            [
+              0.10275174188030417,
+              -0.2492515079168866,
+              0.26522458873708427
+            ]
+          ],
+          "median": [
+            [
+              -0.05582666216181211,
+              -0.5152314004196404,
+              0.053490435028257934
+            ],
+            [
+              0.061432483791200754,
+              -0.5131840341338381,
+              0.047327560077469286
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.04284106978858359,
+              0.2813440441349584,
+              0.26477706918520627
+            ],
+            [
+              0.07090525213265554,
+              0.2683996749590935,
+              0.25272945222189525
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.5181167245416338,
+            -0.5204136878800147
+          ],
+          "maximum": [
+            -0.23949963734284685,
+            -0.25158942111730237
+          ],
+          "median": [
+            -0.5110611566710569,
+            -0.5178766329513812
+          ],
+          "peakToPeak": [
+            0.278617087198787,
+            0.26882426676271237
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            85.3727194503039,
+            86.47026756106185
+          ],
+          "maximum": [
+            165.76116957293405,
+            163.61231590606099
+          ],
+          "median": [
+            164.31011452961843,
+            160.01027409458155
+          ],
+          "peakToPeak": [
+            80.38845012263015,
+            77.14204834499914
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.5467054213186858,
+          0.507791692643219
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.3752352239548254,
+          0.36738434878650816
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          72.37707934651736,
+          88.56039089361208
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          105.96251158963227,
+          102.09190819788834
+        ]
+      },
+      "angularCoupling": [
+        {
+          "startSeconds": 0.0,
+          "endSecondsInclusive": 1.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              36.069312150889374,
+              35.458493908151766
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              18.46899155263792,
+              21.126593583588146
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              58.011706926815364,
+              51.96910668349426
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              22.405732965251875,
+              13.42309867869249
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              7.308882523834025,
+              4.456809359081603
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              37.350062673857146,
+              18.20378414819342
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              64.1074801151779,
+              45.05019990150899
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              33.68589586469118,
+              30.727800530416175
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              241.2941844158526,
+              132.36256258317906
+            ]
+          }
+        },
+        {
+          "startSeconds": 2.0,
+          "endSecondsInclusive": 3.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              64.26140863550606,
+              59.5185511344598
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              39.315028410850985,
+              45.934182229079575
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              109.51737787595776,
+              210.907280088847
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              82.20606982334249,
+              86.94179332519604
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              77.74373305231923,
+              75.80910441599839
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              192.88651438054933,
+              231.118432767984
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              88.15824059809106,
+              120.69552043613143
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              72.96097026098307,
+              91.70222528160964
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              195.5894075613068,
+              298.47236801840046
+            ]
+          }
+        },
+        {
+          "startSeconds": 4.0,
+          "endSecondsInclusive": 5.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              43.577163788901906,
+              32.57914216784848
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              19.506977428689627,
+              19.47692327338999
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              76.18815879914227,
+              62.095020181561594
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              87.21978712593223,
+              85.67849361702442
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              80.38906260330072,
+              77.1146518762024
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              238.124626543932,
+              223.74101822193865
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              72.37707934651736,
+              88.56039089361208
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              55.529845990129985,
+              77.22745556660318
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              144.9798389159975,
+              155.62007372954034
+            ]
+          }
+        }
+      ],
+      "semanticPass": null
+    },
+    {
+      "id": "original-generated-last16-seed0",
+      "history": "generated-last16",
+      "seed": 0,
+      "description": "Both arms extend straight forward at shoulder level, palms facing inward, then wave side to side",
+      "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\original-generated-last16-seed0.json",
+      "clipSha256": "963d342b2cd2b669ca3cee002f0033f5d1db99fafa0e795689aaf12343b80344",
+      "frameMeasurements": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\original-generated-last16-seed0.measurements.json",
+      "initialPoseNEVA": {
+        "frame": 15,
+        "seconds": 0.75,
+        "leftRightWristRelativeShoulderXYZMeters": [
+          [
+            0.011643901782127241,
+            -0.07240646083231092,
+            0.4118153426701308
+          ],
+          [
+            -0.024059353028596422,
+            -0.09111618523086977,
+            0.4078989509197572
+          ]
+        ],
+        "leftRightElbowInteriorAngleDegrees": [
+          152.5427253593774,
+          152.93740440147775
+        ]
+      },
+      "lastTwoSecondsNEVA": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.0837724908212033,
+              -0.419411257630863,
+              0.044723845368356475
+            ],
+            [
+              0.06021626569565323,
+              -0.4225381415659841,
+              0.019209732613415832
+            ]
+          ],
+          "maximum": [
+            [
+              -0.029531124689039446,
+              -0.049132362028649575,
+              0.2543543885892185
+            ],
+            [
+              0.13226333078993296,
+              -0.10491448785431795,
+              0.2131097946251009
+            ]
+          ],
+          "median": [
+            [
+              -0.0495913988868593,
+              -0.12853937688349598,
+              0.21592192772862492
+            ],
+            [
+              0.08565796961033145,
+              -0.1644905274431558,
+              0.19160579348795392
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.05424136613216386,
+              0.37027889560221344,
+              0.20963054322086203
+            ],
+            [
+              0.07204706509427974,
+              0.3176236537116662,
+              0.19390006201168508
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.41818844301927327,
+            -0.42368574548002524
+          ],
+          "maximum": [
+            -0.04979809477473607,
+            -0.1078045947826296
+          ],
+          "median": [
+            -0.11671522041810545,
+            -0.15907837242646938
+          ],
+          "peakToPeak": [
+            0.3683903482445372,
+            0.31588115069739564
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            54.58477854330756,
+            60.66426920734255
+          ],
+          "maximum": [
+            160.69029228871693,
+            165.6875958317103
+          ],
+          "median": [
+            85.97708836976189,
+            84.36955686338081
+          ],
+          "peakToPeak": [
+            106.10551374540938,
+            105.02332662436774
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.6054078198713843,
+          0.5276542864402243
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.35964747854014606,
+          0.3211355322199608
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          126.38097905560164,
+          135.15254505044555
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          157.1807377905824,
+          137.99972527675848
+        ]
+      },
+      "lastTwoSecondsCore27": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.11727451258136626,
+              -0.5149446759366482,
+              0.04623808191770511
+            ],
+            [
+              0.07743608374258054,
+              -0.5180458893903768,
+              0.017384833903062308
+            ]
+          ],
+          "maximum": [
+            [
+              -0.05759789332910456,
+              -0.10162991254049197,
+              0.29306807743110025
+            ],
+            [
+              0.17530734177498072,
+              -0.16292974210269814,
+              0.23521555368727853
+            ]
+          ],
+          "median": [
+            [
+              -0.07294528234237338,
+              -0.18909591068913378,
+              0.24483160900226808
+            ],
+            [
+              0.11845163220137049,
+              -0.22720146021132653,
+              0.2074950569028134
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.0596766192522617,
+              0.4133147633961562,
+              0.24682999551339513
+            ],
+            [
+              0.09787125803240018,
+              0.3551161472876786,
+              0.21783071978421623
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.5133808734567692,
+            -0.519544098476864
+          ],
+          "maximum": [
+            -0.10186051466132401,
+            -0.1666945362531892
+          ],
+          "median": [
+            -0.17506827011096887,
+            -0.22231867756038776
+          ],
+          "peakToPeak": [
+            0.4115203587954452,
+            0.3528495622236748
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            54.68608184400044,
+            60.76557153872728
+          ],
+          "maximum": [
+            160.79161022822024,
+            165.78889275508774
+          ],
+          "median": [
+            86.0783994325127,
+            84.47087455912126
+          ],
+          "peakToPeak": [
+            106.1055283842198,
+            105.02332121636047
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.6846961357270385,
+          0.5973055521631235
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.4140896694734653,
+          0.36569402515332466
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          126.38097905560053,
+          135.15254505044433
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          157.1807377905818,
+          137.9997252767579
+        ]
+      },
+      "angularCoupling": [
+        {
+          "startSeconds": 0.0,
+          "endSecondsInclusive": 1.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              108.05925887607646,
+              102.15061335296153
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              82.2862279640041,
+              86.27463837786071
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              116.90054723070661,
+              115.55734491264813
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              85.07986127298894,
+              85.35234848592451
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              35.11826168813751,
+              35.04528773410394
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              105.47559452586695,
+              106.9132551468391
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              74.4332470363458,
+              77.96294429250777
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              35.20976184745517,
+              26.38214831258947
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              97.03472015633147,
+              117.5180621879183
+            ]
+          }
+        },
+        {
+          "startSeconds": 2.0,
+          "endSecondsInclusive": 3.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              8.10810018218021,
+              8.983136252708722
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              2.5690116218285612,
+              2.498497002095741
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              20.777861732338117,
+              10.56313962516999
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              8.714299907892299,
+              4.894204866756219
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              4.909860033741416,
+              1.0827566644966398
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              17.049570448955272,
+              6.871102928412007
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              9.826168782389045,
+              9.093610663806581
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              3.5130004674491664,
+              1.2751011131567977
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              15.791818509453005,
+              12.398088775439325
+            ]
+          }
+        },
+        {
+          "startSeconds": 4.0,
+          "endSecondsInclusive": 5.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              52.81576758150653,
+              63.72012088308761
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              35.87407215163619,
+              42.37859959260246
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              119.39070332874536,
+              142.66227023576226
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              141.05239864056335,
+              137.03062409196028
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              106.10731256021062,
+              105.03151843252219
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              203.39036867686758,
+              231.1260648029949
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              126.38097905560053,
+              135.15254505044433
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              56.59596159618394,
+              70.91297056441634
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              210.75764401452003,
+              263.96587765588845
+            ]
+          }
+        }
+      ],
+      "semanticPass": null
+    },
+    {
+      "id": "original-generated-last16-seed1",
+      "history": "generated-last16",
+      "seed": 1,
+      "description": "Both arms extend straight forward at shoulder level, palms facing inward, then wave side to side",
+      "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\original-generated-last16-seed1.json",
+      "clipSha256": "6ded19f6c4ae54581c5e70b8bf775b19c96bd37cdb60ad3fa4c627c69c05ea82",
+      "frameMeasurements": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\original-generated-last16-seed1.measurements.json",
+      "initialPoseNEVA": {
+        "frame": 15,
+        "seconds": 0.75,
+        "leftRightWristRelativeShoulderXYZMeters": [
+          [
+            0.011643901782127241,
+            -0.07240646083231092,
+            0.4118153426701308
+          ],
+          [
+            -0.024059353028596422,
+            -0.09111618523086977,
+            0.4078989509197572
+          ]
+        ],
+        "leftRightElbowInteriorAngleDegrees": [
+          152.5427253593774,
+          152.93740440147775
+        ]
+      },
+      "lastTwoSecondsNEVA": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.11373334026533138,
+              -0.41905801162186473,
+              0.08299202659578835
+            ],
+            [
+              0.03793343694346062,
+              -0.4192322298205912,
+              0.06997696809945808
+            ]
+          ],
+          "maximum": [
+            [
+              -0.036110774451889434,
+              -0.10474694583395858,
+              0.17879271117001383
+            ],
+            [
+              0.09693399507976048,
+              -0.11790024395546199,
+              0.1718937275692905
+            ]
+          ],
+          "median": [
+            [
+              -0.08304196277123006,
+              -0.32236456603153607,
+              0.13124188329590736
+            ],
+            [
+              0.05609320203169385,
+              -0.326025385171682,
+              0.12036137639051307
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.07762256581344196,
+              0.31431106578790613,
+              0.09580068457422548
+            ],
+            [
+              0.05900055813629986,
+              0.3013319858651292,
+              0.10191675946983242
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.42167459782158867,
+            -0.42226876480329345
+          ],
+          "maximum": [
+            -0.10118073127677718,
+            -0.12211513951377206
+          ],
+          "median": [
+            -0.32585678644809113,
+            -0.33426518866657773
+          ],
+          "peakToPeak": [
+            0.3204938665448115,
+            0.3001536252895214
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            56.84307370985446,
+            56.778095347617544
+          ],
+          "maximum": [
+            169.30885494927597,
+            164.81569756626138
+          ],
+          "median": [
+            115.2434642864252,
+            112.72527636540886
+          ],
+          "peakToPeak": [
+            112.46578123942152,
+            108.03760221864383
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.4380547455888412,
+          0.41151480556193587
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.3059358509698518,
+          0.2873374082375788
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          83.61435702300072,
+          114.08489913506224
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          132.46213727411748,
+          138.22386366557689
+        ]
+      },
+      "lastTwoSecondsCore27": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.1408427713574178,
+              -0.5145925476023258,
+              0.09737450067014175
+            ],
+            [
+              0.05262887857992447,
+              -0.5144246664298608,
+              0.08118948416292225
+            ]
+          ],
+          "maximum": [
+            [
+              -0.047416277095665205,
+              -0.1678508031290706,
+              0.19343069773285143
+            ],
+            [
+              0.12444833291832724,
+              -0.18036714973849072,
+              0.1809783180248124
+            ]
+          ],
+          "median": [
+            [
+              -0.10689425976724096,
+              -0.4068203996550714,
+              0.13420981639499602
+            ],
+            [
+              0.07907535410443498,
+              -0.4096550822295217,
+              0.11971790194230514
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.09342649426175259,
+              0.3467417444732551,
+              0.09605619706270968
+            ],
+            [
+              0.07181945433840278,
+              0.3340575166913701,
+              0.09978883386189015
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.5175749619206584,
+            -0.5180101648908532
+          ],
+          "maximum": [
+            -0.16305174098292308,
+            -0.18583932742668585
+          ],
+          "median": [
+            -0.4096138752872521,
+            -0.41841970764770886
+          ],
+          "peakToPeak": [
+            0.35452322093773536,
+            0.3321708374641673
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            56.944392002194476,
+            56.87941024679609
+          ],
+          "maximum": [
+            169.4101709785006,
+            164.91701344402668
+          ],
+          "median": [
+            115.344763331331,
+            112.8265472184431
+          ],
+          "peakToPeak": [
+            112.46577897630611,
+            108.0376031972306
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.507764404622187,
+          0.4662212535705666
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.33898567828371134,
+          0.3181906287442317
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          83.6143570230002,
+          114.08489913506169
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          132.46213727411748,
+          138.22386366557683
+        ]
+      },
+      "angularCoupling": [
+        {
+          "startSeconds": 0.0,
+          "endSecondsInclusive": 1.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              88.70441501526025,
+              96.14393814942987
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              65.22799393793973,
+              67.46128815601024
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              145.297099643991,
+              138.66906736870715
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              122.29933906414631,
+              80.19238519802343
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              49.76408851021449,
+              31.63792507476433
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              191.29432153011717,
+              145.20072581283534
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              68.98105374052822,
+              53.322112993502
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              34.95718147202535,
+              26.134542625018653
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              106.6216361912974,
+              82.90393865056473
+            ]
+          }
+        },
+        {
+          "startSeconds": 2.0,
+          "endSecondsInclusive": 3.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              6.486562368732414,
+              6.518110949047926
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              2.5504648429686854,
+              1.2670621571739809
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              7.696193496700248,
+              6.594150185362518
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              4.74283161704399,
+              4.876139798856888
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              2.3856676433227966,
+              1.179499708997651
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              8.572760392518292,
+              4.874532612935953
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              8.096578533468243,
+              9.089461376509234
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              2.8765675538911277,
+              1.7175119047952772
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              12.791271196877076,
+              10.796399147081246
+            ]
+          }
+        },
+        {
+          "startSeconds": 4.0,
+          "endSecondsInclusive": 5.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              79.16437101370933,
+              91.17114211921057
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              58.67277331146686,
+              68.87601047008826
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              232.7813400919769,
+              250.53621024026452
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              129.0145918835088,
+              126.5297631253866
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              112.4665770256767,
+              108.04592057131613
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              397.0293769068939,
+              367.97139585619834
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              83.6143570230002,
+              114.08489913506169
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              47.34840008523584,
+              77.64566007622454
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              248.207934863427,
+              288.1957871751502
+            ]
+          }
+        }
+      ],
+      "semanticPass": null
+    },
+    {
+      "id": "explicit-wrists-archived-idle-seed0",
+      "history": "archived-idle",
+      "seed": 0,
+      "description": "Keeping both arms straight forward at shoulder height with elbows still, gently wave both hands side to side at the wrists twice.",
+      "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\explicit-wrists-archived-idle-seed0.json",
+      "clipSha256": "1579f42e489e0fcfc929f975df49728b83afe9b9b52787e190101c25011eea4f",
+      "frameMeasurements": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\explicit-wrists-archived-idle-seed0.measurements.json",
+      "initialPoseNEVA": {
+        "frame": 15,
+        "seconds": 0.75,
+        "leftRightWristRelativeShoulderXYZMeters": [
+          [
+            0.06431944878485865,
+            -0.37216727526858767,
+            0.18828267409115151
+          ],
+          [
+            -0.059646901127242545,
+            -0.3836885207821323,
+            0.17221342553602806
+          ]
+        ],
+        "leftRightElbowInteriorAngleDegrees": [
+          157.08457137863792,
+          161.13596308865098
+        ]
+      },
+      "lastTwoSecondsNEVA": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.0497862639929767,
+              -0.40927996496640057,
+              0.10652901719043815
+            ],
+            [
+              0.04577854487760155,
+              -0.41702696382909366,
+              0.07251040181799394
+            ]
+          ],
+          "maximum": [
+            [
+              -0.01660566792830957,
+              -0.40079680561285086,
+              0.11881293695969962
+            ],
+            [
+              0.05359598734104899,
+              -0.4111745518431325,
+              0.09687896529198274
+            ]
+          ],
+          "median": [
+            [
+              -0.018162467183056835,
+              -0.4080562199865982,
+              0.11165095154534566
+            ],
+            [
+              0.05001849330641114,
+              -0.4130424950633462,
+              0.08815813369766207
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.033180596064667126,
+              0.008483159353549707,
+              0.012283919769261464
+            ],
+            [
+              0.007817442463447441,
+              0.005852411985961148,
+              0.024368563473988802
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.4099879681123493,
+            -0.41976884177738016
+          ],
+          "maximum": [
+            -0.39792950276020067,
+            -0.413471190934369
+          ],
+          "median": [
+            -0.4084007558379114,
+            -0.4154635875397901
+          ],
+          "peakToPeak": [
+            0.012058465352148606,
+            0.006297650843011149
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            155.75160709748687,
+            161.53977731770073
+          ],
+          "maximum": [
+            159.9092267296633,
+            165.47648491249717
+          ],
+          "median": [
+            159.35005486279442,
+            162.03112386420378
+          ],
+          "peakToPeak": [
+            4.15761963217642,
+            3.936707594796445
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.05775287392963839,
+          0.07075729994676752
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.03403999745762296,
+          0.011288044564748896
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          23.853069784757373,
+          34.87187616872111
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          20.6177304061935,
+          17.466916837307508
+        ]
+      },
+      "lastTwoSecondsCore27": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.06695495624553605,
+              -0.5035284399864118,
+              0.12331659410392674
+            ],
+            [
+              0.06151976035408023,
+              -0.5120245861542593,
+              0.08257712543609533
+            ]
+          ],
+          "maximum": [
+            [
+              -0.02746645022038317,
+              -0.49388159497119355,
+              0.13581705794803708
+            ],
+            [
+              0.07035414547823508,
+              -0.5052080083293987,
+              0.11289339637067858
+            ]
+          ],
+          "median": [
+            [
+              -0.029326779551210793,
+              -0.5021155784104919,
+              0.13002566056822074
+            ],
+            [
+              0.0670316191448823,
+              -0.5073715378822092,
+              0.10147185650020077
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.03948850602515287,
+              0.009646845015218286,
+              0.01250046384411034
+            ],
+            [
+              0.008834385124154853,
+              0.006816577824860559,
+              0.03031627093458325
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.5040081985031246,
+            -0.5154996910237487
+          ],
+          "maximum": [
+            -0.4901837252343386,
+            -0.5081639276051941
+          ],
+          "median": [
+            -0.502186983802691,
+            -0.5104920616193034
+          ],
+          "peakToPeak": [
+            0.013824473268785997,
+            0.007335763418554575
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            155.85289153175682,
+            161.64108362826974
+          ],
+          "maximum": [
+            160.01054510413368,
+            165.5771529443576
+          ],
+          "median": [
+            159.45133834204657,
+            162.13242604277363
+          ],
+          "peakToPeak": [
+            4.157653572376859,
+            3.936069316087867
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.06837354136732314,
+          0.08721366631952089
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.040852341538844705,
+          0.014952583392339692
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          23.853069784757267,
+          34.871876168721016
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          20.61773040619348,
+          17.466916837307473
+        ]
+      },
+      "angularCoupling": [
+        {
+          "startSeconds": 0.0,
+          "endSecondsInclusive": 1.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              100.96630777473007,
+              115.91693659308845
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              64.42861693672545,
+              85.64629366048199
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              169.56625307964163,
+              236.5580205824057
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              86.9786719881898,
+              85.78712153665921
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              74.71211801928429,
+              70.39016630015438
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              171.00628326438726,
+              185.89150358198023
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              98.73991501626797,
+              126.31487064496243
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              28.319283533238572,
+              77.46764055663274
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              134.50585447527627,
+              214.88970194193337
+            ]
+          }
+        },
+        {
+          "startSeconds": 2.0,
+          "endSecondsInclusive": 3.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              91.77373433482602,
+              94.98331077176144
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              62.23082668089439,
+              74.46292191912171
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              102.22076426755513,
+              106.55594445672592
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              98.33362272473946,
+              83.07866758102698
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              63.01694939844276,
+              65.09783417865289
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              196.73392472631548,
+              155.88996559231188
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              72.59862680963262,
+              63.614951858876054
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              46.845715065110866,
+              28.37571730095636
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              95.59576338512221,
+              83.82917039140663
+            ]
+          }
+        },
+        {
+          "startSeconds": 4.0,
+          "endSecondsInclusive": 5.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              18.863585727011277,
+              17.87381297729432
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              14.359870368471727,
+              8.10035731162723
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              45.67232147551365,
+              59.592325323139775
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              11.574831169540765,
+              10.615250606699888
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              4.194321158205717,
+              3.537970889565341
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              45.6909673094778,
+              21.648907257224774
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              23.853069784757267,
+              34.871876168721016
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              14.58449065029445,
+              19.285320755033723
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              75.22565572184813,
+              106.31908168567318
+            ]
+          }
+        }
+      ],
+      "semanticPass": null
+    },
+    {
+      "id": "explicit-wrists-archived-idle-seed1",
+      "history": "archived-idle",
+      "seed": 1,
+      "description": "Keeping both arms straight forward at shoulder height with elbows still, gently wave both hands side to side at the wrists twice.",
+      "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\explicit-wrists-archived-idle-seed1.json",
+      "clipSha256": "e52747d913d8fdd697ed9550a8608beb58de7ef69af6f986757783270c47db92",
+      "frameMeasurements": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\explicit-wrists-archived-idle-seed1.measurements.json",
+      "initialPoseNEVA": {
+        "frame": 15,
+        "seconds": 0.75,
+        "leftRightWristRelativeShoulderXYZMeters": [
+          [
+            0.06431944878485865,
+            -0.37216727526858767,
+            0.18828267409115151
+          ],
+          [
+            -0.059646901127242545,
+            -0.3836885207821323,
+            0.17221342553602806
+          ]
+        ],
+        "leftRightElbowInteriorAngleDegrees": [
+          157.08457137863792,
+          161.13596308865098
+        ]
+      },
+      "lastTwoSecondsNEVA": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.04901916332265549,
+              -0.416438758874782,
+              0.08400098699214177
+            ],
+            [
+              0.016718369730121804,
+              -0.4151142332980301,
+              0.07928427199467644
+            ]
+          ],
+          "maximum": [
+            [
+              -0.030253261627013476,
+              -0.4134168915996989,
+              0.08971360606920771
+            ],
+            [
+              0.0345618777634394,
+              -0.4111795907389915,
+              0.09755897627268514
+            ]
+          ],
+          "median": [
+            [
+              -0.040296788336452435,
+              -0.4141509321337492,
+              0.08706055035725312
+            ],
+            [
+              0.03139294839461672,
+              -0.4122255440313768,
+              0.09412587383253783
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.018765901695642014,
+              0.003021867275083079,
+              0.005712619077065939
+            ],
+            [
+              0.017843508033317596,
+              0.003934642559038581,
+              0.018274704278008702
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.4203507456022533,
+            -0.4185072607320186
+          ],
+          "maximum": [
+            -0.4165872834325437,
+            -0.41540497711503077
+          ],
+          "median": [
+            -0.4172117210378495,
+            -0.4164366160057854
+          ],
+          "peakToPeak": [
+            0.003763462169709575,
+            0.003102283616987833
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            161.13851178775923,
+            158.4243624505758
+          ],
+          "maximum": [
+            164.84660782209139,
+            160.4891718992868
+          ],
+          "median": [
+            161.64208256107966,
+            159.80132908211084
+          ],
+          "peakToPeak": [
+            3.708096034332158,
+            2.0648094487109745
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.050989653710130554,
+          0.06234541139406798
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.0068720008336880445,
+          0.017712959792663234
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          18.239135453331215,
+          15.763173823896778
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          17.793752951353227,
+          13.713932212213473
+        ]
+      },
+      "lastTwoSecondsCore27": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.06541265485323522,
+              -0.5115084935141849,
+              0.09562552699941164
+            ],
+            [
+              0.02783945969100631,
+              -0.5103059253591073,
+              0.08947151844479168
+            ]
+          ],
+          "maximum": [
+            [
+              -0.042524559752337536,
+              -0.5080159483402805,
+              0.1034943849381779
+            ],
+            [
+              0.04824300781688509,
+              -0.5057084130050531,
+              0.11250831453729494
+            ]
+          ],
+          "median": [
+            [
+              -0.05470921874979305,
+              -0.5090816678849226,
+              0.10000329175455842
+            ],
+            [
+              0.0445089349887423,
+              -0.5069725084753485,
+              0.10776633592977378
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.022888095100897683,
+              0.0034925451739044044,
+              0.007868857938766266
+            ],
+            [
+              0.02040354812587878,
+              0.004597512354054256,
+              0.023036796092503267
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.5159751395966482,
+            -0.5141223204155975
+          ],
+          "maximum": [
+            -0.511663955240188,
+            -0.5107104382052798
+          ],
+          "median": [
+            -0.5123580310100518,
+            -0.5117994210343252
+          ],
+          "peakToPeak": [
+            0.004311184356460163,
+            0.0034118822103176294
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            161.23979070517416,
+            158.52566665421344
+          ],
+          "maximum": [
+            164.94778768743166,
+            160.59047937719436
+          ],
+          "median": [
+            161.74337956237616,
+            159.90264282580785
+          ],
+          "peakToPeak": [
+            3.707996982257498,
+            2.0648127229809177
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          0.06415860313837946,
+          0.07752459740213609
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.012341175995179135,
+          0.020594888843814753
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          18.239135453331038,
+          15.763173823896661
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          17.793752951353202,
+          13.713932212213452
+        ]
+      },
+      "angularCoupling": [
+        {
+          "startSeconds": 0.0,
+          "endSecondsInclusive": 1.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              170.29242328717928,
+              136.84971624556783
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              66.73340638211808,
+              80.2464750492635
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              242.7698712237162,
+              280.8825466426293
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              105.79750195364667,
+              73.09921804546379
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              59.144070026225975,
+              54.13895266375708
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              147.58189355537527,
+              123.44113255974635
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              239.02639587876203,
+              141.87729592933007
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              70.26572193828744,
+              75.18248077609991
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              285.4722233419996,
+              214.9808205221408
+            ]
+          }
+        },
+        {
+          "startSeconds": 2.0,
+          "endSecondsInclusive": 3.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              137.0676632221485,
+              114.48580087019836
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              75.71974460078201,
+              85.02022197506224
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              166.06692090306612,
+              104.24847611231664
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              118.70828884557659,
+              101.27816071516911
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              51.006334270571735,
+              46.95691742182398
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              137.50033258618336,
+              146.53486580350585
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              158.09614073051594,
+              81.6141528806349
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              39.8857800161947,
+              37.006714095802025
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              259.8890293029941,
+              145.22188011587315
+            ]
+          }
+        },
+        {
+          "startSeconds": 4.0,
+          "endSecondsInclusive": 5.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              17.18509386998586,
+              13.147028429825781
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              10.79850094853915,
+              7.88530709294623
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              59.78332283977296,
+              35.162181972523356
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              8.276300140430603,
+              7.0922088704186725
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              3.7322801877401153,
+              1.3779000097457654
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              16.321583235420988,
+              13.456769499554834
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              18.239135453331038,
+              15.763173823896661
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              6.770327940380091,
+              5.125726404965131
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              62.784663696259244,
+              32.18300741114537
+            ]
+          }
+        }
+      ],
+      "semanticPass": null
+    },
+    {
+      "id": "explicit-wrists-generated-last16-seed0",
+      "history": "generated-last16",
+      "seed": 0,
+      "description": "Keeping both arms straight forward at shoulder height with elbows still, gently wave both hands side to side at the wrists twice.",
+      "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\explicit-wrists-generated-last16-seed0.json",
+      "clipSha256": "796cf722758f69139fa8e3c99f5837afba462b92ad11d25f06184c639725781d",
+      "frameMeasurements": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\explicit-wrists-generated-last16-seed0.measurements.json",
+      "initialPoseNEVA": {
+        "frame": 15,
+        "seconds": 0.75,
+        "leftRightWristRelativeShoulderXYZMeters": [
+          [
+            0.011643901782127241,
+            -0.07240646083231092,
+            0.4118153426701308
+          ],
+          [
+            -0.024059353028596422,
+            -0.09111618523086977,
+            0.4078989509197572
+          ]
+        ],
+        "leftRightElbowInteriorAngleDegrees": [
+          152.5427253593774,
+          152.93740440147775
+        ]
+      },
+      "lastTwoSecondsNEVA": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.2665746168244113,
+              -0.4102444509201761,
+              0.07985193491510739
+            ],
+            [
+              0.05877689252977722,
+              -0.41929302294485127,
+              0.046949487681867526
+            ]
+          ],
+          "maximum": [
+            [
+              -0.04673449466428919,
+              0.23771305958949193,
+              0.28085227094065496
+            ],
+            [
+              0.33244667774151637,
+              0.22146234360844022,
+              0.24073837032397669
+            ]
+          ],
+          "median": [
+            [
+              -0.12494210410801848,
+              0.14100967977493123,
+              0.22419154136566027
+            ],
+            [
+              0.18525734612031602,
+              0.1367676016036294,
+              0.21697699703647566
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.2198401221601221,
+              0.647957510509668,
+              0.20100033602554757
+            ],
+            [
+              0.2736697852117391,
+              0.6407553665532915,
+              0.19378888264210917
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.4085010384528721,
+            -0.41988078820605423
+          ],
+          "maximum": [
+            0.2687588852404259,
+            0.23993040772118768
+          ],
+          "median": [
+            0.16608558701281706,
+            0.1541051683170387
+          ],
+          "peakToPeak": [
+            0.677259923693298,
+            0.6598111959272419
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            74.37039916449108,
+            77.93541660164266
+          ],
+          "maximum": [
+            155.1971179574933,
+            163.5051838533671
+          ],
+          "median": [
+            117.20661300424979,
+            123.4582046617506
+          ],
+          "peakToPeak": [
+            80.82671879300223,
+            85.56976725172444
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          1.26654771545062,
+          1.1433391266126232
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.5515602588557358,
+          0.5595826312834399
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          369.8122461236971,
+          284.2162386445811
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          316.29616710005973,
+          261.41601116903774
+        ]
+      },
+      "lastTwoSecondsCore27": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.33914037218346493,
+              -0.5045769057732169,
+              0.0876608605500313
+            ],
+            [
+              0.07699504158340306,
+              -0.5144177310575601,
+              0.05080808433043162
+            ]
+          ],
+          "maximum": [
+            [
+              -0.06337136504419223,
+              0.2707461455283769,
+              0.3436227385899435
+            ],
+            [
+              0.41400660237284287,
+              0.2549239842056652,
+              0.29060960875463093
+            ]
+          ],
+          "median": [
+            [
+              -0.18037085873619663,
+              0.15383077176604998,
+              0.2748282266495197
+            ],
+            [
+              0.25346837722796745,
+              0.1540094641144023,
+              0.25616945157210635
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.2757690071392727,
+              0.7753230513015938,
+              0.2559618780399122
+            ],
+            [
+              0.33701156078943983,
+              0.7693417152632253,
+              0.2398015244241993
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.5024224666111783,
+            -0.5152896705333172
+          ],
+          "maximum": [
+            0.31104859407490626,
+            0.2763897224851032
+          ],
+          "median": [
+            0.18714849537153277,
+            0.17372424335995312
+          ],
+          "peakToPeak": [
+            0.8134710606860845,
+            0.7916793930184204
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            74.47164463638623,
+            78.03671378549801
+          ],
+          "maximum": [
+            155.29843545989712,
+            163.60649397401608
+          ],
+          "median": [
+            117.30785095607112,
+            123.55932146813178
+          ],
+          "peakToPeak": [
+            80.82679082351089,
+            85.56978018851807
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          1.497580037746311,
+          1.3685863232000157
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.6786948682597364,
+          0.6869271696432123
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          369.8122461236952,
+          284.21623864457933
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          316.29616710005894,
+          261.41601116903684
+        ]
+      },
+      "angularCoupling": [
+        {
+          "startSeconds": 0.0,
+          "endSecondsInclusive": 1.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              120.23804614013049,
+              121.87576210609926
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              80.81012280099003,
+              84.76649862091297
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              184.33411321005266,
+              154.03045898663484
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              188.5015818371861,
+              172.7153704223903
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              86.29820225389605,
+              76.90158574748102
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              238.43465307387368,
+              253.5733658782267
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              91.10187856519434,
+              120.68123051395622
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              42.677444923622886,
+              46.58610560613144
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              207.17022285748214,
+              205.77797839864053
+            ]
+          }
+        },
+        {
+          "startSeconds": 2.0,
+          "endSecondsInclusive": 3.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              12.970806227523434,
+              11.624799290581175
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              4.732029316947883,
+              4.910483547946972
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              48.71100092931631,
+              26.069729457968982
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              17.045083824342043,
+              9.445955130124554
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              11.709857485008499,
+              2.9727432440524755
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              41.59645438995846,
+              18.52976989916357
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              14.268156195180314,
+              10.773608020001568
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              5.706458181250586,
+              3.038175899332865
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              58.01322806516136,
+              22.01128023675293
+            ]
+          }
+        },
+        {
+          "startSeconds": 4.0,
+          "endSecondsInclusive": 5.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              271.66417767528407,
+              228.52814519226177
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              109.47777805320221,
+              109.37416436111215
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              364.91454132551905,
+              370.3692348829043
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              214.49492494125417,
+              181.34331417091698
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              80.90552577210721,
+              85.58347994594371
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              262.52801131285736,
+              213.26109227228926
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              369.8122461236952,
+              284.21623864457933
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              55.916096553587984,
+              50.82209292336966
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              496.79649685526897,
+              327.88490018324006
+            ]
+          }
+        }
+      ],
+      "semanticPass": null
+    },
+    {
+      "id": "explicit-wrists-generated-last16-seed1",
+      "history": "generated-last16",
+      "seed": 1,
+      "description": "Keeping both arms straight forward at shoulder height with elbows still, gently wave both hands side to side at the wrists twice.",
+      "clip": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\explicit-wrists-generated-last16-seed1.json",
+      "clipSha256": "63b528598e6127c7be51a67930af3b0039f2100be3cc0a4e0af61926bfd86a44",
+      "frameMeasurements": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\composition-diagnosis-v1\\http-probes\\explicit-wrists-generated-last16-seed1.measurements.json",
+      "initialPoseNEVA": {
+        "frame": 15,
+        "seconds": 0.75,
+        "leftRightWristRelativeShoulderXYZMeters": [
+          [
+            0.011643901782127241,
+            -0.07240646083231092,
+            0.4118153426701308
+          ],
+          [
+            -0.024059353028596422,
+            -0.09111618523086977,
+            0.4078989509197572
+          ]
+        ],
+        "leftRightElbowInteriorAngleDegrees": [
+          152.5427253593774,
+          152.93740440147775
+        ]
+      },
+      "lastTwoSecondsNEVA": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.32676770234634317,
+              -0.41543365224659917,
+              0.07387707198389273
+            ],
+            [
+              0.03009846418853207,
+              -0.4167108629501897,
+              0.07302873028134782
+            ]
+          ],
+          "maximum": [
+            [
+              -0.03755288140519988,
+              0.17471743398271797,
+              0.15816724322247228
+            ],
+            [
+              0.3238933042290534,
+              0.16662857092393354,
+              0.19893741165597653
+            ]
+          ],
+          "median": [
+            [
+              -0.1137082749617771,
+              -0.2692231576017009,
+              0.09696982077288874
+            ],
+            [
+              0.09405031793575258,
+              -0.28309726330405993,
+              0.11223319057043121
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.2892148209411433,
+              0.5901510862293171,
+              0.08429017123857954
+            ],
+            [
+              0.2937948400405213,
+              0.5833394338741232,
+              0.1259086813746287
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.4178937895066084,
+            -0.4195872146895169
+          ],
+          "maximum": [
+            0.18782960813595406,
+            0.16614737967850401
+          ],
+          "median": [
+            -0.2624312265898241,
+            -0.2940150891018097
+          ],
+          "peakToPeak": [
+            0.6057233976425624,
+            0.5857345943680209
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            64.61553981968679,
+            73.78152611068839
+          ],
+          "maximum": [
+            165.036709466893,
+            162.28606637117034
+          ],
+          "median": [
+            137.1901230227428,
+            141.23548811440764
+          ],
+          "peakToPeak": [
+            100.42116964720621,
+            88.50454026048195
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          1.1252990876729296,
+          1.0976298976637955
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.6249747402999468,
+          0.6237409208059939
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          322.64644861421897,
+          236.75433049654958
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          276.4425052159837,
+          269.6634545141851
+        ]
+      },
+      "lastTwoSecondsCore27": {
+        "startFrame": 80,
+        "endFrameInclusive": 119,
+        "leftRightWristRelativeShoulderXYZMeters": {
+          "minimum": [
+            [
+              -0.40383465160675064,
+              -0.5103657595953552,
+              0.07991334423696514
+            ],
+            [
+              0.04429961369821298,
+              -0.5115372592018114,
+              0.08147170613034166
+            ]
+          ],
+          "maximum": [
+            [
+              -0.05101509258152211,
+              0.19405564718482118,
+              0.1884902014253164
+            ],
+            [
+              0.403455296234334,
+              0.17930122085687644,
+              0.24175079378259462
+            ]
+          ],
+          "median": [
+            [
+              -0.17301294014117458,
+              -0.3380651502671419,
+              0.10747456825914736
+            ],
+            [
+              0.15383133456279602,
+              -0.35336150533907273,
+              0.12052836329184405
+            ]
+          ],
+          "peakToPeak": [
+            [
+              0.35281955902522855,
+              0.7044214067801764,
+              0.10857685718835125
+            ],
+            [
+              0.359155682536121,
+              0.6908384800586878,
+              0.16027908765225296
+            ]
+          ]
+        },
+        "leftRightWorldHeightFromShoulderMeters": {
+          "minimum": [
+            -0.5131159681534544,
+            -0.514907098290491
+          ],
+          "maximum": [
+            0.2121883957774977,
+            0.17739994105300183
+          ],
+          "median": [
+            -0.3293039652189704,
+            -0.36637680221755176
+          ],
+          "peakToPeak": [
+            0.7253043639309521,
+            0.6923070393434928
+          ]
+        },
+        "leftRightElbowInteriorAngleDegrees": {
+          "minimum": [
+            64.71685527947372,
+            73.88279443678495
+          ],
+          "maximum": [
+            165.13802598846067,
+            162.38737483087468
+          ],
+          "median": [
+            137.29140854129398,
+            141.3367003113297
+          ],
+          "peakToPeak": [
+            100.42117070898695,
+            88.50458039408973
+          ]
+        },
+        "leftRightWristPathInChestMeters": [
+          1.3375527927182378,
+          1.294681483352287
+        ],
+        "leftRightWristNetDisplacementInChestMeters": [
+          0.7732270021742248,
+          0.770402316976555
+        ],
+        "leftRightHandRelativeForearmRotationTravelDegrees": [
+          322.646448614217,
+          236.75433049654805
+        ],
+        "leftRightForearmRelativeChestRotationTravelDegrees": [
+          276.44250521598343,
+          269.66345451418476
+        ]
+      },
+      "angularCoupling": [
+        {
+          "startSeconds": 0.0,
+          "endSecondsInclusive": 1.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              76.6975897360181,
+              79.26291034270363
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              61.678191230404394,
+              62.40425424508428
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              104.89861540446995,
+              106.04654949741844
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              60.280150675797245,
+              32.48409530943436
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              19.08140011819041,
+              11.37710182800915
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              92.1430655051058,
+              62.994272868608974
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              67.08176376059838,
+              51.31077890786095
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              27.439879867268747,
+              32.51365778546749
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              145.50135203568624,
+              106.56444276951359
+            ]
+          }
+        },
+        {
+          "startSeconds": 2.0,
+          "endSecondsInclusive": 3.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              14.267343537222528,
+              17.62198043655421
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              6.637480995776707,
+              8.892527637820594
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              35.968914520929644,
+              62.10771071655686
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              9.360070655180454,
+              7.499593832843016
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              6.4473631957428,
+              4.049317933608123
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              25.91841357535889,
+              19.957222309788566
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              13.190696929572479,
+              18.241184600147285
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              3.3066915098532808,
+              8.009938112576506
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              20.145952146914198,
+              55.115306964059
+            ]
+          }
+        },
+        {
+          "startSeconds": 4.0,
+          "endSecondsInclusive": 5.95,
+          "upperArmRelativeChest": {
+            "leftRightRotationTravelDegrees": [
+              196.70425084036987,
+              221.89705422838156
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              111.67586722812342,
+              115.22746858457688
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              301.84162199052463,
+              311.2126912395944
+            ]
+          },
+          "forearmRelativeUpperArm": {
+            "leftRightRotationTravelDegrees": [
+              145.66013114487737,
+              119.24816079480098
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              100.4027922051558,
+              88.56721597177817
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              208.63537010857695,
+              243.76037721084924
+            ]
+          },
+          "handRelativeForearm": {
+            "leftRightRotationTravelDegrees": [
+              322.646448614217,
+              236.75433049654805
+            ],
+            "leftRightMaxDeviationFromWindowFirstDegrees": [
+              77.44007428510206,
+              64.93278455914255
+            ],
+            "leftRightMaxSampledSpeedDegreesPerSecond": [
+              551.2121597753652,
+              424.48510916337807
+            ]
+          }
+        }
+      ],
+      "semanticPass": null
+    }
+  ]
+}

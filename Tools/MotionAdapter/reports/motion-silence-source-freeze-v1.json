@@ -1,0 +1,74 @@
+{
+  "status": "source-frozen-awaiting-unity",
+  "sources": [
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.cs",
+      "sha256": "679b02462b907ea5fac1e667d32afe86263c768b79d25a9dff0af09a02998691"
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs",
+      "sha256": "8ce53aee80deff9e8216934ca1d464a9f4b7c67c5d3ace77d9512245437dc427"
+    },
+    {
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.MotionFeedback.cs",
+      "sha256": "a6a8666012d7f7bc75dd9cf3e271889c52234af152f8679d5bfa99007b261cb6"
+    },
+    {
+      "path": "Assets/Editor/ArdyMotionFeedbackChatRegression.cs",
+      "sha256": "352006f2a7ac769ba3f0b8df355069d4b52267ddf13c69e4a806297b47c7590c"
+    }
+  ],
+  "changes": [
+    "Only the one permitted motion repair treats zero public speech and no valid motion as no-solution.",
+    "Rejected original stream does not enter spoken history or the normal answered-success path.",
+    "Unrepaired compose/replay rejection produces a separate system error, without generated replacement.",
+    "Same-model feedback transport separates ordinary context from short completed-action failure facts."
+  ],
+  "cpu": {
+    "passed": true,
+    "tests": 21
+  },
+  "scopeLimit": "No provider implementation, services, Unity process, model request, private prompt, or character scene was modified/run by this agent.",
+  "entryPoint": "ArdyMotionFeedbackChatRegression.RunInteractive",
+  "notice": {
+    "explicitHiddenPreferenceRespected": true,
+    "defaultMode": "ErrorsOnly",
+    "writesCharacterHistory": false,
+    "actualUnityTestRunByParent": true,
+    "api": "HandleSystemNotice -> SubtitleOverlay.PublishSystemNotice",
+    "actualActiveCanvasTestAdded": true,
+    "severity": "Error",
+    "speaks": false
+  },
+  "checkedAtUtc": "2026-09-10T13:06:17.7960502Z",
+  "confirmedIncident": {
+    "invalidMotionExamples": [
+      "compose generic palm attribute is not in schema",
+      "unsupported motion name bow"
+    ],
+    "sanitizedPublicSpeechLengths": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "repairCallbackLines": [
+      8559,
+      9808,
+      11811,
+      12632
+    ],
+    "snapshot": "Logs/motion-silence-20260910/Editor.snapshot.log",
+    "privateContentsIncluded": false
+  },
+  "firstUnityFailure": {
+    "log": "Logs/motion-silence-20260910/feedback-chat-silence-fix-v1-unity.log",
+    "cause": "Inactive AddComponent fixture left serialized m_ChatHistory null; initialize the actual list in test setup, without weakening history assertions.",
+    "report": "Logs/motion-silence-20260910/feedback-chat-silence-fix-v1-failure.json"
+  },
+  "intermediateUnity": {
+    "checks": 252,
+    "scope": "Before final exact-silent action-only branch; final Chat/Dialogue rerun pending.",
+    "passed": true
+  }
+}

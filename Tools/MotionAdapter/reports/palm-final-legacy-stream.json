@@ -1,0 +1,62 @@
+{
+    "passed": true,
+    "checks": 162723,
+    "unityVersion": "2022.3.22f1",
+    "checkedAtUtc": "2026-09-10T09:25:21.8162301Z",
+    "environment": "Real Unity Editor preview scenes; imported NEVA and NeEEvA VRM rigs; replay of actual live-qwen ARDY HTTP chunks",
+    "limitation": "Fixed idle baseline and response replay; no live network scheduling or subjective naturalness measurement",
+    "fixtureHashes": [
+        {
+            "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\live-service-validation\\live\\chunk-0.json",
+            "sha256": "3162e22d4c598ec50f6f7eb0d0e0fb85b9334441e6323e21b04c2296cd81ea13"
+        },
+        {
+            "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\live-service-validation\\live\\chunk-1.json",
+            "sha256": "013e304fe6b693c9bef3526cdf5240fd765d69a645634d8abb9ce6a180b7b1f4"
+        },
+        {
+            "path": "E:\\VRproject\\VR20250611\\NeEEvA\\Server\\ARDY\\runtime\\live-service-validation\\live\\chunk-2.json",
+            "sha256": "f340a82e71f1f4f105923be5b31183fc51fee3a192388ddda67ce6b21daecb20"
+        }
+    ],
+    "sourceHashes": [
+        {
+            "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionPlayer.cs",
+            "sha256": "94c219abb28ea1fddc28466cad3804d0d3db540cbc204a6e3f352a5a8f446172"
+        },
+        {
+            "path": "Assets/AIChatTookit/Scripts/Motion/ArdyMotionClip.cs",
+            "sha256": "f2b32c0bb4e1456e55a04e3ecb8a2b594a490ba8bbef22f3dfdca829cd8a4375"
+        },
+        {
+            "path": "Assets/AIChatTookit/Scripts/Motion/ArdyLiveProtocol.cs",
+            "sha256": "b3bb9ead21d30d3afcb277a46d2ebdf69d6c0edd8696c836c5b708672fee244d"
+        },
+        {
+            "path": "Assets/Editor/ArdyStreamRegression.cs",
+            "sha256": "058a2b34d364d7a5f72c56a206fdbe20ea4186cbfc8b2e500b6a7e0ed26bc282"
+        }
+    ],
+    "avatars": [
+        {
+            "asset": "Assets/Model/NEVA.vrm",
+            "mappedBones": 13,
+            "totalStreamFrames": 120,
+            "historyReconstructionMaxDegrees": 0.0,
+            "historyYawInvarianceMaxDegrees": 0.0,
+            "appendPoseChangeDegrees": 0.0,
+            "idleRecoveryMaxDegrees": 0.0,
+            "underrunRecoveryMaxDegrees": 0.0
+        },
+        {
+            "asset": "Assets/Model/NeEEvA.vrm",
+            "mappedBones": 13,
+            "totalStreamFrames": 120,
+            "historyReconstructionMaxDegrees": 0.0,
+            "historyYawInvarianceMaxDegrees": 0.0,
+            "appendPoseChangeDegrees": 0.0,
+            "idleRecoveryMaxDegrees": 0.0,
+            "underrunRecoveryMaxDegrees": 0.0
+        }
+    ]
+}

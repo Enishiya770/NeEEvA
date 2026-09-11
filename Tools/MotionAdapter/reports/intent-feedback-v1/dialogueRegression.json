@@ -1,0 +1,9 @@
+{
+    "passed": true,
+    "checks": 1306,
+    "unityVersion": "2022.3.22f1",
+    "checkedAtUtc": "2026-09-10T12:19:35.0521660Z",
+    "environment": "Real Unity Editor; actual inactive ChatSample and production parser sources, no stubs",
+    "scope": "Completed action channel, autonomous and compositional planning contract delivery, every stream boundary, malformed/private/quoted input, TTS queue, stale generation rejection, response-independent body lifetime, exact same-chain idempotency and pure-motion interruption",
+    "excludes": "No model or service request; autonomous trigger appropriateness needs real dialogue review, and generated motion semantics/naturalness need separate motion review"
+}

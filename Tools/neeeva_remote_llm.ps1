@@ -6,7 +6,10 @@ Existing Unity endpoints remain 127.0.0.1:8080 and 127.0.0.1:8090.
 param(
     [ValidateSet('start', 'stop', 'status', 'restart')]
     [string]$Action = 'status',
-    [switch]$KeepRemoteRunning
+    [ValidateSet('legacy', 'feature')]
+    [string]$Mode = 'legacy',
+    [switch]$KeepRemoteRunning,
+    [switch]$SkipEmbeddingStartup
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,12 +28,23 @@ function Invoke-Remote([string]$RemoteAction) {
     if ($LASTEXITCODE -ne 0) { throw "Remote action '$RemoteAction' failed" }
 }
 
+function Get-RemoteLlmInfo {
+    $result = & ssh -o BatchMode=yes neeeva-5090 `
+        "powershell -NoProfile -ExecutionPolicy Bypass -File $RemoteScript llm-info"
+    if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the actual remote Qwen endpoint.' }
+    return (($result -join "`n") | ConvertFrom-Json)
+}
+
 function Get-TunnelProcess {
     if (-not (Test-Path -LiteralPath $PidFile)) { return $null }
     $storedPid = (Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
     if ($storedPid -notmatch '^\d+$') { return $null }
     $process = Get-Process -Id ([int]$storedPid) -ErrorAction SilentlyContinue
-    if ($process -and $process.ProcessName -eq 'ssh') { return $process }
+    if ($process -and $process.ProcessName -eq 'ssh') {
+        $info = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
+        if ($info.CommandLine -match '8080:127\.0\.0\.1:(8080|8082)' -and
+            $info.CommandLine -match '8090:127\.0\.0\.1:8090' -and $info.CommandLine -match 'neeeva-5090') { return $process }
+    }
     return $null
 }
 
@@ -44,9 +58,13 @@ function Assert-LocalPortsFree {
     }
 }
 
-function Start-Tunnel {
+function Start-Tunnel([int]$RemoteLlmPort) {
     $existing = Get-TunnelProcess
     if ($existing) {
+        $info = Get-CimInstance Win32_Process -Filter "ProcessId=$($existing.Id)"
+        if ($info.CommandLine -notmatch ('8080:127\.0\.0\.1:' + $RemoteLlmPort + '(?:\s|$)')) {
+            throw "The existing tunnel targets a different Qwen port. Stop this tunnel with -KeepRemoteRunning before starting the selected mode."
+        }
         Write-Output "[tunnel] already running, PID $($existing.Id)"
         return
     }
@@ -56,7 +74,7 @@ function Start-Tunnel {
         '-o', 'ExitOnForwardFailure=yes',
         '-o', 'ServerAliveInterval=15',
         '-o', 'ServerAliveCountMax=3',
-        '-L', '8080:127.0.0.1:8080',
+        '-L', "127.0.0.1:8080:127.0.0.1:$RemoteLlmPort",
         '-L', '8090:127.0.0.1:8090',
         'neeeva-5090'
     )
@@ -114,11 +132,25 @@ function Start-RemoteStack {
     # Each WMI-launched CUDA process must outlive the short SSH control
     # session. Wait locally, then start the second service only after the LLM
     # has completed its cold load; this also avoids simultaneous VRAM fitting.
-    Invoke-Remote start-llm
-    Start-Tunnel
+    if ($Mode -eq 'feature') { Invoke-Remote start-llm-feature } else { Invoke-Remote start-llm }
+    $info = Get-RemoteLlmInfo
+    # Existing feature validation instances may run on 8082. Reuse the same
+    # model and map the unchanged local chat URL to its actual port.
+    Start-Tunnel $info.port
     Wait-EndpointOrThrow 'llm' 8080 300
-    Invoke-Remote start-embed
-    Wait-EndpointOrThrow 'embed' 8090 120
+    if ($Mode -eq 'feature' -or $info.mode -eq 'feature') {
+        $body = @{text='A person stands still.';request_id='startup-feature-check';feature_contract='f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0'} | ConvertTo-Json
+        $feature = Invoke-RestMethod 'http://127.0.0.1:8080/neeeva/motion-features' -Method Post -ContentType application/json -Body $body -TimeoutSec 20
+        if (-not $feature.shared_model -or $feature.dimension -ne 2048 -or $feature.embedding.Count -ne 2048 -or
+            $feature.feature_contract -ne 'f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0' -or
+            $feature.model_sha256 -ne '071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4' -or
+            $feature.context_tokens -ne 512 -or $feature.chat_slots -ne 3 -or $feature.chat_context_tokens_per_slot -ne 65536) { throw 'Shared Qwen feature readiness check failed.' }
+        Write-Output '[motion-feature] ready on the same local 8080 Qwen service'
+    }
+    if (-not $SkipEmbeddingStartup) {
+        Invoke-Remote start-embed
+        Wait-EndpointOrThrow 'embed' 8090 120
+    }
 }
 
 switch ($Action) {

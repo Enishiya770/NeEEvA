@@ -1,0 +1,45 @@
+{
+  "cpu": {
+    "tests": 17,
+    "passed": true,
+    "command": "python -m unittest -q test_intent_consistency.py"
+  },
+  "status": "source-frozen-awaiting-real-unity-regression",
+  "limitations": [
+    "Known capability phrase checks are not a universal semantic classifier.",
+    "Previously played streamed speech cannot be retracted; remaining failed-round speech is discarded.",
+    "Same-Qwen corrections use collected output before dispatch; physical success is measured separately.",
+    "Legacy Generated and experimental Semantic contract literals remain unchanged; feedback extension v2 has known public development failures."
+  ],
+  "unity": {
+    "requestedEntryPoint": "ArdyMotionFeedbackChatRegression.RunInteractive",
+    "executedHere": false
+  },
+  "checkedAtUtc": "2026-09-10T12:10:37.1737738Z",
+  "sources": [
+    {
+      "sha256": "1c3290c09a4fd126e47c4b978561d26f10d4ba7fa77dae03382b3b3ecfe45897",
+      "path": "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs"
+    },
+    {
+      "sha256": "296c589826f09cc76654175d6c8982314bdb59f2afe41cafba2be00cd8cb0af1",
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.MotionFeedback.cs"
+    },
+    {
+      "sha256": "40fd31bca1d570f7e70089084d538a399b33c91c110e433a341224857c4ea177",
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs"
+    },
+    {
+      "sha256": "97191351f9b82343a86e2d71575379bd62492b68edf8393567af175003c1a6e9",
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.ActionPlanning.cs"
+    },
+    {
+      "sha256": "7e9ed5b082c964a7aa19e14ee982cd6efe311a0dfb8286fe15ed9118117834fe",
+      "path": "Assets/AIChatTookit/Scripts/Chat/ChatSample.cs"
+    },
+    {
+      "sha256": "b7dbb0e578a1836f30cecf50b4feca55e335a80efeb20f8c48a1889337e22667",
+      "path": "Assets/Editor/ArdyMotionFeedbackChatRegression.cs"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "source_sha256": "3d564dc0e1b13a54ad6bfb6e6f3950542ebad711798cf4238861f7108ab1bd0a",
+  "exclude_keys": [
+    "raise/both/forward/chest/hold"
+  ],
+  "revision_keys": [
+    "head/nod/1/gentle",
+    "head/nod/1/quick",
+    "head/nod/1/slow",
+    "point/left/outward/briskly",
+    "point/left/outward/slowly",
+    "point/right/outward/briskly",
+    "point/right/outward/slowly",
+    "raise/both/diagonal/chest/repeat",
+    "raise/both/diagonal/face/repeat",
+    "raise/both/diagonal/overhead/repeat",
+    "raise/both/forward/chest/repeat",
+    "raise/both/forward/face/repeat",
+    "raise/both/forward/overhead/repeat",
+    "raise/left/diagonal/chest/repeat",
+    "raise/left/diagonal/face/repeat",
+    "raise/left/forward/chest/repeat",
+    "raise/left/forward/face/repeat",
+    "raise/right/diagonal/chest/repeat",
+    "raise/right/diagonal/face/repeat",
+    "raise/right/forward/chest/repeat",
+    "raise/right/forward/face/repeat"
+  ],
+  "frozen_suite_sha256": "bad7ec319c961c077b8ab92eb39eb8482e847c2ff67d6c39e5a8434b3e197889"
+}

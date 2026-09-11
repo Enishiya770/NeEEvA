@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "scope": "Four new public formulations of already-developed semantic classes. Freeze before model calls, evaluate once after the development pass. Not the frozen final-80 motion evaluation and not a general success-rate benchmark.",
+  "cases": [
+    {
+      "id": "new-zh-window-farewell",
+      "language": "zh",
+      "user": "把双臂向前伸来，像隔着窗跟老朋友道别那样摆一摆手，不要碰窗户。",
+      "expected": {"name": "compose", "left": "forward", "right": "forward", "leftPalm": "partner", "rightPalm": "partner", "joint": "wrists", "axis": "palm-normal"}
+    },
+    {
+      "id": "new-ja-right-static-side-display",
+      "language": "ja",
+      "user": "右腕を自分の右へ水平に広げて、その位置で動かさず、手のひらをこちらに向けて見せてください。左腕は休めておいて。",
+      "expected": {"name": "compose", "left": "none", "right": "outward", "rightPalm": "partner", "joint": "none"}
+    },
+    {
+      "id": "new-en-free-arm-loops-and-torso",
+      "language": "en",
+      "user": "Stay in place and improvise a flowing upper-body dance, drawing alternating loops with your arms while your torso gently rises and dips.",
+      "expected": {"name": "generate"}
+    },
+    {
+      "id": "new-zh-fixed-straight-limit-explanation",
+      "language": "zh",
+      "fact": {"phase": "idle-Animator", "previousRequestedPoseHeld": false, "lastControlPlan": {"left": "forward", "right": "forward", "leftBend": 0, "rightBend": 0, "leftBendAuto": false, "rightBendAuto": false, "leftPalm": "partner", "rightPalm": "partner", "joint": "none", "end": "hold"}, "lastControlError": "palm-unreachable: keeping the elbows at zero degrees with the arms forward and palms facing the partner exceeds the wrist swing limit"},
+      "user": "可以不挥动，双臂仍须向前而且肘部完全伸直；如果掌心朝我做不到，就直接告诉我，不要自行改姿势。",
+      "expected": {"name": [null, "none", "shake-head"]},
+      "requiresLimitationExplanation": true
+    }
+  ]
+}

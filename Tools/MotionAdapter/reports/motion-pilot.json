@@ -1,0 +1,244 @@
+{
+  "date": "2026-09-10",
+  "scope": "10 held-out descriptions, seed 0, cold-start 40-frame clips, no motion correction or Unity retargeting",
+  "architectures": {
+    "linear": {
+      "conditions": {
+        "dataset_sha256": "f137cc3b104a339350accf185b33bb739b55dc9c53b8af2f992a7cce977b7967",
+        "teacher_contract": "5179f91dcafe261730bd9adf2bc5f1d3fe77b7befe28b2c6ced6987d81ba8a30",
+        "qwen_contract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "adapter": "linear-seed1.pt",
+        "adapter_sha256": "8d2cc2bef8dca1db3de66fcd67cfb276fabf1e96dcd0d5842d216f10a29391c8"
+      },
+      "text_encoder_loaded": false,
+      "peak_torch_allocated_mib": 916.06787109375,
+      "student_generation_ms": {
+        "p50": 106.71330000332091,
+        "p95": 121.48061999760102,
+        "note": "Denoising and decoding only; student runs follow a teacher warm-up. Excludes feature extraction, transfer and Unity."
+      },
+      "paired_differences": {
+        "root_position_difference_m": {
+          "mean": 0.005049221706576646,
+          "max": 0.02218429371714592
+        },
+        "root_aligned_joint_difference_m": {
+          "mean": 0.01993552187923342,
+          "max": 0.05528849735856056
+        },
+        "local_rotation_difference_degrees": {
+          "mean": 2.3059585839509964,
+          "max": 5.796322345733643
+        },
+        "foot_contact_disagreement": {
+          "mean": 0.003125,
+          "max": 0.03125
+        }
+      },
+      "per_prompt": [
+        {
+          "id": "motion-00005",
+          "text": "A person who is standing waves the right hand with small movements slowly.",
+          "root_position_difference_m": 0.0030349898152053356,
+          "root_aligned_joint_difference_m": 0.004215756896883249,
+          "local_rotation_difference_degrees": 1.2680445909500122,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00014",
+          "text": "A person who is standing extends the left arm outward with a small movement and brings it back quickly.",
+          "root_position_difference_m": 0.0018442623550072312,
+          "root_aligned_joint_difference_m": 0.042467352002859116,
+          "local_rotation_difference_degrees": 2.941793918609619,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00021",
+          "text": "While standing in place, a person standing upright shrugs both shoulders with large movements slowly.",
+          "root_position_difference_m": 0.002636584686115384,
+          "root_aligned_joint_difference_m": 0.006187665741890669,
+          "local_rotation_difference_degrees": 1.1009421348571777,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00048",
+          "text": "While standing in place, a person standing on the floor shakes the head from side to side with large movements at a moderate pace.",
+          "root_position_difference_m": 0.002061608713120222,
+          "root_aligned_joint_difference_m": 0.008901617489755154,
+          "local_rotation_difference_degrees": 1.1529422998428345,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00053",
+          "text": "While standing in place, a person who is standing waves the left hand with moderate movements at a moderate pace.",
+          "root_position_difference_m": 0.006992263253778219,
+          "root_aligned_joint_difference_m": 0.05528849735856056,
+          "local_rotation_difference_degrees": 5.796322345733643,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00057",
+          "text": "While standing in place, a standing person nods the head with small movements at a moderate pace.",
+          "root_position_difference_m": 0.0011309097753837705,
+          "root_aligned_joint_difference_m": 0.0023068946320563555,
+          "local_rotation_difference_degrees": 0.48329535126686096,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00079",
+          "text": "While standing in place, an individual raises and lowers the left arm with moderate movements at a moderate pace.",
+          "root_position_difference_m": 0.006368059664964676,
+          "root_aligned_joint_difference_m": 0.0232809167355299,
+          "local_rotation_difference_degrees": 2.9424262046813965,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00080",
+          "text": "A person standing on the floor raises and lowers the left arm with moderate movements slowly.",
+          "root_position_difference_m": 0.002743346616625786,
+          "root_aligned_joint_difference_m": 0.024413667619228363,
+          "local_rotation_difference_degrees": 2.9998011589050293,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00081",
+          "text": "While standing in place, a standing person makes small pointing gestures to the left with the left hand quickly.",
+          "root_position_difference_m": 0.0014958984684199095,
+          "root_aligned_joint_difference_m": 0.0056075844913721085,
+          "local_rotation_difference_degrees": 0.8850394487380981,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00088",
+          "text": "While standing in place, an individual turns the body to the right with a large movement at a moderate pace.",
+          "root_position_difference_m": 0.02218429371714592,
+          "root_aligned_joint_difference_m": 0.026685265824198723,
+          "local_rotation_difference_degrees": 3.488978385925293,
+          "foot_contact_disagreement": 0.03125
+        }
+      ]
+    },
+    "mlp": {
+      "conditions": {
+        "dataset_sha256": "f137cc3b104a339350accf185b33bb739b55dc9c53b8af2f992a7cce977b7967",
+        "teacher_contract": "5179f91dcafe261730bd9adf2bc5f1d3fe77b7befe28b2c6ced6987d81ba8a30",
+        "qwen_contract": "f30f7b62ee39bfe3c930b44e1d0654b291442653c310d715ad6ae3784eee31a0",
+        "adapter": "mlp-seed1.pt",
+        "adapter_sha256": "ec8ffa909c0f173fa4d8af20d52cdf05f4873fdf41e17962776a2ee590d79bfa"
+      },
+      "text_encoder_loaded": false,
+      "peak_torch_allocated_mib": 932.09130859375,
+      "student_generation_ms": {
+        "p50": 110.39094999432564,
+        "p95": 115.7330199930584,
+        "note": "Denoising and decoding only; student runs follow a teacher warm-up. Excludes feature extraction, transfer and Unity."
+      },
+      "paired_differences": {
+        "root_position_difference_m": {
+          "mean": 0.004380533378571272,
+          "max": 0.01349366270005703
+        },
+        "root_aligned_joint_difference_m": {
+          "mean": 0.018694393918849528,
+          "max": 0.06817612797021866
+        },
+        "local_rotation_difference_degrees": {
+          "mean": 2.3021304994821548,
+          "max": 7.457134246826172
+        },
+        "foot_contact_disagreement": {
+          "mean": 0.001875,
+          "max": 0.01875
+        }
+      },
+      "per_prompt": [
+        {
+          "id": "motion-00005",
+          "text": "A person who is standing waves the right hand with small movements slowly.",
+          "root_position_difference_m": 0.0032626036554574966,
+          "root_aligned_joint_difference_m": 0.0040295482613146305,
+          "local_rotation_difference_degrees": 1.1212226152420044,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00014",
+          "text": "A person who is standing extends the left arm outward with a small movement and brings it back quickly.",
+          "root_position_difference_m": 0.002825224306434393,
+          "root_aligned_joint_difference_m": 0.02756919339299202,
+          "local_rotation_difference_degrees": 2.1051266193389893,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00021",
+          "text": "While standing in place, a person standing upright shrugs both shoulders with large movements slowly.",
+          "root_position_difference_m": 0.0018123835325241089,
+          "root_aligned_joint_difference_m": 0.00471963407471776,
+          "local_rotation_difference_degrees": 0.9161273241043091,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00048",
+          "text": "While standing in place, a person standing on the floor shakes the head from side to side with large movements at a moderate pace.",
+          "root_position_difference_m": 0.002668504137545824,
+          "root_aligned_joint_difference_m": 0.010899245738983154,
+          "local_rotation_difference_degrees": 1.2533460855484009,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00053",
+          "text": "While standing in place, a person who is standing waves the left hand with moderate movements at a moderate pace.",
+          "root_position_difference_m": 0.006952266208827496,
+          "root_aligned_joint_difference_m": 0.06817612797021866,
+          "local_rotation_difference_degrees": 7.457134246826172,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00057",
+          "text": "While standing in place, a standing person nods the head with small movements at a moderate pace.",
+          "root_position_difference_m": 0.0021732484456151724,
+          "root_aligned_joint_difference_m": 0.0029531309846788645,
+          "local_rotation_difference_degrees": 0.4971359670162201,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00079",
+          "text": "While standing in place, an individual raises and lowers the left arm with moderate movements at a moderate pace.",
+          "root_position_difference_m": 0.005706381984055042,
+          "root_aligned_joint_difference_m": 0.019907481968402863,
+          "local_rotation_difference_degrees": 2.875765085220337,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00080",
+          "text": "A person standing on the floor raises and lowers the left arm with moderate movements slowly.",
+          "root_position_difference_m": 0.0033914591185748577,
+          "root_aligned_joint_difference_m": 0.023694850504398346,
+          "local_rotation_difference_degrees": 2.8746092319488525,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00081",
+          "text": "While standing in place, a standing person makes small pointing gestures to the left with the left hand quickly.",
+          "root_position_difference_m": 0.0015195996966212988,
+          "root_aligned_joint_difference_m": 0.0054145390167832375,
+          "local_rotation_difference_degrees": 0.998156726360321,
+          "foot_contact_disagreement": 0.0
+        },
+        {
+          "id": "motion-00088",
+          "text": "While standing in place, an individual turns the body to the right with a large movement at a moderate pace.",
+          "root_position_difference_m": 0.01349366270005703,
+          "root_aligned_joint_difference_m": 0.019580187276005745,
+          "local_rotation_difference_degrees": 2.9226810932159424,
+          "foot_contact_disagreement": 0.01875
+        }
+      ]
+    }
+  },
+  "observations": [
+    "The small slow right-hand wave is nearly stationary for the teacher too; close imitation does not prove instruction compliance.",
+    "The moderate left-hand wave has the largest same-frame mean pose difference in this batch. Raw trajectories confirm that the teacher starts with its hand raised while the student includes a low-hand-to-raised-hand transition. The user prefers this transition for a standing character; the difference is not evidence of worse student quality.",
+    "The seed is shared but no common initial full-body pose or motion history was supplied. Compare from a shared history across seeds and separate onset latency, transition naturalness and steady waving behavior."
+  ],
+  "phase_analysis": "motion-00053-phase-analysis.json"
+}

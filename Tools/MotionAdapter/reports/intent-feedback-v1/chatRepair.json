@@ -1,0 +1,18 @@
+{
+    "passed": true,
+    "checks": 61,
+    "cases": [
+        "strict IDs/goal/replay schema, immutable per-action snapshots, deduplication, default legacy contract",
+        "real PostSpeechContinuationStream → capture → collected callback → dispatch; cross-autonomous-generation feedback; one repair budget",
+        "overlength original role-command retention; equivalent compression; capability-disabled route; known finger boundary",
+        "goal lowering and route substitution rejected; stop allowed; failed revision cannot recurse",
+        "feedback fences: current action/binding/user turn and immutable identity; unknown/completed never treated as failure",
+        "actual delayed model callbacks fenced after replacement, user speech, user turn, disconnect and new model generation",
+        "unplayed failed-round TTS discarded; no command in an explanation does not force an action",
+        "exact replay dispatch reference; unknown replay facts without substitute; real JsonUtility null serialization"
+    ],
+    "failure": "",
+    "checkedAtUtc": "2026-09-10T12:19:24.1405956Z",
+    "unityVersion": "2022.3.22f1",
+    "scope": "Actual C# parser, inactive ChatSample identity/feedback lifecycle, same-LLM PostSpeechContinuationStream callbacks and existing collected speech/action callback; fake transport only, no model-semantic or physical-motion claim."
+}

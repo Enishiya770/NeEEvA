@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "frozenUtc": "2026-09-10T09:24:12.940897+00:00",
+  "selectedContractSha256": "2e0a7326c68054c9c05798e97f855982896d40679b5ca3b4428730893c4ddaee",
+  "exactOriginalV1ContractPreserved": true,
+  "originalBasicOnlyContractPreserved": true,
+  "releaseSelectionReport": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-protocol-release-selection.json",
+  "executionFixtureUnchanged": "E:\\VRproject\\VR20250611\\NeEEvA\\Tools\\MotionAdapter\\reports\\palm-purpose-first-qwen-plan-v2.json",
+  "finalAdditionsAfterSelection": [
+    "XML current plus an explicitly supplied same-side Bend is rejected rather than silently ignoring the numeric target; direct C# current/default occupancy behavior is preserved",
+    "Original 14 real model tags contain no current-plus-explicit-Bend combination and remain accepted unchanged",
+    "Historical parser rejection facts identify their original generation and sequence; normal text and later generation keep the fact, later valid role syntax clears it, execution errors remain independent",
+    "Real inactive Chat Editor tests cover rejected-palm/axis non-dispatch, next-turn feedback, stale fencing, user/private isolation, capability-switch/disable/rebind cleanup"
+  ],
+  "cpuValidation": {
+    "compilerExitCode": 0,
+    "pureProductionAndExtractedEditorAssertions": 786,
+    "originalActualTags": 14,
+    "acceptedActualTags": 14,
+    "assertionsIncludingTags": 800,
+    "exitCode": 0,
+    "diffCheckExitCode": 0,
+    "noModelRequestsAfterRollback": true
+  },
+  "unityStatus": "Parent owns and runs final Full+Legacy against these source hashes. Newly added Chat tests are prepared, not claimed as executed by this subagent.",
+  "limits": "Selected v1 planning retains the documented semantic gaps. Four unseen formulations were tested once against the rejected v5 candidate, not against the selected contract. No universal planning, naturalness or reachability claim.",
+  "sourceSha256": {
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "b66004fee7c13d01ce43d614a2c1e19b43e29839dc059b33cde443af5c87f90f",
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "2d839e97949fa2e5e8a7d101fd2d952af2dbce68ec89af510203ba16f8385c56",
+    "Assets/AIChatTookit/Scripts/Chat/ChatSample.Motion.cs": "7cc104ecc84adca02b77f8c85308c83ce7fb613357251e1c1966403059b19fbe",
+    "Assets/Editor/ArdyDialogueMotionRegression.cs": "b9d30129ff69a8e42d9b68a1e6b61d83ace7891632fbcbe1c0a49bb47fe6a6e5",
+    "Tools/MotionAdapter/validate_dialogue_motion.py": "62612e4546f1399607c1f8b991412e41d442ec088dcec6a8a848eee9f6a2f829",
+    "Tools/MotionAdapter/validate_purpose_motion_planning.py": "0da6cf6c447125fa76fcafa6f704555f61bd1f8f16ca70170236120b7e5e0e48",
+    "Tools/MotionAdapter/data/palm-purpose-new-expressions-v1.json": "ba2481d83a9b67ffce65aae456f5407fa5b0167feffe74c738b8b2f3f579659e",
+    "Server/ARDY/runtime/palm-protocol-check/Program.cs": "9104477038772f8d1d43696e518275f19842332ae669af86e10798441d396f3d"
+  }
+}

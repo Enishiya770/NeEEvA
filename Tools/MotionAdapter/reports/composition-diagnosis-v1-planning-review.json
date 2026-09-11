@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "checkedAtUtc": "2026-09-10T07:33:58.667694+00:00",
+  "status": "implementation-ready-with-planning-limitations",
+  "changes": [
+    "Basic gesture priority is limited to a complete independent intent without extra posture/other-joint holding constraints.",
+    "One open-ended generated command may include preparation plus local motion while holding other joints.",
+    "Preserve unretracted constraints across corrections, distinguish forward/side and moving/held parts, and distinguish historical desired posture from current actual state.",
+    "Declare 6-second default return to idle and lack of stage-completion feedback; no new presets, controller or bridge changes."
+  ],
+  "sourceSha256": {
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "ab137567761a793708fef10aa2d8407fd494783330b642d1cc13f9504848e245",
+    "Assets/Editor/ArdyDialogueMotionRegression.cs": "f47d2ddd5a7158a511fcd93b3c506272f1c69eadb0ef6bf5b49ca5278a840409",
+    "Tools/MotionAdapter/validate_compositional_planning.py": "379ad84e397206b229c24d28ec09811187f21a9118b3e1286f078d0a3e895ff4",
+    "Server/ARDY/runtime/dialogue-protocol-check/Program.cs": "4b50120d9f14958d98606020ba828050919fb6623e7726020c169188686f253c"
+  },
+  "cpuProtocolValidation": {
+    "environment": "Production C# DialogueMotionProtocol/RoleOutputChannels/SpeechText with Unity-bundled Roslyn+Mono CLI, not a Unity Editor run",
+    "checks": 214,
+    "compileExitCode": 0,
+    "executionExitCode": 0
+  },
+  "unityRegression": {
+    "prepared": true,
+    "executedByThisTask": false,
+    "entryPoint": "ArdyDialogueMotionRegression.RunBatch",
+    "scope": "Real inactive ChatSample context/capability/idle fact delivery; complete compositional tags through production parsing/dispatch; existing TTS/dedup/cancellation assertions preserved."
+  },
+  "planningComparison": {
+    "finalAttempt": "Tools\\MotionAdapter\\reports\\composition-diagnosis-v1-planning-comparison-r3.json",
+    "priorAttempts": [
+      "Tools/MotionAdapter/reports/composition-diagnosis-v1-planning-comparison.json",
+      "Tools/MotionAdapter/reports/composition-diagnosis-v1-planning-comparison-r2.json"
+    ],
+    "baselineContract": "Tools/MotionAdapter/reports/composition-diagnosis-v1-planning-contract-before.json",
+    "realRequestsPerAttempt": 16,
+    "syntheticIndependentCases": 8,
+    "models": [
+      "qwen36.gguf"
+    ],
+    "finalShapeAndRouting": {
+      "old": {
+        "count": 8,
+        "syntaxPassed": 8,
+        "routingPassed": 8
+      },
+      "new": {
+        "count": 8,
+        "syntaxPassed": 8,
+        "routingPassed": 8
+      }
+    },
+    "busyHandling": "All three existing /slots had to report is_processing false before each request; no queueing when busy/unknown. Sequential requests only. No service lifecycle changes.",
+    "manualConstraintReview": [
+      {
+        "caseId": "forward-hold-wrists",
+        "newRetained": [
+          "bilateral arms",
+          "forward at shoulder height",
+          "wrist left/right movement twice",
+          "shoulder/elbow stability",
+          "torso forward"
+        ],
+        "newStillMissingOrAmbiguous": [
+          "Explicit elbow straightness omitted; fixed elbow does not identify the target elbow angle.",
+          "Preparation vs holding phase remains ambiguous in raise ... keeping shoulders fixed.",
+          "Two English sentences rather than requested single compact sentence."
+        ],
+        "comparison": "New description names shoulders and wrist movement; cannot call complete constraint preservation or execution success."
+      },
+      {
+        "caseId": "followup-idle-preserve-goal",
+        "newRetained": [
+          "forward shoulder height",
+          "straight elbows",
+          "stable shoulders",
+          "wrist movement twice",
+          "maintaining pose"
+        ],
+        "newStillMissingOrAmbiguous": [
+          "Starts Keep arms extended despite explicit synthetic idle fact; no preparation movement.",
+          "Inherited palms-facing-inward and newly fixed torso requirements omitted."
+        ],
+        "comparison": "The generic protocol states correct state distinction, but this real model response still violates it."
+      },
+      {
+        "caseId": "side-hold-with-nod",
+        "newRetained": [
+          "bilateral shoulder height",
+          "stable shoulders/elbows/torso",
+          "gentle nod once"
+        ],
+        "newStillMissingOrAmbiguous": [
+          "Out-to-the-sides direction omitted; horizontally is insufficient.",
+          "Explicit straight elbows omitted.",
+          "then nod does not clearly encode the requested simultaneous sustained arm posture."
+        ],
+        "comparison": "Old and new both omit side direction; new prompt is not demonstrated to fix this."
+      },
+      {
+        "caseId": "unilateral-hold-other-extend",
+        "newRetained": [
+          "left forward shoulder height with shoulder/elbow stability",
+          "right outward-to-right shoulder height",
+          "torso forward",
+          "preparation verb"
+        ],
+        "newStillMissingOrAmbiguous": [
+          "Straightness is implied by extend rather than explicitly stated.",
+          "Holding left throughout right movement is less explicit than the user request."
+        ],
+        "comparison": "Final description is valid length (186 characters), unlike previous two new-prompt attempts; this is not proof of full semantics."
+      },
+      {
+        "caseIds": [
+          "independent-left-wave",
+          "independent-right-wave",
+          "independent-nod",
+          "independent-shake"
+        ],
+        "comparison": "Both old and new selected the expected independent basic action in every case."
+      }
+    ],
+    "developmentFindings": [
+      "Attempt 1 generated 286/248-character invalid descriptions and one false completed-action claim; retained.",
+      "Attempt 2 still produced a 272-character invalid unilateral description and incorrect T-pose shorthand; retained.",
+      "Final shorter prioritized contract kept all outputs under 240 characters, but did not eliminate semantic omissions. No further tuning on these cases performed."
+    ]
+  },
+  "limits": [
+    "No ARDY requests, Unity runs or motion execution occurred in this planning comparison.",
+    "Prompt assertions verify that the contract is delivered, not that Qwen obeys every semantic condition.",
+    "This development set was used for wording iteration; it is not held-out evidence of generalization.",
+    "Wrist-specific execution remains unproven and the root team has independent evidence of whole-arm coupling; do not report it as fixed.",
+    "A separately designed posture/local-joint constraint execution layer and real motion review are required for reliable compound motion."
+  ]
+}
