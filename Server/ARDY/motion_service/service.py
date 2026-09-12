@@ -115,6 +115,8 @@ class MotionService:
         if not 1 <= queue_limit <= 64 or not 1 <= character_limit <= 1024:
             raise ValueError("Queue and character limits must be bounded")
         self.backend, self.provider = backend, provider
+        # Shared by upper-body and room workers: diffusion and global RNG are mutable.
+        self.backend_gate = asyncio.Lock()
         self.queue_limit, self.character_limit = queue_limit, character_limit
         self.characters = {}
         self.queue = deque()
@@ -272,7 +274,12 @@ class MotionService:
                     raise ServiceError(504, "deadline_exceeded", "Motion deadline expired after feature extraction")
                 # One worker waits for its CUDA call even after HTTP cancellation. Never overlap
                 # model diffusion mutations or process-global RNG with a second GPU inference.
-                result = await asyncio.to_thread(self.backend.generate, job.request, feature["embedding"], job.state.backend_state)
+                async with self.backend_gate:
+                    if not self._valid(job):
+                        continue
+                    if job.deadline <= time.monotonic():
+                        raise ServiceError(504, "deadline_exceeded", "Motion deadline expired waiting for ARDY")
+                    result = await asyncio.to_thread(self.backend.generate, job.request, feature["embedding"], job.state.backend_state)
                 if not self._valid(job):
                     self.counts["staleResultsDiscarded"] += 1
                     continue

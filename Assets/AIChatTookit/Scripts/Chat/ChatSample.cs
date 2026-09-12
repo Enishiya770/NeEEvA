@@ -185,6 +185,7 @@ public partial class ChatSample : MonoBehaviour
             m_ChatSettings.m_ChatModel.OnSystemNotice += HandleSystemNotice;
             m_ChatSettings.m_ChatModel.OnRawResponse += HandleRawLLMResponse;
             m_ChatSettings.m_ChatModel.OnOutputFormatError += HandleLLMOutputFormatError;
+            m_ChatSettings.m_ChatModel.OnSpeechPhaseError += HandleLLMSpeechPhaseError;
             m_ChatSettings.m_ChatModel.OnRequestDiagnostic += HandleRequestDiagnostic;
         }
         if (m_AudioSource != null)
@@ -229,6 +230,7 @@ public partial class ChatSample : MonoBehaviour
             m_ChatSettings.m_ChatModel.OnSystemNotice -= HandleSystemNotice;
             m_ChatSettings.m_ChatModel.OnRawResponse -= HandleRawLLMResponse;
             m_ChatSettings.m_ChatModel.OnOutputFormatError -= HandleLLMOutputFormatError;
+            m_ChatSettings.m_ChatModel.OnSpeechPhaseError -= HandleLLMSpeechPhaseError;
             m_ChatSettings.m_ChatModel.OnRequestDiagnostic -= HandleRequestDiagnostic;
         }
         if (m_ActiveSVSRequest != null) m_ActiveSVSRequest.Abort();
@@ -4377,9 +4379,16 @@ public partial class ChatSample : MonoBehaviour
 
     private void HandleLLMOutputFormatError(string reason)
     {
+        if (m_RoomSpeechGuardGeneration == m_FormalResponseGeneration) { m_RoomTaskFormatError = true; return; }
         ReportToolFailureForLlm("output", "malformed_tool_syntax", reason,
             "这是格式错误，不是业务执行失败。工具用标准 <工具名 属性=\"值\"/>；程序没有自动修正或执行。" +
             "可重新选择动作、询问或暂不行动，不需要给普通台词添加 say。");
+    }
+
+    private void HandleLLMSpeechPhaseError(string reason, string correction)
+    {
+        if (m_RoomSpeechGuardGeneration == m_FormalResponseGeneration) { m_RoomTaskFormatError = true; return; }
+        ReportToolFailureForLlm("speech", "speech_phase_conflict", reason, correction);
     }
 
     private void HandleRequestDiagnostic(string requestJson)
@@ -4592,12 +4601,18 @@ public partial class ChatSample : MonoBehaviour
         string imageUrl,
         int responseGeneration,
         bool recordAssistantHistory = true,
-        string transientSystemContext = null)
+        string transientSystemContext = null,
+        bool roomTaskPrepared = false)
     {
+        if (!roomTaskPrepared && TryPlanRoomTask(prompt, imageUrl, responseGeneration, recordAssistantHistory, transientSystemContext)) return;
         PublishSpokenPrefixToLlm();
         m_ChatSettings.m_ChatModel.RequestContext = BuildMotionRequestContext(BuildFormalObservationContext(transientSystemContext));
         ObservationReceipt observations = CaptureObservationReceipt();
         bool consumed = false;
+        bool guardRoomSpeech = ShouldGuardRoomSpeech(responseGeneration);
+        var roomSpeech = guardRoomSpeech ? new SpeechTextBuffer() : null;
+        m_RoomSpeechGuardGeneration = guardRoomSpeech ? responseGeneration : -1;
+        m_RoomTaskFormatError = false;
         m_FormalResponseInFlight = true;
         m_ChatSettings.m_ChatModel.PostSpeechStream(
             prompt,
@@ -4605,20 +4620,22 @@ public partial class ChatSample : MonoBehaviour
             {
                 if (consumed || responseGeneration != m_FormalResponseGeneration ||
                     (observations != null && observations.Epoch != m_WorkEpoch)) return;
-                OnSpeechStreamDelta(delta);
+                if (guardRoomSpeech) roomSpeech.Append(delta);
+                else OnSpeechStreamDelta(delta);
             },
             full =>
             {
                 if (consumed || responseGeneration != m_FormalResponseGeneration ||
                     (observations != null && observations.Epoch != m_WorkEpoch)) return;
                 consumed = true;
+                if (guardRoomSpeech) { CompleteRoomSpeech(roomSpeech, full, responseGeneration, recordAssistantHistory, observations); return; }
                 AcknowledgeObservations(observations, responseGeneration, full);
                 m_FormalResponseInFlight = false;
                 if ((full ?? "").StartsWith("<silent/>", StringComparison.Ordinal)) OnStreamDelta("<silent/>");
                 OnStreamComplete(full);
             },
             imageUrl,
-            recordAssistantHistory);
+            recordAssistantHistory && !guardRoomSpeech);
     }
 
     /// <summary>
@@ -18128,9 +18145,11 @@ public partial class ChatSample : MonoBehaviour
         string activeSkills,
         string correction)
     {
+        bool speechPhase = code == "speech_phase_conflict";
         return "\n[工具纠错事实；来自本地程序，优先于聊天记忆和你的猜测]\n" +
             "tool=" + SanitizeToolFeedbackValue(tool, 64) + "\n" +
             "status=rejected\n" +
+            (speechPhase ? "scope=speech_phase_only; independent_motion_status=read_runtime_facts\n" : "") +
             "code=" + SanitizeToolFeedbackValue(code, 80) + "\n" +
             "reason=" + SanitizeToolFeedbackValue(reason) + "\n" +
             "round=real_user\n" +
@@ -18139,8 +18158,10 @@ public partial class ChatSample : MonoBehaviour
             "请根据这些事实用你自己的自然语气重新决定：" +
             "可以选正确工具、自然询问或如实说明，程序不替你决定；" +
             "不要复述字段，不要编造权限或成功状态。" +
-            "若文字声称马上执行，同轮必须提交可验证的工具请求；" +
-            "选择不执行就不要先口头承诺。" +
+            (speechPhase
+                ? "本次只纠正发声阶段；已受理的独立身体动作继续依照其执行状态，不要重发 motion。" +
+                  "依据当前程序事实说明正在准备、行进、已到达或未完成；没有该事实就只表达意图。"
+                : "若文字声称马上执行，同轮必须提交可验证的工具请求；选择不执行就不要先口头承诺。") +
             "参数修正可以用 silent 在内部进行；没有可执行进展时不要再次外放稍等或开始。" +
             "选择停止时可以一次说明真实原因，不能把未执行说成服务坏了。]";
     }
@@ -18180,7 +18201,7 @@ public partial class ChatSample : MonoBehaviour
         if (tool == "sing" || tool == "clip_confirm" || tool == "clip_revise" || tool == "clip_drop")
             m_LastSingingRepairAt = Time.realtimeSinceStartup;
         string safeReason = SanitizeToolFeedbackValue(reason);
-        NoteToolFailure($"{tool} 未执行：{safeReason}");
+        NoteToolFailure(code == "speech_phase_conflict" ? "回复发声阶段校验失败：" + safeReason : $"{tool} 未执行：{safeReason}");
         if (m_WorkNoProgress) return;
         bool realUserWaiting = m_AgentRunning && !m_AgentCurrentRoundIsTick &&
             m_AgentRoundInFlight && m_UserTurnAwaitingReplySince > 0f;
@@ -18198,7 +18219,11 @@ public partial class ChatSample : MonoBehaviour
         {
             m_ToolCorrectionExhaustedThisRound = true;
             m_PendingNonCharacterToolNotice =
-                "系统：角色连续两次未能完成本轮工具调用，请重新询问或稍后再试。";
+                code == "speech_phase_conflict"
+                    ? "系统：本轮回复的发声阶段格式仍有错误。已受理的身体动作不会因此停止，移动结果请查看房间移动状态。"
+                    : tool == "output"
+                        ? "系统：本轮回复格式纠正未完成，请重新询问；已有动作以各自的执行状态为准。"
+                        : "系统：角色连续两次未能完成本轮工具调用，请重新询问或稍后再试。";
             if (m_LogAgentLoop)
                 Debug.LogWarning($"[ToolCorrection] 已达单轮纠错上限 tool={tool} code={code}");
             return;

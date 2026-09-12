@@ -6,7 +6,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
 
-public class ChatQW : LLM
+public partial class ChatQW : LLM
 {
     public enum BackendType { Cloud, Local }
 
@@ -1362,7 +1362,7 @@ public class ChatQW : LLM
                     if (!string.IsNullOrWhiteSpace(merged)) m_DataList.Add(new SendData("assistant", merged));
                     Debug.Log($"[LLM/Channels] speech={channels.Speech.Length} private={channels.PrivateCharacters} actions={channels.HasActions}");
                     bool complete = ReportRoleOutputCompletion(_textback.choices[0].finish_reason);
-                    ReportMalformedRoleTool(channels);
+                    ReportRoleOutputFormatFacts(channels, complete);
                     executable = ProjectFormalCompletion(_backMsg, channels, complete);
                 }
             }
@@ -1495,6 +1495,7 @@ public class ChatQW : LLM
 
     public override void CancelActiveResponse()
     {
+        CancelRoomTaskMessage();
         m_StreamRequestGeneration++;
         if (m_ActiveStreamRequest != null)
         {
@@ -2144,7 +2145,7 @@ public class ChatQW : LLM
                     m_DataList.Add(new SendData("assistant", merged));
                 Debug.Log($"[LLM/Channels] speech={completedChannels.Speech.Length} private={completedChannels.PrivateCharacters} actions={completedChannels.HasActions}");
                 bool complete = ReportRoleOutputCompletion(handler.FinishReason);
-                ReportMalformedRoleTool(completedChannels);
+                ReportRoleOutputFormatFacts(completedChannels, complete);
                 string executable = ProjectFormalCompletion(full, completedChannels, complete);
                 if (m_LogRequestStats)
                     Debug.Log("[LLM/Performance] " + new Newtonsoft.Json.Linq.JObject {
@@ -2451,8 +2452,6 @@ public class ChatQW : LLM
     {
         if (finishReason != "length") return true;
         Debug.LogWarning("[LLM/Channels] 输出达到生成长度上限，未完成的决策不派发工具；已说出的发言无法撤回。");
-        m_DataList.Add(new SendData("system", "[程序执行事实] 上一条回复因生成长度上限被截断，" +
-            "其中工具动作没有执行；不能把未完成输出当作成功。可根据当前用户语境重新决定、询问或暂不行动。"));
         RaiseSystemNotice(new SystemNotice("llm_output_truncated", SystemNoticeSeverity.Error,
             "角色本次回复被截断，工具动作尚未执行。", "finish_reason=length；可重新请求。", "ChatQW", true));
         return false;
@@ -2460,18 +2459,30 @@ public class ChatQW : LLM
 
     private void ReportMalformedRoleTool(RoleOutputChannels channels)
     {
+        ReportRoleOutputFormatFacts(channels, true);
+    }
+
+    private void ReportRoleOutputFormatFacts(RoleOutputChannels channels, bool complete)
+    {
+        const string reason = "检测到方括号或全角括号等错误工具属性语法；错误工具文本未朗读，本条回复的所有工具均未执行。";
+        var currentFormatFacts = new System.Text.StringBuilder();
+        if (!complete) currentFormatFacts.AppendLine(RoleOutputFormatFactHistory.TruncationFact);
+        if (channels.HasInvalidSpeechPhase)
+            currentFormatFacts.AppendLine(channels.SpeechPhaseExecutionFact + channels.SpeechPhaseCorrection);
+        if (channels.HasMalformedTool)
+            currentFormatFacts.AppendLine(reason + "可使用标准 <工具名 属性=\"值\"/> 重新决定或询问；不能称为已执行。");
+        // Replace before callbacks: immediate correction requests see this output's
+        // facts. A valid completion clears obsolete format errors, not body history.
+        RoleOutputFormatFactHistory.ReplaceCurrent(m_DataList, message => message.role,
+            message => message.content, fact => new SendData("system", fact), currentFormatFacts.ToString().Trim());
         if (channels.HasInvalidSpeechPhase)
         {
-            const string phaseReason = "发声阶段与动作冲突；本条回复的歌唱/素材变更动作没有执行。";
-            Debug.LogWarning("[LLM/Channels] " + phaseReason + " " + channels.SpeechPhaseError);
-            m_DataList.Add(new SendData("system", "[程序执行事实] " + phaseReason +
-                "独立台词不能附带依赖校验的动作。若确需执行，请声明 after_action 阶段并等待实际校验；不要声称已完成。"));
-            RaiseOutputFormatError(phaseReason);
+            string phaseReason = channels.SpeechPhaseExecutionFact;
+            Debug.LogWarning("[LLM/Channels] " + phaseReason);
+            RaiseSpeechPhaseError(phaseReason, channels.SpeechPhaseCorrection);
         }
         if (!channels.HasMalformedTool) return;
-        const string reason = "检测到以《/＜/〈代替 < 的工具属性语法；错误工具文本未朗读，本条回复的所有工具均未执行。";
         Debug.LogWarning("[LLM/Channels] " + reason);
-        m_DataList.Add(new SendData("system", "[程序执行事实] " + reason + "可使用标准 <工具名 属性=\"值\"/> 重新决定或询问；不能称为已执行。"));
         RaiseOutputFormatError(reason);
     }
 

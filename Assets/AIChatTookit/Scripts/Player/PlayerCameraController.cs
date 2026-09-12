@@ -25,6 +25,20 @@ namespace NeEEvA.Player
 
         public bool IsVRActive { get; private set; }
         public bool IsLooking { get; private set; }
+        /// <summary>Whether the current world pose is usable as the explicit conversation partner anchor.</summary>
+        public bool HasValidWorldPose
+        {
+            get
+            {
+                if (!isActiveAndEnabled || !gameObject.activeInHierarchy) return false;
+                if (!IsVRActive) return true;
+                if (awaitingHeadPose || headTracking == null || !headTracking.enabled) return false;
+                var required = InputTrackingState.Position | InputTrackingState.Rotation;
+                return ((InputTrackingState)headTracking.ReadValue<int>() & required) == required;
+            }
+        }
+        /// <summary>UI panels temporarily reserve desktop pointer/keyboard input; head tracking is unaffected.</summary>
+        public bool InteractionBlocked { get; set; }
 
         private readonly List<XRDisplaySubsystem> displays = new List<XRDisplaySubsystem>();
         private readonly List<XRInputSubsystem> inputs = new List<XRInputSubsystem>();
@@ -144,7 +158,7 @@ namespace NeEEvA.Player
         {
             var mouse = Mouse.current;
             var keyboard = Keyboard.current;
-            if (!Application.isFocused || mouse == null || keyboard == null || IsEditingText())
+            if (InteractionBlocked || !Application.isFocused || mouse == null || keyboard == null || IsEditingText())
             {
                 ReleaseCursor();
                 return;

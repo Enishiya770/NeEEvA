@@ -91,6 +91,37 @@ public sealed class SubtitleOverlay : MonoBehaviour
     public SystemNoticeMode NoticeMode { get { return m_NoticeMode; } }
     public IList<SystemNotice> NoticeHistory { get { return m_NoticeHistory.AsReadOnly(); } }
 
+    // A separate desktop/VR presentation can read these channels while the legacy
+    // Canvas is hidden. activeSelf preserves the channel's own visibility policy.
+    public string PresentationOriginal { get { return m_OriginalText != null ? m_OriginalText.text : ""; } }
+    public string PresentationTranslation { get { return m_TranslationText != null ? m_TranslationText.text : ""; } }
+    public bool PresentationShowOriginal
+    {
+        get
+        {
+            return m_OriginalContainer != null
+                ? m_OriginalContainer.activeSelf
+                : ShouldShowOriginal(m_DisplayMode) ||
+                    (m_DisplayMode == SubtitleDisplayMode.TranslationOnly && m_TranslationFallbackOriginalVisible);
+        }
+    }
+    public bool PresentationShowTranslation
+    {
+        get { return m_TranslationText != null && m_TranslationText.gameObject.activeSelf; }
+    }
+    public string PresentationNotice
+    {
+        get
+        {
+            return m_SystemNoticeText != null && m_SystemNoticeText.gameObject.activeSelf
+                ? m_SystemNoticeText.text : "";
+        }
+    }
+    public Color PresentationNoticeColor
+    {
+        get { return m_SystemNoticeText != null ? m_SystemNoticeText.color : Color.white; }
+    }
+
     public void Initialize(
         Text originalText,
         LLM translator,

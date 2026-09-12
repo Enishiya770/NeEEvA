@@ -26,6 +26,9 @@ public class LLM:MonoBehaviour
     // Protocol failures are routed to the existing LLM correction path, never TTS.
     public event Action<string> OnOutputFormatError;
     protected void RaiseOutputFormatError(string reason) => OnOutputFormatError?.Invoke(reason);
+    // Separate scope: invalid speech staging can coexist with a valid room motion.
+    public event Action<string, string> OnSpeechPhaseError;
+    protected void RaiseSpeechPhaseError(string reason, string correction) => OnSpeechPhaseError?.Invoke(reason, correction);
 
     protected void RaiseRawResponse(string content)
     {
@@ -459,6 +462,11 @@ public class LLM:MonoBehaviour
     public virtual void CancelUtilityMessage()
     {
     }
+
+    /// <summary>Same-model, request-local spatial decision and speech consistency check. No history or side effects.</summary>
+    public virtual bool SupportsRoomTaskMessages => false;
+    public virtual void PostRoomTaskMessage(string input, bool reviewSpeech, Action<bool, string, string> callback)
+        => callback?.Invoke(false, "", "room-task-provider-unavailable");
 
     /// <summary>
     /// 撤销当前正式回复。用户重新开口或打断角色时调用。

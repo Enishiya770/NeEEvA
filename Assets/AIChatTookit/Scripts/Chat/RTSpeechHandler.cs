@@ -410,6 +410,12 @@ public class RTSpeechHandler : MonoBehaviour
     [SerializeField] private string m_LabelClosing = "正在完成当前对话（点击恢复）";
     private Coroutine m_GracefulDisableCoroutine;
     private bool m_GracefulDisablePending = false;
+
+    // Presentation reads state without changing VAD, microphone or shutdown logic.
+    public bool IsRealtimeEnabled { get { return m_AwakeState; } }
+    public bool IsRealtimeClosing { get { return m_GracefulDisablePending; } }
+    public bool IsRecording { get { return m_IsRecording; } }
+    public ChatSample ChatOwner { get { return m_ChatSample; } }
     /// <summary>
     /// 启用时是否播放问候语(如果m_GreatingVoice配置了的话)，
     /// 模拟原唤醒词路径的"对方应了一声"感觉。

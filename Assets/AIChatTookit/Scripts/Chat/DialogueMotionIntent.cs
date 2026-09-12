@@ -19,6 +19,8 @@ public readonly struct DialogueMotionIntent
     public readonly string ParentActionId;
     public readonly int RepairAttempt;
 
+    public bool IsRoomMotion => DialogueMotionProtocol.IsRoomMotionName(Name);
+
     public DialogueMotionIntent(string name, string description, int responseGeneration, int sequence)
         : this(name, description, responseGeneration, sequence, null) { }
 
@@ -54,6 +56,26 @@ public readonly struct DialogueMotionIntent
 /// <summary>Validates only the executable channel after RoleOutputChannels has removed quotations/private text.</summary>
 public static class DialogueMotionProtocol
 {
+    public static bool IsRoomMotionName(string name) => name == "approach" || name == "stop-moving";
+
+    public const string RoomOutputContract = "[房间移动：当前运行时已启用]\n"
+        + "另可选择<motion name=\"approach\"/>走近当前交流对象并面向对方，或<motion name=\"stop-moving\"/>停止房间移动。两个标签严格只有name属性；不提供坐标、距离、速度或其他动作属性。仍然每次回复至多一个motion标签，遵守相同的私密/引号/朗读边界。\n"
+        + "用户叫你过来、到身边时使用approach；交流确实需要靠近时也可自主选择。具体用户位置、可达落点、家具绕行和停止距离由Unity根据实时场景决定，不猜测坐标。已经很近时可能只转向；未绑定用户或没有同层可达目标时会拒绝，不能假称已走到。\n"
+        + "根据当前交流判断意图：要求靠近、向我走来或停止正在进行的移动属于空间动作；不能因为旧歌唱任务、旧录音引用或一句话像歌词，就改成唱歌。用户明确在引用歌词或要求演唱时仍按其真实意图处理，不按关键词强行移动。\n"
+        + "只有房间移动时，正文前用<speech mode=\"independent\"/>，例如<lang code=\"zh\"/><speech mode=\"independent\"/>我试着走近你。<motion name=\"approach\"/>。after_action仅用于本轮演唱/素材校验，不等待走路完成；已受理的移动不因发声格式纠正重发。\n"
+        + "房间移动独立于普通聊天：用户说话和你继续回复不会自动取消走路；明确要求停止移动时提交stop-moving。none只停止上身动作，不停止房间移动。不要为了边走边说每轮重复approach，不把continue/next当作继续走路命令。\n"
+        + "以下房间执行事实才是移动结果依据：preparing/generating/moving/returning分别表示准备、生成、行进和衔接待机；arrived与reachedPlannedStandpoint记录该次到达，当前是否仍在用户身边且面对用户应读currentlyNearAndFacingUser及实际距离/朝向。blocked/failed/unreachable/unavailable/goal-not-reached表示未完成，cancelled/stopped表示已停止。使用事实提供的原因说明，不能仅根据自己说了什么来宣称完成。移动事实独立于上身lastRequested/goal；不套用手腕或手臂自动修订，不将失败替换成上身手势。\n"
+        + "当前只支持已核实的同层地面移动；未开放跟随、楼梯、台阶、跳跃或物体接触。generate/compose/plan仍限制为原地上身动作，根节点位移必须走房间approach通道。";
+
+    /// <summary>Retains the legacy contract when room motion is absent; scopes its upper-body limits when present.</summary>
+    public static string IncludeRoomOutput(string contract) => (contract ?? "")
+        .Replace("停止动作、回待机", "停止上身动作、回待机")
+        .Replace("停止用none。", "停止上身动作用none。")
+        .Replace("不支持根腿位移、蹲跳", "generate/compose不支持根腿位移、蹲跳")
+        .Replace("不执行根腿位移、蹲跳", "plan/free不执行根腿位移、蹲跳")
+        .Replace("不能执行根腿移动或真实物体接触", "generate/compose/plan不能执行根腿移动或真实物体接触")
+        + "\n" + RoomOutputContract;
+
     public const string BasicOutputContract = "[本次身体动作协议]\n"
         + "你可以在本轮回复末尾单独输出至多一个自闭合动作标签：<motion name=\"left-wave\"/>（角色自己的左手挥手）、<motion name=\"right-wave\"/>（角色自己的右手挥手）、<motion name=\"nod\"/>（轻点头一次）、<motion name=\"shake-head\"/>（小幅左右摇头一次），或<motion name=\"none\"/>（停止动作、回待机）。\n"
         + "用户直接要求上述支持动作时，应输出对应的 motion 指令；不能只写‘（轻轻摇头）’之类括号动作描写来代替实际执行。\n"
@@ -107,7 +129,7 @@ public static class DialogueMotionProtocol
         "\\G\\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\\s*=\\s*(?:\"(?<value>[^\"<>]*)\"|'(?<value>[^'<>]*)')");
 
     public static bool TryExtract(ref string executable, int generation, int sequence,
-        out DialogueMotionIntent intent, out string rejection)
+        out DialogueMotionIntent intent, out string rejection, bool allowRoomMotion = false)
     {
         intent = default;
         rejection = "";
@@ -144,7 +166,7 @@ public static class DialogueMotionProtocol
         }
         if (!values.TryGetValue("name", out string name) ||
             !(name == "left-wave" || name == "right-wave" || name == "nod" ||
-              name == "shake-head" || name == "none" || name == "generate" || name == "compose" || name == "plan" || name == "replay"))
+              name == "shake-head" || name == "none" || name == "generate" || name == "compose" || name == "plan" || name == "replay" || IsRoomMotionName(name)))
         {
             rejection = "motion name 不在当前支持范围。可用 left-wave/right-wave/nod/shake-head/none/generate/compose/plan/replay；" +
                 "其他动作需按当前已启用路线表达意图，不能自造动作名。";
@@ -152,6 +174,21 @@ public static class DialogueMotionProtocol
         }
         values.TryGetValue("text", out string description);
         description = description ?? "";
+        if (IsRoomMotionName(name))
+        {
+            if (!allowRoomMotion)
+            {
+                rejection = "房间移动通道尚未启用；不能执行approach或stop-moving，也不能用generate代替根节点移动。";
+                return false;
+            }
+            if (values.Count != 1)
+            {
+                rejection = "房间移动仅接受name属性，用户位置与路线由Unity实时计算；不能附加坐标、上身目标或执行身份。";
+                return false;
+            }
+            intent = new DialogueMotionIntent(name, "", generation, sequence);
+            return true;
+        }
         if (name == "replay")
         {
             if (values.Count != 2 || !values.TryGetValue("ref", out string reference) ||

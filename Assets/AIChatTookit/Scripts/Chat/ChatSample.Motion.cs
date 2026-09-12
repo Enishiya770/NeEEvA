@@ -13,6 +13,14 @@ public partial class ChatSample
 
     private bool m_MotionOutputEnabled;
     private bool m_GeneratedMotionEnabled;
+    private bool m_RoomMotionOutputEnabled;
+    public bool RoomMotionOutputEnabled => m_MotionOutputEnabled && m_RoomMotionOutputEnabled;
+
+    /// <summary>Opt-in from a bound runtime room controller, never from a model response.</summary>
+    public void ConfigureRoomMotionOutput(bool enabled)
+    {
+        m_RoomMotionOutputEnabled = enabled;
+    }
     [SerializeField, Tooltip("实验性语义动作规划。尚有约束理解遗漏；默认保留已验收的动作协议。")]
     private bool m_UseSemanticMotionPlanning;
     private bool m_ConfiguredSemanticMotionPlanning;
@@ -89,6 +97,8 @@ public partial class ChatSample
         contract += "\n一次 motion 会独立执行，不会随着下一句话自动重新开始。" +
             "continue/next 只调度后续回复，不表示身体动作已经完成；不要为同一动作在续轮中重复发送 motion。" +
             "已有动作进行中时可以继续说话；只有确实要改变动作时才发送新 motion，停止用 none。";
+        if (m_RoomMotionOutputEnabled) contract = DialogueMotionProtocol.IncludeRoomOutput(contract)
+            .Replace("停止用 none。", "停止上身动作用 none；停止房间移动用 stop-moving。");
         var sources = MotionStateContextRequested;
         if (sources != null)
         {
@@ -130,7 +140,7 @@ public partial class ChatSample
         int sequence = ++m_MotionSequence;
         string executable = text;
         if (DialogueMotionProtocol.TryExtract(ref text, m_FormalResponseGeneration, sequence,
-            out DialogueMotionIntent intent, out string rejection))
+            out DialogueMotionIntent intent, out string rejection, RoomMotionOutputEnabled))
         {
             // A later valid role command replaces parser feedback. Execution failures
             // are independently recorded by the controller as lastControlError.
@@ -158,6 +168,16 @@ public partial class ChatSample
             m_RoundSilencedForRepeat || m_UserSpeechActiveForAutonomy) return;
         DialogueMotionIntent intent = pending.Value;
         if (intent.ResponseGeneration != m_FormalResponseGeneration) return;
+        if (intent.IsRoomMotion && !m_RoomMotionOutputEnabled)
+        {
+            RejectDialogueMotion(intent, "", "房间移动通道尚未启用，未执行本次移动指令。", intent.Sequence);
+            return;
+        }
+        if (intent.IsRoomMotion && HasRoomTaskPlanner)
+        {
+            Debug.Log("[Room/Task] ignored-prose-motion name=" + intent.Name + "; spatial authority belongs to the structured task decision", this);
+            return;
+        }
         if ((intent.Name == "generate" || intent.Name == "compose" || intent.Name == "plan" || intent.Name == "replay") && !m_GeneratedMotionEnabled)
         {
             RejectDialogueMotion(intent, "", "当前仅启用基本手势，该动作能力未开启；请说明限制，不能声称已执行。", intent.Sequence);
@@ -179,7 +199,10 @@ public partial class ChatSample
         string key = intent.Name + "\n" + (intent.ActionPlan != null ? JsonUtility.ToJson(intent.ActionPlan)
             : intent.ControlPlan != null ? JsonUtility.ToJson(intent.ControlPlan) : intent.Description) +
             "\n" + intent.ReplayReference + "\n" + (intent.Goal == null ? "null" : JsonUtility.ToJson(intent.Goal));
-        if (intent.Name == "none") m_MotionDispatchedKeys.Clear();
+        if (intent.Name == "none")
+            m_MotionDispatchedKeys.RemoveWhere(value => !value.StartsWith("approach\n", StringComparison.Ordinal));
+        else if (intent.Name == "stop-moving")
+            m_MotionDispatchedKeys.RemoveWhere(value => value.StartsWith("approach\n", StringComparison.Ordinal));
         else if (m_MotionDispatchedKeys.Contains(key))
         {
             if (m_LogAgentLoop) Debug.Log($"[Dialogue/Motion] 同一回复链的相同动作已提交，保留正在执行的动作；generation={intent.ResponseGeneration}, name={intent.Name}", this);
@@ -196,7 +219,7 @@ public partial class ChatSample
             return;
         }
         RegisterMotionAction(ref intent);
-        if (intent.Name != "none") m_MotionDispatchedKeys.Add(key);
+        if (intent.Name != "none" && intent.Name != "stop-moving") m_MotionDispatchedKeys.Add(key);
         if (m_LogAgentLoop) Debug.Log($"[Dialogue/Motion] dispatch t={Time.realtimeSinceStartup:F3}, generation={intent.ResponseGeneration}, sequence={intent.Sequence}, name={intent.Name}", this);
         foreach (Action<DialogueMotionIntent> listener in listeners.GetInvocationList())
         {

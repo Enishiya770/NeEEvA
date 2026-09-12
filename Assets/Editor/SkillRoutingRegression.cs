@@ -539,9 +539,13 @@ public static partial class SkillRoutingRegression
                 malformed.ToExecutableText().Contains("<next"))
                 throw new Exception("Malformed tool recovery bypassed its retry budget or executed sibling tools.");
             int before = model.m_DataList.Count;
+            int formatEvents = 0;
+            model.OnOutputFormatError += _ => formatEvents++;
             report.Invoke(model, new object[] { RoleOutputChannels.Parse("我喜欢《One Last Kiss》。") });
-            if (model.m_DataList.Count != before)
-                throw new Exception("An ordinary book title was reported as a tool failure.");
+            if (model.m_DataList.Count != before - 1 || formatEvents != 0 ||
+                model.m_DataList.Exists(message => message.role == "system" &&
+                    message.content.StartsWith(RoleOutputFormatFactHistory.Prefix, StringComparison.Ordinal)))
+                throw new Exception("A valid reply retained obsolete format facts or an ordinary book title raised a new tool failure.");
             model.OnOutputFormatError -= listener;
         }
         finally { UnityEngine.Object.DestroyImmediate(host); }

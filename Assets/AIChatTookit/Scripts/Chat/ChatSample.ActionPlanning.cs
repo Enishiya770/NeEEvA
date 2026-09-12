@@ -72,6 +72,9 @@ public partial class ChatSample
         if (source != m_ActionConstraints.CurrentUserTurn) return false;
         try
         {
+            // Room destinations and arm-pose constraints are independent channels.
+            // Neither a walk nor its stop command may erase or inherit wrist/arm locks.
+            if (intent.IsRoomMotion) return true;
             if (intent.Name == "none")
             {
                 m_ActionConstraints.ClearGoalOnStop(source);

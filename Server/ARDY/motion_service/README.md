@@ -1,5 +1,25 @@
 # Local adapter and ARDY motion service
 
+For the normal full stack after a reboot, use the project-root `start_all.cmd`.
+It starts the existing shared Qwen in motion-feature mode, checks that live
+feature route, and starts managed background ARDY on 8093 before the voice
+services. `status.cmd` checks ARDY and its live dependency; `stop_all.cmd` stops
+the recorded ARDY process before stopping Qwen. Logs are
+`Server/RuntimeLogs/ardy.out.log` and `ardy.err.log`.
+
+To restore only ARDY when Qwen feature mode is already running:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File Tools/neeeva_ardy.ps1 start
+```
+
+The manager also accepts `status` and `stop`. Starts are idempotent, including
+an already-loading managed process; stale PID records cannot stop a reused PID.
+An independently launched healthy service can be reused, but must be stopped
+from its original console. An active legacy Qwen is not silently replaced:
+stop the stack while idle and run `start_all.cmd` again to select feature mode.
+The foreground launcher below remains available for manual operation.
+
 Run from the repository root with the existing ARDY environment:
 
 ```powershell

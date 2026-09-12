@@ -16,6 +16,7 @@ public sealed class RoleOutputChannels
     private readonly StringBuilder suspicious = new StringBuilder();
     private bool droppingMalformedTool;
     private char malformedQuote;
+    private char malformedEnd;
     public bool HasMalformedTool { get; private set; }
     private static readonly string[] ToolNames = { "sing", "clip_confirm", "clip_revise", "clip_drop",
         "hum_back", "song_sing", "song_remember", "song_catalog", "song_search", "song_rename", "song_forget",
@@ -32,7 +33,21 @@ public sealed class RoleOutputChannels
     public bool HasInvalidSpeechPhase { get; private set; }
     public string SpeechPhaseError { get; private set; }
     public bool HasSingingValidationActions { get; private set; }
+    // A speech-phase error does not reject independently validated motion tags.
+    // Keep that distinction in both model feedback and user-facing diagnostics.
+    public string SpeechPhaseExecutionFact => !HasInvalidSpeechPhase ? "" :
+        "本条回复的发声阶段校验失败：" + SpeechPhaseError +
+        " 依赖校验的台词仍受发声门控；歌唱/素材变更标签未受理。" +
+        "房间及上身 motion 不因该格式错误撤回，是否受理或完成以各自程序事实为准。";
+    public string SpeechPhaseCorrection => !HasInvalidSpeechPhase ? "" :
+        (SpeechDependency == SpeechActionDependency.AfterAction && !HasSingingValidationActions
+            ? "本轮没有提交演唱或素材变更，不能使用 after_action。"
+            : "发声阶段必须在正文前声明一次；本轮不能中途切换。") +
+        "普通聊天及房间/上身 motion 使用 independent；只有本轮确实提交演唱或素材变更才用 after_action。" +
+        "先读当前房间/身体执行事实，再自然说明意图或实际结果；不要为了纠正发声阶段重复已受理的 motion，" +
+        "也不要把格式错误说成房间移动失败或已完成。";
     private bool phaseDeclared, phaseSpeechSuppressed;
+    private int independentWrapperDepth;
     private static readonly string[] SingingValidationActions = { "sing_goal", "sing", "hum_back", "song_sing",
         "clip_confirm", "clip_revise", "clip_drop", "practice_confirm", "practice_revise", "practice_drop",
         "song_remember", "song_rename", "song_forget" };
@@ -55,7 +70,7 @@ public sealed class RoleOutputChannels
             {
                 if (malformedQuote != '\0') { if (c == malformedQuote) malformedQuote = '\0'; }
                 else if (c == '"' || c == '\'') malformedQuote = c;
-                else if (c == '>' || c == '》' || c == '＞' || c == '〉') droppingMalformedTool = false;
+                else if (malformedEnd != '\0' ? c == malformedEnd : c == '>' || c == '》' || c == '＞' || c == '〉') droppingMalformedTool = false;
                 continue;
             }
             if (suspicious.Length > 0)
@@ -70,6 +85,7 @@ public sealed class RoleOutputChannels
                 {
                     HasMalformedTool = true;
                     droppingMalformedTool = true;
+                    malformedEnd = suspicious[0] == '[' ? ']' : '\0';
                     suspicious.Length = 0;
                     continue;
                 }
@@ -98,7 +114,7 @@ public sealed class RoleOutputChannels
             if (c == '`') { inCode = !inCode; continue; }
             // Hold only a possible known tool name + attribute assignment. Normal
             // book titles such as 《One Last Kiss》 are emitted unchanged.
-            if (!inCode && thoughtDepth == 0 && (c == '《' || c == '＜' || c == '〈'))
+            if (!inCode && thoughtDepth == 0 && (c == '《' || c == '＜' || c == '〈' || (c == '[' && !inSay && !silent)))
             { suspicious.Append(c); continue; }
             if (c == '<' && !inCode) { tag.Append(c); continue; }
             Emit(c, emitted);
@@ -134,7 +150,8 @@ public sealed class RoleOutputChannels
         // An unfinished metadata tag is discarded, never read aloud.
         if (Regex.IsMatch(tag.ToString(), @"^<\s*lang\b", RegexOptions.IgnoreCase))
             HasInvalidLanguage = true;
-        if (Regex.IsMatch(tag.ToString(), @"^<\s*speech\b", RegexOptions.IgnoreCase))
+        if (!silent && thoughtDepth == 0 && !inCode && !inSay &&
+            Regex.IsMatch(tag.ToString(), @"^<\s*speech\b", RegexOptions.IgnoreCase))
             RejectSpeechPhase("发声阶段标记未闭合；未受理依赖动作。 ");
         if (phaseDeclared && SpeechDependency == SpeechActionDependency.AfterAction && HasSpeech &&
             !HasSingingValidationActions)
@@ -161,24 +178,43 @@ public sealed class RoleOutputChannels
             // A front-loaded contract, not a promise keyword heuristic. Once independent
             // speech starts, this response cannot add a dependent singing action later.
             if (silent || inCode || inSay) return;
-            if (closing || phaseDeclared || HasSpeech)
+            // Some providers write the explicit independent declaration as an XML
+            // wrapper. Only this unambiguous spelling is compatible; it never
+            // changes the dependency of speech or repairs an after_action promise.
+            if (closing && independentWrapperDepth > 0 && !HasInvalidSpeechPhase &&
+                Regex.IsMatch(token, @"^</speech\s*>$", RegexOptions.IgnoreCase))
+            {
+                independentWrapperDepth--;
+                return;
+            }
+            var declaration = Regex.Match(token,
+                "^<speech\\s+mode\\s*=\\s*(?<q>[\"'])(?<mode>independent|after_action)\\k<q>\\s*(?<slash>/)?>$",
+                RegexOptions.IgnoreCase);
+            bool isIndependent = declaration.Success &&
+                declaration.Groups["mode"].Value.Equals("independent", StringComparison.OrdinalIgnoreCase);
+            bool validDeclaration = declaration.Success && (isIndependent || declaration.Groups["slash"].Success);
+            SpeechActionDependency declaredDependency = isIndependent
+                ? SpeechActionDependency.Independent : SpeechActionDependency.AfterAction;
+            // Idempotent metadata before the first public character is harmless.
+            // Repeating it after prose, switching modes, or using unknown attributes
+            // remains an error, including when a previous error already suppressed speech.
+            bool repeatsFrontDeclaration = phaseDeclared && validDeclaration && !HasSpeech &&
+                !HasInvalidSpeechPhase && declaredDependency == SpeechDependency;
+            if (closing || HasSpeech || (phaseDeclared && !repeatsFrontDeclaration))
             {
                 RejectSpeechPhase("发声阶段必须在正文前声明一次，不能在本轮改换阶段。 ");
                 return;
             }
             FlushSpeech();
-            var declaration = Regex.Match(token,
-                "^<speech\\s+mode\\s*=\\s*(?<q>[\"'])(?<mode>independent|after_action)\\k<q>\\s*/>$",
-                RegexOptions.IgnoreCase);
             phaseDeclared = true;
-            if (!declaration.Success)
+            if (!validDeclaration)
             {
                 SpeechDependency = SpeechActionDependency.AfterAction;
                 RejectSpeechPhase("发声阶段标记无效；未受理依赖动作。 ");
                 return;
             }
-            SpeechDependency = declaration.Groups["mode"].Value.Equals("independent", StringComparison.OrdinalIgnoreCase)
-                ? SpeechActionDependency.Independent : SpeechActionDependency.AfterAction;
+            SpeechDependency = declaredDependency;
+            if (isIndependent && !declaration.Groups["slash"].Success) independentWrapperDepth++;
             if (SpeechDependency == SpeechActionDependency.Independent && HasSingingValidationActions)
                 RejectSpeechPhase("本轮已经包含待校验演唱或素材动作，不能声明为独立闲聊。 ");
             return;
@@ -269,5 +305,36 @@ public sealed class RoleOutputChannels
         result.Push(full);
         result.Finish();
         return result;
+    }
+}
+
+/// <summary>
+/// One current output-format observation, not permanent instructions accumulated
+/// after every failed reply. Other execution history and user text are untouched.
+/// </summary>
+public static class RoleOutputFormatFactHistory
+{
+    public const string Prefix = "[程序执行事实/当前输出格式] ";
+    public const string TruncationFact = "上一条回复因生成长度上限被截断，其中工具动作没有执行；" +
+        "不能把未完成输出当作成功。可根据当前用户语境重新决定、询问或暂不行动。";
+    private static readonly string[] LegacyPrefixes = {
+        "[程序执行事实] 本条回复的发声阶段校验失败：",
+        "[程序执行事实] 检测到方括号或全角括号等错误工具属性语法；",
+        "[程序执行事实] 上一条回复因生成长度上限被截断，"
+    };
+
+    public static void ReplaceCurrent<T>(IList<T> messages, Func<T, string> role,
+        Func<T, string> content, Func<string, T> createSystemMessage, string currentFailure)
+    {
+        for (int i = messages.Count - 1; i >= 0; i--)
+        {
+            if (!string.Equals(role(messages[i]), "system", StringComparison.Ordinal)) continue;
+            string text = content(messages[i]) ?? "";
+            if (text.StartsWith(Prefix, StringComparison.Ordinal) ||
+                Array.Exists(LegacyPrefixes, p => text.StartsWith(p, StringComparison.Ordinal)))
+                messages.RemoveAt(i);
+        }
+        if (!string.IsNullOrWhiteSpace(currentFailure))
+            messages.Add(createSystemMessage(Prefix + "仅描述最近一次模型输出；房间/身体执行结果仍以对应动作事实为准。\n" + currentFailure));
     }
 }

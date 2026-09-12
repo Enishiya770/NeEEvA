@@ -126,9 +126,9 @@ public partial class ChatSample
         spoken = "";
         m_SingingSpeechWithheld = true;
         m_WorkProgressFact += "\n[外放事实] 上一决策的待验证台词未外放：" +
-            (missingAction ? "声明依赖动作，但没有受理对应动作。" : "演唱仍待审核或动作被拒绝。") +
+            (missingAction ? "声明依赖演唱/素材校验，但没有受理对应演唱/素材动作；独立身体动作仍以各自程序事实为准。" : "演唱仍待审核或动作被拒绝。") +
             "不要把它当作用户已经听到的承诺/解释。\n";
-        if (m_LogAgentLoop) Debug.Log("[Work/Speech] 演唱未受理，撤回本轮待验证台词；保留动作结果供下一次决定");
+        if (m_LogAgentLoop) Debug.Log("[Work/Speech] 发声阶段或演唱校验未通过，撤回本轮待验证台词；独立身体动作结果不受此项判定影响");
     }
 
     private void NormalizeSingingGoalReview(AutonomyIntentDecision decision)

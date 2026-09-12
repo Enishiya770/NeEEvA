@@ -14,17 +14,26 @@ from fastapi.responses import JSONResponse
 from .backend import ArdyBackend, ROOT
 from .protocol import CancelRequest, GenerateRequest, ServiceError
 from .service import FixtureFeatureProvider, LiveFeatureProvider, MotionService
+from .locomotion_service import RoomLocomotionService
+from .locomotion_protocol import LocomotionRequest, LocomotionCancel
+from .locomotion_backend import capabilities
 
 
 def create_app(service):
+    room = RoomLocomotionService(service)
     @asynccontextmanager
     async def lifespan(app):
         await service.start()
-        yield
-        await service.close()
+        await room.start()
+        try:
+            yield
+        finally:
+            await room.close()
+            await service.close()
 
     app = FastAPI(title="NeEEvA local ARDY motion", lifespan=lifespan)
     app.state.motion_service = service
+    app.state.room_service = room
 
     @app.exception_handler(ServiceError)
     async def service_error(request, error):
@@ -62,23 +71,37 @@ def create_app(service):
     async def cancel(value: CancelRequest):
         return service.cancel(value)
 
-    @app.post("/v1/motion/generate")
-    async def generate(value: GenerateRequest, request: Request):
-        job = service.submit(value)
+    @app.get("/v1/locomotion/capabilities")
+    async def room_capabilities():
+        return capabilities(service.backend)
+
+    @app.post("/v1/locomotion/cancel")
+    async def room_cancel(value: LocomotionCancel):
+        return room.cancel(value)
+
+    @app.post("/v1/locomotion/generate")
+    async def room_generate(value: LocomotionRequest, request: Request):
+        return await await_job(room, room.submit(value), request)
+
+    async def await_job(owner, job, request):
         try:
             while not job.future.done():
                 if await request.is_disconnected():
-                    service.abort(job, ServiceError(499, "client_disconnected", "The motion client disconnected"))
+                    owner.abort(job, ServiceError(499, "client_disconnected", "The motion client disconnected"))
                     break
                 remaining = job.deadline-time.monotonic()
                 if remaining <= 0:
-                    service.abort(job, ServiceError(504, "deadline_exceeded", "Motion request exceeded its deadline"))
+                    owner.abort(job, ServiceError(504, "deadline_exceeded", "Motion request exceeded its deadline"))
                     break
                 await asyncio.wait({job.future}, timeout=min(0.05, remaining))
             return job.future.result()
         except asyncio.CancelledError:
-            service.abort(job, ServiceError(499, "client_disconnected", "The motion request was cancelled"))
+            owner.abort(job, ServiceError(499, "client_disconnected", "The motion request was cancelled"))
             raise
+
+    @app.post("/v1/motion/generate")
+    async def generate(value: GenerateRequest, request: Request):
+        return await await_job(service, service.submit(value), request)
 
     return app
 

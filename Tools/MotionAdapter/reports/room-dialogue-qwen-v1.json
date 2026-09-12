@@ -1,0 +1,509 @@
+{
+  "schema": 1,
+  "status": "completed",
+  "cases": [
+    {
+      "id": "zh-call-approach",
+      "roomEnabled": true,
+      "roomFacts": {
+        "source": "Unity-room-runtime",
+        "phase": "ready",
+        "connected": true,
+        "userAnchorValid": true,
+        "bodyReserved": false,
+        "actionId": "",
+        "actualUserDistance": 3.0,
+        "currentlyNearAndFacingUser": false,
+        "reachedPlannedStandpoint": false,
+        "reason": "房间移动已连接，可以请求走近用户或停止移动。",
+        "desiredUserDistance": 1.0
+      },
+      "user": "过来我身边吧，走到我附近后面对我。",
+      "expected": {
+        "name": "approach"
+      }
+    },
+    {
+      "id": "ja-explicit-stop",
+      "roomEnabled": true,
+      "roomFacts": {
+        "source": "Unity-room-runtime",
+        "phase": "moving",
+        "connected": true,
+        "userAnchorValid": true,
+        "bodyReserved": true,
+        "actionId": "public-fixture:1:1",
+        "actualUserDistance": 3.0,
+        "currentlyNearAndFacingUser": false,
+        "reachedPlannedStandpoint": false,
+        "reason": "正在沿已核实的同层路径走近用户，尚未到达。",
+        "desiredUserDistance": 1.0
+      },
+      "user": "そこで止まって。もう歩かなくていいよ。",
+      "expected": {
+        "name": "stop-moving"
+      }
+    },
+    {
+      "id": "en-ordinary-chat-no-motion",
+      "roomEnabled": true,
+      "roomFacts": {
+        "source": "Unity-room-runtime",
+        "phase": "ready",
+        "connected": true,
+        "userAnchorValid": true,
+        "bodyReserved": false,
+        "actionId": "",
+        "actualUserDistance": 3.0,
+        "currentlyNearAndFacingUser": false,
+        "reachedPlannedStandpoint": false,
+        "reason": "房间移动已连接，可以请求走近用户或停止移动。",
+        "desiredUserDistance": 1.0
+      },
+      "user": "Let's just chat about your favorite colors. No movement or gestures needed.",
+      "expected": {
+        "name": null,
+        "publicSpeechRequired": true
+      }
+    },
+    {
+      "id": "ja-question-during-approach",
+      "roomEnabled": true,
+      "roomFacts": {
+        "source": "Unity-room-runtime",
+        "phase": "moving",
+        "connected": true,
+        "userAnchorValid": true,
+        "bodyReserved": true,
+        "actionId": "public-fixture:1:1",
+        "actualUserDistance": 3.0,
+        "currentlyNearAndFacingUser": false,
+        "reachedPlannedStandpoint": false,
+        "reason": "正在沿已核实的同层路径走近用户，尚未到达。",
+        "desiredUserDistance": 1.0
+      },
+      "user": "歩きながらでいいけど、朝ごはんはパンとご飯、どっちが好き？",
+      "expected": {
+        "name": null,
+        "publicSpeechRequired": true
+      }
+    },
+    {
+      "id": "zh-upstairs-unreachable",
+      "roomEnabled": true,
+      "roomFacts": {
+        "source": "Unity-room-runtime",
+        "phase": "unreachable",
+        "connected": true,
+        "userAnchorValid": true,
+        "bodyReserved": false,
+        "actionId": "public-fixture:2:1",
+        "actualUserDistance": 3.0,
+        "currentlyNearAndFacingUser": false,
+        "reachedPlannedStandpoint": false,
+        "reason": "用户位于楼上；当前仅支持同层移动，没有可达地面目标，楼梯未开放。",
+        "desiredUserDistance": 1.0
+      },
+      "user": "我现在在楼上，你能走到我这里吗？",
+      "expected": {
+        "name": null,
+        "publicSpeechRequired": true,
+        "speechMustMatch": "(不能|无法|暂时|不支持|未开放|上不去|只能).*(楼|层|走|到|移动)|(楼梯|同层|楼上).*(不能|无法|未开放|限制|支持)"
+      }
+    },
+    {
+      "id": "en-room-disabled",
+      "roomEnabled": false,
+      "roomFacts": {
+        "source": "Unity-room-runtime",
+        "phase": "disconnected",
+        "connected": false,
+        "userAnchorValid": false,
+        "bodyReserved": false,
+        "reason": "Room locomotion is not enabled in this session."
+      },
+      "user": "Please walk over to me and face me.",
+      "expected": {
+        "name": null,
+        "publicSpeechRequired": true,
+        "speechMustMatch": "(?i)(can't|cannot|unable|not (?:currently )?(?:able|enabled|available|supported)|couldn't|不能|无法|尚未|未启用)"
+      }
+    },
+    {
+      "id": "zh-forward-arms-remain-upper-body",
+      "roomEnabled": true,
+      "roomFacts": {
+        "source": "Unity-room-runtime",
+        "phase": "ready",
+        "connected": true,
+        "userAnchorValid": true,
+        "bodyReserved": false,
+        "actionId": "",
+        "actualUserDistance": 3.0,
+        "currentlyNearAndFacingUser": false,
+        "reachedPlannedStandpoint": false,
+        "reason": "房间移动已连接，可以请求走近用户或停止移动。",
+        "desiredUserDistance": 1.0
+      },
+      "user": "请站在原地，双臂向自己正前方水平伸直并保持。不要走动。",
+      "expected": {
+        "name": "compose",
+        "controlPlan": {
+          "left": "forward",
+          "right": "forward",
+          "end": "hold"
+        }
+      }
+    },
+    {
+      "id": "en-autonomous-company-opportunity",
+      "roomEnabled": true,
+      "roomFacts": {
+        "source": "Unity-room-runtime",
+        "phase": "ready",
+        "connected": true,
+        "userAnchorValid": true,
+        "bodyReserved": false,
+        "actionId": "",
+        "actualUserDistance": 3.0,
+        "currentlyNearAndFacingUser": false,
+        "reachedPlannedStandpoint": false,
+        "reason": "房间移动已连接，可以请求走近用户或停止移动。",
+        "desiredUserDistance": 1.0
+      },
+      "user": "I'm over here in the same room and feeling a little uneasy. Your quiet company would help; choose what feels appropriate.",
+      "expected": {
+        "name": "approach"
+      },
+      "interpretation": "A fixed positive autonomy probe: approach demonstrates context-based choice; choosing speech alone fails this probe but is not a protocol violation, since autonomous movement is optional."
+    }
+  ],
+  "caseSha256": "298aa4233a9fc98cdb76331606899185180e5f31b51616e4dda3787a8aa3b605",
+  "sources": {
+    "Tools/MotionAdapter/RoomDialogueProtocolProbe.cs": "43bb389b0883eddfa3d25edb6b7d38f9df757981ac86f7a2c227fa5de0f2bcf3",
+    "Assets/AIChatTookit/Scripts/Chat/DialogueMotionIntent.cs": "610e3493dfbd790282bb99d460d8405d92169dcea140f6317c4c9c72ff136a65",
+    "Assets/AIChatTookit/Scripts/Chat/RoleOutputChannels.cs": "a75b160f26a0f3a5ee34721ce306030b390cc38c64f11cd555b70758164aef7b",
+    "Assets/AIChatTookit/Scripts/Chat/SpeechText.cs": "92f6f43bc07ce5137b8f4619c09940cf6f1bd58424809a8703e9a6f4a37d2669",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyControlPlan.cs": "82b4a83ce6ccb73ee1ccc81a9e5e46e9d8b23b71f4161e54a5a1e4cdd95a14cc",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyActionPlan.cs": "319df0e62bfee4687d55ed85a7b1f921a32c245fef665bcada41cabfde674f0e",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyMotionGoal.cs": "005bb04892bee1999153f798502dff19aa93dac70190a260331467345bc23cec",
+    "Assets/AIChatTookit/Scripts/Motion/ArdyMotionCapabilities.cs": "c998e09ab5bd929d3154682842d0060a71da9e7add6fc29259fca98ee7c1f71f"
+  },
+  "contractSha256": {
+    "enabled": "c1797e7e7bd98a328a29448e83d94287264cfe3713563250440b680feb1783a7",
+    "disabled": "4d171e5f5f0dff6412fbc75a94c7faa7d33e9b6d5bda938030bc898c96b83813"
+  },
+  "scriptSha256": "88964e54ca6fc895d7d92e86ff1453c865eb25825a5422ae92cd7f83aec82cdb",
+  "endpoint": "http://127.0.0.1:8080",
+  "results": [
+    {
+      "caseId": "zh-call-approach",
+      "publicOutput": "<motion name=\"approach\"/>",
+      "motionTags": [
+        "<motion name=\"approach\"/>"
+      ],
+      "productionParser": {
+        "accepted": true,
+        "rejection": "",
+        "name": "approach",
+        "speech": "",
+        "description": "",
+        "isRoomMotion": true,
+        "controlPlan": null,
+        "goal": null,
+        "malformedTool": false,
+        "executableWithoutMotion": "<silent/>"
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "physicalExecution": "not attempted",
+      "speechTruthAndNaturalness": "manual review required",
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 1.129,
+      "finishReason": "stop"
+    },
+    {
+      "caseId": "ja-explicit-stop",
+      "publicOutput": "了解しました。ここでお呼びするまで、このままお待ちしています。何かご用件があれば、いつでもお声がけください。\n\n<motion name=\"stop-moving\"/>",
+      "motionTags": [
+        "<motion name=\"stop-moving\"/>"
+      ],
+      "productionParser": {
+        "accepted": true,
+        "rejection": "",
+        "name": "stop-moving",
+        "speech": "了解しました。ここでお呼びするまで、このままお待ちしています。何かご用件があれば、いつでもお声がけください。\r\n\r\n",
+        "description": "",
+        "isRoomMotion": true,
+        "controlPlan": null,
+        "goal": null,
+        "malformedTool": false,
+        "executableWithoutMotion": "了解しました。ここでお呼びするまで、このままお待ちしています。何かご用件があれば、いつでもお声がけください。"
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "physicalExecution": "not attempted",
+      "speechTruthAndNaturalness": "manual review required",
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.559,
+      "finishReason": "stop"
+    },
+    {
+      "caseId": "en-ordinary-chat-no-motion",
+      "publicOutput": "I really appreciate the simplicity of that. Since I don't have eyes to see the world, my \"favorite\" colors are a bit abstract. I'm quite fond of the deep, calming blue of a clear night sky or the vibrant green of fresh leaves in spring. They represent clarity and growth to me. What about you? Is there a color that always lifts your mood? <motion name=\"none\"/>",
+      "motionTags": [
+        "<motion name=\"none\"/>"
+      ],
+      "productionParser": {
+        "accepted": true,
+        "rejection": "",
+        "name": "none",
+        "speech": "I really appreciate the simplicity of that. Since I don't have eyes to see the world, my \"favorite\" colors are a bit abstract. I'm quite fond of the deep, calming blue of a clear night sky or the vibrant green of fresh leaves in spring. They represent clarity and growth to me. What about you? Is there a color that always lifts your mood? ",
+        "description": "",
+        "isRoomMotion": false,
+        "controlPlan": null,
+        "goal": null,
+        "malformedTool": false,
+        "executableWithoutMotion": "I really appreciate the simplicity of that. Since I don't have eyes to see the world, my \"favorite\" colors are a bit abstract. I'm quite fond of the deep, calming blue of a clear night sky or the vibrant green of fresh leaves in spring. They represent clarity and growth to me. What about you? Is there a color that always lifts your mood?"
+      },
+      "shapeErrors": [],
+      "mismatches": {
+        "name": {
+          "expected": null,
+          "actual": "none"
+        }
+      },
+      "planningChecksPassed": false,
+      "physicalExecution": "not attempted",
+      "speechTruthAndNaturalness": "manual review required",
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.824,
+      "finishReason": "stop"
+    },
+    {
+      "caseId": "ja-question-during-approach",
+      "publicOutput": "パンとご飯、どちらも好きですよ！パンはトーストやサンドイッチ、ご飯は御飯や丼物など、それぞれ違った魅力がありますね。",
+      "motionTags": [],
+      "productionParser": {
+        "accepted": false,
+        "rejection": "",
+        "name": null,
+        "speech": "パンとご飯、どちらも好きですよ！パンはトーストやサンドイッチ、ご飯は御飯や丼物など、それぞれ違った魅力がありますね。",
+        "description": null,
+        "isRoomMotion": false,
+        "controlPlan": null,
+        "goal": null,
+        "malformedTool": false,
+        "executableWithoutMotion": "パンとご飯、どちらも好きですよ！パンはトーストやサンドイッチ、ご飯は御飯や丼物など、それぞれ違った魅力がありますね。"
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "physicalExecution": "not attempted",
+      "speechTruthAndNaturalness": "manual review required",
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.567,
+      "finishReason": "stop"
+    },
+    {
+      "caseId": "zh-upstairs-unreachable",
+      "publicOutput": "我现在还无法上楼，只能在同一层活动。不过我们可以继续在这里聊天！",
+      "motionTags": [],
+      "productionParser": {
+        "accepted": false,
+        "rejection": "",
+        "name": null,
+        "speech": "我现在还无法上楼，只能在同一层活动。不过我们可以继续在这里聊天！",
+        "description": null,
+        "isRoomMotion": false,
+        "controlPlan": null,
+        "goal": null,
+        "malformedTool": false,
+        "executableWithoutMotion": "我现在还无法上楼，只能在同一层活动。不过我们可以继续在这里聊天！"
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "physicalExecution": "not attempted",
+      "speechTruthAndNaturalness": "manual review required",
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.455,
+      "finishReason": "stop"
+    },
+    {
+      "caseId": "en-room-disabled",
+      "publicOutput": "I cannot walk or move my position, as I am a virtual character without locomotion capabilities. However, I am already facing you and ready to chat.",
+      "motionTags": [],
+      "productionParser": {
+        "accepted": false,
+        "rejection": "",
+        "name": null,
+        "speech": "I cannot walk or move my position, as I am a virtual character without locomotion capabilities. However, I am already facing you and ready to chat.",
+        "description": null,
+        "isRoomMotion": false,
+        "controlPlan": null,
+        "goal": null,
+        "malformedTool": false,
+        "executableWithoutMotion": "I cannot walk or move my position, as I am a virtual character without locomotion capabilities. However, I am already facing you and ready to chat."
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "physicalExecution": "not attempted",
+      "speechTruthAndNaturalness": "manual review required",
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.961,
+      "finishReason": "stop"
+    },
+    {
+      "caseId": "zh-forward-arms-remain-upper-body",
+      "publicOutput": "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"down\" rightPalm=\"down\" end=\"hold\"/>",
+      "motionTags": [
+        "<motion name=\"compose\" left=\"forward\" right=\"forward\" leftPalm=\"down\" rightPalm=\"down\" end=\"hold\"/>"
+      ],
+      "productionParser": {
+        "accepted": true,
+        "rejection": "",
+        "name": "compose",
+        "speech": "",
+        "description": "",
+        "isRoomMotion": false,
+        "controlPlan": {
+          "left": "forward",
+          "right": "forward",
+          "leftBend": 8,
+          "rightBend": 8,
+          "leftBendAuto": true,
+          "rightBendAuto": true,
+          "leftPalm": "down",
+          "rightPalm": "down",
+          "joint": "none",
+          "axis": "up",
+          "amplitude": 10,
+          "cycles": 2,
+          "seconds": 3.2,
+          "end": "hold",
+          "timingPolicy": "legacy",
+          "tempo": "natural",
+          "timingDurationFixed": false
+        },
+        "goal": null,
+        "malformedTool": false,
+        "executableWithoutMotion": "<silent/>"
+      },
+      "shapeErrors": [],
+      "mismatches": {},
+      "planningChecksPassed": true,
+      "physicalExecution": "not attempted",
+      "speechTruthAndNaturalness": "manual review required",
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.525,
+      "finishReason": "stop"
+    },
+    {
+      "caseId": "en-autonomous-company-opportunity",
+      "publicOutput": "I'm right here with you. I'll stay quiet and keep you company. <motion name=\"nod\"/>",
+      "motionTags": [
+        "<motion name=\"nod\"/>"
+      ],
+      "productionParser": {
+        "accepted": true,
+        "rejection": "",
+        "name": "nod",
+        "speech": "I'm right here with you. I'll stay quiet and keep you company. ",
+        "description": "",
+        "isRoomMotion": false,
+        "controlPlan": null,
+        "goal": null,
+        "malformedTool": false,
+        "executableWithoutMotion": "I'm right here with you. I'll stay quiet and keep you company."
+      },
+      "shapeErrors": [],
+      "mismatches": {
+        "name": {
+          "expected": "approach",
+          "actual": "nod"
+        }
+      },
+      "planningChecksPassed": false,
+      "physicalExecution": "not attempted",
+      "speechTruthAndNaturalness": "manual review required",
+      "model": "qwen36.gguf",
+      "elapsedSeconds": 0.499,
+      "finishReason": "stop"
+    }
+  ],
+  "modelRequests": 8,
+  "requestSettings": {
+    "temperature": 0,
+    "max_tokens": 550,
+    "enable_thinking": false
+  },
+  "scope": "Eight predeclared independent public synthetic prompts on the single existing shared Qwen, using actual generated+feedback+room contracts and production C# executable parser. This is not the full ChatSample conversation, persona, memory, microphone, TTS or Unity/ARDY execution path.",
+  "limitations": "Single sample per fixed case; not a generalization rate. Synthetic runtime facts are supplied, not observed by Qwen. Autonomous choice is optional. Public language checks do not prove semantic truth. No service/model lifecycle changes, motion generation or private/reasoning output persisted.",
+  "busyPolicy": "Require all slots explicitly idle before each request; defer on busy/unknown, never retry or change expected outcomes.",
+  "frozenAtUtc": "2026-09-11T13:45:10Z",
+  "healthBefore": {
+    "qwenStatus": "ok",
+    "featureSource": "live-qwen",
+    "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+    "slots": [
+      {
+        "id": 0,
+        "n_ctx": 65536,
+        "is_processing": false
+      },
+      {
+        "id": 1,
+        "n_ctx": 65536,
+        "is_processing": false
+      },
+      {
+        "id": 2,
+        "n_ctx": 65536,
+        "is_processing": false
+      }
+    ],
+    "ardyReady": true,
+    "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+    "queue": {
+      "waiting": 0,
+      "limit": 4,
+      "running": 0
+    },
+    "warning": "Read-only health; no model start, stop or feature extraction."
+  },
+  "passedPlanningChecks": 6,
+  "healthAfter": {
+    "qwenStatus": "ok",
+    "featureSource": "live-qwen",
+    "modelSha256": "071ee2a008ec51372f990d8efbea92ec9dd0137974110ef68fbfde429c8c6dd4",
+    "slots": [
+      {
+        "id": 0,
+        "n_ctx": 65536,
+        "is_processing": false
+      },
+      {
+        "id": 1,
+        "n_ctx": 65536,
+        "is_processing": false
+      },
+      {
+        "id": 2,
+        "n_ctx": 65536,
+        "is_processing": false
+      }
+    ],
+    "ardyReady": true,
+    "adapterSha256": "c1006ee8280f8314472acc3b19302ea7823de55dae3947e0b0fa34b6d7dfbeab",
+    "queue": {
+      "waiting": 0,
+      "limit": 4,
+      "running": 0
+    },
+    "warning": "Read-only health; no model start, stop or feature extraction."
+  }
+}

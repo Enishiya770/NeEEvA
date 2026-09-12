@@ -128,6 +128,9 @@ public partial class ChatSample
     {
         if (feedback == null || string.IsNullOrEmpty(feedback.actionId) ||
             !m_MotionActions.TryGetValue(feedback.actionId, out MotionActionRecord record) || !IsCurrentMotionRecord(record)) return;
+        // Runtime room facts have their own lifetime across user speech and come
+        // through MotionStateContextRequested, never the upper-body repair loop.
+        if (record.intent.IsRoomMotion) return;
         if (feedback.responseGeneration != record.intent.ResponseGeneration || feedback.repairAttempt != record.intent.RepairAttempt ||
             (feedback.parentActionId ?? "") != record.intent.ParentActionId || feedback.name != record.intent.Name) return;
         bool terminal = feedback.status == "completed" || feedback.status == "goal-unmet" || feedback.status == "rejected" || feedback.status == "cancelled";
@@ -176,11 +179,12 @@ public partial class ChatSample
             actionId = rejected.ActionId, parentActionId = rejected.ParentActionId,
             responseGeneration = rejected.ResponseGeneration, repairAttempt = rejected.RepairAttempt,
             name = rejected.Name, description = rejected.Description, goal = rejected.Goal?.Copy(),
-            status = "rejected", reason = reason, canRepair = rejected.RepairAttempt == 0 };
+            status = "rejected", reason = reason, canRepair = !rejected.IsRoomMotion && rejected.RepairAttempt == 0 };
         record.terminal = true;
         m_LastMotionExecutionFeedback = fact;
         SuppressRejectedMotionSpeech(record);
-        QueueMotionRepair(record, fact);
+        if (!rejected.IsRoomMotion) QueueMotionRepair(record, fact);
+        else ReportMotionFailure("room_motion_protocol_rejected", "本次房间移动指令未执行。", reason);
         if (rejected.RepairAttempt == 1) ReportMotionRepairExhausted(reason);
     }
 
@@ -200,6 +204,8 @@ public partial class ChatSample
         error = "";
         var repair = m_ActiveMotionRepair;
         if (repair == null || !repair.callbackStarted || intent.Name == "none") return true;
+        if (intent.IsRoomMotion)
+        { error = "上身动作修订不能变成房间移动；请保留原动作目标或说明限制。"; return false; }
         var original = repair.original.intent;
         if ((original.Name == "generate" && intent.Name != "generate") ||
             (original.Name == "replay" && (intent.Name != "replay" || intent.ReplayReference != original.ReplayReference)))
@@ -215,7 +221,7 @@ public partial class ChatSample
 
     private void QueueMotionRepair(MotionActionRecord record, ArdyMotionExecutionFeedback feedback)
     {
-        if (!IsCurrentMotionRecord(record) || record.repairConsumed || record.intent.RepairAttempt != 0) return;
+        if (record.intent.IsRoomMotion || !IsCurrentMotionRecord(record) || record.repairConsumed || record.intent.RepairAttempt != 0) return;
         record.repairConsumed = true; // Budget is spent once, including cancellation or a failed correction.
         m_PendingMotionRepair = new MotionRepairRequest { original = record, feedback = feedback.Copy() };
         if (Application.isPlaying && isActiveAndEnabled && m_MotionRepairCoroutine == null)
@@ -325,7 +331,7 @@ public partial class ChatSample
         channels.Finish();
         string executable = channels.ToExecutableText();
         bool hasMotion = DialogueMotionProtocol.TryExtract(ref executable, m_FormalResponseGeneration,
-            m_MotionSequence + 1, out _, out string rejection);
+            m_MotionSequence + 1, out _, out string rejection, RoomMotionOutputEnabled);
         if (!channels.HasSpeech && !hasMotion && string.IsNullOrEmpty(rejection))
         {
             m_LastMotionRepairResult = new MotionRepairResultFact {

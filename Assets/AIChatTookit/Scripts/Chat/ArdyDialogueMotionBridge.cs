@@ -16,6 +16,7 @@ public sealed class ArdyDialogueMotionBridge : MonoBehaviour
     private ChatSample subscribedChat;
     private ArdyLiveMotionController controller;
     public bool IsBound => subscribedChat != null && controller != null && controller.IsBound;
+    public Vrm10Instance Avatar => target;
     public string Status => controller != null ? controller.Status : "尚未连接对话与角色";
 
     private void Start()
@@ -51,6 +52,13 @@ public sealed class ArdyDialogueMotionBridge : MonoBehaviour
 
     private void OnMotionIntent(DialogueMotionIntent intent)
     {
+        if (intent.IsRoomMotion) return;
+        var room = GetComponent<ArdyRoomDialogueBridge>();
+        if (room != null && room.avatar == target && room.ReservesBody)
+        {
+            room.RejectBodyRequest(intent);
+            return;
+        }
         if (!isActiveAndEnabled || !IsBound) return;
         controller.interactionTarget = interactionTarget;
         try
@@ -77,6 +85,8 @@ public sealed class ArdyDialogueMotionBridge : MonoBehaviour
 
     private void OnMotionCancelled(int generation, string reason)
     {
+        var room = GetComponent<ArdyRoomDialogueBridge>();
+        if (room != null && room.avatar == target && room.ReservesBody) return;
         if (controller != null) controller.Cancel(reason);
     }
 
