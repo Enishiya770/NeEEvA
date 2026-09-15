@@ -178,6 +178,7 @@ public partial class ChatSample
         "新用户轮只暂停执行，不清空active_goal。追问失败原因或没听到时，原refs顺序和成功条件仍在；确认要继续可用<sing_goal transition=\"continue\"/>，程序绑定原目标和版本，不默认最近录音。" +
         "修改原任务用transition=revise，换成独立新演唱任务用replace，明确放弃原任务用cancel；用户事项须change_quote逐字引用最新用户改变/取消要求，并由独立审查确认其语义。" +
         "有未完成active_goal时省略transition等于continue，不能借新proposal缩减原目标。revise/replace仍须完整refs/range/expected/completion；revisions可省略由程序绑定当前素材，提供时必须匹配。" +
+        "登记时还是候选的素材绑定revisions=pending；之后来源被确认，程序会把它解析成实际版本，不需要你改目标，也不算改变内容。" +
         "continue不能改素材/范围/完成条件；只解释或回答追问可以不发工具，保留待办但不会自动演唱。cancel只取消事项，不删除录音。" +
         "reason只是解释，expanded必须写入range。目标与真正工具参数都要落实用户修正，不能只把二者填成同一个错误方案。\n";
 
@@ -361,6 +362,37 @@ public partial class ChatSample
         }));
     }
 
+    // A clip still in quarantine binds revisions="pending". Confirming its source later
+    // resolves the same audio to a concrete revision: the recording did not change, and
+    // neither did what was promised. Treating the two as different material deadlocks an
+    // objective against its own stale binding, so a pending→concrete promotion is the
+    // same material here. A real re-cut bumps the revision and still needs re-registering.
+    private static bool SameSingingMaterialVersion(string bound, string actual) =>
+        bound == actual || (bound == "pending" && actual != "pending" && actual != "missing");
+
+    // Follow that promotion on the stored objective so every later comparison, and the
+    // version the character is shown, reflect the material that actually exists.
+    private string PromoteResolvedSingingMaterialVersions(string refsCsv, string revisionsCsv)
+    {
+        if (string.IsNullOrEmpty(refsCsv) || string.IsNullOrEmpty(revisionsCsv)) return revisionsCsv;
+        var refs = refsCsv.Split(',').Select(s => s.Trim()).ToArray();
+        var bound = revisionsCsv.Split(',').Select(s => s.Trim()).ToArray();
+        if (refs.Length != bound.Length) return revisionsCsv;
+        var actual = BindCurrentSingingMaterialVersions(refs).Split(',');
+        if (actual.Length != refs.Length) return revisionsCsv;
+        bool promoted = false;
+        for (int i = 0; i < bound.Length; i++)
+        {
+            if (bound[i] != "pending" || actual[i] == "pending" || actual[i] == "missing") continue;
+            bound[i] = actual[i]; promoted = true;
+        }
+        if (!promoted) return revisionsCsv;
+        string resolved = string.Join(",", bound);
+        Debug.Log($"[Sing/Goal] 素材来源已确认，目标版本随之解析 {revisionsCsv} → {resolved}；" +
+            "refs、范围与成功条件未变，这不是内容改动，也不构成新的演唱授权。");
+        return resolved;
+    }
+
     // Syntax identifies an intended transition; semantic authority remains the separate
     // review. Missing/invalid edits cannot remove the previously committed objective.
     private bool BindSingingGoalTransition(SingingGoal goal, string attrs, out string failure)
@@ -393,10 +425,29 @@ public partial class ChatSample
         { failure = "没有可继续或修改的活动目标；请按实际新要求登记create，未回退到旧录音。"; return false; }
         if (goal.transition == "continue")
         {
+            // Resolve a quarantined clip's binding before comparing. Without this the
+            // objective is unreachable once its source is confirmed: omitting revisions
+            // inherits the stale "pending" and fails material validation, while supplying
+            // the resolved value reads as changing the objective. Only the material
+            // version moves; refs, range and the success condition are still pinned.
+            active.revisions = PromoteResolvedSingingMaterialVersions(active.refs, active.revisions);
             string Supplied(string field) => (ReadToolAttribute(attrs, field) ?? "").Trim();
             bool Different(string field, string bound) => Supplied(field).Length > 0 && Supplied(field) != bound;
+            // Copying the objective's pre-promotion "pending" back from an older frame
+            // still names the same recording, so it is not a changed objective either.
+            bool DifferentRevisions()
+            {
+                string supplied = Supplied("revisions");
+                if (supplied.Length == 0 || supplied == active.revisions) return false;
+                var a = supplied.Split(',').Select(s => s.Trim()).ToArray();
+                var b = active.revisions.Split(',').Select(s => s.Trim()).ToArray();
+                if (a.Length != b.Length) return true;
+                for (int i = 0; i < a.Length; i++)
+                    if (!SameSingingMaterialVersion(a[i], b[i]) && !SameSingingMaterialVersion(b[i], a[i])) return true;
+                return false;
+            }
             if (Different("refs", active.refs) || Different("range", active.range) ||
-                Different("revisions", active.revisions) || Different("expected", active.expected) ||
+                DifferentRevisions() || Different("expected", active.expected) ||
                 Different("completion", active.completion) || Different("intent", active.intent) ||
                 Different("repair_scope", active.repairScope) || Different("origin", active.origin) ||
                 (Supplied("start_seconds").Length > 0 && !goal.start.Equals(active.start)) ||
@@ -531,6 +582,7 @@ public partial class ChatSample
         var errors = new List<string>();
         var sense = m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText;
         if (sense == null) { reason = "当前没有录音素材接口。"; return false; }
+        goal.revisions = PromoteResolvedSingingMaterialVersions(goal.refs, goal.revisions);
         var refs = goal.refs.Split(','); var versions = goal.revisions.Split(',');
         for (int i = 0; i < refs.Length; i++)
         {
@@ -538,7 +590,7 @@ public partial class ChatSample
             var pending = sense.DescribeQuarantinedSingingCandidates().Find(p => p.ClipRef == refs[i]);
             if (ready == null && pending == null) { errors.Add(refs[i] + "不存在"); continue; }
             string actual = ready == null ? "pending" : ready.Revision.ToString(CultureInfo.InvariantCulture);
-            if (i >= versions.Length || versions[i] != actual)
+            if (i >= versions.Length || !SameSingingMaterialVersion(versions[i].Trim(), actual))
                 errors.Add(refs[i] + "版本不符，实际revision=" + actual);
             if (goal.range == "current" && ready == null && pending.PlaybackStatus != "ready")
                 errors.Add(refs[i] + " current尚未选定；须据真实边界选择clean/expanded/window");
@@ -660,6 +712,7 @@ public partial class ChatSample
             (requestRange == "window" && (Mathf.Abs(goal.start - request.StartSeconds) > .001f || Mathf.Abs(goal.end - request.EndSeconds) > .001f)))
         { failure = $"动作不符合已核对目标：expected_refs={goal.refs} range={goal.range}；actual_refs={request.ClipRefs} range={requestRange}。reason不会改变参数；没有修改或播放。";
             return RejectSingingResolution(out detail, "goal_target_mismatch", "goal", failure, "按已审目标的精确refs/范围执行；需要改变时先重新审核。"); }
+        goal.revisions = PromoteResolvedSingingMaterialVersions(goal.refs, goal.revisions);
         var versions = goal.revisions.Split(',');
         var refs = request.ClipRefs.Split(',');
         var preview = new List<SingingMaterialFact>();
@@ -668,7 +721,7 @@ public partial class ChatSample
             var phrase = sense.DescribePracticePhrases().Find(p => p.ClipRef == refs[i]);
             var pending = sense.DescribeQuarantinedSingingCandidates().Find(p => p.ClipRef == refs[i]);
             string actualVersion = phrase == null ? "pending" : phrase.Revision.ToString(CultureInfo.InvariantCulture);
-            if (versions[i] != actualVersion)
+            if (!SameSingingMaterialVersion(versions[i].Trim(), actualVersion))
             { failure = $"目标版本已过期：{refs[i]} expected_revision={versions[i]} actual_revision={actualVersion}；请根据新事实更新目标，未修改或播放。";
                 return RejectSingingResolution(out detail, "material_version_mismatch", "material", failure, "保持原任务范围，核对最新素材版本后重新审核。"); }
             if (phrase == null && pending == null) return RejectSingingResolution(out detail, "material_reference_missing", "material", "目标素材已不存在；未修改或播放。", "报告缺失事实，不自动选另一份录音。");

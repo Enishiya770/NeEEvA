@@ -20,6 +20,9 @@ public sealed class RoleOutputChannels
     private bool probingInternalEnvelope, atSpeechBlockStart = true;
     public bool HasInvalidPublicBoundary { get; private set; }
     public string PublicBoundaryError { get; private set; }
+    // Prose written before any declaration was absorbed as an implicit thought. This
+    // is an observation about output shape, not a delivery or execution failure.
+    public bool HasAbsorbedBarePreamble { get; private set; }
     public bool HasAnyActionTag { get; private set; }
     private bool droppingMalformedTool;
     private char malformedQuote;
@@ -166,8 +169,21 @@ public sealed class RoleOutputChannels
         if (RequiresExplicitPublicSay &&
             !inSay && !silent && thoughtDepth == 0 && !inCode)
         {
-            if (!char.IsWhiteSpace(c))
-                RejectPublicBoundary("公开台词缺少 say 边界；无标记正文和其中动作未受理。内部判断用闭合的 thought，[内心] 只是历史显示；公开台词须先声明 lang、speech 并放在 say 中。");
+            if (char.IsWhiteSpace(c)) return;
+            // Prose before any declaration is the model reasoning out loud, and it is
+            // never read aloud either way. Absorbing it as an implicit thought keeps
+            // the well-formed remainder of the reply usable instead of discarding a
+            // whole turn over a preamble. Only a leading preamble qualifies: once a
+            // language/phase declaration or public speech exists, unframed prose is
+            // still a boundary error, and Finish still rejects a reply that never
+            // framed a public line at all.
+            if (!phaseDeclared && languageCode == null && !HasSpeech)
+            {
+                HasAbsorbedBarePreamble = true;
+                PrivateCharacters++;
+                return;
+            }
+            RejectPublicBoundary("公开台词缺少 say 边界；无标记正文和其中动作未受理。内部判断用闭合的 thought，[内心] 只是历史显示；公开台词须先声明 lang、speech 并放在 say 中。");
             return;
         }
         if (!silent && thoughtDepth == 0 && !inCode && !phaseSpeechSuppressed)
@@ -196,6 +212,13 @@ public sealed class RoleOutputChannels
             RejectPublicBoundary("公开 say 块未闭合；未执行其中或后续动作。");
         foreach (char c in suspicious.ToString()) Emit(c, emitted);
         suspicious.Length = 0;
+        // Absorbing a preamble rescues the framed remainder; it does not invent one.
+        // A reply whose only prose was that preamble never framed a public line, so it
+        // stays a boundary failure and is retried rather than silently running tools
+        // with nothing said. An explicit silent tail is a real choice and is kept.
+        if (RequiresExplicitPublicSay && HasAbsorbedBarePreamble && !HasSpeech && !silent)
+            RejectPublicBoundary("整条回复都是无标记正文，没有任何 say 边界；已按内部思考处理，未发声，本条动作未执行。" +
+                "要说的话放进 <say>，内部判断放进闭合的 <thought>；确实只想在心里想时用 <silent/>。");
         // An unfinished metadata tag is discarded, never read aloud.
         if (Regex.IsMatch(tag.ToString(), @"^<\s*lang\b", RegexOptions.IgnoreCase))
             HasInvalidLanguage = true;

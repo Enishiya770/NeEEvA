@@ -2776,10 +2776,20 @@ public partial class ChatQW : LLM
             currentFormatFacts.AppendLine(channels.SpeechPhaseExecutionFact + channels.SpeechPhaseCorrection);
         if (channels.HasMalformedTool)
             currentFormatFacts.AppendLine(reason + "可使用标准 <工具名 属性=\"值\"/> 重新决定或询问；不能称为已执行。");
+        // A rescued preamble is a shape note, not a failure: the reply was delivered.
+        // Say so plainly so the next turn writes thought explicitly, without spending a
+        // correction round on an output that already worked.
+        if (!channels.HasInvalidPublicBoundary && channels.HasAbsorbedBarePreamble)
+            currentFormatFacts.AppendLine("[public_output_boundary/preamble] 上一条回复在首个标签之前写了无标记正文。" +
+                "它已按内部思考处理：没有朗读，也没有改变本条已交付的台词与已受理的动作。" +
+                "下次把内部判断放进闭合的 <thought>，公开台词仍放在 <say> 内。");
         // Replace before callbacks: immediate correction requests see this output's
         // facts. A valid completion clears obsolete format errors, not body history.
         RoleOutputFormatFactHistory.ReplaceCurrent(m_DataList, message => message.role,
             message => message.content, fact => new SendData("system", fact), currentFormatFacts.ToString().Trim());
+        if (channels.HasAbsorbedBarePreamble)
+            Debug.Log("[LLM/Channels] 首个标签之前的无标记正文已按内部思考吸收 privateCharacters=" +
+                channels.PrivateCharacters + " boundaryRejected=" + channels.HasInvalidPublicBoundary);
         if (channels.HasInvalidSpeechPhase)
         {
             string phaseReason = channels.SpeechPhaseExecutionFact;
