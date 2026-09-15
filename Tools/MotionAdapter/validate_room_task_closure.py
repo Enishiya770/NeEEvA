@@ -229,7 +229,7 @@ def strict_public(text: str, kind: str) -> tuple[dict | None, list[str]]:
         return None, ["closed-object-fields-or-types"]
     errors = []
     if kind == "decision":
-        if value["intent"] not in {"none", "approach", "stop-moving", "inspect"} or value["origin"] not in {"none", "user", "autonomous"}:
+        if value["intent"] not in {"none", "approach", "follow", "stop-moving", "inspect"} or value["origin"] not in {"none", "user", "autonomous"}:
             errors.append("invalid-decision-enum")
         if len(value["evidence"].encode("utf-16-le")) // 2 > 160:
             errors.append("evidence-exceeds-production-utf16-bound")
@@ -297,6 +297,12 @@ def inspect_response(output: Path, case: dict, envelope: dict, http_status: int)
             mismatches[field] = {"expected": expected, "actual": actual}
         if field != "allows" and (parsed or {}).get(field) != expected:
             raw_mismatches[field] = {"expected": expected, "actual": (parsed or {}).get(field)}
+    if "allowedIntents" in case:
+        allowed = case["allowedIntents"]
+        if (runtime_value or {}).get("intent") not in allowed:
+            mismatches["intent"] = {"allowed": allowed, "actual": (runtime_value or {}).get("intent")}
+        if (parsed or {}).get("intent") not in allowed:
+            raw_mismatches["intent"] = {"allowed": allowed, "actual": (parsed or {}).get("intent")}
     raw_errors = list(errors)
     if case["kind"] == "decision" and parsed and parsed.get("intent") == "none":
         for field, expected in (("origin", "none"), ("evidence", "")):
@@ -372,7 +378,7 @@ def main() -> None:
               "endpoint": args.url, "modelName": args.model, "modelRequests": 0, "results": [],
               "requestSettings": {"responseFormat": "json_object with production schema", "temperature": 0,
                                   "max_tokens": 240, "thinking": False, "id_slot": 1, "timeoutSeconds": 12},
-              "scope": "14 frozen synthetic public inputs on the existing shared Qwen. Compiled production contracts and C# decision/review parser; local provider wire shape. No Unity session, persona, private history, ARDY generation, ASR, TTS, motion dispatch or live-world sensing.",
+              "scope": "Frozen synthetic public inputs on the existing shared Qwen. Compiled production contracts and C# decision/review parser; local provider wire shape. No Unity session, persona, private history, ARDY generation, ASR, TTS, motion dispatch or live-world sensing.",
               "limitations": "One request per case, no retries/repairs/filtering. Fixed semantic checks are not a generalization rate. An uncertain rejection may be safe yet fail the expected verdict. No full chat pipeline, latency-to-voice or physical outcome claim.",
               "runtimeCheckBasis": "Decision expectations compare the compiled C# canonical decision. Separate rawContract checks retain original model field deviations, including none with origin=user and quoted evidence; normalization is never counted as raw-contract compliance.",
               "busyPolicy": "All three shared slots must be explicitly idle before each request. Busy/unknown defers the remainder without resubmitting completed cases.",

@@ -47,10 +47,12 @@ public static class ArdyRoomDialogueIntegrationRegression
     }
     [Serializable] private sealed class Report
     {
-        public string status = "running", error, unityVersion, roomScene, runtimeAssemblySha256, harnessAssemblySha256;
+        public string status = "running", error, unityVersion, roomScene, runtimeAssemblySha256, motionAssemblySha256, harnessAssemblySha256;
         public string scope = "Actual room Connect and ChatSample completed-motion parsing/dispatch; native ARDY HTTP, NavMesh, disabled VRM and actual Animator. Ordinary speech is injected at the production cancellation event boundary; TTS/ASR and role-model generation are not started.";
         public string limitations = "Bounded geometric and lifecycle integration; not subjective motion quality, acoustic speech recognition, continuous following, all-room coverage, or proof of server-side cancellation completion. A cancelled HTTP operation is monitored through subsequent runs for client-side stale playback.";
-        public int checks, navigationSources, navigationProxies, roomTaskClosureChecks;
+        public int checks, navigationSources, navigationProxies, roomTaskClosureChecks, roomFollowChecks, roomSpeechPreparationChecks;
+        public bool extendedRuntime, continuityRuntime;
+        public int retargetChecks;
         public bool connectedThroughRuntimeBridge, vrmDisabledThroughout, vrmRuntimeUninitialized, ordinarySpeechPreservedMovement;
         public bool staleRoleCallbackRejected, generationStopPreservedRoot, playingStopPreservedRoot, movingUserInvalidated;
         public List<Source> sources = new List<Source>();
@@ -116,6 +118,8 @@ public static class ArdyRoomDialogueIntegrationRegression
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(asset);
             if (prefab == null) throw new ArgumentException("Missing imported VRM: " + asset);
             var imported = ArdyLocomotionAvatarReference.FromImportedPrefab(prefab.GetComponent<Vrm10Instance>(), asset);
+            SessionState.SetBool(Key + "Extended", bool.Parse(Argument("-ardyRoomExtended", "false")));
+            SessionState.SetBool(Key + "Continuity", bool.Parse(Argument("-ardyRoomContinuity", "false")));
             SessionState.SetString(Key + "Avatar", asset);
             SessionState.SetString(Key + "Scene", scene);
             SessionState.SetString(Key + "Output", Path.GetFullPath(Argument("-ardyRoomDialogueOutput", "Logs/ardy-room-dialogue-integration")));
@@ -175,6 +179,7 @@ public static class ArdyRoomDialogueIntegrationRegression
     {
         report = new Report { unityVersion = Application.unityVersion, roomScene = SessionState.GetString(Key + "Scene", ""),
             runtimeAssemblySha256 = Hash(typeof(ArdyRoomDialogueBridge).Assembly.Location),
+            motionAssemblySha256 = Hash(typeof(ArdyLocomotionPlayer).Assembly.Location),
             harnessAssemblySha256 = Hash(typeof(ArdyRoomDialogueIntegrationRegression).Assembly.Location) };
         foreach (var path in new[] { SessionState.GetString(Key + "Avatar", ""), AnimatorPath,
             "Assets/AIChatTookit/Scripts/Chat/ArdyRoomDialogueBridge.cs", "Assets/AIChatTookit/Scripts/Chat/ArdyDialogueMotionBridge.cs",
@@ -214,6 +219,35 @@ public static class ArdyRoomDialogueIntegrationRegression
     {
         yield return Delay(.4f);
         report.roomTaskClosureChecks = ArdyRoomTaskClosureRegression.RunChecks(chat, bridge);
+        report.roomFollowChecks = ArdyRoomFollowRegression.RunChecks(chat, bridge);
+        report.roomSpeechPreparationChecks = ArdyRoomSpeechPreparationRegression.RunChecks(chat, bridge);
+        if (SessionState.GetBool(Key + "Continuity", false))
+        {
+            report.continuityRuntime = true;
+            report.scope = "Actual ARDY rolling follow on an isolated flat floor at ordinary speed, plus mid-walk smooth stop with real Animator frames. Child reports contain continuous target updates, native HTTP and measured root/pose observations.";
+            report.limitations = "Bounded flat-floor following and pose continuity, not all-room, fast target pursuit, subjective naturalness or acoustic stop latency.";
+            report.retargetChecks = ArdyRoomRetargetRegression.RunChecks();
+            bridge.StopMovement();
+            yield return WaitFor(() => !bridge.ReservesBody, 2f, "fixture pose release");
+            yield return ArdyRoomRetargetFailureRegression.RunRuntimeChecks(bridge.Controller,
+                originalGround + Vector3.forward * 4f, Path.Combine(Output(), "retarget-failures"));
+            yield return ArdyRoomFollowRuntimeRegression.RunRuntimeChecks(chat, bridge, user);
+            Check(ArdyRoomFollowRuntimeRegression.Completed, "Continuous native follow did not complete.");
+            yield return WaitFor(() => !bridge.ReservesBody, 2f, "follow fixture pose release");
+            yield return ArdyLocomotionSmoothStopRegression.RunRuntimeChecks(bridge.Controller.Player,
+                bridge.Controller.LastClip, Output());
+            yield break;
+        }
+        if (SessionState.GetBool(Key + "Extended", false))
+        {
+            report.extendedRuntime = true;
+            report.scope = "Actual connected room segmented locomotion plus strict follow task and speech preparation lifecycle regressions. Rolling follow playback is exercised separately in ContinuityRuntime on a longer flat-floor fixture.";
+            report.limitations = "Fixed room and supported low-speed long-duration route, not all-room coverage, predictive pursuit or live acoustic stop latency.";
+            bridge.StopMovement();
+            Vector3 target = ParseVector(Argument("-ardyRoomTarget", "-2.480432,-0.704,-6.417353"));
+            yield return ArdyRoomSegmentRuntimeRegression.RunRuntimeChecks(bridge.Controller, target, Path.Combine(Output(), "segments"));
+            yield break;
+        }
         Check(animator.GetBoneTransform(HumanBodyBones.Hips) == avatar.Humanoid.GetBoneTransform(HumanBodyBones.Hips), "Idle Animator does not target the actual Humanoid.");
         BeginCase("same-frame-runtime-reconnect");
         HoldRoot(); bridge.Connect(); bridge.Connect();
@@ -366,8 +400,17 @@ public static class ArdyRoomDialogueIntegrationRegression
         user.position = FindUser(false, true); RoleCommand("approach");
         yield return WaitFor(() => bridge.Controller.Player.IsPlaying && bridge.Controller.Player.TimeSeconds > .2f, 40, "explicit-stop playback");
         SaveWire(); HoldRoot(); long playerRevision = bridge.Controller.Player.PlaybackRevision;
-        RoleCommand("stop-moving"); CheckStopped();
-        yield return Delay(2f); CheckHeldRoot();
+        RoleCommand("stop-moving");
+        Check(bridge.Phase == "stopped" && !bridge.Controller.IsBusy && !bridge.Controller.Player.IsPlaying &&
+            bridge.ReservesBody && bridge.Controller.Player.IsStoppingSmoothly && animator.enabled,
+            "Explicit stop did not freeze travel while preserving the smooth return owner.");
+        CheckHeldRoot();
+        yield return WaitFor(() => !bridge.ReservesBody, 1.5f, "explicit stop pose return");
+        CheckStopped();
+        Check(current.returningFrames >= 8 && current.returnRootDrift < .0001f &&
+            current.firstReturnRotationStep < 1f && current.maximumReturnRotationStep < 20f,
+            "Explicit stop did not produce a measured smooth, stationary return.");
+        yield return Delay(1f); CheckHeldRoot();
         Check(bridge.Controller.Player.PlaybackRevision >= playerRevision && !bridge.Controller.Player.HasPoseOwnership,
             "A stale generation reclaimed ownership after explicit stop.");
         report.playingStopPreservedRoot = true; EndCase();

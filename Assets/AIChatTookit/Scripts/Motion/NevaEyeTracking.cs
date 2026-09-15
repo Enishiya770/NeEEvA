@@ -37,9 +37,44 @@ namespace NeEEvA.Motion
         public float OuterLimit => horizontalOuter.CurveYRangeDegree;
         public float UpLimit => verticalUp.CurveYRangeDegree;
         public float DownLimit => verticalDown.CurveYRangeDegree;
+        public string AttentionOwnerId => attentionOwnerId;
 
         private Camera fallbackCamera;
         private bool ownsEyes, warnedAboutOwner;
+        private string attentionOwnerId;
+        private Vector3 attentionWorldPoint;
+        private ArdyLocomotionPlayer locomotionAttentionPlayer;
+
+        /// <summary>A temporary scene attention target; leaves the user's authored gazeTarget unchanged.</summary>
+        public bool TrySetAttentionTarget(string ownerId, Vector3 worldPoint)
+        {
+            if (string.IsNullOrEmpty(ownerId) || !IsInitialized || !isActiveAndEnabled ||
+                !Finite(worldPoint.x) || !Finite(worldPoint.y) || !Finite(worldPoint.z) ||
+                !string.IsNullOrEmpty(attentionOwnerId) && attentionOwnerId != ownerId) return false;
+            attentionOwnerId = ownerId; attentionWorldPoint = worldPoint;
+            locomotionAttentionPlayer = null;
+            return true;
+        }
+
+        /// <summary>Only the exact live locomotion lease may supplement VRM's eyes.
+        /// The player still writes the head through its own rig before VRM processing.</summary>
+        public bool TrySetLocomotionAttentionTarget(string ownerId, Vector3 worldPoint, ArdyLocomotionPlayer player)
+        {
+            if (player == null || !player.OwnsSceneFocus(ownerId, this) ||
+                !TrySetAttentionTarget(ownerId, worldPoint)) return false;
+            locomotionAttentionPlayer = player;
+            return true;
+        }
+
+        public bool ReleaseAttentionTarget(string ownerId)
+        {
+            if (string.IsNullOrEmpty(ownerId) || attentionOwnerId != ownerId) return false;
+            attentionOwnerId = null;
+            locomotionAttentionPlayer = null;
+            return true;
+        }
+
+        private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
         /// <summary>Calibrate in the avatar's neutral edit-mode pose. Repeated calls preserve the reference.</summary>
         public void Configure(Vrm10Instance target, Transform targetTransform = null)
@@ -80,6 +115,8 @@ namespace NeEEvA.Motion
             }
             CurrentInputAngles = Vector2.zero;
             fallbackCamera = null;
+            attentionOwnerId = null;
+            locomotionAttentionPlayer = null;
         }
 
         private static CurveMapper Copy(CurveMapper map) => new CurveMapper(map.CurveXRangeDegree, map.CurveYRangeDegree);
@@ -107,7 +144,10 @@ namespace NeEEvA.Motion
         {
             if (!IsInitialized) return;
             // Never activate Vrm10Instance.Runtime: it would also own expressions and springs.
-            if (avatar.isActiveAndEnabled)
+            bool scopedLocomotion = locomotionAttentionPlayer != null &&
+                locomotionAttentionPlayer.OwnsSceneFocus(attentionOwnerId, this) &&
+                locomotionAttentionPlayer.SceneFocusLastAppliedFrame == Time.frameCount;
+            if (avatar.isActiveAndEnabled && !scopedLocomotion)
             {
                 if (!warnedAboutOwner)
                     Debug.LogWarning("[NEVA Eyes] Full VRM updates are enabled; independent eye tracking is paused to avoid two eye writers.", this);
@@ -117,10 +157,11 @@ namespace NeEEvA.Motion
             }
             warnedAboutOwner = false;
             Vector2 wanted = Vector2.zero;
-            var target = ResolveTarget();
-            if (target != null)
+            var target = string.IsNullOrEmpty(attentionOwnerId) ? ResolveTarget() : null;
+            if (target != null || !string.IsNullOrEmpty(attentionOwnerId))
             {
-                Vector3 offset = target.position - EyeOrigin;
+                Vector3 point = !string.IsNullOrEmpty(attentionOwnerId) ? attentionWorldPoint : target.position;
+                Vector3 offset = point - EyeOrigin;
                 float scale = Mathf.Max(0.01f, avatar.transform.lossyScale.magnitude / Mathf.Sqrt(3f));
                 if (offset.sqrMagnitude >= minimumTargetDistance * minimumTargetDistance * scale * scale)
                 {
@@ -157,7 +198,7 @@ namespace NeEEvA.Motion
             ownsEyes = false;
         }
 
-        private void OnDisable() { RestoreEyes(); CurrentInputAngles = Vector2.zero; }
-        private void OnDestroy() { RestoreEyes(); }
+        private void OnDisable() { RestoreEyes(); CurrentInputAngles = Vector2.zero; attentionOwnerId = null; locomotionAttentionPlayer = null; }
+        private void OnDestroy() { RestoreEyes(); attentionOwnerId = null; locomotionAttentionPlayer = null; }
     }
 }

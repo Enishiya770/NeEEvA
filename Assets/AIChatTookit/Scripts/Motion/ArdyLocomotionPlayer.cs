@@ -11,7 +11,7 @@ namespace NeEEvA.Motion
     /// to conceal source sliding with IK. No navigation or collision resolution is implied.
     /// </summary>
     [DisallowMultipleComponent, DefaultExecutionOrder(10000)]
-    public sealed class ArdyLocomotionPlayer : MonoBehaviour
+    public sealed partial class ArdyLocomotionPlayer : MonoBehaviour
     {
         private sealed class Bone
         {
@@ -58,6 +58,8 @@ namespace NeEEvA.Motion
         public bool HasPoseOwnership { get; private set; }
         public bool CompletedNaturally { get; private set; }
         public bool IsReturningToAnimation { get; private set; }
+        /// <summary>Translation has stopped; this player still owns the remaining body-pose handoff.</summary>
+        public bool IsStoppingSmoothly { get; private set; }
         public bool ReturnedToAnimation { get; private set; }
         public int BoundBoneCount => bones.Count;
         public float MotionScale { get; private set; }
@@ -67,6 +69,8 @@ namespace NeEEvA.Motion
         public ArdyLocomotionClip Clip => clip;
         public long PlaybackRevision { get; private set; }
         public string LastBlockedReason { get; private set; }
+        /// <summary>Exact playback revoked by a root-step rejection, before its smooth-stop revision.</summary>
+        public long LastGuardBlockedPlaybackRevision { get; private set; } = -1;
 
         public void Bind(Vrm10Instance avatar, ArdyLocomotionAvatarReference importedReference)
         {
@@ -128,6 +132,8 @@ namespace NeEEvA.Motion
             if (target == null || bones.Count == 0) throw new InvalidOperationException("Bind the imported full-body reference first.");
             if (!enabled || (Application.isPlaying && !gameObject.activeInHierarchy))
                 throw new InvalidOperationException("Enable the locomotion player before playback.");
+            if (IsStoppingSmoothly && HasPoseOwnership)
+                throw new InvalidOperationException("Wait for the stopped body's animation handoff before playing another locomotion clip.");
             ValidateRoot(target.transform); CheckRuntime();
             foreach (var other in FindObjectsOfType<ArdyLocomotionPlayer>(true))
                 if (other != this && other.Target == target && other.HasPoseOwnership)
@@ -155,6 +161,7 @@ namespace NeEEvA.Motion
             PlaybackEndSeconds = lastPlaybackFrame / next.rotationClip.fps;
             rootStepGuard = stepGuard;
             LastBlockedReason = null;
+            LastGuardBlockedPlaybackRevision = -1;
             PlaybackRevision++;
             for (int i = 0; i < bones.Count; i++) bones[i].index = indices[i];
             try
@@ -202,6 +209,39 @@ namespace NeEEvA.Motion
             ApplySample(elapsed);
             // A manual preview/regression has no scheduled VRM LateUpdate to transfer its ControlRig.
             if (rig != null) target.Runtime.Process();
+        }
+
+        /// <summary>
+        /// Replace the unplayed tail (longer or shorter) without rebinding its root, restoring its saved pose,
+        /// or releasing any body producer. Every displayed sample must be identical in the replacement.
+        /// The room controller audits the complete replacement and seam before calling this method.
+        /// </summary>
+        public void ExtendAuditedTimeline(ArdyLocomotionClip replacement, int unchangedFrames, int endFrame)
+        {
+            if (!HasPoseOwnership || !IsPlaying || IsReturningToAnimation || clip == null)
+                throw new InvalidOperationException("An active owned room timeline is required for continuation.");
+            replacement.Validate(); ValidateReturnState();
+            if (unchangedFrames < 16 || unchangedFrames > clip.frames.Length ||
+                elapsed >= (unchangedFrames - 1) / clip.rotationClip.fps ||
+                replacement.frames.Length < unchangedFrames || endFrame < unchangedFrames || endFrame >= replacement.frames.Length ||
+                replacement.rotationClip.fps != clip.rotationClip.fps ||
+                replacement.sourceOrigin != clip.sourceOrigin || replacement.sourceHeadingDegrees != clip.sourceHeadingDegrees ||
+                Mathf.Abs(replacement.sourceRootHeight - clip.sourceRootHeight) > .0001f)
+                throw new InvalidOperationException("Continuation arrived after its unchanged seam or changed the source anchor.");
+            for (int i = 0; i < clip.rotationClip.jointNames.Length; i++)
+                if (replacement.rotationClip.jointNames[i] != clip.rotationClip.jointNames[i] ||
+                    replacement.rotationClip.jointParents[i] != clip.rotationClip.jointParents[i] ||
+                    Quaternion.Angle(replacement.rotationClip.restGlobalRotations[i], clip.rotationClip.restGlobalRotations[i]) > .001f)
+                    throw new InvalidOperationException("Continuation changed the rotation basis of already audited samples.");
+            for (int i = 0; i < unchangedFrames; i++)
+            {
+                if (replacement.frames[i] != clip.frames[i] || replacement.rotationClip.frames[i] != clip.rotationClip.frames[i])
+                    throw new InvalidOperationException("Continuation must preserve previously audited samples exactly.");
+            }
+            clip = replacement; PlaybackEndSeconds = endFrame / replacement.rotationClip.fps;
+            CompletedNaturally = false; PlaybackRevision++;
+            RebaseRecordedSourcePose(0);
+            Status = "连续播放已审核的下一段房间步态";
         }
 
         public Vector3 SourceRootToWorld(Vector3 sourcePosition)
@@ -262,6 +302,50 @@ namespace NeEEvA.Motion
             if (IsReturningToAnimation) return;
             if (!HasPoseOwnership || !CompletedNaturally || IsPlaying || clip == null)
                 throw new InvalidOperationException("Only a naturally completed, still-owned clip can return to animation.");
+            BeginAnimationReturn(seconds);
+            Status = "已到达 · 正在平滑衔接当前动画";
+        }
+
+        /// <summary>
+        /// Revoke the remaining trajectory immediately, then blend the currently displayed body
+        /// pose into the live Animator without moving the root. No new model output is needed.
+        /// A true result retains HasPoseOwnership until IsReturningToAnimation finishes; callers
+        /// must wait for that release before starting another clip. Repeated requests are idempotent.
+        /// Stop remains the immediate, forced-release API for disconnects and competing owners.
+        /// </summary>
+        public bool RequestSmoothStop(float seconds = .4f)
+        {
+            if (!ArdyLocomotionClip.Finite(seconds) || seconds <= 0)
+                throw new ArgumentException("Animation return duration must be finite and positive.");
+            if (!HasPoseOwnership || clip == null) return false;
+            if (IsStoppingSmoothly) return true;
+            // Invalidate pending timeline extensions before resuming any Animator. Cancellation
+            // must not ask the old route guard to authorize another sample or stationary step.
+            IsPlaying = false; CompletedNaturally = false;
+            rootStepGuard = null; PlaybackRevision++;
+            IsStoppingSmoothly = true;
+            try
+            {
+                // An existing natural return already owns the same frozen root and displayed
+                // pose. Keep its elapsed blend instead of restarting from an Update baseline.
+                if (!IsReturningToAnimation) BeginAnimationReturn(seconds);
+                Status = "已停止移动 · 正在平滑衔接当前动画";
+                return true;
+            }
+            catch
+            {
+                // Returning to a changed/destroyed owner cannot be made smooth. Still revoke
+                // the old trajectory; never leave it poised to resume on the next LateUpdate.
+                if (HasPoseOwnership) Stop();
+                throw;
+            }
+        }
+
+        private void BeginAnimationReturn(float seconds)
+        {
+            // The last rig pose already includes the authorized gaze. Capture it below so
+            // stopping hands that displayed pose to the existing whole-body return blend.
+            WithdrawSceneFocus();
             try { ValidateReturnState(); }
             catch (ReturnOwnershipChangedException error)
             {
@@ -289,7 +373,6 @@ namespace NeEEvA.Motion
                 if (owner.enabled && owner.behaviour is Animator animator) animator.enabled = true;
             // Enabling an Animator must not expose its binding/reset pose even for the first frame.
             RestoreTransforms(returnFrom);
-            Status = "已到达 · 正在平滑衔接当前动画";
         }
 
         private void Update()
@@ -383,11 +466,13 @@ namespace NeEEvA.Motion
             }
             // The displayed pose is already the latest animation baseline (weight one). Do not
             // call Stop: its preview semantics would restore the stale pre-locomotion snapshot.
-            IsReturningToAnimation = false; ReturnedToAnimation = true; HasPoseOwnership = false;
+            bool wasSmoothStop = IsStoppingSmoothly;
+            IsReturningToAnimation = false; IsStoppingSmoothly = false;
+            ReturnedToAnimation = true; HasPoseOwnership = false;
             rootStepGuard = null; saved.Clear(); returnFrom.Clear(); returnBaseline.Clear();
             foreach (var owner in owners) if (owner.behaviour != null) owner.behaviour.enabled = owner.enabled;
             owners.Clear();
-            Status = "已平滑交回原动画 · 保留到达位置";
+            Status = wasSmoothStop ? "已停止并平滑交回原动画 · 保留停止位置" : "已平滑交回原动画 · 保留到达位置";
         }
 
         private void AbortAnimationReturn(Exception error)
@@ -413,7 +498,8 @@ namespace NeEEvA.Motion
             }
             PlaybackRevision++;
             IsPlaying = false; HasPoseOwnership = false;
-            IsReturningToAnimation = false; ReturnedToAnimation = false; returnBaselinePrepared = false;
+            IsReturningToAnimation = false; IsStoppingSmoothly = false;
+            ReturnedToAnimation = false; returnBaselinePrepared = false;
             rootStepGuard = null; returnElapsed = 0;
             saved.Clear(); returnFrom.Clear(); returnBaseline.Clear(); owners.Clear();
             foreach (var owner in restore) if (owner.behaviour != null) owner.behaviour.enabled = true;
@@ -455,9 +541,13 @@ namespace NeEEvA.Motion
             string blocked = rootStepGuard?.Invoke(lastAppliedRoot, proposedPosition);
             if (!string.IsNullOrEmpty(blocked))
             {
-                Stop();
+                long rejectedRevision = PlaybackRevision;
+                // Reject the proposed root BEFORE writing any position or bone. Smooth stop
+                // clears rootStepGuard before validating/capturing its return, so the rejected
+                // guard cannot recursively reject this frozen-pose handoff.
+                if (RequestSmoothStop()) LastGuardBlockedPlaybackRevision = rejectedRevision;
                 LastBlockedReason = blocked;
-                Status = "移动已停止 · " + blocked;
+                Status = "移动已停止，正在平滑衔接待机 · " + blocked;
                 return;
             }
             root.rotation = proposedRotation;
@@ -469,18 +559,22 @@ namespace NeEEvA.Motion
             foreach (var bone in bones)
                 bone.transform.rotation = sourceToWorldRotation * clip.rotationClip.SampleDelta(bone.index, seconds) * bone.rest;
             bones.Find(b => b.human == HumanBodyBones.Hips).transform.position = pelvis;
+            RecordAppliedSourcePose(seconds);
+            ApplySceneFocus();
         }
 
         /// <summary>Release all body owners and return the saved local pose, retaining the reached position/heading by default.</summary>
         public void Stop(bool restoreStartTransform = false)
         {
+            WithdrawSceneFocus();
             PlaybackRevision++;
             IsPlaying = false;
             rootStepGuard = null;
             // Cancellation/replay during a handoff releases the current animation baseline;
             // ordinary preview Stop retains its existing saved-pose restoration semantics.
             RestoreTransforms(IsReturningToAnimation ? returnBaseline : saved);
-            IsReturningToAnimation = false; ReturnedToAnimation = false; returnBaselinePrepared = false;
+            IsReturningToAnimation = false; IsStoppingSmoothly = false;
+            ReturnedToAnimation = false; returnBaselinePrepared = false;
             returnFrom.Clear(); returnBaseline.Clear(); returnElapsed = 0;
             saved.Clear();
             HasPoseOwnership = false;

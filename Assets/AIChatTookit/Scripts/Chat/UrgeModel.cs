@@ -4,30 +4,10 @@ using UnityEngine;
 namespace AIChat.Agent
 {
     /// <summary>
-    /// 「想开口」的冲动累积器——取代固定倒计时的 tick 调度。
-    ///
-    /// 原来的设计是：轮次结束时读 LLM 的 &lt;next in="Ns"/&gt;，起一个 N 秒的协程，到点就发。
-    /// 问题不在"固定"(间隔本来就是她自己排的)，而在这三件事:
-    ///   1. 一次决定、然后盲等。等待期间世界发生什么都改不了它——每多一种"该让她提前
-    ///      醒"的事件就得多打一个补丁(环境 spike 拉前、工具结果拉前……)。
-    ///   2. 闹钟响了就必须推理，哪怕什么也没发生。
-    ///   3. 防独白靠硬上限，撞到就彻底闭嘴等用户开口——是断崖，不是疲劳。
-    ///
-    /// 改成能量式之后:
-    ///   U 每帧累积，越过阈值就发一次 tick。&lt;next in/&gt; 的语义从"定时"变成"定速"——
-    ///   速率按剩余缺口现算，使得**无事发生时恰好 N 秒后触顶**。她的意图完整保留。
-    ///   其余所有输入(孤独、记忆、环境)都是**加法**项，只能让她比自己排的更早开口；
-    ///   想更晚只有疲劳一条路，而那是有主体依据的——没人理我，那我少说点。
-    ///
-    /// 参数是拿真实 Editor.log 重建的会话 + 真实 memory.json 跑模拟定的，别凭感觉调:
-    ///   - 回放 2026-08-03 那段 5 分钟会话: 实际主动开口 6 次，本模型 7 次。多出的一次
-    ///     有账可算——当前设计把 11/16 个环境 spike 当成"本段沉默已拉前过"丢掉了，
-    ///     这些加起来正好是 1.15 个阈值。
-    ///   - 用户离开后的 30 分钟: 本模型开口 13 次、间隔从 78s 自己拉长到 178s；
-    ///     当前设计是固定 60s 一次，第 8 次撞上硬上限后 22 分钟一声不吭。
-    ///
-    /// 注意: 本模型决定的是**她什么时候醒来看一眼**，不是什么时候说话——
-    /// &lt;silent/&gt; 仍是第二道闸。所以每次触发都要付一次 LLM 推理，触发率就是成本。
+    /// Bounded environment/memory event accumulator. ChatSample's private observation schedule
+    /// is now owned by SceneReviewClock: no fatigue multiplier and no second not-before gate.
+    /// The legacy rate/SetNextIn API remains for existing callers and offline calibration;
+    /// its configured interval is never a measurement of elapsed time.
     /// </summary>
     [Serializable]
     public class UrgeModel
@@ -204,7 +184,7 @@ namespace AIChat.Agent
             if (m_LogUrge)
             {
                 Debug.Log($"[Urge] 触发 U={m_U:F2} 主因={m_LastCause} — 她排的 {m_RequestedSec:F0}s→" +
-                          $"实际 {m_EffectiveSec:F0}s；构成: 底噪 {m_AccBase:F2} / 孤独 {m_AccLonely:F2}" +
+                          $"配置间隔 {m_EffectiveSec:F0}s；构成: 底噪 {m_AccBase:F2} / 孤独 {m_AccLonely:F2}" +
                           $" / 记忆 {m_AccMemory:F2} / 环境 {m_AccSpike:F2}" +
                           $"  (环境额度已用 {m_SpikeSpentThisSilence:F2}/{m_SpikeMaxPerSilence:F2})");
             }

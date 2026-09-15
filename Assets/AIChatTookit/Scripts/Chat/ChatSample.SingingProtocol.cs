@@ -245,19 +245,56 @@ public partial class ChatSample
             request.SourceValidationError = "明确起止秒数与 range 二选一；坐标均来自原录音，不混用。";
     }
 
+    private sealed class SingingResolutionFailure
+    {
+        public string code, stage, message, nextStep;
+        public bool waiting;
+    }
+
+    private static bool RejectSingingResolution(out SingingResolutionFailure failure,
+        string code, string stage, string message, string nextStep, bool waiting = false)
+    {
+        failure = new SingingResolutionFailure { code = code, stage = stage,
+            message = message, nextStep = nextStep, waiting = waiting };
+        return false;
+    }
+
+    // Keep existing callers/tests compatible; the executor uses the structured result.
+    // Codes come from the rejecting branch, never from matching translated prose.
     private bool TryResolveUnifiedSing(AgentHumBackRequest request, out string failure)
-        => TryResolveUnifiedSingCore(request, out failure, false);
+    {
+        bool resolved = TryResolveUnifiedSingDetailed(request, out var detail);
+        failure = detail?.message ?? "";
+        return resolved;
+    }
+
+    private bool TryResolveUnifiedSingDetailed(AgentHumBackRequest request, out SingingResolutionFailure failure)
+        => TryResolveUnifiedSingDetailedCore(request, out failure, false);
 
     private bool TryResolveUnifiedSingCore(AgentHumBackRequest request, out string failure, bool preparationOnly)
     {
-        failure = request.SourceValidationError;
-        if (!string.IsNullOrEmpty(failure)) return false;
+        bool resolved = TryResolveUnifiedSingDetailedCore(request, out var detail, preparationOnly);
+        failure = detail?.message ?? "";
+        return resolved;
+    }
+
+    private bool TryResolveUnifiedSingDetailedCore(AgentHumBackRequest request,
+        out SingingResolutionFailure detail, bool preparationOnly)
+    {
+        detail = null;
+        if (request == null)
+            return RejectSingingResolution(out detail, "invalid_request", "request", "没有演唱请求。", "提交明确的sing请求。");
+        string failure = request.SourceValidationError;
+        if (!string.IsNullOrEmpty(failure))
+            return RejectSingingResolution(out detail, "invalid_source_parameters", "request", failure, "依据真实refs与原录音坐标修正参数。");
         if (!string.IsNullOrEmpty(request.ValidationError))
-        { failure = request.ValidationError; return false; }
-        if (!CanExecuteSkillAction("singing", out failure)) return false;
+            return RejectSingingResolution(out detail, "invalid_performance_parameters", "request", request.ValidationError, "修正本次演唱参数，保留原目标。");
+        if (!CanExecuteSkillAction("singing", out failure))
+            return RejectSingingResolution(out detail, "skill_unavailable", "capability", failure, "按当前技能事实申请或等待能力可用；不改变用户事项。");
         var sense = m_ChatSettings != null ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText : null;
-        if (sense == null) { failure = "语音模块不可用。"; return false; }
-        string[] refs = request.ClipRefs.Split(',').Select(r => r.Trim()).ToArray();
+        if (sense == null)
+            return RejectSingingResolution(out detail, "material_interface_unavailable", "material", "语音模块不可用。", "等待录音素材接口恢复；不要猜测素材丢失。");
+        string[] refs = (request.ClipRefs ?? "").Split(',').Select(r => r.Trim()).ToArray();
         // Validate ALL identities before any source confirmation or range revision.
         foreach (string clip in refs)
             if (!clip.StartsWith("clip:", StringComparison.Ordinal) ||
@@ -269,16 +306,17 @@ public partial class ChatSample
                     "曲库 ID 不能加 clip: 前缀变成本次录音。" +
                     (available.Length == 0 ? "当前没有已登记的录音引用；不能通过猜 ID 修复。" :
                         "当前真实录音引用=" + available + "；存在不等于已确认或可播放，请结合素材状态选范围，也可询问。");
-                return false;
+                return RejectSingingResolution(out detail, "material_reference_missing", "material", failure, "保留原用户目标，依据当前素材清单重新选择或询问，不猜测ID。");
             }
         refs = refs.Select(sense.CanonicalSingingClipReference).ToArray();
         request.ClipRefs = string.Join(",", refs);
         if (refs.Length > 1 && !float.IsNaN(request.StartSeconds))
         { failure = "单组 start_seconds/end_seconds 只能指定一个 clip 的原录音坐标；本次多 refs 尚未准备或播放。" +
-                "可逐段 clip_revise 后 sing 当前版本；统一 range=clean/expanded 可直接用于多 refs。"; return false; }
+                "可逐段 clip_revise 后 sing 当前版本；统一 range=clean/expanded 可直接用于多 refs。";
+            return RejectSingingResolution(out detail, "invalid_range", "range", failure, "多段范围必须逐段核对，不复用一组坐标。"); }
         if (request.Range != "current" && request.Range != "clean" && request.Range != "expanded")
-        { failure = "range 只能为 current、clean、expanded；没有准备或播放任何片段。"; return false; }
-        if (!preparationOnly && !TryValidateSingingGoalRequest(request, sense, out failure)) return false;
+            return RejectSingingResolution(out detail, "invalid_range", "range", "range 只能为 current、clean、expanded；没有准备或播放任何片段。", "按实际原录音范围修正参数。");
+        if (!preparationOnly && !TryValidateSingingGoalRequestDetailed(request, sense, out detail)) return false;
         var order = new List<string>();
         var prepared = new List<string>();
         foreach (string clip in refs)
@@ -294,7 +332,7 @@ public partial class ChatSample
             {
                 failure = $"{clip} range={request.Range} 准备失败：" + failure;
                 if (prepared.Count > 0) failure += " 已准备的素材保持：" + string.Join(",", prepared) + "；整次演唱未开始。";
-                return false;
+                return RejectSingingResolution(out detail, "material_preparation_failed", "material", failure, "依据所选录音的实际范围/来源事实修正，不把准备失败当作已播放。");
             }
             if (oldRevision >= 0 && sense.DescribePracticePhrases().Find(p => p.StableId == stableId)?.Revision != oldRevision)
                 m_PracticePitchStates.Remove(stableId);
@@ -308,8 +346,10 @@ public partial class ChatSample
                 request.ExcludeSpeech, out failure))
         {
             failure += " 所选范围已准备并保留，尚未播放；可根据冲突事实修订或询问。";
-            return false;
+            return RejectSingingResolution(out detail, "material_boundary_conflict", "range", failure, "依据真实边界证据修订范围或询问。");
         }
+        if (!preparationOnly && !BindPreparedSingingGoalMaterials(sense, out failure))
+            return RejectSingingResolution(out detail, "prepared_goal_mismatch", "range", failure, "准备后的素材已改变；重新核对完整目标，未开始播放。");
         Debug.Log($"[Sing/Resolve] refs={request.ClipRefs} -> order={request.Order} range={request.Range}; prepared_not_played");
         return true;
     }

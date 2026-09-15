@@ -98,7 +98,9 @@ namespace NeEEvA.Motion
                 desiredDistance < .5f || desiredDistance > 3f)
                 return PlanFail(observation, "input-invalid", "角色坐标、用户坐标或接近距离无效（距离须为 0.5–3 米）。", out reason);
             observation.stage = "start";
-            if (!navigation.TryProjectGround(avatarGround, out var start, out reason, out var startObservation))
+            // Reject an invalid actor start once, before enumerating user-side candidates.
+            // Otherwise the same boundary fault looks like many unrelated unreachable targets.
+            if (!navigation.TryValidatePlanStart(avatarGround, out var start, out reason, out var startObservation))
             {
                 startObservation.stage = "start";
                 observation.preflightFailure = startObservation;

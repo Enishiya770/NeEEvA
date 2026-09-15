@@ -91,7 +91,7 @@ class RoomLocomotionService:
         if job.feature_task is not None:
             job.feature_task.cancel()
         if not job.future.done():
-            job.future.set_exception(ServiceError(error.status, error.code, error.message))
+            job.future.set_exception(ServiceError(error.status, error.code, error.message, error.details))
             job.future.exception()
 
     def _valid(self, job):

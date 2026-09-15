@@ -413,26 +413,31 @@ public static partial class SkillRoutingRegression
             typeof(LLM).GetField("m_PromptFiles", flags).SetValue(model, new[] { behavior });
             typeof(LLM).GetField("m_SkillFiles", flags).SetValue(model, new[] { singing });
             string system = model.BuildSystemPrompt();
-            if (!system.Contains("实时朗读普通正文") || system.Contains("未标记文字不朗读") ||
-                system.Contains("只通过语音合成 (TTS) 实时朗读你放在") ||
-                system.Contains("不发声内容\"的唯一信号"))
-                throw new Exception("Effective character prompt still requires say or contradicts thought.");
+            if (!system.Contains("实时朗读 <say>...</say> 内的公开台词") ||
+                !system.Contains("say 不覆盖 silent") || !system.Contains("<thought>内部判断</thought>") ||
+                system.Contains("实时朗读普通正文") || system.Contains("之前的文字会被念出来") ||
+                system.Contains("SKILL-BEGIN"))
+                throw new Exception("Effective character prompt lacks the explicit public/private boundary or retains legacy prose guidance.");
             model.m_DataList.Add(new LLM.SendData("system", system));
             model.m_DataList.Add(new LLM.SendData("user", "听得到吗？"));
             foreach (bool skill in new[] { false, true })
             {
-                model.SetActiveSkills(skill ? new[] { "singing" } : new string[0]);
+                if (!model.SetActiveSkills(skill ? new[] { "singing" } : new string[0]))
+                    throw new Exception("Production singing prompt asset could not be loaded.");
                 foreach (bool stream in new[] { false, true })
                 {
                     string json = (string)typeof(ChatQW).GetMethod("BuildRequestJson", flags)
                         .Invoke(model, new object[] { stream, "" });
                     var messages = (Newtonsoft.Json.Linq.JArray)Newtonsoft.Json.Linq.JObject.Parse(json)["messages"];
                     string effective = messages.ToString();
-                    if (!effective.Contains("实时朗读普通正文") || effective.Contains("未标记文字不朗读") ||
-                        effective.Contains("对外发言放在 <say>"))
+                    if (!effective.Contains("公开台词的必要边界") || !effective.Contains("say 不覆盖 silent") ||
+                        effective.Contains("实时朗读普通正文") || effective.Contains("之前的文字会被念出来"))
                         throw new Exception("Main request has missing/conflicting speech protocol.");
-                    if (skill && !effective.Contains("普通正文直接作为对外发言"))
-                        throw new Exception("Singing skill did not receive the simplified speech protocol.");
+                    if (effective.Contains("[已加载技能: singing]") != skill ||
+                        effective.Contains("## 当前事项与独立核对") != skill ||
+                        (skill && (!effective.Contains("公开台词必须放在 <say>...</say> 内") ||
+                            !effective.Contains("silent 是本条回复的永久静音尾部"))))
+                        throw new Exception("Selected singing skill did not preserve the same explicit public/private protocol.");
                     if (!effective.Contains("先想后问时") || effective.Contains("每句都用") ||
                         effective.Contains("推荐节奏：一句话") || !effective.Contains("没有调度标签时系统采用默认等待"))
                         throw new Exception("Effective prompts still encourage silent questions or per-sentence continuation loops.");
@@ -446,7 +451,7 @@ public static partial class SkillRoutingRegression
                 throw new Exception("Character speech protocol contaminated an auxiliary JSON request.");
         }
         finally { UnityEngine.Object.DestroyImmediate(host); }
-        Debug.Log("[SkillRoutingRegression] effective plain-speech prompts and primary/auxiliary request JSON passed");
+        Debug.Log("[SkillRoutingRegression] effective explicit public/private prompts and primary/auxiliary request JSON passed");
     }
 
     private static void RunRawResponseDiagnosticsRegression()

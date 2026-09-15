@@ -99,6 +99,9 @@ public partial class ChatSample
 
     private bool HoldSingingSpeechUntilValidation()
     {
+        // Permission review protects dependent claims in direct conversation too.
+        // Even a synchronously rejected/applied review cannot release its old promise.
+        if (IsSingingPolicyActionDeferredThisRound() || HasPendingSingingPolicyReview()) return true;
         if (!m_AgentRunning || m_SingingResolvedSpeechRound == m_CurrentSpeechRoundId) return false;
         if (m_SingingRejectedSpeechRound == m_CurrentSpeechRoundId) return true;
         if (m_SingingSpeechPhaseRound == m_CurrentSpeechRoundId)
@@ -109,7 +112,7 @@ public partial class ChatSample
         // Legacy output has no early, checkable declaration. Keep its conservative
         // fallback in an action-capable context; explicit ordinary chat never uses it.
         return GetSkillRouteState("singing").ActiveThisRound || m_ActiveSkillsThisRound.Contains("singing") ||
-            HasPendingSingingGoalReview() || m_RejectedWorkAttempts.Count > 0;
+            HasPendingSingingGoalReview() || HasPendingSingingPolicyReview() || m_RejectedWorkAttempts.Count > 0;
     }
 
     private void ResolveSingingSpeech(ref string spoken)
@@ -119,21 +122,49 @@ public partial class ChatSample
             m_SingingSpeechDependency == SpeechActionDependency.AfterAction &&
             m_SingingDeclaredActionRound != m_CurrentSpeechRoundId;
         m_SingingResolvedSpeechRound = m_CurrentSpeechRoundId;
-        if (!held || (!missingAction && !HasPendingSingingGoalReview() && m_SingingRejectedSpeechRound != m_CurrentSpeechRoundId))
+        bool waitingGoal = HasPendingSingingGoalReview();
+        bool waitingPolicy = HasPendingSingingPolicyReview();
+        bool deferredPolicy = IsSingingPolicyActionDeferredThisRound();
+        if (!held || (!missingAction && !waitingGoal && !waitingPolicy && !deferredPolicy && m_SingingRejectedSpeechRound != m_CurrentSpeechRoundId))
         { m_SingingSpeechWithheld = false; return; }
         // Nothing has been synthesized yet. Do not count discarded promises as heard speech.
         m_SentenceBuffer.Length = 0;
         spoken = "";
         m_SingingSpeechWithheld = true;
         m_WorkProgressFact += "\n[外放事实] 上一决策的待验证台词未外放：" +
-            (missingAction ? "声明依赖演唱/素材校验，但没有受理对应演唱/素材动作；独立身体动作仍以各自程序事实为准。" : "演唱仍待审核或动作被拒绝。") +
+            (waitingPolicy ? "策略提案待独立审核；尚未改变歌唱策略，不是执行失败。" :
+             deferredPolicy ? "策略提案已经单独处理，旧回复不能作为结果确认；以本次策略结果事实为准。" :
+             waitingGoal ? "演唱目标待独立审核；尚未提交音频执行，不是执行失败。" :
+             missingAction ? "声明依赖演唱/素材校验，但没有受理对应演唱/素材动作；独立身体动作仍以各自程序事实为准。" : "动作被拒绝，原因以本轮执行事实为准。") +
             "不要把它当作用户已经听到的承诺/解释。\n";
-        if (m_LogAgentLoop) Debug.Log("[Work/Speech] 发声阶段或演唱校验未通过，撤回本轮待验证台词；独立身体动作结果不受此项判定影响");
+        if (m_LogAgentLoop) Debug.Log(waitingPolicy
+            ? "[Work/Speech] status=waiting_policy_review；依赖策略审核的台词未外放；未改变策略"
+            : deferredPolicy ? "[Work/Speech] status=policy_response_withheld；策略另有独立结果事实，本轮旧台词未外放"
+            : waitingGoal ? "[Work/Speech] status=waiting_goal_review；依赖目标审核的台词未外放；未提交音频"
+            : "[Work/Speech] 发声阶段或演唱校验未通过，撤回本轮待验证台词；独立身体动作结果不受此项判定影响");
     }
 
     private void NormalizeSingingGoalReview(AutonomyIntentDecision decision)
     {
         if (!HasPendingSingingGoalReview()) return;
+        if (m_SingingGoal.transition == "cancel")
+        {
+            var target = decision.singing_goal_expected;
+            bool matched = m_ActiveSingingGoal != null && m_SingingGoal.baseVersion == m_ActiveSingingGoal.version &&
+                (string)target?["origin"] == "none" && (string)target?["refs"] == "" &&
+                (string)target?["range"] == "none" &&
+                (m_ActiveSingingGoal.autonomous || (string)target?["request_quote"] == m_SingingGoal.changeQuote);
+            if (matched && (decision.singing_goal_status == "cancelled" || decision.singing_goal_status == "approved"))
+                decision.singing_goal_status = "cancelled";
+            else
+            {
+                decision.singing_goal_status = "revise";
+                decision.singing_goal_evidence = "取消提案缺少独立核对的当前取消引文或目标版本；原活动目标仍保留且暂停执行。";
+                decision.work_status = "continue";
+                decision.proceed = true;
+            }
+            return;
+        }
         if (m_SingingGoal.intent != "observe" && (string)decision.singing_goal_expected?["origin"] == "none")
         {
             decision.singing_goal_status = "cancelled";
@@ -202,6 +233,7 @@ public partial class ChatSample
     private void StopWorkWithoutProgress(string reason)
     {
         if (m_WorkNoProgress) return;
+        ClearDeferredSingingRequest();
         m_WorkNoProgress = true; m_WorkStatus = "blocked"; m_WorkReviewOpen = false;
         m_ToolCorrectionContinuationPending = false; m_PendingToolCorrectionFrame = "";
         m_ToolCorrectionExhaustedThisRound = true;
@@ -215,8 +247,10 @@ public partial class ChatSample
     {
         if (m_WorkNoProgress) return false;
         // The scheduled reviewer and immediate correction chain share one allowance.
-        if (!m_WorkReviewOpen && !HasAutonomousSingingGoal()) return true;
-        int used = m_WorkReviewOpen ? m_WorkContinuations : m_AutonomousGoalContinuations;
+        bool recoveredUserGoal = HasReviewedRecoveredUserSingingGoal();
+        if (!m_WorkReviewOpen && !HasAutonomousSingingGoal() && !recoveredUserGoal) return true;
+        int used = recoveredUserGoal ? m_WorkContinuations + m_AutonomousGoalContinuations :
+            m_WorkReviewOpen ? m_WorkContinuations : m_AutonomousGoalContinuations;
         if (used >= MaxWorkContinuations)
         { StopWorkWithoutProgress("本轮事项续接总预算已耗尽；没有把未完成事项标为成功。"); return false; }
         if (m_WorkReviewOpen) ++m_WorkContinuations; else ++m_AutonomousGoalContinuations;

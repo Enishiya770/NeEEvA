@@ -295,6 +295,7 @@ public class RTSpeechHandler : MonoBehaviour
     private bool m_TentativeFullAsrResultReady = false;
     private string m_TentativeFullAsrText = "";
     private string m_TentativeFullAsrTranscriptKey = "";
+    private string m_TentativeFullAsrRawText = "";
     private bool m_AwaitingTentativeFinal = false;
     private int m_AwaitingTentativeSeq = -1;
     private AudioClip m_AwaitingTentativeFinalClip = null;
@@ -385,6 +386,8 @@ public class RTSpeechHandler : MonoBehaviour
     private int m_LatestStreamPartialAudioMs = 0;
     private float m_LatestStreamPartialTime = -1f;
     private bool m_StreamHumBackPrefixOffered = false;
+    private readonly ClosedSpeechEvidenceTracker m_ClosedSpeechTracker = new ClosedSpeechEvidenceTracker();
+    public int CurrentCaptureSerial => m_NeuralVadClient != null ? m_NeuralVadClient.InputCaptureSessionSerial : 0;
 
     /// <summary>
     /// 聊天脚本。指向场景里那个跑流式ASR/LLM/TTS管线的ChatSample——
@@ -593,6 +596,7 @@ public class RTSpeechHandler : MonoBehaviour
                 if (m_TurnActivity.ActivityRevision != oldRevision)
                     InvalidateTentativeEou("effective-user-activity");
                 ObserveListeningBoundaryEvidence(recordingActivityThreshold);
+                PublishPreparedTurnBoundaryEvidence();
                 // Analysis is private, cancellable preparation, not permission to close
                 // the microphone or speak. Start it during boundary reasoning/ASR edits.
                 if (RoleChoosesBoundary && m_EnableTentativeEou &&
@@ -1654,6 +1658,7 @@ public class RTSpeechHandler : MonoBehaviour
         m_TentativeUsedFullAsr = false;
         m_TentativeFullAsrResultReady = false;
         m_TentativeFullAsrText = "";
+        m_TentativeFullAsrRawText = "";
         PrintLog(m_LikelySinging ? "正在倾听演唱..." : "正在录制对话...");
 
         if (m_NeuralVadClient != null)
@@ -1705,6 +1710,7 @@ public class RTSpeechHandler : MonoBehaviour
             Debug.Log("[Listening/Continuation] 首次回复前声音恢复，合并原始录音与续音；不把歌词尾音另立一轮");
         }
         m_NeuralVadClient?.SetInputCaptureTime(m_RecordingCapturedAt);
+        m_ClosedSpeechTracker.Begin(CurrentCaptureSerial, m_RecordingCapturedAt);
         m_UnheardCapture.Clear();
         // Keep the same ASR stream during the brief, unheard handoff so its
         // cumulative transcript still contains the beginning, not only the tail.
@@ -1750,6 +1756,7 @@ public class RTSpeechHandler : MonoBehaviour
         if (m_ChatSample != null)
         {
             PublishListeningEndEvidence();
+            PublishClosedSpeechEvidence();
             m_ChatSample.CancelTurnBoundaryReview();
             //EOU锚点：必须在AcceptClip之前调用，ChatSample的DealingTextCallback/StartStreaming
             //会用这个时间戳算ASR延迟和"EOU→首音"总延迟。
@@ -1768,6 +1775,7 @@ public class RTSpeechHandler : MonoBehaviour
                 bool streamingExit = m_ChatSample.BeginDeferredFinalAsr(toSend);
                 if (m_LogTimings)
                     Debug.Log("[T-EOU] 复用已完成的完整预测ASR作为最终结果；跳过重复识别");
+                m_NeuralVadClient?.PublishReusedFinalTranscript(CurrentCaptureSerial, m_TentativeFullAsrRawText);
                 m_ChatSample.AcceptDeferredFinalAsrText(
                     m_TentativeFullAsrText,
                     streamingExit);
@@ -1971,11 +1979,49 @@ public class RTSpeechHandler : MonoBehaviour
         return clip;
     }
 
+    // Unlike the semantic key, this revision includes punctuation, negation repairs,
+    // empty ASR revisions and rollbacks. Returning to an old spelling cannot revive a lease.
+    private string m_PreparedBoundaryRawTranscript = "";
+    private int m_PreparedBoundaryTextRevision;
+
+    private void PublishPreparedTurnBoundaryEvidence()
+    {
+        if (m_ChatSample == null) return;
+        float now = Time.realtimeSinceStartup;
+        m_ChatSample.ObservePreparedTurnBoundaryEvidence(new PreparedTurnBoundaryEvidence
+        {
+            CaptureSerial = CurrentCaptureSerial,
+            TextRevision = m_PreparedBoundaryTextRevision,
+            ActivityRevision = m_TurnActivity.ActivityRevision,
+            Transcript = m_PreparedBoundaryRawTranscript,
+            AudioMs = m_LatestStreamPartialAudioMs,
+            SampledAt = now,
+            LatestSoundAt = m_TurnActivity.LatestSoundAt,
+            QuietSeconds = m_TurnActivity.QuietSeconds(now),
+            MinimumQuietSeconds = m_TurnBoundaryDropHoldSeconds,
+            MinimumConfidence = m_StalledTurnDecisionMinConfidence,
+            Recording = m_IsRecording,
+            AsrHealthy = m_TurnActivity.AsrHealthy(now) &&
+                m_LastStreamProgressTime >= 0f && now - m_LastStreamProgressTime <= 2.5f,
+            FreshCoverage = HasFreshStreamingCoverage,
+            CoversQuietTail = m_TurnActivity.CoversQuietTail,
+            PendingText = m_TurnActivity.PendingText,
+            LevelActive = m_TurnActivity.LevelActive,
+            MelodyActive = m_TurnActivity.MelodyActive,
+            TextActivityActive = m_TurnActivity.TextActivityActive,
+            TailAvailable = m_TurnActivity.TailAvailable,
+            TailAge = m_TurnActivity.TailAge(now),
+            Singing = m_LikelySinging || m_MelodicEouProtectionActive || m_RecordingRescuedByTonalOverride,
+        });
+    }
+
     /// <summary>
     /// 建立一轮 WebSocket partial 会话，并立即补发 pre-roll 到当前麦克风位置。
     /// </summary>
     private void BeginStreamingRecognition(int currentPos)
     {
+        m_PreparedBoundaryRawTranscript = "";
+        m_PreparedBoundaryTextRevision++;
         m_StreamLastSentPos = -1;
         m_StreamSubmittedSeconds = 0f;
         m_LastStreamAudioSubmittedAt = -1f;
@@ -2036,7 +2082,19 @@ public class RTSpeechHandler : MonoBehaviour
     private void OnStreamingTranscript(SenseVoiceSpeechToText.StreamingTranscript transcript)
     {
         if (!m_IsRecording || transcript == null) return;
+        string rawTranscript = transcript.Text ?? "";
+        if (!string.Equals(rawTranscript, m_PreparedBoundaryRawTranscript, StringComparison.Ordinal))
+        {
+            m_PreparedBoundaryRawTranscript = rawTranscript;
+            m_PreparedBoundaryTextRevision++;
+        }
         ObserveStreamingTurnActivity(transcript, Time.realtimeSinceStartup);
+        bool speechObserved = transcript.ActivityAvailable && transcript.ActivityVadAvailable &&
+            transcript.ActivityWindowMs >= 200 && transcript.ActivityWindowMs <= 1000 &&
+            transcript.ActivitySpeechMs >= 120 && transcript.ActivitySpeechEndAgeMs >= 0 &&
+            transcript.ActivityRms > EffectiveNoiseUpper * 1.15f;
+        m_ClosedSpeechTracker.Observe(CurrentCaptureSerial, transcript.Text, transcript.StableText,
+            transcript.AudioMs, Time.realtimeSinceStartup, speechObserved);
         float latestSingingProbability = Mathf.Clamp01(transcript.SingingProbability);
         m_LatestStreamingSingingProbability = latestSingingProbability;
         if (!m_HasStreamingSingingProbability)
@@ -2088,6 +2146,7 @@ public class RTSpeechHandler : MonoBehaviour
             m_LastStreamProgressTime = Time.realtimeSinceStartup;
         m_LatestStreamPartialAudioMs = transcript.AudioMs;
         m_LatestStreamPartialTime = Time.realtimeSinceStartup;
+        PublishPreparedTurnBoundaryEvidence();
         if (m_ChatSample != null) m_ChatSample.UpdateStreamingTranscript(transcript);
 
         // A requested sing-along can hide almost all RVC latency behind the user's own
@@ -2205,6 +2264,7 @@ public class RTSpeechHandler : MonoBehaviour
         m_StalledTranscriptReviewRequestTime = now;
         m_NextStalledTranscriptReviewTime = now + Mathf.Max(2f, m_StalledTranscriptReviewCooldown);
         if (heldDrop) m_LastReviewedDropSince = m_BoundaryAcoustics.DropSince;
+        PublishPreparedTurnBoundaryEvidence();
         bool requested = m_ChatSample.RequestStalledTurnReview(
             m_LatestStreamPartial,
             unchanged,
@@ -2286,6 +2346,24 @@ public class RTSpeechHandler : MonoBehaviour
             $"recentMelody={m_TurnActivity.MelodyActive} softSpeech={m_TurnActivity.TextActivityActive} pendingText={m_TurnActivity.PendingText} " +
             $"noiseUpper={EffectiveNoiseUpper:F4} tailAvailable={m_TurnActivity.TailAvailable} " +
             $"asrProgressAge={(m_LastStreamProgressTime >= 0f ? now - m_LastStreamProgressTime : -1f):F2}s");
+    }
+
+    private void PublishClosedSpeechEvidence()
+    {
+        bool closed = m_RecordingCloseReason != "manual-disable" &&
+            m_RecordingCloseReason != "llm-interrupt_user" && m_RecordingCloseReason != "llm-ask_user";
+        bool speech = !m_LikelySinging && !m_MelodicEouProtectionActive &&
+            m_PendingSemanticEouObservedMode != "singing" &&
+            m_PendingSemanticEouSource != "background" && m_PendingSemanticEouSource != "ai";
+        if (!m_ClosedSpeechTracker.TrySeal(CurrentCaptureSerial, Time.realtimeSinceStartup,
+                Mathf.RoundToInt(m_StreamSubmittedSeconds * 1000f), closed,
+                HasFreshStreamingCoverage && m_TurnActivity.CoversQuietTail,
+                m_TurnActivity.PendingText, speech, m_RecordingCloseReason, out var evidence)) return;
+        m_NeuralVadClient?.RetainClosedSpeechEvidence(evidence);
+        Debug.Log($"[Speech/ClosedEvidence] capture={evidence.CaptureSessionSerial} revision={evidence.Revision} " +
+            $"audioMs={evidence.AudioMs}/{evidence.SubmittedAudioMs} stableSeconds={evidence.StableForSeconds:F2} " +
+            $"closedAt={evidence.ClosedAt:F3} reason={evidence.CloseReason} textChars={evidence.Text.Length}");
+        m_ChatSample?.AcceptClosedSpeechEvidence(evidence.Copy());
     }
 
     private void PublishListeningEndEvidence()
@@ -2724,6 +2802,7 @@ public class RTSpeechHandler : MonoBehaviour
             m_TentativeUsedFullAsr = false;
             m_TentativeFullAsrResultReady = false;
             m_TentativeFullAsrText = "";
+        m_TentativeFullAsrRawText = "";
             m_TentativeSeq++;
             int streamingSeq = m_TentativeSeq;
             m_TentativePreviewSentTime = Time.realtimeSinceStartup;
@@ -2745,6 +2824,7 @@ public class RTSpeechHandler : MonoBehaviour
         m_TentativeUsedFullAsr = true;
         m_TentativeFullAsrResultReady = false;
         m_TentativeFullAsrText = "";
+        m_TentativeFullAsrRawText = "";
         m_TentativeSeq++;
         int seqAtFire = m_TentativeSeq;
         m_TentativePreviewSentTime = Time.realtimeSinceStartup;
@@ -2758,8 +2838,12 @@ public class RTSpeechHandler : MonoBehaviour
             m_CurrentRecordingAllowsSpeakerLearning,
             rawText =>
             {
-                if (seqAtFire == m_TentativeSeq && m_IsRecording)
+                if (seqAtFire == m_TentativeSeq &&
+                    (m_IsRecording || (m_AwaitingTentativeFinal && seqAtFire == m_AwaitingTentativeSeq)))
+                {
+                    m_TentativeFullAsrRawText = rawText ?? "";
                     m_TentativeFullAsrTranscriptKey = NormalizeSemanticTranscript(rawText);
+                }
             });
     }
 
@@ -2895,6 +2979,7 @@ public class RTSpeechHandler : MonoBehaviour
         {
             m_RecordingCloseReason = "tentative-eou";
             PublishListeningEndEvidence();
+            PublishClosedSpeechEvidence();
             m_ChatSample.CancelTurnBoundaryReview();
             //EOU锚点：保持和StopRecording一致的语义，方便ASR/LLM/TTS阶段延迟统计
             m_ChatSample.MarkEOU(rescuedByTonalOverride);
@@ -2911,6 +2996,8 @@ public class RTSpeechHandler : MonoBehaviour
             else
             {
                 //关闭流式功能，或完整预测已经覆盖有效内容时，避免第二次识别。
+                m_NeuralVadClient?.PublishReusedFinalTranscript(CurrentCaptureSerial,
+                    reuseFullPreview ? m_TentativeFullAsrRawText : text);
                 m_ChatSample.AcceptText(reuseFullPreview
                     ? m_TentativeFullAsrText
                     : text);
@@ -2926,6 +3013,7 @@ public class RTSpeechHandler : MonoBehaviour
         m_TentativeUsedFullAsr = false;
         m_TentativeFullAsrResultReady = false;
         m_TentativeFullAsrText = "";
+        m_TentativeFullAsrRawText = "";
         m_TentativeSeq++;
         ResetMelodicEouProtection();
         ResetStalledTurnState();
@@ -2964,6 +3052,11 @@ public class RTSpeechHandler : MonoBehaviour
         m_AwaitingTentativeStreamingExit = false;
         if (m_LogTimings)
             Debug.Log("[T-EOU] 同轮预测ASR已晋升为最终结果；未重复分析完整音频");
+        // A promoted request may have recovered from its own sealed evidence;
+        // do not overwrite that provenance with an empty preview raw text.
+        if (m_NeuralVadClient != null &&
+            m_NeuralVadClient.LastFinalTranscriptSource != "closed-stream-recovery")
+            m_NeuralVadClient.PublishReusedFinalTranscript(CurrentCaptureSerial, m_TentativeFullAsrRawText);
         ClearTentativeReuseState(true);
         if (m_ChatSample != null)
             m_ChatSample.AcceptDeferredFinalAsrText(text, streamingExit);
@@ -3007,6 +3100,7 @@ public class RTSpeechHandler : MonoBehaviour
         m_TentativeUsedFullAsr = false;
         m_TentativeFullAsrResultReady = false;
         m_TentativeFullAsrText = "";
+        m_TentativeFullAsrRawText = "";
         if (advanceSequence) m_TentativeSeq++;
     }
 
@@ -3027,6 +3121,7 @@ public class RTSpeechHandler : MonoBehaviour
         m_TentativeUsedFullAsr = false;
         m_TentativeFullAsrResultReady = false;
         m_TentativeFullAsrText = "";
+        m_TentativeFullAsrRawText = "";
         m_TentativeSeq++;
         m_TentativePreviewInFlight = false;
         m_ChatSample?.CancelPreviewAnalysis();

@@ -94,3 +94,99 @@ For explicit preview use, run `Server/ARDY/start_motion_service.ps1 -AdapterRele
 To use the preserved original baseline regardless of an active release, run `Server/ARDY/start_motion_service.ps1 -BaselineAdapter`. The Python equivalent is `python -m Server.ARDY.motion_service.app --baseline-adapter`. No old checkpoint or preview approval report is replaced. Preview health reports `adapterMode="verified-preview"`, `previewReleaseVerified=true`, release ID and all evidence hashes. It retains `naturalnessAccepted=false` and the checkpoint's `approvedForRuntime=false`: completed integration and descriptive final audits permit this explicit preview, but do not certify arbitrary-action success or subjective naturalness. Default initial conditioning remains 16 frames.
 
 CPU-only publication checks: `python -m unittest Server.ARDY.test_adapter_release -v`. Synthetic fixture reports verify the evidence gate itself and must never be used as real release evidence.
+# Continuous room locomotion (experimental)
+
+The existing `/v1/locomotion/generate` full-route interface is unchanged. The
+capabilities response advertises `streamProtocol: "ardy-room-stream-v1"`,
+`streamCommitFrames: 8`, `streamGenerationFrames: 40`, allowed prefixes `[8,16]`,
+16 history frames, and a maximum 184-frame target lookahead. This uses the same
+loaded Core H40 model and Qwen adapter. It has not changed to a Horizon8 model.
+
+`POST /v1/locomotion/stream/step` returns a normal root-level locomotion clip
+(`frames`, `targets`, `rotationClip`, `source`, fixed zero source origin/heading)
+with 40 generated frames. It adds `streamProtocol`, `characterId`, `revision`,
+`sessionId`, `requestId`, `stepIndex`, `startFrame`, `commitFrames`,
+`generationFrames`, `nextStartFrame`, `controlRevision`, `previousRequestId`,
+and `requiresClientAudit: true`.
+
+First request fields:
+
+```json
+{
+  "schema": 1,
+  "characterId": "neva",
+  "revision": 100,
+  "sessionId": "follow-100",
+  "requestId": "follow-100-step-0",
+  "stepIndex": 0,
+  "startFrame": 0,
+  "controlRevision": 0,
+  "commitFrames": 8,
+  "description": "A person walks naturally while following the indicated path.",
+  "seed": 0,
+  "timeoutMs": 5000,
+  "initialHistory": "the existing FullBodyHistory object, with 16 explicit frames",
+  "targets": "40 to 184 PathTarget objects, length divisible by four"
+}
+```
+
+The two string placeholders above must be replaced with their actual typed
+objects/array. Target positions use the same fixed source anchor as history,
+Y=0, maximum 1.5 source m/s and 9 degrees/frame. The stream does not require an
+end hold. Only 40 frames are generated even when more future constraints are
+supplied. The returned target array likewise contains 40 entries.
+
+After auditing and adopting the response's first `commitFrames`, send
+the next step with `stepIndex + 1`, `startFrame = previous.nextStartFrame`, a new
+`requestId`, and `previousRequestId = previous.requestId`. Keep `revision`,
+`sessionId`, and `seed` unchanged. Omit `initialHistory`; omit `description` or
+send the identical description. `controlRevision` may increase or remain equal.
+The description's verified Qwen feature and adapted condition are reused only
+inside this session. Provenance retains the original `featureRequestId`; it
+does not claim a fresh language-model request for every step. Null optional
+strings serialized as `""` by Unity are accepted as null.
+
+Acknowledgement means the client audited and accepted the short prefix, not
+that the server observed it being rendered. The server retains the previous
+history plus only that prefix, cropped to the newest 16 frames. Unaccepted
+prediction-tail frames never enter the next history. The client must not ACK a
+rejected or expired candidate; it must stop safely and open a newer revision
+from actual pose history. Terrain, body clearance, and safe playback stopping
+remain client responsibilities. A prediction tail is not inherently a safe
+stopping animation.
+
+`POST /v1/locomotion/stream/cancel` takes `characterId`, `revision`, and
+`sessionId`. A cancelled revision cannot restart. A newer revision starts at
+step zero; old in-flight outputs are discarded and cannot advance its history.
+Only the current exact request has idempotent replay; older or out-of-order
+steps, changed ACK/frame identities, and changed text/seed are rejected. There
+is one queued/in-flight step per session, bounded queue and character capacity,
+and the shared GPU gate remains held until a cancelled inference has finished.
+
+Before returning a candidate, the server audits only its `commitFrames` prefix,
+including the transition from the original retained history's final frame and
+each internal prefix frame. It rejects root steps over .1 source metres, hip
+height outside .72–1.25 times the neutral source standing height, and global
+joint steps over 35 degrees. The checked Core27 joints match the full-body
+player's mapping: Spine1, HandEnd and HandThumb1 auxiliaries are omitted; both
+ToeBase joints remain checked. This does not replace Unity's terrain, clearance,
+skeletal-basis and playback audits. Unconfirmed prediction tails cannot be played
+merely because the prefix passed.
+
+A rejected native candidate is resampled at most twice (three candidates total)
+from the same retained history, condition and target constraints. No rejected
+pose advances history or is modified/smoothed to pass. Candidate zero retains
+the existing `(seed + stepIndex) % 2147483648` seed; candidate index `attempt`
+adds `attempt * 1000003` before that modulus. Cancellation is checked between
+candidates and after each inference. Three failures return HTTP 422 with code
+`stream_quality_rejected`; the failed step cannot be acknowledged.
+
+Timing fields distinguish `queueMs`, `featureMs`, `backendGateMs`,
+`windowsMs` (one entry per actual candidate), `backendMs`, and `totalMs`.
+`qualityAttempts` is 1–3, and `qualityCandidates` records each candidate's attempt,
+seed, inference `windowMs`, `qualityMs`, acceptance and bounded rejection reasons
+(offending frame/joint/value/threshold). The all-failed response retains these
+diagnostics under `error.details.timings`. These measure service work, not user-input
+to rendered motion latency; Unity must measure that separately, including its
+playback buffer and audit time. This API alone does not establish motion quality
+or sustained real-time throughput.

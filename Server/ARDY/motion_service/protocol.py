@@ -95,9 +95,13 @@ class CancelRequest(Identity):
 
 
 class ServiceError(Exception):
-    def __init__(self, status: int, code: str, message: str):
+    def __init__(self, status: int, code: str, message: str, details: dict | None = None):
         self.status, self.code, self.message = status, code, message
+        self.details = details
         super().__init__(message)
 
     def payload(self):
-        return {"error": {"code": self.code, "message": self.message}}
+        error = {"code": self.code, "message": self.message}
+        if self.details is not None:
+            error["details"] = self.details
+        return {"error": error}

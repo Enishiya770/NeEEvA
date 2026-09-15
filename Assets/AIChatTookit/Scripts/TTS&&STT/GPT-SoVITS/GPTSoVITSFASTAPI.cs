@@ -58,6 +58,7 @@ public class GPTSoVITSFASTAPI : TTS
 
     private UnityWebRequest m_ActiveStreamingRequest;
     private AudioSource m_ActiveStreamingOutput;
+    private AudioClip m_ActiveStreamingClip;
     private bool m_StreamCancelled;
     private int m_StreamGeneration;
     private float m_AdaptivePrebufferSeconds;
@@ -137,11 +138,13 @@ public class GPTSoVITSFASTAPI : TTS
             m_ActiveStreamingRequest.Abort();
         }
         m_ActiveStreamingRequest = null;
-        if (m_ActiveStreamingOutput != null)
+        if (m_ActiveStreamingOutput != null && m_ActiveStreamingClip != null &&
+            m_ActiveStreamingOutput.clip == m_ActiveStreamingClip)
         {
             m_ActiveStreamingOutput.Stop();
         }
         m_ActiveStreamingOutput = null;
+        m_ActiveStreamingClip = null;
     }
 
     /// <summary>
@@ -486,9 +489,12 @@ public class GPTSoVITSFASTAPI : TTS
         Func<StreamingPlaybackPermission> playbackGate, int generation, string languageCode)
     {
         bool gateCancelled = false;
+        bool playbackInterrupted = false;
+        AudioClip streamingClip = null;
         bool IsCurrent()
         {
-            if (m_StreamCancelled || generation != m_StreamGeneration || gateCancelled) return false;
+            if (m_StreamCancelled || generation != m_StreamGeneration || gateCancelled || playbackInterrupted) return false;
+            if (streamingClip != null && (output == null || output.clip != streamingClip)) return false;
             if (playbackGate != null && playbackGate() == StreamingPlaybackPermission.Cancel)
                 gateCancelled = true;
             return !gateCancelled;
@@ -504,8 +510,8 @@ public class GPTSoVITSFASTAPI : TTS
 
         string postJson = JsonUtility.ToJson(requestData);
         var pcmHandler = new PcmStreamingDownloadHandler();
-        AudioClip streamingClip = null;
         bool started = false;
+        bool playbackAdvanced = false;
         bool success = false;
         float requestStart = Time.realtimeSinceStartup;
         float headerAt = -1f, firstPcmAt = -1f, bufferReadyAt = -1f;
@@ -567,6 +573,7 @@ public class GPTSoVITSFASTAPI : TTS
                         true,
                         pcmHandler.ReadSamples);
                     output.clip = streamingClip;
+                    m_ActiveStreamingClip = streamingClip;
                     output.loop = false;
                     output.Play();
                     started = true;
@@ -590,6 +597,13 @@ public class GPTSoVITSFASTAPI : TTS
             int streamUnderruns = 0;
             while (started && IsCurrent())
             {
+                if (!playbackAdvanced && output.isPlaying && output.timeSamples > 0)
+                {
+                    playbackAdvanced = true;
+                    Debug.Log($"[TTS/PlaybackEvidence] phase=playback-advanced generation={generation} samples={output.timeSamples} scope=audio-source-progress-not-human-audibility");
+                }
+                if (!pausedForRebuffer && !output.isPlaying)
+                { playbackInterrupted = true; break; }
                 if (operation.isDone) pcmHandler.MarkInputComplete();
 
                 int newUnderruns = pcmHandler.ConsumeUnderrunSignals();
@@ -659,6 +673,7 @@ public class GPTSoVITSFASTAPI : TTS
             success = IsCurrent()
                 && request.result == UnityWebRequest.Result.Success
                 && started
+                && playbackAdvanced
                 && !pcmHandler.FormatError;
 
             if (!IsCurrent() && !operation.isDone) request.Abort();
@@ -675,7 +690,10 @@ public class GPTSoVITSFASTAPI : TTS
         {
             m_ActiveStreamingRequest = null;
             m_ActiveStreamingOutput = null;
+            m_ActiveStreamingClip = null;
         }
+        if (started && !playbackAdvanced)
+            Debug.LogWarning($"[TTS/PlaybackEvidence] phase=ended-before-observed-progress generation={generation} success=False");
         onCompleted?.Invoke(success, text, audioDuration);
 
         if (streamingClip != null)

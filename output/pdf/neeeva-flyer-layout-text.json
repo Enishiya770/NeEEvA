@@ -1,0 +1,135 @@
+[
+  {
+    "page": "front",
+    "text": "NeEEvA",
+    "x": 17,
+    "baseline": 18,
+    "size_pt": 23
+  },
+  {
+    "page": "front",
+    "text": "虚拟具身智能解决方案",
+    "x": 12,
+    "baseline": 29,
+    "size_pt": 10.3
+  },
+  {
+    "page": "front",
+    "text": "走进彼此的世界",
+    "x": 12,
+    "baseline": 56,
+    "size_pt": 29
+  },
+  {
+    "page": "front",
+    "text": "图片",
+    "x": 74,
+    "baseline": 130,
+    "size_pt": 11
+  },
+  {
+    "page": "front",
+    "text": "感知 · 理解 · 决策 · 行动",
+    "x": 74,
+    "baseline": 195.5,
+    "size_pt": 10.5
+  },
+  {
+    "page": "back",
+    "text": "彼此的世界，",
+    "x": 12,
+    "baseline": 22,
+    "size_pt": 23
+  },
+  {
+    "page": "back",
+    "text": "在这里相遇",
+    "x": 12,
+    "baseline": 34,
+    "size_pt": 23
+  },
+  {
+    "page": "back",
+    "text": "你所在的世界，",
+    "x": 18,
+    "baseline": 54,
+    "size_pt": 13.5
+  },
+  {
+    "page": "back",
+    "text": "分享游戏、学习、工作……",
+    "x": 18,
+    "baseline": 64,
+    "size_pt": 10.4
+  },
+  {
+    "page": "back",
+    "text": "角色所在的世界，",
+    "x": 18,
+    "baseline": 89,
+    "size_pt": 13.5
+  },
+  {
+    "page": "back",
+    "text": "携手探索、互动、创造……",
+    "x": 18,
+    "baseline": 99,
+    "size_pt": 10.4
+  },
+  {
+    "page": "back",
+    "text": "从单纯交流，到真正参与",
+    "x": 12,
+    "baseline": 123,
+    "size_pt": 15.1
+  },
+  {
+    "page": "back",
+    "text": "探索人与智能体共生的未来——",
+    "x": 12,
+    "baseline": 134,
+    "size_pt": 10.5
+  },
+  {
+    "page": "back",
+    "text": "项目原型已开源 · 支持本地部署",
+    "x": 12,
+    "baseline": 154,
+    "size_pt": 10
+  },
+  {
+    "page": "back",
+    "text": "欢迎算力与硬件支持，以及场景试点、",
+    "x": 12,
+    "baseline": 164,
+    "size_pt": 8.8
+  },
+  {
+    "page": "back",
+    "text": "IP 合作、联合开发与投资交流。",
+    "x": 12,
+    "baseline": 170,
+    "size_pt": 8.8
+  },
+  {
+    "page": "back",
+    "text": "二维码",
+    "x": 22,
+    "baseline": 191.2,
+    "size_pt": 7
+  },
+  {
+    "page": "back",
+    "text": "了解项目",
+    "x": 39,
+    "baseline": 186,
+    "size_pt": 12.5
+  },
+  {
+    "page": "back",
+    "text": "杭州昕宁科技有限公司 · NeEEvA",
+    "x": 39,
+    "baseline": 197,
+    "size_pt": 8
+  }
+]

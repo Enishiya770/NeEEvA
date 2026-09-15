@@ -8,7 +8,7 @@ public static class ArdyRoomDialogueProtocolCases
     {
         int checks = 0;
         Action<bool, string> check = (ok, message) => { checks++; if (!ok) throw new InvalidOperationException(message); };
-        foreach (string name in new[] { "approach", "stop-moving" })
+        foreach (string name in new[] { "approach", "follow", "stop-moving" })
         {
             string tag = "<motion name=\"" + name + "\"/>";
             string disabled = tag;

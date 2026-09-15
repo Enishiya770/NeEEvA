@@ -19,6 +19,7 @@ public partial class ChatSample
     /// <summary>Opt-in from a bound runtime room controller, never from a model response.</summary>
     public void ConfigureRoomMotionOutput(bool enabled)
     {
+        if (!enabled) { CancelClosedRoomPreparation("room-output-disabled"); CancelSceneAction("room-output-disabled"); }
         m_RoomMotionOutputEnabled = enabled;
     }
     [SerializeField, Tooltip("实验性语义动作规划。尚有约束理解遗漏；默认保留已验收的动作协议。")]
@@ -57,6 +58,7 @@ public partial class ChatSample
         // Speech generations reject stale model callbacks. A committed body action
         // has its own lifetime, and may continue through a new autonomous speech frame.
         int generation = ++m_FormalResponseGeneration;
+        ClearFormalSceneObservation();
         BeginMotionPlanningResponse();
         BeginMotionFeedbackResponse();
         m_MotionDispatchedGeneration = generation;
@@ -200,9 +202,9 @@ public partial class ChatSample
             : intent.ControlPlan != null ? JsonUtility.ToJson(intent.ControlPlan) : intent.Description) +
             "\n" + intent.ReplayReference + "\n" + (intent.Goal == null ? "null" : JsonUtility.ToJson(intent.Goal));
         if (intent.Name == "none")
-            m_MotionDispatchedKeys.RemoveWhere(value => !value.StartsWith("approach\n", StringComparison.Ordinal));
+            m_MotionDispatchedKeys.RemoveWhere(value => !(value.StartsWith("approach\n", StringComparison.Ordinal) || value.StartsWith("follow\n", StringComparison.Ordinal)));
         else if (intent.Name == "stop-moving")
-            m_MotionDispatchedKeys.RemoveWhere(value => value.StartsWith("approach\n", StringComparison.Ordinal));
+            m_MotionDispatchedKeys.RemoveWhere(value => value.StartsWith("approach\n", StringComparison.Ordinal) || value.StartsWith("follow\n", StringComparison.Ordinal));
         else if (m_MotionDispatchedKeys.Contains(key))
         {
             if (m_LogAgentLoop) Debug.Log($"[Dialogue/Motion] 同一回复链的相同动作已提交，保留正在执行的动作；generation={intent.ResponseGeneration}, name={intent.Name}", this);
@@ -230,6 +232,7 @@ public partial class ChatSample
 
     private void CancelDialogueMotion(string reason)
     {
+        CancelSceneAction(reason);
         m_MotionDispatchedKeys.Clear();
         ResetMotionFeedback();
         var listeners = MotionCancelled;
@@ -244,6 +247,12 @@ public partial class ChatSample
 
     private void OnDisable()
     {
+        ResetSingingPolicyReview("chat-disabled");
+        ClearDeferredSingingRequest();
+        SuspendSceneTime("chat-disabled");
+        CancelAutonomyIntentProbe();
+        ResetSceneVision("chat-disabled", true);
+        CancelClosedRoomPreparation("chat-disabled");
         m_LastMotionProtocolRejection = null;
         ResetActionPlanning();
         CancelDialogueMotion("chat-disabled");

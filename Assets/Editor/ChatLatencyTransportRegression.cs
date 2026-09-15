@@ -1,8 +1,12 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -13,6 +17,7 @@ public static class ChatLatencyTransportRegression
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
     private static int checks;
+    public static JObject PublicBoundaryHttpReport { get; private set; }
 
     [MenuItem("Tools/NeEEvA/Validate chat latency transport")]
     public static void RunInteractive()
@@ -21,6 +26,9 @@ public static class ChatLatencyTransportRegression
         CheckStreamingPerformance();
         CheckStableDialoguePrefix();
         CheckStagedObservations();
+        CheckSceneFactRequestSharing();
+        CheckFormalResponseStages();
+        checks += SceneFactCompactionRegression.RunChecks();
         Debug.Log("[ChatLatencyTransportRegression] passed checks=" + checks);
     }
 
@@ -67,7 +75,7 @@ public static class ChatLatencyTransportRegression
 
     private static void CheckStreamingPerformance()
     {
-        const string text = "<lang code=\"ja\"/>青い空、こんにちは。";
+        const string text = "<lang code=\"ja\"/><speech mode=\"independent\"/><say>青い空、こんにちは。</say>";
         string content = new JObject { ["choices"] = new JArray(new JObject {
             ["delta"] = new JObject { ["content"] = text }
         }) }.ToString(Newtonsoft.Json.Formatting.None);
@@ -113,6 +121,229 @@ public static class ChatLatencyTransportRegression
         }
     }
 
+    // Explicit opt-in by the isolated integration fixture. Only synthetic replies
+    // are served on an ephemeral loopback port; no Qwen, TTS or microphone is used.
+    // Unlike parser tests this exercises the public production formal and feedback
+    // entrypoints, request contract, native UnityWebRequest, SSE and completion.
+    public static IEnumerator RunPublicBoundaryHttpChecks(string output)
+    {
+        var observations = new JArray();
+        var host = new GameObject("PublicBoundaryLoopbackFixture"); host.SetActive(false);
+        ChatQW model = null;
+        int before = checks;
+        using (var server = new PublicBoundaryLoopbackServer())
+        {
+            try
+            {
+                model = host.AddComponent<ChatQW>();
+                model.enabled = false; // Suppress Start/slot initialization while public coroutines remain callable.
+                model.m_Backend = ChatQW.BackendType.Local;
+                model.m_LocalUrl = server.Url;
+                model.m_PrewarmPrefixOnStart = false;
+                model.m_LogRequestStats = false;
+                typeof(LLM).GetField("url", Flags).SetValue(model, server.Url);
+                host.SetActive(true);
+                // Awake may assign the endpoint, but it can only assign this same loopback URL.
+                Check((string)typeof(LLM).GetField("url", Flags).GetValue(model) == server.Url,
+                    "Isolated transport selected a non-loopback provider.");
+                const string valid = "<lang code=\"ja\"/><speech mode=\"independent\"/><say>今の状態を確認しているよ。</say><motion name=\"nod\"/>";
+                var outputs = new Dictionary<string, string> {
+                    { "naked-protocol", "lang code=ja\n\nspeech mode=after_action\n\n確認しているよ。<sing refs=\"clip:fixture\"/>" },
+                    { "unmarked-reasoning", "ユーザーは二つの録音を連結したい。先に内部手順を確認する。\n" + valid },
+                    { "public-prefix-then-invalid-tail", valid + "裸の内部記録<continue/>" },
+                    { "valid-public-action", valid }
+                };
+                foreach (bool feedback in new[] { false, true })
+                foreach (bool typedSpeech in new[] { false, true })
+                foreach (var sample in outputs)
+                {
+                    model.CancelActiveResponse();
+                    model.m_DataList.Clear();
+                    model.m_DataList.Add(new LLM.SendData("system", "Synthetic persona: speak Japanese."));
+                    model.m_DataList.Add(new LLM.SendData("user", "Keep the two-part goal; verify the previous result."));
+                    const string facts = "[fixture current facts] original_goal=part1_then_part2 actual_playback=none";
+                    var parts = new List<SpeechText>();
+                    var plain = new StringBuilder();
+                    var errors = new List<string>();
+                    string complete = null;
+                    Action<string> errorSink = e => errors.Add(e);
+                    model.OnOutputFormatError += errorSink;
+                    var exchange = server.ServeOne(sample.Value);
+                    try
+                    {
+                        if (feedback)
+                        {
+                            if (typedSpeech) model.PostSpeechFeedbackStream(facts, "[actual result] action not yet submitted", parts.Add, value => complete = value);
+                            else model.PostContinuationStream(facts, value => plain.Append(value), value => complete = value);
+                        }
+                        else
+                        {
+                            model.RequestContext = facts;
+                            if (typedSpeech) model.PostSpeechStream("Please explain the current result.", parts.Add, value => complete = value);
+                            else model.PostMsgStream("Please explain the current result.", value => plain.Append(value), value => complete = value);
+                        }
+                        float deadline = Time.realtimeSinceStartup + 12f;
+                        while (complete == null || !exchange.IsCompleted)
+                        {
+                            if (exchange.IsFaulted) throw exchange.Exception;
+                            if (Time.realtimeSinceStartup > deadline) throw new TimeoutException("Loopback public-output transport: " + sample.Key);
+                            yield return null;
+                        }
+                        string wire = exchange.Result;
+                        bool hasContract = false;
+                        foreach (JObject message in (JArray)JObject.Parse(wire)["messages"])
+                            if (message["content"].Type == JTokenType.String &&
+                                ((string)message["content"]).Contains(RoleOutputPublicBoundary.OutputContract)) hasContract = true;
+                        Check(hasContract,
+                            "Actual formal/feedback request omitted the explicit say contract.");
+                        Check(wire.Contains("original_goal=part1_then_part2") && wire.Contains("actual_playback=none"),
+                            "Public contract injection removed current task/evidence.");
+                        var emitted = new StringBuilder(); foreach (SpeechText part in parts) emitted.Append(part.Text);
+                        emitted.Append(plain);
+                        bool validCase = sample.Key == "valid-public-action";
+                        bool publicPrefixCase = sample.Key == "public-prefix-then-invalid-tail";
+                        if (validCase)
+                        {
+                            Check(emitted.ToString() == "今の状態を確認しているよ。" && errors.Count == 0 &&
+                                complete.Contains("<motion name=\"nod\"/>") && !complete.Contains("<say"),
+                                "Valid public speech or validated tool projection changed through actual transport.");
+                            if (typedSpeech) Check(parts.TrueForAll(p => p.LanguageCode == "ja" &&
+                                p.ActionDependency == SpeechActionDependency.Independent), "Transport lost language/phase metadata.");
+                        }
+                        else
+                        {
+                            Check(emitted.ToString() == (publicPrefixCase ? "今の状態を確認しているよ。" : "") && complete == "" && errors.Count == 1 &&
+                                errors[0].Contains("[public_output_boundary]"),
+                                "Malformed model output reached speech or executable completion through actual transport.");
+                            Check(!model.m_DataList.Exists(m => m.role == "assistant") &&
+                                model.m_DataList.Exists(m => m.role == "system" && m.content.Contains("[public_output_boundary]")),
+                                "Malformed response became accepted history or lost its structured correction fact.");
+                            string errorFact = model.m_DataList.Find(m => m.role == "system" && m.content.Contains("[public_output_boundary]")).content;
+                            if (publicPrefixCase)
+                            {
+                                var receipt = ReadPublicReceipt(errorFact);
+                                Check((string)receipt["text"] == emitted.ToString() &&
+                                    (string)receipt["delivery"] == "public-stream-callback" &&
+                                    (string)receipt["playback"] == "not-observed-here" &&
+                                    (long)receipt["charactersSent"] == emitted.Length &&
+                                    errors[0].Contains("[public_stream_prefix]") && !errorFact.Contains("裸の内部記録") &&
+                                    !errorFact.Contains("<motion") && !errorFact.Contains("<continue"),
+                                    "Correction lost an emitted prefix, claimed heard audio or retained the invalid tail/actions.");
+                            }
+                            else Check(!errorFact.Contains("[public_stream_prefix]"), "Undelivered parser content was reported as a public stream prefix.");
+                        }
+                        observations.Add(new JObject { ["case"] = sample.Key, ["request"] = feedback ? (typedSpeech ? "work-feedback" : "continuation") : "formal",
+                            ["callback"] = typedSpeech ? "SpeechText" : "string", ["spokenCharacters"] = emitted.Length,
+                            ["formatErrors"] = errors.Count, ["projectedActions"] = complete.Contains("<motion"), ["passed"] = true });
+                    }
+                    finally { model.OnOutputFormatError -= errorSink; model.CancelActiveResponse(); }
+                }
+                model.m_DataList.Clear();
+                model.m_DataList.Add(new LLM.SendData("system", "Synthetic persona."));
+                string noCallbackComplete = null;
+                var noCallbackExchange = server.ServeOne(valid + "裸の内部記録<continue/>");
+                model.PostMsgStream("Completion-only consumer.", null, value => noCallbackComplete = value);
+                float noCallbackDeadline = Time.realtimeSinceStartup + 12f;
+                while (noCallbackComplete == null || !noCallbackExchange.IsCompleted)
+                {
+                    if (noCallbackExchange.IsFaulted) throw noCallbackExchange.Exception;
+                    if (Time.realtimeSinceStartup > noCallbackDeadline) throw new TimeoutException("Completion-only public boundary transport.");
+                    yield return null;
+                }
+                Check(noCallbackComplete == "" &&
+                    !model.m_DataList.Exists(m => m.content.Contains("[public_stream_prefix]")),
+                    "A stream without a public delta consumer claimed the parsed prefix was delivered.");
+                observations.Add(new JObject { ["case"] = "parsed-prefix-without-public-callback", ["request"] = "formal",
+                    ["callback"] = "completion-only", ["spokenCharacters"] = 0, ["projectedActions"] = false, ["passed"] = true });
+                // Completion-only/nonstream parsing of an identical valid prefix
+                // is not a callback delivery; it must not invent an audible prefix.
+                model.m_DataList.Clear();
+                var nonstream = RoleOutputChannels.Parse(valid + "裸の内部記録<continue/>",
+                    RoleOutputBoundaryPolicy.ExplicitPublicSayWithActions);
+                typeof(ChatQW).GetMethod("ReportRoleOutputFormatFacts", Flags).Invoke(model, new object[] { nonstream, true });
+                Check(nonstream.HasSpeech && model.m_DataList.Exists(m => m.content.Contains("[public_output_boundary]")) &&
+                    !model.m_DataList.Exists(m => m.content.Contains("[public_stream_prefix]")),
+                    "Nonstream parse falsely claimed public callback delivery.");
+                CheckBoundedPublicReceipt();
+                PublicBoundaryHttpReport = new JObject { ["passed"] = true, ["checks"] = checks - before,
+                    ["loopbackRequests"] = observations.Count, ["cases"] = observations,
+                    ["scope"] = "Production ChatQW public entrypoints → ephemeral loopback UnityWebRequest/SSE → speech callbacks/executable projection. Synthetic payloads, no real model, TTS or scene actions." };
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    Directory.CreateDirectory(output);
+                    File.WriteAllText(Path.Combine(output, "public-boundary-http.json"), PublicBoundaryHttpReport.ToString(), new UTF8Encoding(false));
+                }
+            }
+            finally
+            {
+                if (model != null) model.CancelActiveResponse();
+                UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+    }
+
+    private static JObject ReadPublicReceipt(string fact)
+    {
+        const string marker = "[public_stream_prefix] ";
+        foreach (string line in fact.Split('\n'))
+            if (line.StartsWith(marker, StringComparison.Ordinal)) return JObject.Parse(line.Substring(marker.Length));
+        throw new InvalidOperationException("Missing structured public stream receipt.");
+    }
+
+    private static void CheckBoundedPublicReceipt()
+    {
+        var type = typeof(ChatQW).GetNestedType("PublicSpeechStreamReceipt", Flags);
+        object receipt = Activator.CreateInstance(type, true);
+        type.GetMethod("Record", Flags).Invoke(receipt, new object[] { new string('あ', 1023) + "😀suffix", SpeechActionDependency.AfterAction });
+        type.GetMethod("Record", Flags).Invoke(receipt, new object[] { new string('い', 2000), SpeechActionDependency.AfterAction });
+        string description = (string)type.GetMethod("Describe", Flags).Invoke(receipt, null);
+        JObject fact = ReadPublicReceipt(description);
+        string text = (string)fact["text"];
+        Check(text.Length <= 1024 && !char.IsHighSurrogate(text[text.Length - 1]) &&
+            (bool)fact["prefixTruncated"] && (long)fact["charactersSent"] > 3000 &&
+            (string)fact["speechDependencies"][0] == "AfterAction" &&
+            (string)fact["playback"] == "not-observed-here", "Public receipt grew unbounded, split UTF-16 or claimed dependent speech was heard.");
+    }
+
+    private sealed class PublicBoundaryLoopbackServer : IDisposable
+    {
+        private readonly HttpListener listener = new HttpListener();
+        public string Url { get; }
+        public PublicBoundaryLoopbackServer()
+        {
+            var probe = new TcpListener(IPAddress.Loopback, 0); probe.Start();
+            int port = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
+            Url = "http://127.0.0.1:" + port + "/v1/chat/completions";
+            listener.Prefixes.Add("http://127.0.0.1:" + port + "/"); listener.Start();
+        }
+        public Task<string> ServeOne(string output) => Task.Run(async () =>
+        {
+            var context = await listener.GetContextAsync();
+            string wire;
+            using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8)) wire = await reader.ReadToEndAsync();
+            context.Response.StatusCode = 200; context.Response.ContentType = "text/event-stream";
+            context.Response.SendChunked = true;
+            try
+            {
+                // Semantic chunks are intentionally tiny. SSE boundaries also cut
+                // across protocol fields and multibyte public text.
+                for (int at = 0; at < output.Length; at += 3)
+                {
+                    var payload = new JObject { ["choices"] = new JArray(new JObject {
+                        ["delta"] = new JObject { ["content"] = output.Substring(at, Math.Min(3, output.Length - at)) } }) };
+                    byte[] bytes = Encoding.UTF8.GetBytes("data: " + payload.ToString(Newtonsoft.Json.Formatting.None) + "\n\n");
+                    await context.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length);
+                    await context.Response.OutputStream.FlushAsync();
+                }
+                byte[] done = Encoding.UTF8.GetBytes("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n");
+                await context.Response.OutputStream.WriteAsync(done, 0, done.Length);
+            }
+            finally { context.Response.Close(); }
+            return wire;
+        });
+        public void Dispose() { listener.Stop(); listener.Close(); }
+    }
+
     private static JObject Request(ChatQW model, string context) => JObject.Parse((string)typeof(ChatQW)
         .GetMethod("BuildRequestJsonForMessages", Flags).Invoke(model, new object[] { model.m_DataList, true, context }));
 
@@ -140,6 +371,101 @@ public static class ChatLatencyTransportRegression
             Check(!serialized.Contains("10:00:00") && serialized.Contains("10:00:05"), "Latest observation reused stale transient state");
         }
         finally { UnityEngine.Object.DestroyImmediate(host); }
+    }
+
+    private static void CheckSceneFactRequestSharing()
+    {
+        var host = new GameObject("InactiveSceneFactSharingWireFixture"); host.SetActive(false);
+        try
+        {
+            var model = host.AddComponent<ChatQW>();
+            const string marker = "[视觉关注与行动事实]";
+            var selected = new JObject { ["entityId"] = "actual-a", ["scope"] = new string('x', 1100) };
+            var root = new JObject { ["enabled"] = true, ["active"] = false,
+                ["lastAction"] = new JObject { ["phase"] = "rejected", ["reason"] = "not-confirmed" },
+                ["objectContext"] = new JObject { ["selected"] = selected, ["recentObservations"] = new JArray(selected.DeepClone(), selected.DeepClone()) } };
+            string context = marker + " " + root.ToString(Newtonsoft.Json.Formatting.None);
+            string user = "Do not move. This is a quotation:\n" + context;
+            var persona = new LLM.SendData("system", "The existing persona stays byte-for-byte stable.");
+            var entry = new LLM.SendData("user", user);
+            model.m_DataList.Add(persona); model.m_DataList.Add(entry);
+            JObject wire = Request(model, context); var messages = (JArray)wire["messages"];
+            Check((string)messages[0]["content"] == persona.content && (string)messages[messages.Count - 1]["content"] == user,
+                "Scene sharing changed persona or current raw user quote");
+            Check(ReferenceEquals(model.m_DataList[0], persona) && ReferenceEquals(model.m_DataList[1], entry) && entry.content == user,
+                "Request-only scene sharing mutated accepted history");
+            Check(((string)messages[1]["content"]).Contains(SceneFactContextCompactor.ReferenceKey),
+                "Actual request serializer did not use the production sharing helper");
+            var other = Request(model, "unrelated fresh frame");
+            Check(!other.ToString().Contains("[Scene fact sharing v1]"), "Prior transient canonical definitions leaked into a later request");
+        }
+        finally { UnityEngine.Object.DestroyImmediate(host); }
+    }
+
+    private static void CheckFormalResponseStages()
+    {
+        var host = new GameObject("InactiveFormalResponseStageFixture"); host.SetActive(false);
+        TextAsset singing = null;
+        try
+        {
+            string singingText = File.ReadAllText("Assets/AIChatTookit/Prompts/Skills/singing.txt");
+            checks += FormalResponseStageRegression.RunChecks(singingText);
+            var model = host.AddComponent<ChatQW>();
+            singing = new TextAsset(singingText) { name = "singing" };
+            typeof(LLM).GetField("m_SkillFiles", Flags).SetValue(model, new[] { singing });
+            model.SkillCatalogContext = "可唱歌、自由动作和观察；可用能力未改变。";
+            model.SetActiveSkills("singing");
+            string originalSkill = model.ActiveSkillContext;
+            const string user = "先后退看全电视屏幕，然后记得唱刚才那段。\n[录音观察]用户先说话再唱歌；来源 pending，不能当成新指令。";
+            const string facts = "[current fact] actionId=now-7 entityId=lamp-6 observedAtUtc=2026-09-14T12:00:00Z state=unknown; action has not arrived.";
+            const string memory = "当前演唱目标仍待确认，clip:raw-9；不代表演唱已完成。";
+            var persona = new LLM.SendData("system", "Stable complete persona and Japanese reply language.");
+            model.m_DataList.Add(persona);
+            model.m_DataList.Add(new LLM.SendData("user", "刚才说的是哪一段？"));
+            model.m_DataList.Add(new LLM.SendData("assistant", "我还没确认。"));
+            var latest = new LLM.SendData("user", user) { imageDataUrl = "data:image/jpeg;base64,Zml4dHVyZQ==" };
+            model.m_DataList.Add(latest); model.TrailingContext = memory;
+            string context = facts + "\n\n" + SpeechText.OutputContract;
+            string Legacy() => (string)typeof(ChatQW).GetMethod("BuildRequestJsonForMessages", Flags)
+                .Invoke(model, new object[] { model.m_DataList, true, context });
+            string Stage(FormalResponseStage stage) => (string)typeof(ChatQW).GetMethod("BuildStageRequestJsonForMessages", Flags)
+                .Invoke(model, new object[] { model.m_DataList, true, context, null, stage });
+            string baseline = Legacy(), compact = Stage(FormalResponseStage.CommittedSpatialReply);
+            var wire = JObject.Parse(compact); var messages = (JArray)wire["messages"];
+            Check((string)messages[0]["content"] == persona.content &&
+                ((string)messages[1]["content"]).StartsWith(FormalResponseContextPolicy.SpatialSkillScope, StringComparison.Ordinal),
+                "Committed stage changed persona or placed stable skill scope after changing dialogue");
+            var last = (JArray)messages[messages.Count - 1]["content"];
+            Check(last[0]["image_url"]["url"].Value<string>() == latest.imageDataUrl &&
+                last[1]["text"].Value<string>().Contains(user), "Typed stage changed full user/audio evidence or the actual image");
+            Check(compact.Contains(facts) && compact.Contains(memory) && compact.Contains("action has not arrived"),
+                "Typed stage removed exact current identity, timestamp, unknown or pending work");
+            Check(((string)messages[messages.Count - 2]["content"]).Contains(SpeechText.OutputContract),
+                "Typed stage dropped production speech language/channel contract");
+            Check(!compact.Contains("<sing_goal") && compact.Length < baseline.Length &&
+                Stage(FormalResponseStage.General) == baseline && Legacy() == baseline && model.ActiveSkillContext == originalSkill,
+                "Stage scope leaked across consecutive shared-provider requests or mutated capability state");
+            string projected = FormalResponseContextPolicy.SkillContext(FormalResponseStage.CommittedSpatialReply, originalSkill, model.SkillCatalogContext);
+            int oldEstimate = (int)typeof(ChatQW).GetMethod("EstimateRequestTokens", Flags).Invoke(model, new object[] { model.m_DataList, context });
+            int newEstimate = (int)typeof(ChatQW).GetMethod("EstimateStageRequestTokens", Flags).Invoke(model, new object[] { model.m_DataList, context, projected });
+            int SkillTokens(string value) => (int)typeof(ChatQW).GetMethod("EstimateTokens", Flags).Invoke(null, new object[] { value });
+            Check(oldEstimate - newEstimate == SkillTokens(originalSkill) - SkillTokens(projected),
+                "History budgeting does not use the exact stage-projected skill payload");
+            int generation = (int)typeof(ChatQW).GetField("m_StreamRequestGeneration", Flags).GetValue(model);
+            var stale = (System.Collections.IEnumerator)typeof(ChatQW).GetMethod("RequestStageStreamWithObservation", Flags).Invoke(model,
+                new object[] { "", generation - 1, null, null, false, context, null, null, null, FormalResponseStage.CommittedSpatialReply });
+            Check(!stale.MoveNext() && model.ActiveSkillContext == originalSkill && Legacy() == baseline,
+                "Cancelled stage coroutine reached HTTP preparation or changed the next request");
+            Check(ReferenceEquals(model.m_DataList[0], persona) && ReferenceEquals(model.m_DataList[3], latest) && latest.content == user,
+                "Stage serialization mutated accepted history references");
+            Debug.Log("[FormalResponseStageRegression] " + new JObject { ["baselineWireCharacters"] = baseline.Length,
+                ["stageWireCharacters"] = compact.Length, ["baselineEstimatedTokens"] = oldEstimate, ["stageEstimatedTokens"] = newEstimate });
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(host);
+            if (singing != null) UnityEngine.Object.DestroyImmediate(singing);
+        }
     }
 
     private static void CheckStagedObservations()

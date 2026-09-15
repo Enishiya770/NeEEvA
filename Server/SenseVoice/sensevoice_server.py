@@ -1822,6 +1822,7 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
         )
         timing.mark("quick_pitch")
         checkpoint()
+        raw_vad_has_speech, raw_vad_speech_ms = has_speech, speech_ms
         singing_vad_override = not has_speech and is_tonal_vocal(quick_singing)
         if singing_vad_override:
             has_speech = True
@@ -1842,6 +1843,9 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
                 "emotion": "",
                 "audio_event": "NoSpeech",
                 "no_speech": True,
+                "no_speech_reason": "vad-insufficient-speech",
+                "raw_vad_has_speech": bool(raw_vad_has_speech),
+                "raw_vad_speech_ms": int(raw_vad_speech_ms),
                 "speech_ms": speech_ms,
                 "vad_elapsed": round(vad_dt, 3),
                 "elapsed": round(vad_dt, 3),
@@ -1882,6 +1886,9 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
                 "emotion": "",
                 "audio_event": "SelfSpeech",
                 "no_speech": True,
+                "no_speech_reason": "self-speech",
+                "raw_vad_has_speech": bool(raw_vad_has_speech),
+                "raw_vad_speech_ms": int(raw_vad_speech_ms),
                 "speech_ms": speech_ms,
                 "vad_elapsed": round(vad_dt, 3),
                 "speaker_elapsed": round(speaker_dt, 3),
@@ -1953,6 +1960,7 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
                 and _is_hallucinated_transcript(text, emotion, speaker_meta)):
             print(
                 f"[ASR] rejected hallucination emo={emotion} lang={lang} "
+                f"raw_vad={raw_vad_has_speech}/{raw_vad_speech_ms}ms "
                 f"spk={speaker_meta.get('speaker_id')} "
                 f"quick({describe_vocal_probe(quick_singing)}) "
                 f"full({describe_vocal_probe(singing)}) "
@@ -1964,6 +1972,10 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
                 "emotion": "",
                 "audio_event": "NoSpeech",
                 "no_speech": True,
+                "no_speech_reason": "hallucination-rejected",
+                "rejected_text": text,
+                "raw_vad_has_speech": bool(raw_vad_has_speech),
+                "raw_vad_speech_ms": int(raw_vad_speech_ms),
                 "speech_ms": speech_ms,
                 "vad_elapsed": round(vad_dt, 3),
                 "speaker_elapsed": round(speaker_dt, 3),

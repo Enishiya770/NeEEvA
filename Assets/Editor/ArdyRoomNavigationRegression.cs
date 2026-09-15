@@ -192,7 +192,11 @@ public static class ArdyRoomNavigationRegression
             f.Build();
             Check(f.Navigation.TryPlan(Vector3.zero, new Vector3(2f, 0f, 0f), out _, out var reason), "Initial dynamic fixture plan: " + reason);
             var blocker = f.Box("UserOutsideEnvironment", new Vector3(.6f, .8f, 0f), new Vector3(.15f, 1.6f, .6f), true);
-            Check(!f.Navigation.ValidateStep(Vector3.zero, new Vector3(.4f, 0f, 0f), out _, out reason), "Obstacle appearing after planning must block step");
+            Check(!f.Navigation.ValidateStep(Vector3.zero, new Vector3(.4f, 0f, 0f), out _, out reason, out var observed), "Obstacle appearing after planning must block step");
+            Check(observed.colliderId == blocker.GetInstanceID() && observed.hasColliderBounds &&
+                observed.colliderBoundsCenter == blocker.bounds.center && observed.colliderBoundsSize == blocker.bounds.size &&
+                observed.hasSample && observed.reason == reason && !observed.success,
+                "The rejecting execution query must preserve its exact physical collider, bounds, checked point and reason");
             report.fixtures.Add(new Result { name = "dynamic-user-obstacle", outcome = "execution rejected", reason = reason });
             Object.DestroyImmediate(blocker.gameObject);
             var threshold = f.Box("NewDoorThreshold", new Vector3(.5f, .04f, 0f), new Vector3(.15f, .08f, 1f));

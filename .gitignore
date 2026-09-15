@@ -154,3 +154,6 @@ Server/RVC/*_headers.txt
 /Server/ARDY/.venv/
 /Server/ARDY/models/
 /Server/ARDY/runtime/
+# Local document tooling, previews and machine-specific network diagnostics.
+/tmp/
+/Reports/network-5090-20260915/

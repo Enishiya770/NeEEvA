@@ -1,0 +1,320 @@
+using System;
+using NeEEvA.Motion;
+using NeEEvA.Perception;
+using Newtonsoft.Json.Linq;
+using UnityEngine;
+
+public partial class ChatSample
+{
+    // One read-only candidate may overlap ONLY the final, already generated
+    // local speech clip. Public generation/execution remains exclusively owned.
+    private sealed class ScenePlaybackReview
+    {
+        public int probeGeneration, formalGeneration, workEpoch, userTurn, inputRevision, activityRevision, eventRevision, visionEpoch, controllerOperation;
+        public string actionId, trigger;
+        public AudioSource audio;
+        public AudioClip clip;
+        public LLM model;
+        public ArdyRoomDialogueBridge bridge;
+        public Transform environment;
+        public UniVRM10.Vrm10Instance avatar;
+        public Action<SceneVisionObservation> resume;
+        public bool resuming;
+        public SceneFinalPlaybackWindow finalPlayback;
+        public JObject factStamp;
+    }
+    private sealed class SceneFinalPlaybackWindow
+    {
+        public int generation;
+        public TTS provider;
+        public AudioSource audio;
+        public AudioClip clip;
+        public bool buffered, drained;
+        public int lastSample;
+        public double lastDsp;
+    }
+    private SceneFinalPlaybackWindow m_SceneFinalPlayback;
+    private ScenePlaybackReview m_ScenePlaybackReview;
+    private int m_ScenePlaybackReviewsStarted, m_ScenePlaybackReviewsHandedOff, m_ScenePlaybackReviewsDiscarded;
+    private string m_ScenePlaybackReviewLastReason = "not-started";
+
+    private static bool IsSceneActionReviewReason(string reason) =>
+        (reason ?? "").StartsWith("scene-action-", StringComparison.Ordinal);
+
+    // The direct PCM player keeps m_TTSSenderDone=false until playback ends.
+    // This separate receipt means only the final sentence's synthesis is done;
+    // it does not claim its audio has already been heard.
+    private void ObserveFinalScenePlayback(int generation, TTS provider, AudioClip clip, bool buffered, bool synthesisComplete)
+    {
+        if (generation != m_FormalResponseGeneration || !m_StreamComplete ||
+            m_PendingChunks.Count != 0 || m_PendingClips.Count != 0 || !synthesisComplete ||
+            provider == null || provider != m_ChatSettings?.m_TextToSpeech ||
+            m_AudioSource == null || !m_AudioSource.isPlaying || clip == null || m_AudioSource.clip != clip) return;
+        var value = m_SceneFinalPlayback;
+        if (value == null || value.generation != generation || !ReferenceEquals(value.clip, clip) || value.drained)
+        {
+            value = m_SceneFinalPlayback = new SceneFinalPlaybackWindow {
+                generation = generation, provider = provider, audio = m_AudioSource, clip = clip, buffered = buffered
+            };
+            Debug.Log($"[Agent/Review] final-playback-ready generation={generation} mode={(buffered ? "buffered-wav" : "pcm")} synthesis_complete=True audio_drained=False eligibility={ScenePlaybackEligibility()}", this);
+        }
+        value.lastSample = m_AudioSource.timeSamples; value.lastDsp = AudioSettings.dspTime;
+    }
+
+    private void CompleteFinalScenePlayback(int generation, AudioClip clip, bool succeeded)
+    {
+        var value = m_SceneFinalPlayback;
+        if (value == null || value.generation != generation || !ReferenceEquals(value.clip, clip)) return;
+        bool current = clip != null && generation == m_FormalResponseGeneration && value.provider == m_ChatSettings?.m_TextToSpeech &&
+            value.audio != null && value.audio == m_AudioSource && value.audio.clip == clip && !value.audio.isPlaying;
+        // A WAV is normally stopped by Unity reaching its end. An early external
+        // AudioSource.Stop is not that receipt, even though isPlaying is false.
+        bool reachedEnd = !value.buffered || (clip != null &&
+            (clip.samples - value.lastSample) / (double)Math.Max(1, clip.frequency) <=
+                Math.Max(0, AudioSettings.dspTime - value.lastDsp) + .10);
+        if (!succeeded || !current || !reachedEnd)
+        {
+            m_SceneFinalPlayback = null;
+            Debug.Log($"[Agent/Review] final-playback-revoked generation={generation} success={succeeded} owner_current={current} reached_end={reachedEnd}", this);
+            return;
+        }
+        value.drained = true; // PCM success is reported only after its DSP drain target.
+        Debug.Log($"[Agent/Review] final-playback-drained generation={generation} mode={(value.buffered ? "buffered-wav" : "pcm")} success=True", this);
+    }
+
+    private void DiscardUnfinishedFinalScenePlayback(int generation)
+    {
+        if (m_SceneFinalPlayback != null && m_SceneFinalPlayback.generation == generation && !m_SceneFinalPlayback.drained)
+            m_SceneFinalPlayback = null;
+    }
+
+    private bool HasCurrentFinalPlaybackWindow()
+    {
+        var value = m_SceneFinalPlayback;
+        return value != null && !value.drained && value.generation == m_FormalResponseGeneration &&
+            value.provider == m_ChatSettings?.m_TextToSpeech && value.audio != null && value.audio == m_AudioSource &&
+            value.audio.isPlaying && value.clip != null && value.audio.clip == value.clip;
+    }
+
+    private bool ScenePlaybackAudioCurrent(ScenePlaybackReview value)
+    {
+        if (value.audio == null || value.audio != m_AudioSource || !value.audio.isActiveAndEnabled) return false;
+        if (value.finalPlayback == null) return m_TTSSenderDone && value.clip != null && value.audio.clip == value.clip;
+        var receipt = value.finalPlayback;
+        if (receipt != m_SceneFinalPlayback || receipt.generation != value.formalGeneration ||
+            receipt.provider != m_ChatSettings?.m_TextToSpeech) return false;
+        if (!receipt.drained)
+        {
+            if (HasCurrentFinalPlaybackWindow()) return true;
+            // Unity Update can observe WAV isPlaying=false one frame before the
+            // player's coroutine records its end. Keep only this short pending
+            // boundary; it is not a drain receipt and cannot authorize handoff.
+            double elapsed = AudioSettings.dspTime - receipt.lastDsp;
+            return receipt.buffered && receipt.clip != null && value.audio.clip == receipt.clip &&
+                !value.audio.isPlaying && elapsed >= 0 && elapsed <= .5 &&
+                (receipt.clip.samples - receipt.lastSample) / (double)Math.Max(1, receipt.clip.frequency) <= elapsed + .10;
+        }
+        // The successful direct player may clear/destroy its owned clip before
+        // FinishSpeakingNaturally. Preserve only that exact completed lease;
+        // any new/replayed clip is a different output owner.
+        return !value.audio.isPlaying && (value.audio.clip == null || ReferenceEquals(value.audio.clip, receipt.clip));
+    }
+
+    private bool SceneReviewExecutionBusy()
+    {
+        var room = GetComponent<ArdyRoomDialogueBridge>();
+        return SceneActionIsBusy || HasWorkToolInFlight() || IsSingingRuntimeActivityActive() ||
+            m_PendingMotionRepair != null || m_ActiveMotionRepair != null || SceneReviewFreeBodyBusy() ||
+            (room != null && (room.ReservesBody || room.IsFollowing || (room.Controller != null &&
+                (room.Controller.IsBusy || room.Controller.IsMoving))));
+    }
+
+    private bool SceneReviewFreeBodyBusy()
+    {
+        var avatar = GetComponent<ArdyRoomDialogueBridge>()?.avatar ?? m_SceneVisionCapture?.Target;
+        if (avatar == null) return false;
+        var live = avatar.GetComponent<ArdyLiveMotionController>();
+        var player = avatar.GetComponent<ArdyMotionPlayer>();
+        // Free generated/nod gestures have a separate controller from room
+        // locomotion. Include their generation, playback and return lifecycle.
+        return (live != null && !string.IsNullOrEmpty(live.DescribeActiveMotion())) ||
+            (player != null && player.IsPlaying);
+    }
+
+    private JObject CaptureScenePlaybackFactStamp()
+    {
+        var room = ReadCompactRoomTaskFacts(GetComponent<ArdyRoomDialogueBridge>());
+        return new JObject {
+            ["sceneEpoch"] = m_SceneActionEpoch, ["sceneAction"] = RoomSpeechSceneStamp(),
+            ["room"] = PickRoomFields(room["currentFacts"] as JObject, "currentTargetRevision", "lastAttemptTargetRevision",
+                "lastAttemptAppliesToCurrentTarget", "attemptStatus", "connected", "userAnchorValid", "userTrackingValid",
+                "userSupportVerified", "executionTargetKind", "activeActionId", "taskMode", "activeTaskId", "controllerOperationRevision"),
+            ["roomResult"] = PickRoomFields(room["lastActionResults"] as JObject, "actionId", "targetKind", "targetRevision", "appliesToCurrentTarget", "phase", "reason"),
+            ["sceneResult"] = PickRoomFields(room["lastSceneTargetResult"] as JObject, "actionId", "captureId", "targetId", "targetKind", "status", "reason", "terminal", "reached"),
+            ["work"] = new JObject { ["epoch"] = m_WorkEpoch, ["open"] = m_WorkReviewOpen, ["status"] = m_WorkStatus,
+                ["intent"] = m_WorkIntent, ["continuations"] = m_WorkContinuations, ["responses"] = new JArray(m_WorkResponses),
+                ["progress"] = m_WorkProgressFact, ["noProgress"] = m_WorkNoProgress,
+                ["pendingInspection"] = m_PendingSelfInspection, ["lastInspection"] = m_LastSelfInspection,
+                ["motionExecution"] = m_LastMotionExecutionFeedback == null ? null : MotionFeedbackJson(m_LastMotionExecutionFeedback) }
+        };
+    }
+
+    private bool DiscardChangedScenePlaybackFacts(ScenePlaybackReview value)
+    {
+        if (value.factStamp != null && JToken.DeepEquals(value.factStamp, CaptureScenePlaybackFactStamp())) return false;
+        ClearScenePlaybackReview("objective-facts-changed-before-handoff");
+        if (value.probeGeneration == m_AutonomyProbeGeneration) m_AutonomyProbeInFlight = false;
+        ScheduleNextTick(2f, "scene-action-facts-changed");
+        Debug.Log($"[Agent/Review] private-playback-discard generation={value.formalGeneration} reason=objective-facts-changed new_private_review_required=True", this);
+        return true;
+    }
+
+    private bool CanBeginScenePlaybackReview(string reason)
+    {
+        var room = GetComponent<ArdyRoomDialogueBridge>();
+        return m_EnableAutonomyIntentProbe && m_ScenePlaybackReview == null && !m_AutonomyProbeInFlight &&
+            m_AgentRunning && !m_AgentGracefulShutdownPending && isActiveAndEnabled && !m_SceneTimePaused &&
+            !m_SceneTimeSuspended && Time.timeScale > 0 && SceneEyesOpen &&
+            IsSceneActionReviewReason(reason) && m_SceneActionReviewUserTurn == m_ActionConstraints.CurrentUserTurn &&
+            !string.IsNullOrEmpty(m_SceneActivityAction) && !m_UserSpeechActiveForAutonomy &&
+            Time.realtimeSinceStartup - m_LastStreamingPartialRealtime >= k_UserSpeakingHoldSeconds &&
+            !m_FormalResponseInFlight && m_StreamComplete && (m_TTSSenderDone || HasCurrentFinalPlaybackWindow()) &&
+            m_PendingChunks.Count == 0 && m_PendingClips.Count == 0 &&
+            IsAISpeaking && m_AudioSource != null && m_AudioSource.isPlaying && m_AudioSource.clip != null &&
+            (m_HumStreamSecondaryAudioSource == null || !m_HumStreamSecondaryAudioSource.isPlaying) &&
+            !SceneReviewExecutionBusy() && room != null && room.IsConnected &&
+            m_ChatSettings?.m_ChatModel?.SupportsVisualDecisionMessages == true;
+    }
+
+    private string ScenePlaybackEligibility()
+    {
+        var room = GetComponent<ArdyRoomDialogueBridge>();
+        return new JObject {
+            ["eligible"] = CanBeginScenePlaybackReview(m_SceneReviewClock.Reason),
+            ["pending"] = m_SceneReviewClock.Pending, ["due"] = m_SceneReviewClock.IsDue(SceneMonotonicNow()),
+            ["reason"] = m_SceneReviewClock.Reason, ["actionIdPresent"] = !string.IsNullOrEmpty(m_SceneActivityAction),
+            ["actionUserTurn"] = m_SceneActionReviewUserTurn, ["currentUserTurn"] = m_ActionConstraints.CurrentUserTurn,
+            ["agent"] = m_AgentRunning, ["shutdown"] = m_AgentGracefulShutdownPending,
+            ["enabled"] = m_EnableAutonomyIntentProbe, ["eyes"] = SceneEyesOpen,
+            ["paused"] = m_SceneTimePaused || m_SceneTimeSuspended || Time.timeScale <= 0,
+            ["privateInFlight"] = m_AutonomyProbeInFlight, ["candidateHeld"] = m_ScenePlaybackReview != null,
+            ["formalInFlight"] = m_FormalResponseInFlight, ["userSpeaking"] = m_UserSpeechActiveForAutonomy,
+            ["recentPartial"] = Time.realtimeSinceStartup - m_LastStreamingPartialRealtime < k_UserSpeakingHoldSeconds,
+            ["sceneBusy"] = SceneActionIsBusy, ["roomBodyBusy"] = room != null && (room.ReservesBody || room.IsFollowing || room.Controller != null && room.Controller.IsBusy),
+            ["freeBodyBusy"] = SceneReviewFreeBodyBusy(),
+            ["toolBusy"] = HasWorkToolInFlight(), ["repairPending"] = m_PendingMotionRepair != null || m_ActiveMotionRepair != null,
+            ["connected"] = room != null && room.IsConnected, ["sourcePlaying"] = m_AudioSource != null && m_AudioSource.isPlaying,
+            ["speaking"] = IsAISpeaking, ["streamComplete"] = m_StreamComplete, ["senderDone"] = m_TTSSenderDone,
+            ["queuedText"] = m_PendingChunks.Count, ["queuedClips"] = m_PendingClips.Count,
+            ["modelVisual"] = m_ChatSettings?.m_ChatModel?.SupportsVisualDecisionMessages == true
+        }.ToString(Newtonsoft.Json.Formatting.None);
+    }
+
+    private ScenePlaybackReview CreateScenePlaybackReview(string reason, int probeGeneration)
+    {
+        var room = GetComponent<ArdyRoomDialogueBridge>();
+        var value = new ScenePlaybackReview {
+            probeGeneration = probeGeneration, formalGeneration = m_FormalResponseGeneration,
+            workEpoch = m_WorkEpoch, userTurn = m_ActionConstraints.CurrentUserTurn,
+            inputRevision = m_InputAudioRevision, activityRevision = m_SceneActivityRevision, eventRevision = m_SceneReviewEventRevision,
+            visionEpoch = m_SceneVisionEpoch, actionId = m_SceneActivityAction, trigger = reason,
+            audio = m_AudioSource, clip = m_AudioSource.clip, model = m_ChatSettings.m_ChatModel,
+            bridge = room, environment = room.environmentRoot, avatar = room.avatar, controllerOperation = room.Controller.OperationRevision
+        };
+        if (HasCurrentFinalPlaybackWindow()) value.finalPlayback = m_SceneFinalPlayback;
+        m_ScenePlaybackReview = value; m_ScenePlaybackReviewsStarted++;
+        m_ScenePlaybackReviewLastReason = "read-only-review-during-final-local-clip";
+        Debug.Log($"[Agent/Review] private-playback-start generation={value.formalGeneration} probe={probeGeneration} action={value.actionId} final_direct={value.finalPlayback != null}", this);
+        return value;
+    }
+
+    private bool ScenePlaybackReviewCurrent(ScenePlaybackReview value)
+    {
+        return value != null && m_ScenePlaybackReview == value &&
+            value.probeGeneration == m_AutonomyProbeGeneration && value.formalGeneration == m_FormalResponseGeneration &&
+            value.workEpoch == m_WorkEpoch && value.userTurn == m_ActionConstraints.CurrentUserTurn &&
+            value.inputRevision == m_InputAudioRevision && value.activityRevision == m_SceneActivityRevision && value.eventRevision == m_SceneReviewEventRevision &&
+            value.visionEpoch == m_SceneVisionEpoch && value.actionId == m_SceneActivityAction &&
+            m_AgentRunning && !m_AgentGracefulShutdownPending && isActiveAndEnabled && SceneEyesOpen &&
+            !m_SceneTimePaused && !m_SceneTimeSuspended && Time.timeScale > 0 &&
+            !m_UserSpeechActiveForAutonomy && !m_FormalResponseInFlight &&
+            Time.realtimeSinceStartup - m_LastStreamingPartialRealtime >= k_UserSpeakingHoldSeconds &&
+            !SceneReviewExecutionBusy() && value.model == m_ChatSettings?.m_ChatModel &&
+            value.bridge != null && value.bridge.IsConnected && value.bridge.environmentRoot == value.environment &&
+            value.bridge.Controller.OperationRevision == value.controllerOperation &&
+            value.bridge.avatar == value.avatar && ScenePlaybackAudioCurrent(value) &&
+            (m_HumStreamSecondaryAudioSource == null || !m_HumStreamSecondaryAudioSource.isPlaying) &&
+            (value.audio.isPlaying || IsAISpeaking || m_AgentRoundInFlight || m_TextOutputDrainedGeneration == value.formalGeneration) &&
+            m_StreamComplete && (m_TTSSenderDone || value.finalPlayback != null) && m_PendingChunks.Count == 0 && m_PendingClips.Count == 0;
+    }
+
+    private void ClearScenePlaybackReview(string reason)
+    {
+        if (m_ScenePlaybackReview == null) return;
+        m_ScenePlaybackReview = null; m_ScenePlaybackReviewsDiscarded++;
+        m_ScenePlaybackReviewLastReason = reason ?? "discarded";
+    }
+
+    private void ValidateSceneReviewQueue()
+    {
+        if (m_ScenePlaybackReview != null && !ScenePlaybackReviewCurrent(m_ScenePlaybackReview))
+        {
+            bool ownsProbe = m_ScenePlaybackReview.probeGeneration == m_AutonomyProbeGeneration && m_AutonomyProbeInFlight;
+            if (ownsProbe) CancelAutonomyIntentProbe();
+            else ClearScenePlaybackReview("owner-event-audio-or-resource-changed");
+        }
+        DiscardSupersededSceneActionWake();
+    }
+
+    private void DiscardSupersededSceneActionWake()
+    {
+        if (m_SceneReviewClock.DiscardSupersededSceneAction(m_SceneActionReviewUserTurn, m_ActionConstraints.CurrentUserTurn))
+        {
+            m_ScheduledWakeReason = "";
+            m_ScenePlaybackReviewLastReason = "superseded-user-turn-event-discarded";
+        }
+    }
+
+    private bool TryResumeScenePlaybackReview()
+    {
+        var value = m_ScenePlaybackReview;
+        if (value?.resume == null || value.resuming || !ScenePlaybackReviewCurrent(value)) return false;
+        if (m_AgentRoundInFlight || m_FormalResponseInFlight || m_AutonomyProbeInFlight || IsAISpeaking || IsVoiceOutputPlaying)
+            return false;
+        if (m_TextOutputDrainedGeneration != value.formalGeneration) return false;
+        if (DiscardChangedScenePlaybackFacts(value)) return true;
+        value.resuming = true; m_AutonomyProbeInFlight = true;
+        // Candidate reasoning may have happened seconds earlier. Never hand its
+        // old image to execution; normal scene/geometry matching sees a new view.
+        RequestSceneObservation("scene-review-after-playback", observation => {
+            if (!ScenePlaybackReviewCurrent(value))
+            {
+                if (m_ScenePlaybackReview == value) ClearScenePlaybackReview("handoff-owner-changed");
+                if (value.probeGeneration == m_AutonomyProbeGeneration) m_AutonomyProbeInFlight = false;
+                return;
+            }
+            if (observation?.HasImage != true || !IsFreshSceneObservation(observation) ||
+                m_AgentRoundInFlight || IsAISpeaking || IsVoiceOutputPlaying)
+            {
+                m_AutonomyProbeInFlight = false; ClearScenePlaybackReview("handoff-fresh-observation-unavailable");
+                ScheduleNextTick(2f, "scene-observation-expired"); return;
+            }
+            if (DiscardChangedScenePlaybackFacts(value)) return;
+            var resume = value.resume;
+            m_ScenePlaybackReview = null; m_ScenePlaybackReviewsHandedOff++;
+            m_ScenePlaybackReviewLastReason = "candidate-handed-to-normal-decision-with-new-image";
+            Debug.Log($"[Agent/Review] private-playback-handoff generation={value.formalGeneration} probe={value.probeGeneration} capture={observation.CaptureId} new_view=True", this);
+            // This resumes the ordinary review result path, not a tool, memory
+            // write, direct speech or movement call. It remains a proposal.
+            resume(observation);
+        });
+        return true;
+    }
+
+    private JObject ScenePlaybackReviewContext() => new JObject {
+        ["state"] = m_ScenePlaybackReview == null ? "none" : m_ScenePlaybackReview.resume == null ? "read-only-inflight" : "candidate-waiting-for-audio-drain",
+        ["started"] = m_ScenePlaybackReviewsStarted, ["handedOff"] = m_ScenePlaybackReviewsHandedOff,
+        ["discarded"] = m_ScenePlaybackReviewsDiscarded, ["lastReason"] = m_ScenePlaybackReviewLastReason,
+        ["scope"] = "One budgeted scene-action review can overlap only the final generated local speech clip. It cannot speak, execute tools, mutate work/memory, or claim unheard speech was delivered. Any next action still requires normal current-view decision and execution checks."
+    };
+}

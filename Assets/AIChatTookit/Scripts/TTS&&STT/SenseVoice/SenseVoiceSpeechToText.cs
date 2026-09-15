@@ -904,6 +904,7 @@ public partial class SenseVoiceSpeechToText : STT
         m_CurrentCaptureTranscript = "";
         m_InputCaptureAt = Time.realtimeSinceStartup;
         m_LiveRecordingCandidateSessionSerial++;
+        BeginClosedSpeechCapture();
         ReserveRecordingSequence(m_LiveRecordingCandidateSessionSerial);
         m_LiveRecordingCandidateSessionActive = true;
         m_LastPlayableCandidateAudioBytes = null;
@@ -1510,6 +1511,7 @@ public partial class SenseVoiceSpeechToText : STT
     {
         if (!HasUsableAudioClip(_clip))
         {
+            PublishFinalTranscriptOutcome(InputCaptureSessionSerial, "rejected", "invalid-audio", "");
             if (_callback != null) _callback("");
             return;
         }
@@ -1523,6 +1525,7 @@ public partial class SenseVoiceSpeechToText : STT
     {
         if (!HasUsableWavPayload(_audioData))
         {
+            PublishFinalTranscriptOutcome(InputCaptureSessionSerial, "rejected", "invalid-audio", "");
             if (_callback != null) _callback("");
             return;
         }
@@ -1561,6 +1564,7 @@ public partial class SenseVoiceSpeechToText : STT
     {
         if (!HasUsableAudioClip(clip))
         {
+            if (!speculative) PublishFinalTranscriptOutcome(InputCaptureSessionSerial, "rejected", "invalid-audio", "");
             if (callback != null) callback("");
             return;
         }
@@ -1697,6 +1701,17 @@ public partial class SenseVoiceSpeechToText : STT
         int requestSerial = ++m_AsrRequestSerial;
         var ticket = new AnalysisTicket { CompletedCapture = !speculative };
         int captureSessionSerial = m_LiveRecordingCandidateSessionSerial;
+        string finalSource = "rejected", finalRejection = "request-no-result", finalRawText = "";
+        bool delivered = false;
+        Action<string> originalCallback = _callback;
+        _callback = text =>
+        {
+            if (delivered) return;
+            delivered = true;
+            if (ticket.CompletedCapture)
+                PublishFinalTranscriptOutcome(captureSessionSerial, finalSource, finalRejection, finalRawText);
+            originalCallback?.Invoke(text);
+        };
         if (speculative) CancelPreviewAnalysis();
         m_AnalysisTickets.Add(ticket);
         if (speculative) m_PreviewAnalysis = ticket;
@@ -1727,12 +1742,14 @@ public partial class SenseVoiceSpeechToText : STT
             if (ticket.Cancelled || (www.result == UnityWebRequest.Result.Success &&
                 JsonUtility.FromJson<Response>(www.downloadHandler.text)?.cancelled == true))
             {
-                Debug.Log($"[ASR/Dispatch] 过期分析已取消 request={requestSerial}；不修改本轮感知/记忆");
+                finalRejection = "cancelled";
+                Debug.Log($"[ASR/Dispatch] 过期分析已取消 request={requestSerial} capture={captureSessionSerial}；不修改本轮感知/记忆");
                 _callback?.Invoke("");
                 yield break;
             }
             if (www.result != UnityWebRequest.Result.Success)
             {
+                finalRejection = "http-error";
                 Debug.LogError("[SenseVoice] 请求失败: " + www.error + " / " + www.downloadHandler.text);
                 if (_callback != null) _callback("");
             }
@@ -1743,6 +1760,7 @@ public partial class SenseVoiceSpeechToText : STT
 
                 if (_response == null)
                 {
+                    finalRejection = "invalid-response";
                     Debug.LogError("[SenseVoice] 响应解析失败: " + _responseText);
                     if (_callback != null) _callback("");
                 }
@@ -1750,11 +1768,15 @@ public partial class SenseVoiceSpeechToText : STT
                 {
                     if (ticket.Detached)
                     {
+                        finalRejection = "detached";
                         ArchiveCompletedCapture(_response, audioBytes, capturedAt, captureSessionSerial);
                         // Never publish the old transcript or awaken its cancelled reply.
                         _callback?.Invoke("");
                         yield break;
                     }
+                    finalRawText = !string.IsNullOrWhiteSpace(_response.rejected_text)
+                        ? _response.rejected_text : _response.text ?? "";
+                    finalRejection = FinalRejectionReason(_response);
                     if (_response.timing_schema >= 1 && _response.timings != null)
                     {
                         AsrTiming t = _response.timings;
@@ -2302,10 +2324,18 @@ public partial class SenseVoiceSpeechToText : STT
 
                     if (LastNoSpeech || (string.IsNullOrWhiteSpace(LastText) && !LastIsSinging))
                     {
-                        if (m_VerboseLog)
+                        Debug.Log($"[ASR/Rejected] request={requestSerial} capture={captureSessionSerial} " +
+                            $"terminal={ticket.CompletedCapture} reason={finalRejection} noSpeech={LastNoSpeech} " +
+                            $"event={LastEvent} speechMs={_response.speech_ms} rawTextChars={finalRawText.Length} " +
+                            $"directVad={_response.raw_vad_has_speech}/{_response.raw_vad_speech_ms}ms " +
+                            $"audioSeconds={GetWavDurationSeconds(audioBytes):F2} vadSeconds={_response.vad_elapsed:F3}");
+                        if (TryRecoverClosedTranscript(captureSessionSerial, ticket.CompletedCapture,
+                                finalRejection, _response.text ?? "", out string recovered,
+                                _response.rejected_text, _response.raw_vad_has_speech, _response.raw_vad_speech_ms))
                         {
-                            Debug.Log($"[SenseVoice] no-speech rejected evt={LastEvent} " +
-                                      $"voiced={_response.speech_ms}ms vad={_response.vad_elapsed:F3}s");
+                            finalSource = "closed-stream-recovery";
+                            _callback?.Invoke(recovered);
+                            yield break;
                         }
                         if (_callback != null) _callback("");
                         yield break;
@@ -2333,6 +2363,8 @@ public partial class SenseVoiceSpeechToText : STT
                                   $"progress={LastSpeakerEnrollmentProgress:P0} dt={_response.elapsed:F2}s");
                     }
 
+                    finalSource = "full-asr";
+                    finalRejection = "";
                     if (_callback != null) _callback(finalText);
                 }
             }
@@ -2444,7 +2476,9 @@ public partial class SenseVoiceSpeechToText : STT
         string perceivedText = string.IsNullOrWhiteSpace(LastText)
             ? "（没有识别出歌词的哼唱片段）"
             : LastText;
-        return (m_InjectSpeakerPrefix ? BuildSpeakerPrefix() : "")
+        return (LastFinalTranscriptSource == "closed-stream-recovery"
+                ? "[转写来源:同一录音闭合后的稳定流式证据；最终整段ASR为空，未把空结果当作正确转写] " : "")
+            + (m_InjectSpeakerPrefix ? BuildSpeakerPrefix() : "")
             + (m_InjectMetaPrefix ? BuildMetaPrefix() : "")
             + (LastSingingProbability > 0f || !string.IsNullOrEmpty(LastNoteSequence)
                 ? BuildSingingPrefix(includeSingingConclusion && LastIsSinging) : "")
@@ -7000,6 +7034,10 @@ public partial class SenseVoiceSpeechToText : STT
         public bool speaker_is_new = false;
         public bool speaker_persistent = false;
         public bool no_speech = false;
+        public string no_speech_reason = "";
+        public string rejected_text = "";
+        public bool raw_vad_has_speech;
+        public int raw_vad_speech_ms;
         public float speaker_elapsed = 0f;
         public int speech_ms = 0;
         public float vad_elapsed = 0f;

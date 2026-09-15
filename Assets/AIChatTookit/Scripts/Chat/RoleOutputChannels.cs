@@ -4,8 +4,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 /// <summary>
-/// Request-local routing, not a semantic filter. Ordinary prose is speech;
-/// explicit private blocks, silent tails and tool tags never reach TTS.
+/// Request-local routing, not a semantic filter. Legacy prose remains compatible;
+/// the explicit policy requires a public say boundary. Engine envelopes are never
+/// public speech or an authority to execute copied tool tags.
 /// </summary>
 public sealed class RoleOutputChannels
 {
@@ -14,6 +15,12 @@ public sealed class RoleOutputChannels
     private readonly List<string> actionTokens = new List<string>();
     private readonly StringBuilder tag = new StringBuilder();
     private readonly StringBuilder suspicious = new StringBuilder();
+    private readonly RoleOutputBoundaryPolicy boundaryPolicy;
+    private bool RequiresExplicitPublicSay => boundaryPolicy != RoleOutputBoundaryPolicy.LegacyCompatible;
+    private bool probingInternalEnvelope, atSpeechBlockStart = true;
+    public bool HasInvalidPublicBoundary { get; private set; }
+    public string PublicBoundaryError { get; private set; }
+    public bool HasAnyActionTag { get; private set; }
     private bool droppingMalformedTool;
     private char malformedQuote;
     private char malformedEnd;
@@ -37,28 +44,30 @@ public sealed class RoleOutputChannels
     // Keep that distinction in both model feedback and user-facing diagnostics.
     public string SpeechPhaseExecutionFact => !HasInvalidSpeechPhase ? "" :
         "本条回复的发声阶段校验失败：" + SpeechPhaseError +
-        " 依赖校验的台词仍受发声门控；歌唱/素材变更标签未受理。" +
+        " 依赖校验的台词仍受发声门控；歌唱、素材变更与歌唱权限提案未受理。" +
         "房间及上身 motion 不因该格式错误撤回，是否受理或完成以各自程序事实为准。";
     public string SpeechPhaseCorrection => !HasInvalidSpeechPhase ? "" :
         (SpeechDependency == SpeechActionDependency.AfterAction && !HasSingingValidationActions
-            ? "本轮没有提交演唱或素材变更，不能使用 after_action。"
+            ? "本轮没有提交演唱、素材变更或歌唱权限提案，不能使用 after_action。"
             : "发声阶段必须在正文前声明一次；本轮不能中途切换。") +
-        "普通聊天及房间/上身 motion 使用 independent；只有本轮确实提交演唱或素材变更才用 after_action。" +
+        "普通聊天及房间/上身 motion 使用 independent；只有本轮确实提交演唱、素材变更或歌唱权限提案才用 after_action。" +
         "先读当前房间/身体执行事实，再自然说明意图或实际结果；不要为了纠正发声阶段重复已受理的 motion，" +
         "也不要把格式错误说成房间移动失败或已完成。";
     private bool phaseDeclared, phaseSpeechSuppressed;
     private int independentWrapperDepth;
     private static readonly string[] SingingValidationActions = { "sing_goal", "sing", "hum_back", "song_sing",
         "clip_confirm", "clip_revise", "clip_drop", "practice_confirm", "practice_revise", "practice_drop",
-        "song_remember", "song_rename", "song_forget" };
+        "song_remember", "song_rename", "song_forget", "singing_policy" };
 
-    public RoleOutputChannels(Action<SpeechText> onSpeech = null)
+    public RoleOutputChannels(Action<SpeechText> onSpeech = null,
+        RoleOutputBoundaryPolicy boundaryPolicy = RoleOutputBoundaryPolicy.LegacyCompatible)
     {
         this.onSpeech = onSpeech;
+        this.boundaryPolicy = boundaryPolicy;
     }
     public int PrivateCharacters { get; private set; }
     public bool HasSpeech => speech.ToString().Trim().Length > 0;
-    public bool HasActions => actions.Length > 0;
+    public bool HasActions => !HasInvalidPublicBoundary && actions.Length > 0;
     public string Speech => speech.ToString();
 
     public string Push(string delta)
@@ -66,6 +75,11 @@ public sealed class RoleOutputChannels
         var emitted = new StringBuilder();
         foreach (char c in delta ?? "")
         {
+            if (HasInvalidPublicBoundary)
+            {
+                if (!char.IsWhiteSpace(c)) PrivateCharacters++;
+                continue;
+            }
             if (droppingMalformedTool)
             {
                 if (malformedQuote != '\0') { if (c == malformedQuote) malformedQuote = '\0'; }
@@ -76,6 +90,18 @@ public sealed class RoleOutputChannels
             if (suspicious.Length > 0)
             {
                 suspicious.Append(c);
+                if (probingInternalEnvelope)
+                {
+                    var probe = RoleOutputPublicBoundary.ProbeEnvelope(suspicious.ToString());
+                    if (probe == RoleOutputPublicBoundary.EnvelopeProbe.Internal)
+                    {
+                        RejectPublicBoundary("模型输出包含程序观察或日志信封；未发声，未执行其中标签。");
+                        suspicious.Length = 0;
+                        continue;
+                    }
+                    if (probe == RoleOutputPublicBoundary.EnvelopeProbe.Pending) continue;
+                    probingInternalEnvelope = false;
+                }
                 string body = suspicious.ToString().Substring(1).TrimStart();
                 var parts = Regex.Match(body, @"^(?<name>[a-zA-Z_]*)(?<rest>[\s\S]*)$");
                 string name = parts.Groups["name"].Value;
@@ -84,6 +110,12 @@ public sealed class RoleOutputChannels
                 if (exact && Regex.IsMatch(rest, @"^\s+[a-zA-Z_]\w*\s*=$"))
                 {
                     HasMalformedTool = true;
+                    if (RequiresExplicitPublicSay)
+                    {
+                        RejectPublicBoundary("公开输出包含错误括号动作语法；动作未受理。");
+                        suspicious.Length = 0;
+                        continue;
+                    }
                     droppingMalformedTool = true;
                     malformedEnd = suspicious[0] == '[' ? ']' : '\0';
                     suspicious.Length = 0;
@@ -114,8 +146,13 @@ public sealed class RoleOutputChannels
             if (c == '`') { inCode = !inCode; continue; }
             // Hold only a possible known tool name + attribute assignment. Normal
             // book titles such as 《One Last Kiss》 are emitted unchanged.
-            if (!inCode && thoughtDepth == 0 && (c == '《' || c == '＜' || c == '〈' || (c == '[' && !inSay && !silent)))
-            { suspicious.Append(c); continue; }
+            if (!inCode && thoughtDepth == 0 && (c == '《' || c == '＜' || c == '〈' ||
+                (c == '[' && !silent && (!inSay || RequiresExplicitPublicSay))))
+            {
+                suspicious.Append(c);
+                probingInternalEnvelope = c == '[' && atSpeechBlockStart;
+                continue;
+            }
             if (c == '<' && !inCode) { tag.Append(c); continue; }
             Emit(c, emitted);
         }
@@ -125,10 +162,20 @@ public sealed class RoleOutputChannels
 
     private void Emit(char c, StringBuilder emitted)
     {
+        if (HasInvalidPublicBoundary) return;
+        if (RequiresExplicitPublicSay &&
+            !inSay && !silent && thoughtDepth == 0 && !inCode)
+        {
+            if (!char.IsWhiteSpace(c))
+                RejectPublicBoundary("公开台词缺少 say 边界；无标记正文和其中动作未受理。内部判断用闭合的 thought，[内心] 只是历史显示；公开台词须先声明 lang、speech 并放在 say 中。");
+            return;
+        }
         if (!silent && thoughtDepth == 0 && !inCode && !phaseSpeechSuppressed)
         {
             speech.Append(c); emitted.Append(c);
             pendingSpeech.Append(c);
+            if (c == '\n' || c == '\r') atSpeechBlockStart = true;
+            else if (!char.IsWhiteSpace(c)) atSpeechBlockStart = false;
             if (languageCode == null && char.IsLetterOrDigit(c)) HasUndeclaredSpeech = true;
         }
         else if (!char.IsWhiteSpace(c)) PrivateCharacters++;
@@ -145,6 +192,8 @@ public sealed class RoleOutputChannels
     public string Finish()
     {
         var emitted = new StringBuilder();
+        if (RequiresExplicitPublicSay && inSay)
+            RejectPublicBoundary("公开 say 块未闭合；未执行其中或后续动作。");
         foreach (char c in suspicious.ToString()) Emit(c, emitted);
         suspicious.Length = 0;
         // An unfinished metadata tag is discarded, never read aloud.
@@ -155,7 +204,7 @@ public sealed class RoleOutputChannels
             RejectSpeechPhase("发声阶段标记未闭合；未受理依赖动作。 ");
         if (phaseDeclared && SpeechDependency == SpeechActionDependency.AfterAction && HasSpeech &&
             !HasSingingValidationActions)
-            RejectSpeechPhase("声明台词等待动作校验，但没有提交对应演唱或素材动作；空承诺未受理。 ");
+            RejectSpeechPhase("声明台词等待动作校验，但没有提交对应演唱、素材动作或歌唱权限提案；空承诺未受理。 ");
         FlushSpeech();
         return emitted.ToString();
     }
@@ -166,6 +215,16 @@ public sealed class RoleOutputChannels
         if (!match.Success) return;
         string name = match.Groups["name"].Value.ToLowerInvariant();
         bool closing = match.Groups["close"].Success;
+        if (RequiresExplicitPublicSay && inSay && name != "say" && !closing)
+        {
+            // A public block contains words, not a second protocol context. In
+            // particular a misplaced action must not be moved outside say and
+            // executed by a later projection or language-metadata pass.
+            HasAnyActionTag |= Array.Exists(ToolNames, n => n == name) ||
+                Array.Exists(SingingValidationActions, n => n == name);
+            RejectPublicBoundary("say 内含协议标签；台词与工具必须使用各自的顶层边界。");
+            return;
+        }
         if (name == "thought" || name == "think")
         {
             if (closing) thoughtDepth = Math.Max(0, thoughtDepth - 1);
@@ -173,6 +232,19 @@ public sealed class RoleOutputChannels
             return;
         }
         if (thoughtDepth > 0) return;
+        if (!closing && !inCode && (Array.Exists(ToolNames, n => n == name) ||
+            Array.Exists(SingingValidationActions, n => n == name)) && name != "speech")
+        {
+            HasAnyActionTag = true;
+            // This policy is reserved for the ordinary first-reply route. An
+            // action-looking tag cannot turn an early public answer into a tool
+            // decision, including when the tag was placed inside say.
+            if (boundaryPolicy == RoleOutputBoundaryPolicy.ExplicitPublicSay)
+            {
+                RejectPublicBoundary("普通首句通道出现动作标签；本条动作未执行，需重新进行工具决策。");
+                return;
+            }
+        }
         if (name == "speech")
         {
             // A front-loaded contract, not a promise keyword heuristic. Once independent
@@ -216,7 +288,7 @@ public sealed class RoleOutputChannels
             SpeechDependency = declaredDependency;
             if (isIndependent && !declaration.Groups["slash"].Success) independentWrapperDepth++;
             if (SpeechDependency == SpeechActionDependency.Independent && HasSingingValidationActions)
-                RejectSpeechPhase("本轮已经包含待校验演唱或素材动作，不能声明为独立闲聊。 ");
+                RejectSpeechPhase("本轮已经包含待校验演唱、素材动作或歌唱权限提案，不能声明为独立闲聊。 ");
             return;
         }
         if (name == "lang")
@@ -236,6 +308,24 @@ public sealed class RoleOutputChannels
         }
         if (name == "say")
         {
+            if (RequiresExplicitPublicSay)
+            {
+                bool valid = closing ? inSay && Regex.IsMatch(token, @"^</say\s*>$", RegexOptions.IgnoreCase)
+                    : !inSay && phaseDeclared &&
+                    !HasInvalidSpeechPhase && languageCode != null &&
+                    Regex.IsMatch(token, @"^<say\s*>$", RegexOptions.IgnoreCase);
+                if (!valid)
+                {
+                    RejectPublicBoundary(silent
+                        ? "silent 已终止本条公开输出，其后的 lang/speech 不会重新声明发声。若需要先想后说，使用闭合的 thought 后接 lang、speech、say；不能在 silent 后恢复 say。本条工具未执行。"
+                        : "say 边界无效，或缺少前置语言/发声阶段；未执行动作。先关闭 thought，再在首个 say 前声明 lang 和 speech；真实工具放在闭合 say 之外。");
+                    return;
+                }
+                FlushSpeech();
+                inSay = !closing;
+                atSpeechBlockStart = true;
+                return;
+            }
             // Compatibility wrapper only. Closing say does not mute plain prose,
             // and a later say cannot undo an explicit silent tail in this reply.
             inSay = !closing && !token.EndsWith("/>", StringComparison.Ordinal);
@@ -248,6 +338,12 @@ public sealed class RoleOutputChannels
             if (!closing) silent = true;
             return;
         }
+        if (boundaryPolicy == RoleOutputBoundaryPolicy.ExplicitPublicSay && !closing)
+        {
+            HasAnyActionTag = true;
+            RejectPublicBoundary("普通首句通道出现非公开协议标签；未执行动作。");
+            return;
+        }
         // Action-looking text inside a spoken quotation is not an executable call.
         // Unknown top-level tags are left for the existing tool validator to report.
         if (!inSay && !closing)
@@ -258,7 +354,7 @@ public sealed class RoleOutputChannels
                 HasSingingValidationActions = true;
                 if (SpeechDependency == SpeechActionDependency.Independent)
                 {
-                    RejectSpeechPhase("independent 阶段不能追加演唱或素材变更；这些动作未执行。若仍决定行动，请在新决策前声明 after_action。 ");
+                    RejectSpeechPhase("independent 阶段不能追加演唱、素材变更或歌唱权限提案；这些动作未执行。若仍决定行动，请在新决策前声明 after_action。 ");
                     return;
                 }
             }
@@ -277,8 +373,21 @@ public sealed class RoleOutputChannels
         phaseSpeechSuppressed = true;
     }
 
+    private void RejectPublicBoundary(string reason)
+    {
+        // Public characters already validated before this envelope may have been
+        // delivered in an earlier packet. Preserve the same prefix when both
+        // arrive in one packet; only the unframed/private suffix is suppressed.
+        FlushSpeech();
+        HasInvalidPublicBoundary = true;
+        if (string.IsNullOrEmpty(PublicBoundaryError)) PublicBoundaryError = reason;
+        actions.Length = 0;
+        actionTokens.Clear();
+    }
+
     public string ToExecutableText(bool includeActions = true, bool includeSpeechPhase = false)
     {
+        if (HasInvalidPublicBoundary) return "<silent/>";
         string executableActions = includeActions && !HasMalformedTool ? actions.ToString() : "";
         if (includeActions && !HasMalformedTool && HasInvalidSpeechPhase)
         {
@@ -299,9 +408,10 @@ public sealed class RoleOutputChannels
         return prefix + (!discardedDependentSpeech && HasSpeech ? speech.ToString().TrimEnd() : "<silent/>") + executableActions;
     }
 
-    public static RoleOutputChannels Parse(string full)
+    public static RoleOutputChannels Parse(string full,
+        RoleOutputBoundaryPolicy boundaryPolicy = RoleOutputBoundaryPolicy.LegacyCompatible)
     {
-        var result = new RoleOutputChannels();
+        var result = new RoleOutputChannels(boundaryPolicy: boundaryPolicy);
         result.Push(full);
         result.Finish();
         return result;

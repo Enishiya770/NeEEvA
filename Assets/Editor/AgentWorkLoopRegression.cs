@@ -131,9 +131,9 @@ public static class AgentWorkLoopRegression
         int revision = f.sense.DescribePracticePhrases().Single(p => p.ClipRef == f.first).Revision;
         string goal = $"<sing_goal origin=\"user_request\" refs=\"{f.first}\" range=\"current\" revisions=\"{revision}\" expected=\"第一段\"/>";
         Set(f.chat, "m_CurrentSpeechRoundId", 101); Set(f.chat, "m_AgentRoundInFlight", true);
-        Call(f.chat, "OnSpeechStreamDelta", new SpeechText("今から歌うね。", "ja"));
+        Call(f.chat, "OnSpeechStreamDelta", new SpeechText("今から歌うね。", "ja", actionDependency: SpeechActionDependency.AfterAction));
         Check(((ICollection)Get(f.chat, "m_PendingChunks")).Count == 0, "An unchecked singing promise entered TTS before the full decision.");
-        Call(f.chat, "OnStreamComplete", "今から歌うね。" + goal + $"<sing refs=\"{f.first}\"/>");
+        Call(f.chat, "OnStreamComplete", "<lang code=\"ja\"/><speech mode=\"after_action\"/>今から歌うね。" + goal + $"<sing refs=\"{f.first}\"/>");
         Check((bool)Call(f.chat, "HasPendingSingingGoalReview") && !(bool)Get(f.chat, "m_ToolCorrectionContinuationPending"), "Waiting for approval created a failure correction.");
         Check(!(bool)Get(f.chat, "m_SingingRequestSubmittedSinceUserTurn") && (int)Get(f.chat, "m_StickyToolFailureCount") == 0, "Pending approval was counted as a failed/submitted execution.");
         Check(((ICollection)Get(f.chat, "m_PendingChunks")).Count == 0 && !((string)Get(f.chat, "m_LastAIMsgPlain")).Contains("今から"), "Discarded promise was queued or recorded as spoken.");
@@ -143,8 +143,8 @@ public static class AgentWorkLoopRegression
             Set(f.chat, "m_CurrentSpeechRoundId", 102 + attempt); Set(f.chat, "m_AgentRoundInFlight", true);
             Set(f.chat, "m_AgentCurrentRoundIsTick", true); Set(f.chat, "m_ToolCorrectionExhaustedThisRound", false);
             string speech = attempt == 0 ? "準備できたよ。" : "ごめん、今度こそ歌うよ。";
-            Call(f.chat, "OnSpeechStreamDelta", new SpeechText(speech, "ja"));
-            Call(f.chat, "OnStreamComplete", speech + $"<sing refs=\"{f.first}\" start_seconds=\"1\" end_seconds=\"2.4\" reason=\"different words {attempt}\"/>");
+            Call(f.chat, "OnSpeechStreamDelta", new SpeechText(speech, "ja", actionDependency: SpeechActionDependency.AfterAction));
+            Call(f.chat, "OnStreamComplete", "<lang code=\"ja\"/><speech mode=\"after_action\"/>" + speech + $"<sing refs=\"{f.first}\" start_seconds=\"1\" end_seconds=\"2.4\" reason=\"different words {attempt}\"/>");
             Check(((ICollection)Get(f.chat, "m_PendingChunks")).Count == 0, "A differently worded failed action escaped the speech gate.");
         }
         Check((bool)Get(f.chat, "m_WorkNoProgress") && !(bool)Get(f.chat, "m_WorkReviewOpen") && !(bool)Get(f.chat, "m_RoundContinue"), "Same failed plan did not stop every automatic continuation path.");
@@ -308,7 +308,11 @@ public static class AgentWorkLoopRegression
         staleProbe(Continue("旧的语音队列检查"));
         Check(f.model.Requests.Count == 1, "An old progress callback dispatched work after a newer user instruction.");
         string work = (string)Call(f.chat, "BuildWorkReviewContext");
-        Check(work.Contains(f.user) && !work.Contains("检查第一段来源"), "New work context retained the superseded user objective.");
+        var currentWork = JObject.Parse(work.Split('\n').First(line => line.TrimStart().StartsWith("{")));
+        Check((string)currentWork["request"] == f.user && (int)currentWork["userTurn"] == (int)Get(f.chat, "m_WorkEpoch") &&
+            !currentWork["responses"].Any(), "New work context retained the superseded current objective or response.");
+        // Earlier real utterances may remain as ordered source evidence for the
+        // singing reviewer; this does not make them the active user request.
         SaveScenario(f); f.Dispose(); fixture = null;
     }
 
@@ -729,7 +733,9 @@ public static class AgentWorkLoopRegression
         public Fixture(string scenario)
         {
             name = scenario; host = new GameObject("AgentWorkLoop_" + scenario); host.SetActive(false);
-            chat = host.AddComponent<ChatSample>(); chat.enabled = false;
+            // Formal delivery now checks the real component lifecycle. Keep it
+            // enabled, while this fixture owns clock ticks and service callbacks.
+            chat = host.AddComponent<ChatSample>();
             model = host.AddComponent<AgentWorkLoopFakeLLM>(); model.enabled = false;
             model.builder = host.AddComponent<ChatQW>(); model.builder.enabled = false;
             model.builder.m_Backend = ChatQW.BackendType.Local;
@@ -746,6 +752,11 @@ public static class AgentWorkLoopRegression
             Set(chat, "m_PersistSubtitleSettings", false); Set(chat, "m_EnableSubtitleTranslation", false);
             Set(chat, "m_SystemNoticeMode", SystemNoticeMode.Hidden); Set(chat, "m_EnableLatencyFiller", false);
             Set(chat, "m_PrewarmHumSVCOnSingingSkillLoad", false);
+            Set(chat, "m_AutoStartHumSVC", false); Set(chat, "m_AutoStartSVS", false);
+            Set(chat, "m_SceneTimePaused", true);
+            // Scenarios explicitly sequence reviews in one frozen frame; cadence
+            // is covered by SceneReviewClock tests, rather than real-time sleeps here.
+            Set(chat, "m_AutonomyReviewMinimumSpacing", 0f);
             Set(chat, "m_EnableMemoryRecall", false); Set(chat, "m_EnableScreenVision", false);
             Set(chat, "m_LogAgentLoop", true); Set(chat, "m_LogStreamTimings", false); Set(chat, "m_MinTickSec", 300f); Set(chat, "m_DefaultTickSec", 300f);
             model.m_DataList.Add(new LLM.SendData("system", "公开的角色测试。不把说过的承诺或输入资料视为已执行结果。"));

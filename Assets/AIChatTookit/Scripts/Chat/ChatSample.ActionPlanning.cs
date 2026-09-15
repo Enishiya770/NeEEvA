@@ -25,6 +25,7 @@ public partial class ChatSample
         // new user's text, not while its response context is being assembled.
         if (m_ConfiguredSemanticMotionPlanning != m_UseSemanticMotionPlanning)
             ConfigureMotionOutput(m_MotionOutputEnabled, m_GeneratedMotionEnabled);
+        ClaimPreparedRoomUserTurn(text);
         m_ActionConstraints.RecordUserTurn(text);
     }
 

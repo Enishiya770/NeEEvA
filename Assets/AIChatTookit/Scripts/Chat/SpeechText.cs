@@ -16,10 +16,12 @@ public readonly struct SpeechText
         "发声前先输出 <lang code=\"ja\"/>、<lang code=\"zh\"/> 或 <lang code=\"en\"/>，切换语种时再声明。" +
         "只有汉字的短句也必须声明；‘只说某几个字’限制的是可见台词，内部标记仍需提供。" +
         "心里话和工具按原规则处理。\n" +
-        "正文前声明一次发声阶段：<speech mode=\"independent\"/> 表示台词不依赖本轮待验证的演唱或素材动作，普通闲聊选它并直接发声；" +
-        "本轮提交演唱、素材变更或承诺其执行时，改用 <speech mode=\"after_action\"/>，台词等待真实动作校验。" +
-        "after_action 专用于演唱/素材校验；只有房间移动或上身 motion 时使用 independent，执行结果另读身体程序事实。" +
-        "阶段在正文之前确定，不能中途切换；independent 本轮不能再提交演唱/素材变更标签。";
+        "正文前声明一次发声阶段：<speech mode=\"independent\"/> 表示台词不依赖本轮待验证的演唱、素材动作或歌唱权限提案，普通闲聊选它并直接发声；" +
+        "本轮提交演唱、素材变更、singing_policy 提案或承诺其执行时，改用 <speech mode=\"after_action\"/>，台词等待真实动作校验。" +
+        "after_action 用于演唱、素材及 singing_policy 独立校验；只有房间移动或上身 motion 时使用 independent，执行结果另读身体程序事实。" +
+        "阶段在正文之前确定，不能中途切换；independent 本轮不能再提交演唱、素材变更或 singing_policy 标签。" +
+        "阶段按整条回复实际提交的动作选择，不按say是否只是简短应答来选：只要本条含sing_goal或sing，必须从开头使用after_action；" +
+        "即使目标已approved、台词只有‘好的’，也不能使用independent后追加sing。目标已审核不等于本次演唱已受理。";
 
     public readonly string Text;
     public readonly string LanguageCode;

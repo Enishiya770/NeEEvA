@@ -28,6 +28,18 @@ class ProtocolTests(unittest.TestCase):
         data["initialHistory"]["frames"][-1]["globalRotations"][19] = dict(x=.6,y=0,z=0,w=.8)
         self.assertLess(len(LocomotionRequest(**data).model_dump_json()), 131072)
 
+    def test_generated_continuation_history_has_explicit_source_and_same_bounds(self):
+        data = payload()
+        data["initialHistory"]["kind"] = "audited-generated-full-body-v1"
+        self.assertEqual(LocomotionRequest(**data).initialHistory.kind, "audited-generated-full-body-v1")
+        data["initialHistory"]["frames"][-1]["rootPosition"]["y"] = 2
+        with self.assertRaises(ValidationError):
+            LocomotionRequest(**data)
+        data = payload()
+        data["initialHistory"]["kind"] = "unknown-synthetic-history"
+        with self.assertRaises(ValidationError):
+            LocomotionRequest(**data)
+
     def test_rejects_missing_actual_history_and_unbounded_or_nonflat_routes(self):
         for change in ("history", "order", "stairs", "speed", "heading", "stop", "initial", "window", "quat", "jump", "initial-heading"):
             data = copy.deepcopy(payload())

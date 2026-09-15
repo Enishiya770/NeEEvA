@@ -56,16 +56,16 @@ public readonly struct DialogueMotionIntent
 /// <summary>Validates only the executable channel after RoleOutputChannels has removed quotations/private text.</summary>
 public static class DialogueMotionProtocol
 {
-    public static bool IsRoomMotionName(string name) => name == "approach" || name == "stop-moving";
+    public static bool IsRoomMotionName(string name) => name == "approach" || name == "follow" || name == "stop-moving";
 
     public const string RoomOutputContract = "[房间移动：当前运行时已启用]\n"
-        + "另可选择<motion name=\"approach\"/>走近当前交流对象并面向对方，或<motion name=\"stop-moving\"/>停止房间移动。两个标签严格只有name属性；不提供坐标、距离、速度或其他动作属性。仍然每次回复至多一个motion标签，遵守相同的私密/引号/朗读边界。\n"
+        + "另可选择<motion name=\"approach\"/>走近当前交流对象并面向对方，或<motion name=\"stop-moving\"/>停止房间移动。还可选择<motion name=\"follow\"/>持续跟随当前交流对象。三个标签严格只有name属性；不提供坐标、距离、速度或其他动作属性。仍然每次回复至多一个motion标签，遵守相同的私密/引号/朗读边界。\n"
         + "用户叫你过来、到身边时使用approach；交流确实需要靠近时也可自主选择。具体用户位置、可达落点、家具绕行和停止距离由Unity根据实时场景决定，不猜测坐标。已经很近时可能只转向；未绑定用户或没有同层可达目标时会拒绝，不能假称已走到。\n"
         + "根据当前交流判断意图：要求靠近、向我走来或停止正在进行的移动属于空间动作；不能因为旧歌唱任务、旧录音引用或一句话像歌词，就改成唱歌。用户明确在引用歌词或要求演唱时仍按其真实意图处理，不按关键词强行移动。\n"
         + "只有房间移动时，正文前用<speech mode=\"independent\"/>，例如<lang code=\"zh\"/><speech mode=\"independent\"/>我试着走近你。<motion name=\"approach\"/>。after_action仅用于本轮演唱/素材校验，不等待走路完成；已受理的移动不因发声格式纠正重发。\n"
-        + "房间移动独立于普通聊天：用户说话和你继续回复不会自动取消走路；明确要求停止移动时提交stop-moving。none只停止上身动作，不停止房间移动。不要为了边走边说每轮重复approach，不把continue/next当作继续走路命令。\n"
+        + "房间移动独立于普通聊天：用户说话和你继续回复不会自动取消走路；要求持续跟随时使用follow，已经跟随时普通聊天不重复提交。明确要求停止移动或别再跟着时提交stop-moving；不要停、继续跟着不能解释成停止。none只停止上身动作，不停止房间移动。不要为了边走边说每轮重复approach，不把continue/next当作继续走路命令。\n"
         + "以下房间执行事实才是移动结果依据：preparing/generating/moving/returning分别表示准备、生成、行进和衔接待机；arrived与reachedPlannedStandpoint记录该次到达，当前是否仍在用户身边且面对用户应读currentlyNearAndFacingUser及实际距离/朝向。blocked/failed/unreachable/unavailable/goal-not-reached表示未完成，cancelled/stopped表示已停止。使用事实提供的原因说明，不能仅根据自己说了什么来宣称完成。移动事实独立于上身lastRequested/goal；不套用手腕或手臂自动修订，不将失败替换成上身手势。\n"
-        + "当前只支持已核实的同层地面移动；未开放跟随、楼梯、台阶、跳跃或物体接触。generate/compose/plan仍限制为原地上身动作，根节点位移必须走房间approach通道。";
+        + "当前只支持已核实的同层地面移动；跟随会根据用户新位置重新规划，用户附近等待时仍保留跟随意图；follow-paused表示新路线受阻，位置变化后才重新检查。未开放楼梯、台阶、跳跃或物体接触。generate/compose/plan仍限制为原地上身动作，根节点位移必须走房间approach/follow通道。";
 
     /// <summary>Retains the legacy contract when room motion is absent; scopes its upper-body limits when present.</summary>
     public static string IncludeRoomOutput(string contract) => (contract ?? "")

@@ -13,7 +13,9 @@ Shader "AIChatToolkit/DesktopScreen"
     SubShader
     {
         Tags { "RenderType" = "Opaque" "Queue" = "Geometry" }
-        Cull Off
+        // The installed Quad's front normal is tv_frame local -X. Preserve that
+        // visible face while preventing desktop pixels being read through its back.
+        Cull Back
         ZWrite On
 
         Pass

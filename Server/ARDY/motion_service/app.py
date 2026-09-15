@@ -17,23 +17,29 @@ from .service import FixtureFeatureProvider, LiveFeatureProvider, MotionService
 from .locomotion_service import RoomLocomotionService
 from .locomotion_protocol import LocomotionRequest, LocomotionCancel
 from .locomotion_backend import capabilities
+from .locomotion_stream_service import RoomStreamService
+from .locomotion_stream_protocol import StreamStep, StreamCancel
 
 
 def create_app(service):
     room = RoomLocomotionService(service)
+    stream = RoomStreamService(service)
     @asynccontextmanager
     async def lifespan(app):
         await service.start()
         await room.start()
+        await stream.start()
         try:
             yield
         finally:
+            await stream.close()
             await room.close()
             await service.close()
 
     app = FastAPI(title="NeEEvA local ARDY motion", lifespan=lifespan)
     app.state.motion_service = service
     app.state.room_service = room
+    app.state.room_stream_service = stream
 
     @app.exception_handler(ServiceError)
     async def service_error(request, error):
@@ -82,6 +88,14 @@ def create_app(service):
     @app.post("/v1/locomotion/generate")
     async def room_generate(value: LocomotionRequest, request: Request):
         return await await_job(room, room.submit(value), request)
+
+    @app.post("/v1/locomotion/stream/cancel")
+    async def stream_cancel(value: StreamCancel):
+        return stream.cancel(value)
+
+    @app.post("/v1/locomotion/stream/step")
+    async def stream_step(value: StreamStep, request: Request):
+        return await await_job(stream, stream.submit(value), request)
 
     async def await_job(owner, job, request):
         try:

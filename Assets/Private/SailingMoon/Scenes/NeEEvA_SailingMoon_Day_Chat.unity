@@ -21475,7 +21475,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1a6f68cdf0442f688135e7650157af1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 2
+  moveSpeed: 1
   fastMultiplier: 3
   mouseSensitivity: 0.12
   pitchLimit: 89
@@ -45167,10 +45167,6 @@ MonoBehaviour:
   m_HumBackGain: 0.28
   m_LogHumBack: 1
   m_EnableScreenVision: 1
-  m_CaptureMode: 0
-  m_MonitorIndex: 0
-  m_CaptureMaxDimension: 1280
-  m_CaptureJpegQuality: 80
   m_MemoryHub: {fileID: 63693726}
   m_EnableMemoryRecall: 1
   m_EnableIdleMemoryConsolidation: 1
@@ -45189,6 +45185,14 @@ MonoBehaviour:
   m_UseSemanticMotionPlanning: 0
   m_PresentationNamedModel: {fileID: 0}
   m_PresentationModelFileName: 
+  m_EnableSceneActions: 1
+  m_EnableSceneObjectAwareness: 1
+  m_SceneDeviceDistance: 2.5
+  m_AutonomyReviewsPerMinute: 6
+  m_AutonomyReviewMinimumSpacing: 2
+  m_SceneVisionAvatar: {fileID: 0}
+  m_SceneVisionOpenOnStart: 1
+  m_SceneObservationMaxAgeSeconds: 12
 --- !u!4 &1435085657
 Transform:
   m_ObjectHideFlags: 0
@@ -51389,7 +51393,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 369047.06}
+  m_AnchoredPosition: {x: 0, y: 585153.94}
   m_SizeDelta: {x: -60, y: 0}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &1675399394

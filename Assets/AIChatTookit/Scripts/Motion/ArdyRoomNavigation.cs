@@ -17,6 +17,8 @@ namespace NeEEvA.Motion
         public Vector3 start, target, from, to, sample;
         public int segmentIndex = -1, colliderId;
         public string colliderName = "", colliderPath = "", colliderType = "", sourceObjectPath = "";
+        public bool hasColliderBounds;
+        public Vector3 colliderBoundsCenter, colliderBoundsSize;
     }
 
     /// <summary>A geometric route for the independently driven ARDY body. Points are ground coordinates.</summary>
@@ -25,6 +27,21 @@ namespace NeEEvA.Motion
         public Vector3[] Corners { get; internal set; }
         public float GroundY { get; internal set; }
         public float Length { get; internal set; }
+    }
+
+    /// <summary>A short, navigation-owned inward corridor; it never moves or snaps an avatar.</summary>
+    public sealed class ArdyRoomBoundaryRecovery
+    {
+        internal readonly ArdyRoomNavigation Owner;
+        internal readonly int BuildRevision, SettingsSignature;
+        public Vector3 Start { get; }
+        public Vector3 Target { get; }
+        public float MaximumDistance => .12f;
+        public float CorridorRadius => .035f;
+        public ArdyRoomRoute Route => new ArdyRoomRoute { Corners = new[] { Start, Target }, GroundY = Start.y,
+            Length = Vector3.Distance(Start, Target) };
+        internal ArdyRoomBoundaryRecovery(ArdyRoomNavigation owner, int revision, int signature, Vector3 start, Vector3 target)
+        { Owner = owner; BuildRevision = revision; SettingsSignature = signature; Start = start; Target = target; }
     }
 
     /// <summary>
@@ -84,6 +101,7 @@ namespace NeEEvA.Motion
         private bool ownsAgentSettings;
         private bool hasRoutePlane;
         private float routeGroundY;
+        private int buildRevision;
         private static readonly Vector2[] Footprint = {
             Vector2.zero, Vector2.right, Vector2.left, Vector2.up, Vector2.down,
             new Vector2(.7071f, .7071f), new Vector2(-.7071f, .7071f),
@@ -214,13 +232,10 @@ namespace NeEEvA.Motion
             observation.stage = "target";
             if (!CheckPoint(target, start.y, out _, out _, out reason, observation)) return false;
             var filter = new NavMeshQueryFilter { agentTypeID = agentTypeId, areaMask = NavMesh.AllAreas };
-            const float snap = .08f;
             observation.stage = "start";
-            if (!NavMesh.SamplePosition(start, out var navStart, snap, filter) || !CloseProjection(start, navStart.position))
-                return ObserveFailure(observation, "navmesh-boundary", start, "起点或终点不在可通行地面内；拒绝跨墙、跨层或大距离吸附。", out reason);
+            if (!AdmitPlanPoint(start, out var navStart, out reason, observation)) return false;
             observation.stage = "target";
-            if (!NavMesh.SamplePosition(target, out var navTarget, snap, filter) || !CloseProjection(target, navTarget.position))
-                return ObserveFailure(observation, "navmesh-boundary", target, "起点或终点不在可通行地面内；拒绝跨墙、跨层或大距离吸附。", out reason);
+            if (!AdmitPlanPoint(target, out var navTarget, out reason, observation)) return false;
             observation.stage = "path";
             observation.from = start;
             observation.to = target;
@@ -243,7 +258,7 @@ namespace NeEEvA.Motion
                 observation.to = points[i];
                 length += Vector3.Distance(points[i - 1], points[i]);
                 if (length > MaxRouteLength) return ObserveFailure(observation, "route-length-limit", points[i], "路径超出本轮局部房间移动的长度上限。", out reason);
-                if (!CheckSegment(points[i - 1], points[i], start.y, out _, out reason, observation)) return false;
+                if (!CheckSegment(points[i - 1], points[i], start.y, out _, out reason, observation, true)) return false;
             }
             routeGroundY = start.y;
             hasRoutePlane = true;
@@ -257,21 +272,150 @@ namespace NeEEvA.Motion
 
         /// <summary>Call before each actual root displacement, including zero displacement while holding a pose.</summary>
         public bool ValidateStep(Vector3 previousGround, Vector3 nextGround, out float groundY, out string reason)
+            => ValidateStep(previousGround, nextGround, out groundY, out reason, out _);
+
+        public bool ValidateStep(Vector3 previousGround, Vector3 nextGround, out float groundY, out string reason,
+            out ArdyRoomRouteDiagnostic observation)
         {
+            observation = new ArdyRoomRouteDiagnostic { stage = "execution-step", start = previousGround, target = nextGround,
+                from = previousGround, to = nextGround };
             groundY = previousGround.y;
-            if (!IsBuilt) return Fail("房间导航尚未建立。", out reason);
-            if (!ValidSettings()) return Fail("导航几何参数无效。", out reason);
-            if (!hasRoutePlane) return Fail("必须先成功规划完整路径，再执行逐步移动。", out reason);
-            if (!Finite(previousGround) || !Finite(nextGround)) return Fail("执行坐标包含无效数值。", out reason);
+            if (!IsBuilt) return ObserveFailure(observation, "navigation-unavailable", previousGround, "房间导航尚未建立。", out reason);
+            if (!ValidSettings()) return ObserveFailure(observation, "invalid-settings", previousGround, "导航几何参数无效。", out reason);
+            if (!hasRoutePlane) return ObserveFailure(observation, "route-plane-missing", previousGround, "必须先成功规划完整路径，再执行逐步移动。", out reason);
+            if (!Finite(previousGround) || !Finite(nextGround)) return ObserveFailure(observation, "invalid-coordinate", nextGround, "执行坐标包含无效数值。", out reason);
             if (Vector3.Distance(previousGround, nextGround) > MaxGuardedStep)
-                return Fail("单次位移过大；拒绝跳过逐步地形检查。", out reason);
+                return ObserveFailure(observation, "step-distance", nextGround, "单次位移过大；拒绝跳过逐步地形检查。", out reason);
             RefreshGeometryProxies();
             Physics.SyncTransforms();
-            return CheckSegment(previousGround, nextGround, routeGroundY, out groundY, out reason);
+            return observation.success = CheckSegment(previousGround, nextGround, routeGroundY, out groundY, out reason, observation, true);
         }
+
+        /// <summary>The same supported body footprint and local NavMesh admission required by TryPlan's start.</summary>
+        public bool TryValidatePlanStart(Vector3 point, out Vector3 ground, out string reason, out ArdyRoomRouteDiagnostic observation)
+        {
+            observation = new ArdyRoomRouteDiagnostic { stage = "start", start = point, target = point };
+            ground = point;
+            if (!IsBuilt) return ObserveFailure(observation, "navigation-unavailable", point, "房间导航尚未建立。", out reason);
+            if (!ValidSettings()) return ObserveFailure(observation, "invalid-settings", point, "导航几何参数无效。", out reason);
+            if (!ProjectGround(point, out ground, out reason, observation)) return false;
+            if (!CheckPoint(ground, ground.y, out _, out _, out reason, observation)) return false;
+            if (!AdmitPlanPoint(ground, out _, out reason, observation)) return false;
+            observation.success = true;
+            reason = null;
+            return true;
+        }
+
+        private bool AdmitPlanPoint(Vector3 ground, out NavMeshHit nav, out string reason, ArdyRoomRouteDiagnostic observation = null)
+        {
+            var filter = new NavMeshQueryFilter { agentTypeID = agentTypeId, areaMask = NavMesh.AllAreas };
+            if (!NavMesh.SamplePosition(ground, out nav, .08f, filter) || !CloseProjection(ground, nav.position))
+                return ObserveFailure(observation, "navmesh-boundary", ground,
+                    "角色路线采样点超出可重新规划的导航边界；本步不会执行，需要先检查有限的向内恢复路线。", out reason);
+            reason = null;
+            return true;
+        }
+
+        public bool TryPlanBoundaryRecovery(Vector3 point, out ArdyRoomBoundaryRecovery recovery, out string reason)
+            => TryPlanBoundaryRecovery(point, out recovery, out reason, out _);
+
+        /// <summary>Only certifies a <=12 cm, physically clear route from a boundary-invalid start inward.</summary>
+        public bool TryPlanBoundaryRecovery(Vector3 point, out ArdyRoomBoundaryRecovery recovery, out string reason,
+            out ArdyRoomRouteDiagnostic observation)
+        {
+            recovery = null;
+            bool alreadyValid = TryValidatePlanStart(point, out Vector3 start, out reason, out observation);
+            if (alreadyValid)
+                return ObserveFailure(observation, "recovery-not-needed", start, "当前起点已可正常规划，无需边界恢复。", out reason);
+            if (observation.code != "navmesh-boundary") return false;
+            var filter = new NavMeshQueryFilter { agentTypeID = agentTypeId, areaMask = NavMesh.AllAreas };
+            if (!NavMesh.SamplePosition(start, out var nearest, .16f, filter) ||
+                HorizontalDistance(start, nearest.position) > .12f || Mathf.Abs(nearest.position.y - start.y) > .08f)
+                return ObserveFailure(observation, "recovery-too-far", start, "附近 0.12 米内没有本导航实例的同层向内恢复点。", out reason);
+            Vector3 inward = nearest.position - start; inward.y = 0;
+            if (inward.sqrMagnitude < .000001f)
+                return ObserveFailure(observation, "recovery-direction-invalid", start, "未确认可用的水平向内恢复方向。", out reason);
+            inward.Normalize();
+            // Try a little inside the boundary first, then the exact nearest point. Every
+            // candidate remains bounded by the original start, original support and real body.
+            foreach (float inset in new[] { .025f, .0125f, 0f })
+            {
+                Vector3 candidate = nearest.position + inward * inset;
+                if (HorizontalDistance(start, candidate) > .12f) continue;
+                if (!ProjectGround(candidate, out Vector3 target, out _, null) ||
+                    Mathf.Abs(target.y - start.y) > MaxRouteHeightVariation ||
+                    HorizontalDistance(start, target) > .12f) continue;
+                if (!TryValidatePlanStart(target, out target, out _, out _)) continue;
+                if (!NavMesh.SamplePosition(target, out var interior, .08f, filter) ||
+                    HorizontalDistance(target, interior.position) > .005f || Mathf.Abs(target.y - interior.position.y) > .08f) continue;
+                if (!CheckSegment(start, target, start.y, out _, out _, null, false)) continue;
+                recovery = new ArdyRoomBoundaryRecovery(this, buildRevision, RecoverySettingsSignature(), start, target);
+                routeGroundY = start.y; hasRoutePlane = true;
+                observation.success = true; observation.stage = "boundary-recovery"; observation.code = "bounded-inward-recovery";
+                observation.start = start; observation.target = target; observation.from = start; observation.to = target;
+                observation.reason = "已验证短距离向内恢复路线；必须逐步执行，未移动角色。";
+                reason = null;
+                return true;
+            }
+            return ObserveFailure(observation, "recovery-no-safe-corridor", start,
+                "附近恢复点未通过同层地面、身体胶囊或短距离检查；没有执行吸附或跨障碍移动。", out reason);
+        }
+
+        /// <summary>Stateless so candidate auditing cannot consume authority needed by actual playback.</summary>
+        public bool ValidateBoundaryRecoveryStep(Vector3 previousGround, Vector3 nextGround, ArdyRoomBoundaryRecovery recovery,
+            out float groundY, out string reason)
+        {
+            groundY = previousGround.y;
+            if (!IsBuilt || recovery == null || recovery.Owner != this || recovery.BuildRevision != buildRevision ||
+                recovery.SettingsSignature != RecoverySettingsSignature())
+                return Fail("边界恢复凭据已失效或不属于当前导航实例。", out reason);
+            if (!ValidSettings() || !Finite(previousGround) || !Finite(nextGround)) return Fail("边界恢复坐标或导航参数无效。", out reason);
+            if (Vector3.Distance(previousGround, nextGround) > .035f + .00001f)
+                return Fail("边界恢复单步超过 0.035 米；拒绝跳转。", out reason);
+            if (!InsideRecoveryCorridor(previousGround, recovery, out float before) ||
+                !InsideRecoveryCorridor(nextGround, recovery, out float after) || after < before - .001f)
+                return Fail("动作离开已验证的短距离向内恢复走廊，或向外退回。", out reason);
+            RefreshGeometryProxies(); Physics.SyncTransforms();
+            if (!CheckSegment(previousGround, nextGround, recovery.Start.y, out groundY, out reason, null, false)) return false;
+            // Geometry can change after certification. The destination must remain a valid
+            // regular planning start; this is a point query, never a new path plan per frame.
+            if (!CheckPoint(recovery.Target, recovery.Start.y, out _, out _, out reason) ||
+                !AdmitPlanPoint(recovery.Target, out _, out reason)) return false;
+            return true;
+        }
+
+        private bool InsideRecoveryCorridor(Vector3 point, ArdyRoomBoundaryRecovery recovery, out float progress)
+        {
+            var delta = recovery.Target - recovery.Start; delta.y = 0;
+            var offset = point - recovery.Start; offset.y = 0;
+            float length = delta.magnitude;
+            progress = length > .00001f ? Vector3.Dot(offset, delta / length) : 0;
+            if (offset.magnitude > recovery.MaximumDistance + .00001f || progress < -.001f || progress > length + .005f ||
+                Mathf.Abs(point.y - recovery.Start.y) > MaxRouteHeightVariation) return false;
+            Vector3 closest = recovery.Start + delta * Mathf.Clamp01(progress / Mathf.Max(length, .00001f));
+            return HorizontalDistance(point, closest) <= recovery.CorridorRadius;
+        }
+
+        private int RecoverySettingsSignature()
+        {
+            unchecked
+            {
+                int hash = agentTypeId;
+                hash = hash * 31 + AgentRadius.GetHashCode(); hash = hash * 31 + PlanningClearance.GetHashCode();
+                hash = hash * 31 + AgentHeight.GetHashCode(); hash = hash * 31 + MaxGroundSlope.GetHashCode();
+                hash = hash * 31 + MaxLocalGroundChange.GetHashCode(); hash = hash * 31 + MaxRouteHeightVariation.GetHashCode();
+                hash = hash * 31 + SampleSpacing.GetHashCode(); hash = hash * 31 + FloorClearance.GetHashCode();
+                hash = hash * 31 + MaxThinCoverHeight.GetHashCode(); hash = hash * 31 + MaxGuardedStep.GetHashCode();
+                return hash;
+            }
+        }
+
+        private static float HorizontalDistance(Vector3 a, Vector3 b) =>
+            Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
 
         public void Clear()
         {
+            buildRevision++;
             if (dataInstance.valid) dataInstance.Remove();
             dataInstance = default;
             if (data != null)
@@ -494,7 +638,7 @@ namespace NeEEvA.Motion
         }
 
         private bool CheckSegment(Vector3 from, Vector3 to, float baseline, out float groundY, out string reason,
-            ArdyRoomRouteDiagnostic observation = null)
+            ArdyRoomRouteDiagnostic observation = null, bool requirePlanAdmission = false)
         {
             groundY = from.y;
             float distance = Vector3.Distance(from, to);
@@ -502,6 +646,7 @@ namespace NeEEvA.Motion
             if (count > 4096) return ObserveFailure(observation, "terrain-sample-limit", from, "需要检查的地形样本过多。", out reason);
             if (!CheckPoint(from, baseline, out var previousY, out var previousCover, out reason, observation)) return false;
             var last = new Vector3(from.x, previousY, from.z);
+            if (requirePlanAdmission && !AdmitPlanPoint(last, out _, out reason, observation)) return false;
             for (int i = 1; i <= count; i++)
             {
                 var point = Vector3.Lerp(from, to, (float)i / count);
@@ -510,6 +655,7 @@ namespace NeEEvA.Motion
                 if (Mathf.Abs(groundY - previousY) > allowedChange + .0005f)
                     return ObserveFailure(observation, "local-height-change", point, "路径存在台阶或局部地面高度突变。", out reason);
                 point.y = groundY;
+                if (requirePlanAdmission && !AdmitPlanPoint(point, out _, out reason, observation)) return false;
                 var displacement = point - last;
                 float step = displacement.magnitude;
                 if (step > .00001f)
@@ -668,6 +814,9 @@ namespace NeEEvA.Motion
                     observation.colliderName = collider.name;
                     observation.colliderPath = ObjectPath(collider.transform);
                     observation.colliderType = collider.GetType().Name;
+                    observation.hasColliderBounds = true;
+                    observation.colliderBoundsCenter = collider.bounds.center;
+                    observation.colliderBoundsSize = collider.bounds.size;
                     if (collider is BoxCollider box && geometryProxies.TryGetValue(box, out var renderer) && renderer != null)
                         observation.sourceObjectPath = ObjectPath(renderer.transform);
                     else if (collider is MeshCollider mesh && thinCovers.TryGetValue(mesh, out var cover) && cover.renderer != null)

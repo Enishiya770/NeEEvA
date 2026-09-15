@@ -25,7 +25,7 @@ class FullBodyFrame(WireModel):
 
 
 class FullBodyHistory(WireModel):
-    kind: Literal["unity-full-body-projection-v1"]
+    kind: Literal["unity-full-body-projection-v1", "audited-generated-full-body-v1"]
     fps: Literal[20]
     jointNames: list[str]
     frames: list[FullBodyFrame] = Field(min_length=16, max_length=16)

@@ -13,7 +13,7 @@ public static class RoomTaskProtocolRegression
     public static int RunChecks()
     {
         checks = 0;
-        DecisionSchemaCases(); ReviewSchemaCases(); SpeechGateCases();
+        DecisionSchemaCases(); VisualSchemaCases(); DecisionDiagnosticCases(); ReviewSchemaCases(); SpeechGateCases();
 #if UNITY_EDITOR
         ProviderCases();
 #endif
@@ -23,6 +23,22 @@ public static class RoomTaskProtocolRegression
     private static string Decision(string intent, string origin, string evidence) => new JObject {
         ["intent"] = intent, ["origin"] = origin, ["evidence"] = evidence
     }.ToString(Newtonsoft.Json.Formatting.None);
+
+    private static void DecisionDiagnosticCases()
+    {
+        Check(!RoomTaskProtocol.TryDecision("{", "跟着我", false, out var invalidJson, out string reason) &&
+            invalidJson == null && reason == "invalid-decision-json", "Invalid JSON must have a distinct diagnostic and no action.");
+        Check(!RoomTaskProtocol.TryDecision(Decision("follow", "user", "跟着我"), "先别跟着走", false,
+            out var misquoted, out reason) && misquoted == null && reason == "evidence-not-in-current-user-text",
+            "A received but misquoted follow decision must report its actual rejection, never become executable.");
+        var conflict = JObject.Parse(Decision("follow", "user", "跟着我"));
+        conflict["visualTarget"] = new JObject { ["captureId"]="old", ["x"]=.5, ["y"]=.5, ["label"]="用户" };
+        Check(!RoomTaskProtocol.TryDecision(conflict.ToString(), "跟着我", false, out _, out reason) &&
+            reason == "unexpected-action-fields", "Unexpected visual fields on user-follow cannot be silently accepted.");
+        Check(RoomTaskProtocol.TryDecision(Decision("follow", "user", "跟着我"), "来吧，跟着我。", false,
+            out var valid, out reason) && valid.intent == "follow" && reason == null,
+            "Diagnostics must preserve a valid speech-follow decision and leave no stale error.");
+    }
 
     private static void ExpectDecision(string json, string user, bool autonomous, bool expected)
     {
@@ -41,10 +57,36 @@ public static class RoomTaskProtocolRegression
         }
     }
 
+    private static void VisualSchemaCases()
+    {
+        foreach (string intent in new[] { "look-at", "approach-object" })
+        {
+            var value = JObject.Parse(Decision(intent, "autonomous", "想观察眼前的新目标"));
+            ExpectDecision(value.ToString(), "", true, false);
+            value["visualTarget"] = new JObject { ["captureId"] = "fixture-current-capture", ["x"] = .4, ["y"] = .6, ["label"] = "可见柜体" };
+            ExpectDecision(value.ToString(), "", true, true);
+            ExpectDecision(value.ToString(), "", false, false);
+            foreach (JToken bad in new JToken[] { new JValue(-.1), new JValue(1.1), new JValue("0.5"), JValue.CreateNull(), new JValue(double.NaN) })
+            {
+                var copy = (JObject)value.DeepClone(); copy["visualTarget"]["x"] = bad;
+                ExpectDecision(copy.ToString(), "", true, false);
+            }
+            foreach (string key in new[] { "captureId", "x", "y", "label" })
+            {
+                var copy = (JObject)value.DeepClone(); ((JObject)copy["visualTarget"]).Remove(key);
+                ExpectDecision(copy.ToString(), "", true, false);
+            }
+            var extra = (JObject)value.DeepClone(); extra["visualTarget"]["worldPosition"] = new JArray(1, 0, 3);
+            ExpectDecision(extra.ToString(), "", true, false);
+            extra = (JObject)value.DeepClone(); extra["intent"] = "approach";
+            ExpectDecision(extra.ToString(), "", true, false);
+        }
+    }
+
     private static void DecisionSchemaCases()
     {
         const string user = "我靠近一点了，现在这个位置能来吗？请再试试看。";
-        foreach (string intent in new[] { "approach", "stop-moving", "inspect" })
+        foreach (string intent in new[] { "approach", "follow", "stop-moving", "inspect" })
         {
             ExpectDecision(Decision(intent, "user", "现在这个位置能来吗？"), user, false, true);
             ExpectDecision(Decision(intent, "user", "现在这个位置能来吗？"), user, true, false);
@@ -186,15 +228,29 @@ public static class RoomTaskProtocolRegression
                 model.m_Backend = backend; model.m_LocalModelName = "public-local-model"; model.m_ChatModelName = "public-cloud-model";
                 string wire = (string)Call(model, "BuildRoomTaskRequestJson", input, review);
                 JObject request = JObject.Parse(wire); var messages = (JArray)request["messages"];
-                string schema = review ? RoomTaskProtocol.ReviewSchema : RoomTaskProtocol.DecisionSchema;
+                // This deliberately malformed input cannot authorize any observation
+                // continuation. The native grammar excludes those IDs, while the local
+                // decision text defines fields once rather than repeating each oneOf arm.
+                string schema = review ? RoomTaskProtocol.ReviewSchema :
+                    RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(new string[0]);
                 string contract = review ? RoomTaskProtocol.ReviewContract : RoomTaskProtocol.DecisionContract;
+                var guide = JObject.Parse(schema); guide.Remove("oneOf");
+                string system = contract + "\n" + (!review && backend == ChatQW.BackendType.Local
+                    ? "[Native decision field guide]\n" + guide.ToString(Newtonsoft.Json.Formatting.None) : schema);
                 Check((string)request["model"] == (backend == ChatQW.BackendType.Local ? "public-local-model" : "public-cloud-model") &&
-                    (bool)request["stream"] == false && (bool)request["enable_thinking"] == false && (int)request["max_tokens"] == 240 &&
+                    (bool)request["stream"] == false && (bool)request["enable_thinking"] == false && (int)request["max_tokens"] == (review ? 240 : 640) &&
                     (double)request["temperature"] == 0, "Actual provider changed room-task model/output bounds.");
-                Check(messages.Count == 2 && (string)messages[0]["role"] == "system" &&
-                    (string)messages[0]["content"] == contract + "\n" + schema &&
+                Check(messages.Count == (review ? 2 : 3) && (string)messages[0]["role"] == "system" &&
+                    (string)messages[0]["content"] == system &&
                     (string)messages[1]["role"] == "user" && (string)messages[1]["content"] == input,
                     "Provider JSON escaping or role separation changed current input or task contract.");
+                if (!review)
+                {
+                    Check((string)messages[2]["role"] == "user" &&
+                        ((string)messages[2]["content"]).Contains("\"sourceValid\":false") &&
+                        ((string)messages[2]["content"]).Contains("\"currentUserText\":\"\""),
+                        "Malformed current input revived a historical command in the final authority message.");
+                }
                 Check(!wire.Contains("PRIVATE_") && !wire.Contains("本次发声输出协议"),
                     "Auxiliary planning/review received private history or spoken-output instructions.");
                 Check((string)request["response_format"]["type"] == "json_object", "Provider lost structured JSON mode.");

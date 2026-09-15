@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -22,6 +22,9 @@ public class LLM:MonoBehaviour
     // Diagnostic only: final serialized main request; consumers must not log
     // the full payload (which may contain images) or dispatch anything from it.
     public event Action<string> OnRequestDiagnostic;
+    // Correlates one conditional listening request with recorder evidence; diagnostic only.
+    public string ListeningPreparationRequestId { get; set; }
+
     protected void RaiseRequestDiagnostic(string json) => OnRequestDiagnostic?.Invoke(json);
     // Protocol failures are routed to the existing LLM correction path, never TTS.
     public event Action<string> OnOutputFormatError;
@@ -328,7 +331,7 @@ public class LLM:MonoBehaviour
     /// 流式发送：onDelta每收到一小段增量文本触发一次；onComplete在整条回复结束时触发。
     /// 子类可覆写以实现真正的SSE/WebSocket流式；未覆写的LLM回落到非流式模式，整段一次性返回。
     /// imageDataUrl: 可选，OpenAI 多模态格式的图像 data-URL("data:image/jpeg;base64,...")——
-    ///   仅多模态模型(如 Qwen3-VL) 支持。base 类不会处理它，子类自己决定如何序列化。
+    ///   仅多模态模型支持。base 类明确拒绝图片，支持的子类必须实际传输图片。
     /// </summary>
     public virtual void PostMsgStream(
         string _msg,
@@ -337,6 +340,12 @@ public class LLM:MonoBehaviour
         string imageDataUrl = null,
         bool recordAssistantHistory = true)
     {
+        if (!string.IsNullOrEmpty(imageDataUrl))
+        {
+            ReportUnsupportedVisualInput();
+            _onComplete?.Invoke("");
+            return;
+        }
         PostMsg(_msg, (full) =>
         {
             if (_onDelta != null) _onDelta(full);
@@ -383,6 +392,30 @@ public class LLM:MonoBehaviour
         }, imageDataUrl, recordAssistantHistory);
     }
 
+    /// <summary>One request's execution authority. Providers without stage projection
+    /// retain their existing typed speech transport; no shared mode is changed.</summary>
+    public virtual void PostSpeechStreamForStage(string message, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl, bool recordAssistantHistory, FormalResponseStage stage)
+    {
+        PostSpeechStream(message, onSpeech, onComplete, imageDataUrl, recordAssistantHistory);
+    }
+
+    /// <summary>One model decides ordinary speech vs the existing tool pipeline.
+    /// Unsupported providers return a typed failure without silently speaking.
+    /// commitHistory=false prepares privately; callers must not wire it to TTS.</summary>
+    public virtual bool SupportsFirstReplyRouting => false;
+
+    /// <summary>Independent, private permission review. Unsupported providers never grant a proposal.</summary>
+    public virtual void PostSingingPolicyReview(SingingPolicyReviewRequest observation, Action<SingingPolicyReviewResult> callback)
+        => callback?.Invoke(SingingPolicyReviewResult.Failed("policy-review-provider-unsupported"));
+    public virtual void CancelSingingPolicyReview() { }
+    public virtual void PostFirstReplyStream(string message, Action<SpeechText> onSpeech,
+        Action<FirstReplyCompletion> onComplete, string imageDataUrl = null,
+        string transientContext = null, bool commitHistory = true)
+    {
+        onComplete?.Invoke(FirstReplyCompletion.Failed("first-reply-provider-unsupported"));
+    }
+
     public virtual void PostSpeechContinuationStream(string context, Action<SpeechText> onSpeech,
         Action<string> onComplete, string imageDataUrl = null)
     {
@@ -403,6 +436,16 @@ public class LLM:MonoBehaviour
         PostSpeechContinuationStream((context ?? "") + "\n\n" + (feedback ?? ""), onSpeech, onComplete, imageDataUrl);
     }
 
+    /// <summary>Audited feedback must not write its unapproved candidate into provider history.
+    /// Existing providers keep their original five-argument behavior; unsupported unrecorded feedback
+    /// completes empty so the caller can report its factual fallback without publishing a raw candidate.</summary>
+    public virtual void PostSpeechFeedbackStream(string context, string feedback, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl, bool recordAssistantHistory)
+    {
+        if (recordAssistantHistory) PostSpeechFeedbackStream(context, feedback, onSpeech, onComplete, imageDataUrl);
+        else onComplete?.Invoke("");
+    }
+
     /// <summary>
     /// 临时推理：给“用户仍在说话”的可撤销草稿使用。
     /// 实现必须保证请求和回答都不写入 m_DataList；不支持的 provider 返回空结果。
@@ -412,6 +455,35 @@ public class LLM:MonoBehaviour
         if (callback != null) callback("");
     }
 
+    /// <summary>Private ordinary listening draft including its quiet-boundary
+    /// proposal. Shares ephemeral cancellation and never writes accepted history.</summary>
+    public virtual void PostListeningPreparationMsg(string prompt, Action<string> callback)
+        => PostEphemeralMsg(prompt, callback);
+
+    /// <summary>Provider can transmit request-local observation pixels for decisions, without adding them to history.</summary>
+    public virtual bool SupportsVisualDecisionMessages => false;
+
+    protected void ReportUnsupportedVisualInput()
+    {
+        RaiseSystemNotice(new SystemNotice("llm_visual_input_unsupported", SystemNoticeSeverity.Warning,
+            "当前模型接口不支持本次图像观察，视觉请求未执行。", "visual-input-unsupported", GetType().Name));
+    }
+
+    public virtual void PostEphemeralMsg(string prompt, string imageDataUrl, Action<string> callback)
+    {
+        if (string.IsNullOrEmpty(imageDataUrl)) { PostEphemeralMsg(prompt, callback); return; }
+        ReportUnsupportedVisualInput();
+        callback?.Invoke("");
+    }
+
+    /// <summary>
+    /// Private autonomous-intention precheck, distinct from speculative prose drafts.
+    /// It shares CancelEphemeralMsg ownership and must not write dialogue history.
+    /// Providers without a specialized structured transport retain their existing ephemeral path.
+    /// </summary>
+    public virtual void PostAutonomyIntentMsg(string prompt, string imageDataUrl, Action<string> callback)
+        => PostEphemeralMsg(prompt, imageDataUrl, callback);
+
     /// <summary>
     /// Review outstanding user work without writing dialogue history. Providers may use
     /// a separate structured-output budget; CancelEphemeralMsg also cancels this review.
@@ -420,6 +492,13 @@ public class LLM:MonoBehaviour
     public virtual void PostWorkReviewMsg(string prompt, System.Action<string> callback)
     {
         PostEphemeralMsg(prompt, callback);
+    }
+
+    public virtual void PostWorkReviewMsg(string prompt, string imageDataUrl, Action<string> callback)
+    {
+        if (string.IsNullOrEmpty(imageDataUrl)) { PostWorkReviewMsg(prompt, callback); return; }
+        ReportUnsupportedVisualInput();
+        callback?.Invoke("");
     }
 
     /// <summary>用户继续说或 EOU 到达时撤销在飞的临时推理，正式回复拥有最高优先级。</summary>
@@ -465,8 +544,29 @@ public class LLM:MonoBehaviour
 
     /// <summary>Same-model, request-local spatial decision and speech consistency check. No history or side effects.</summary>
     public virtual bool SupportsRoomTaskMessages => false;
+    /// <summary>A shared model's first room-motion features must run before this turn's long spoken reply.</summary>
+    public virtual bool RequiresRoomMotionReadinessBeforeSpeech => false;
+    /// <summary>Request-local current-image semantic target matching; never writes dialogue history.</summary>
+    public virtual bool SupportsSceneObjectMatchMessages => false;
+    public virtual void PostSceneObjectMatchMessage(string input, string imageDataUrl,
+        Action<bool, string, string> callback)
+        => callback?.Invoke(false, "", "scene-object-match-provider-unavailable");
+    public virtual void CancelSceneObjectMatchMessage() { }
+    public virtual bool SupportsRoomPreparationMessages => false;
+    /// <summary>Independent, short-lived preparation for a closed recording; never writes history.</summary>
+    public virtual void PostRoomPreparationMessage(string input, Action<bool, string, string> callback)
+        => callback?.Invoke(false, "", "room-preparation-unsupported");
+    public virtual void CancelRoomPreparationMessage() { }
     public virtual void PostRoomTaskMessage(string input, bool reviewSpeech, Action<bool, string, string> callback)
         => callback?.Invoke(false, "", "room-task-provider-unavailable");
+
+    public virtual void PostRoomTaskMessage(string input, string imageDataUrl, bool reviewSpeech,
+        Action<bool, string, string> callback)
+    {
+        if (string.IsNullOrEmpty(imageDataUrl)) { PostRoomTaskMessage(input, reviewSpeech, callback); return; }
+        ReportUnsupportedVisualInput();
+        callback?.Invoke(false, "", "room-task-image-unsupported");
+    }
 
     /// <summary>
     /// 撤销当前正式回复。用户重新开口或打断角色时调用。
@@ -474,6 +574,7 @@ public class LLM:MonoBehaviour
     /// </summary>
     public virtual void CancelActiveResponse()
     {
+        CancelSceneObjectMatchMessage();
     }
 
     /// <summary>

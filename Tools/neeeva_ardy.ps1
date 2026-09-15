@@ -1,4 +1,4 @@
-<# Managed local ARDY lifecycle. Uses the existing shared Qwen on local 8080. #>
+﻿<# Managed local ARDY lifecycle. Uses the existing shared Qwen on local 8080. #>
 [CmdletBinding()]
 param(
     [ValidateSet('start', 'stop', 'status')][string]$Action = 'status',
@@ -24,6 +24,9 @@ function Get-ManagedProcess {
     # A PID file from before a reboot must never identify an unrelated process.
     if ($process.StartTime.ToUniversalTime().Ticks -ne ([datetime]$record.startedUtc).ToUniversalTime().Ticks) { return $null }
     $info = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)" -ErrorAction Stop
+    # The venv launcher can exit immediately after its verified child is stopped.
+    # A disappeared process is not a new, mismatching service owner.
+    if ($null -eq $info -or $process.HasExited) { return $null }
     if ($info.CommandLine -notmatch $ModulePattern) { throw 'Recorded ARDY PID has an unexpected command line.' }
     return $process
 }

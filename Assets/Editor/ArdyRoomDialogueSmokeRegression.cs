@@ -13,11 +13,13 @@ public static class ArdyRoomDialogueSmokeRegression
         {
             AgentSpeechPhaseRegression.RunOrThrow();
             int roomTaskChecks = RoomTaskProtocolRegression.RunChecks();
+            int closedSpeechChecks = ClosedSpeechRecoveryRegression.RunChecks();
+            int segmentChecks = ArdyRoomSegmentRegression.RunChecks();
             int targetChecks = ArdyRoomTargetBuilderRegression.RunChecks();
             ArdyRoomDialogueProtocolRegression.RunInteractive();
             string output = Environment.GetEnvironmentVariable("ARDY_ROOM_AUDIT_OUTPUT");
             if (string.IsNullOrEmpty(output)) throw new ArgumentException("Missing evidence output.");
-            File.WriteAllText(Path.Combine(output, "report.json"), "{\"status\":\"passed\",\"targetBuilderChecks\":" + targetChecks + ",\"roomTaskProtocolChecks\":" + roomTaskChecks + ",\"dialogueProtocolPassed\":true,\"speechPhasePassed\":true}");
+            File.WriteAllText(Path.Combine(output, "report.json"), "{\"status\":\"passed\",\"closedSpeechChecks\":" + closedSpeechChecks + ",\"segmentChecks\":" + segmentChecks + ",\"targetBuilderChecks\":" + targetChecks + ",\"roomTaskProtocolChecks\":" + roomTaskChecks + ",\"dialogueProtocolPassed\":true,\"speechPhasePassed\":true}");
             EditorApplication.Exit(0);
         }
         catch (Exception error) { Debug.LogException(error); EditorApplication.Exit(1); }
