@@ -94,12 +94,31 @@ public partial class ChatSample
         string refs = string.Join(",", (request.ClipRefs ?? "").Split(',').Select(p => p.Trim()));
         var sense = m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText;
         if (sense != null) refs = string.Join(",", refs.Split(',').Select(sense.CanonicalSingingClipReference));
+        if (refs == goal.refs) AdoptReviewedSingingRange(request, goal);
         string range = Finite(request.StartSeconds) ? "window" : request.Range;
-        if (refs != goal.refs || range != goal.range ||
-            (range == "window" && (!Finite(request.EndSeconds) ||
-                Mathf.Abs(request.StartSeconds - goal.start) > .001f || Mathf.Abs(request.EndSeconds - goal.end) > .001f)))
+        // refs 不同仍然拒绝：那是"要唱哪几段"，两份写法冲突时程序不能替她选。
+        if (refs != goal.refs)
             return RejectSingingResolution(out failure, "goal_target_mismatch", "goal",
-                "待审sing的refs或范围与同回复目标不同；没有保存或修改目标。", "提交一致的目标和动作，待独立审核。");
+                $"待审sing的refs与同回复目标不同（目标 refs={goal.refs}，sing refs={refs}）；没有保存或修改目标。",
+                "让 sing 的 refs 与目标一致，或直接只写 sing 由程序补目标。");
+        // 范围不同则以 sing 为准更新这份尚未审核的目标，而不是双双作废。两者出自同一条
+        // 回复、同一个模型，作废只会让她猜该改哪一半——实测 s18 L20590 她猜错了那一半：
+        // 目标里正确的 range=current 被她改成 expanded，第二段的尾部说话就此回来。
+        if (range != goal.range ||
+            (range == "window" && (Mathf.Abs(request.StartSeconds - goal.start) > .001f ||
+                Mathf.Abs(request.EndSeconds - goal.end) > .001f)))
+        {
+            if (range == "window" && (!Finite(request.EndSeconds) || request.EndSeconds <= request.StartSeconds ||
+                    refs.Split(',').Length != 1))
+                return RejectSingingResolution(out failure, "goal_target_mismatch", "goal",
+                    "sing 给了起止秒数，但它只对单个 clip 有效且须成对有效；没有保存或修改目标。",
+                    "多段要各自范围时先逐段 clip_revise，再用 range=\"current\"。");
+            Debug.Log($"[Sing/Goal] 同回复的 sing 范围与目标不同，按 sing 更新待审目标：" +
+                $"{goal.range} → {range}；refs 与成功条件未变。");
+            goal.range = range;
+            goal.start = range == "window" ? request.StartSeconds : float.NaN;
+            goal.end = range == "window" ? request.EndSeconds : float.NaN;
+        }
         if (m_DeferredSingingRequest != null)
             return RejectSingingResolution(out failure, "goal_request_already_waiting", "goal",
                 "本目标已有一个待审显式请求；没有替换参数或额外排队。", "等待这次独立审核。", true);
@@ -110,6 +129,86 @@ public partial class ChatSample
             formalGeneration = m_FormalResponseGeneration, goalVersion = goal.version,
             model = m_ChatSettings?.m_ChatModel };
         if (m_LogAgentLoop) Debug.Log($"[Sing/Wait] status=waiting_goal_review version={goal.version} explicit_request_saved=true; no_audio_submitted=true");
+        return true;
+    }
+
+    /// 没有当轮目标时，用 sing 自己的参数补一份最小目标，而不是拒绝。
+    ///
+    /// 原先必须把同一件事写两遍且逐字对齐：sing_goal 一遍、sing 一遍。实测 s11–s18 的
+    /// 49 次纠错里，goal_required 9 次、goal_target_mismatch 2 次全部出自这个分离，
+    /// 而它们拦下的都不是"会唱错东西"，只是两份参数没对齐。目标本身仍然登记、仍然
+    /// 走独立审核（授权由 origin/requestQuote 那一关把守），只是不再要求她手写两遍。
+    private bool TryAutoRegisterSingingGoalFromSing(AgentHumBackRequest request, out string failure)
+    {
+        failure = "";
+        if (request == null || !request.UnifiedSing || m_SingingGoal != null) return false;
+        if (m_WorkNoProgress || string.IsNullOrWhiteSpace(request.ClipRefs)) return false;
+        bool autonomous = request.GoalOrigin == "autonomous";
+        // 自主演唱必须她自己写 origin="autonomous"；不写就按用户请求处理，而用户请求
+        // 需要有原话可依托——这条来源区分不由程序代劳，审核那关还会核对引文。
+        if (!autonomous && string.IsNullOrWhiteSpace(m_LastUserMsg)) return false;
+        if (m_SingingGoalOwnerAutonomous == true && !autonomous) return false;
+        string intent = request.GoalIntent.Length > 0 ? request.GoalIntent : "perform";
+        string feedback = request.GoalFeedback.Length > 0 ? request.GoalFeedback : "none";
+        string completion = request.GoalCompletion.Length > 0 ? request.GoalCompletion : "playback";
+        if (!new[] { "perform", "repair", "repeat", "observe" }.Contains(intent))
+        { failure = "sing 的 intent 只能是 perform/repair/repeat/observe，实际=\"" + intent + "\"；未执行。"; return false; }
+        if (!new[] { "none", "unsatisfied", "satisfied" }.Contains(feedback))
+        { failure = "sing 的 feedback 只能是 none/unsatisfied/satisfied，实际=\"" + feedback + "\"；未执行。"; return false; }
+        if (!new[] { "playback", "user_confirmation" }.Contains(completion))
+        { failure = "sing 的 completion 只能是 playback/user_confirmation，实际=\"" + completion + "\"；未执行。"; return false; }
+        if (request.GoalOrigin.Length > 0 && !new[] { "user_request", "autonomous" }.Contains(request.GoalOrigin))
+        { failure = "sing 的 origin 只能是 user_request/autonomous，实际=\"" + request.GoalOrigin + "\"；未执行。"; return false; }
+        // 和手写目标同一条规则：说用户不满意或要求重唱，必须引用用户这一轮的原话。
+        if ((feedback != "none" || intent == "repeat") &&
+            (request.GoalEvidence.Length == 0 || !(m_LastUserMsg ?? "").Contains(request.GoalEvidence)))
+        { failure = "sing 声明了 feedback/repeat，就要在 evidence 里逐字引用用户这一轮的原话；" +
+            "角色自己的话不能代替用户证据。未执行。"; return false; }
+        var sense = m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText;
+        var refs = request.ClipRefs.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToArray();
+        if (refs.Length == 0 || refs.Any(s => !s.StartsWith("clip:", StringComparison.Ordinal))) return false;
+        if (sense != null) refs = refs.Select(sense.CanonicalSingingClipReference).ToArray();
+        bool window = Finite(request.StartSeconds);
+        // window 仍然只对单段有效，和手写目标同一条规则；多段带坐标交回原有报错。
+        if (window && (refs.Length != 1 || !Finite(request.EndSeconds) || request.EndSeconds <= request.StartSeconds))
+            return false;
+        var goal = new SingingGoal
+        {
+            turn = m_SingingGoalTurn,
+            proposalSpeechRound = m_CurrentSpeechRoundId,
+            proposalWorkEpoch = m_WorkEpoch,
+            origin = autonomous ? "autonomous" : "user_request",
+            autonomous = autonomous,
+            refs = string.Join(",", refs),
+            range = window ? "window" : request.Range,
+            revisions = BindCurrentSingingMaterialVersions(refs),
+            intent = intent,
+            completion = completion,
+            expected = string.IsNullOrWhiteSpace(request.Reason)
+                ? "按 sing 指定的素材与范围演唱：" + string.Join(",", refs)
+                : request.Reason.Trim(),
+            feedback = feedback,
+            evidence = request.GoalEvidence,
+            repairScope = "content",
+            start = window ? request.StartSeconds : float.NaN,
+            end = window ? request.EndSeconds : float.NaN
+        };
+        var revisions = goal.revisions.Split(',');
+        if (revisions.Length != refs.Length) return false;
+        // 必须走和手写目标同一条 transition/baseVersion 绑定，不能自己推。实测 s19：
+        // 漏了这一步的版本 baseVersion 恒为 0，一旦本轮已有 active_goal（version>0），
+        // 审核就以"活动目标版本在审查期间已经变化"连判两次 revise，turn 10 卡死在这里。
+        if (!BindSingingGoalTransition(goal, "", out string transitionFailure))
+        { failure = "按 sing 补目标失败：" + transitionFailure; return false; }
+        if (request.GoalChangeQuote.Length > 0) goal.changeQuote = request.GoalChangeQuote;
+        goal.version = ++m_SingingGoalVersion;
+        ClearDeferredSingingRequest();
+        m_SingingGoalOwnerAutonomous = false;
+        m_SingingGoal = goal;
+        RecordPracticeEditResult("本轮没有单独登记 sing_goal，已按这次 sing 的 refs/范围补一份目标，" +
+            "review=pending；未修订/播放。需独立核对最新用户要求后才会执行。" +
+            "想要不同的成功条件或范围，下次直接写 sing_goal。", false);
+        Debug.Log("[Sing/Goal] auto-from-sing proposal=" + JsonConvert.SerializeObject(goal));
         return true;
     }
 
@@ -178,6 +277,7 @@ public partial class ChatSample
         "新用户轮只暂停执行，不清空active_goal。追问失败原因或没听到时，原refs顺序和成功条件仍在；确认要继续可用<sing_goal transition=\"continue\"/>，程序绑定原目标和版本，不默认最近录音。" +
         "修改原任务用transition=revise，换成独立新演唱任务用replace，明确放弃原任务用cancel；用户事项须change_quote逐字引用最新用户改变/取消要求，并由独立审查确认其语义。" +
         "有未完成active_goal时省略transition等于continue，不能借新proposal缩减原目标。revise/replace仍须完整refs/range/expected/completion；revisions可省略由程序绑定当前素材，提供时必须匹配。" +
+        "登记时还是候选的素材绑定revisions=pending；之后来源被确认，程序会把它解析成实际版本，不需要你改目标，也不算改变内容。" +
         "continue不能改素材/范围/完成条件；只解释或回答追问可以不发工具，保留待办但不会自动演唱。cancel只取消事项，不删除录音。" +
         "reason只是解释，expanded必须写入range。目标与真正工具参数都要落实用户修正，不能只把二者填成同一个错误方案。\n";
 
@@ -292,12 +392,32 @@ public partial class ChatSample
         };
         if (!BindSingingGoalTransition(goal, attrs, out string transitionFailure))
         { RejectSingingGoal(transitionFailure); return; }
-        if (!new[] { "perform", "repair", "repeat", "observe" }.Contains(goal.intent) ||
-            !new[] { "none", "unsatisfied", "satisfied" }.Contains(goal.feedback) ||
-            !new[] { "playback", "user_confirmation" }.Contains(goal.completion) ||
-            !new[] { "content", "music", "delivery" }.Contains(goal.repairScope) ||
-            !new[] { "current", "clean", "expanded", "window" }.Contains(goal.range))
-        { RejectSingingGoal("目标枚举无效；未登记、修订或播放。"); return; }
+        // 这五个字段原本共用一句"目标枚举无效"。实测 s12/s14：她三次写出
+        // range="expanded,clean" / "clean,expanded" / "current,current" 这类逐段取值，
+        // 每次都只收到那一句，无从判断错在哪个字段——于是转去怀疑素材，把已经调对的
+        // 第二段又改坏了。报文必须点名字段、给出它自己的合法值。
+        var enumErrors = new List<string>();
+        void CheckGoalChoice(string field, string value, params string[] allowed)
+        {
+            if (Array.IndexOf(allowed, value ?? "") >= 0) return;
+            enumErrors.Add(field + "=\"" + value + "\"（只能是 " + string.Join("/", allowed) + "）");
+        }
+        CheckGoalChoice("intent", goal.intent, "perform", "repair", "repeat", "observe");
+        CheckGoalChoice("feedback", goal.feedback, "none", "unsatisfied", "satisfied");
+        CheckGoalChoice("completion", goal.completion, "playback", "user_confirmation");
+        CheckGoalChoice("repair_scope", goal.repairScope, "content", "music", "delivery");
+        CheckGoalChoice("range", goal.range, "current", "clean", "expanded", "window");
+        if (enumErrors.Count > 0)
+        {
+            // 逗号是她在尝试逐段范围。程序只接受统一取值，但现成的替代路径是存在的，
+            // 直接给出来，免得她再花几轮反推。
+            string perRefHint = (goal.range ?? "").Contains(",")
+                ? " range 对全部 refs 统一生效，不接受逐段列表；要各段不同范围，先逐段 clip_revise，再用 range=\"current\"。"
+                : "";
+            RejectSingingGoal("目标枚举无效：" + string.Join("；", enumErrors) +
+                "。未登记、修订或播放。" + perRefHint);
+            return;
+        }
         if ((goal.feedback != "none" || goal.intent == "repeat") &&
             (goal.evidence.Length == 0 || !(m_LastUserMsg ?? "").Contains(goal.evidence)))
         { RejectSingingGoal("用户反馈/重复演唱意图须引用最新用户原话作为evidence，再由独立语义审查核对；角色自己的话不能代替用户证据。"); return; }
@@ -344,7 +464,20 @@ public partial class ChatSample
         ClearDeferredSingingRequest();
         m_SingingGoalOwnerAutonomous = goal.autonomous;
         m_SingingGoal = goal;
-        RecordPracticeEditResult("歌唱目标已登记，review=pending；未修订/播放。需独立核对最新用户要求、refs顺序、范围、版本及反馈，再决定行动。", false);
+        // 只登记目标不会发出任何声音。实测 s20：她连着两轮只写 sing_goal，目标登记了、
+        // 审核还批了，程序一声没出也没提示，用户等到第三轮才问"没听到你唱出来啊"。
+        // 现在把这件事直接写进回执，而不是让她从沉默里反推。
+        // 用本轮实际发出的标签名判断，它在任何提取器动手之前就测好了（ChatSample.cs:5148），
+        // 不依赖发声阶段校验的先后顺序。
+        bool singingThisReply = ("、" + m_RoundEmittedTagNames + "、").Contains("、sing、") ||
+            ("、" + m_RoundEmittedTagNames + "、").Contains("、hum_back、");
+        RecordPracticeEditResult("歌唱目标已登记，review=pending；未修订/播放。" +
+            (singingThisReply
+                ? "同回复的 sing 已保留，审核通过后会重新核验素材并提交一次。"
+                : "本条回复没有 sing，所以不会发出任何声音——登记目标本身从不触发演唱。" +
+                  "想现在就唱，在同一条回复里补一个 <sing refs=\"…\"/>；" +
+                  "只想先登记、看到审核事实再决定，那就保持现状，等下一轮再唱。") +
+            "需独立核对最新用户要求、refs顺序及反馈，再决定行动。", false);
         Debug.Log("[Sing/Goal] proposal=" + JsonConvert.SerializeObject(goal));
     }
 
@@ -359,6 +492,68 @@ public partial class ChatSample
             return material != null ? material.Revision.ToString(CultureInfo.InvariantCulture) :
                 pending.Any(p => p.ClipRef == clip) ? "pending" : "missing";
         }));
+    }
+
+    // <sing> falls back to range="current" when the attribute is absent, while an
+    // objective for a clip whose current version is not selectable has to name
+    // clean/expanded. That makes the protocol's own two defaults disagree, and the
+    // action is then rejected over a parameter the character never wrote. The reviewed
+    // objective is the authority and its refs already matched, so an omitted range
+    // follows it instead of a static default — the same treatment revisions already
+    // gets. An explicitly written range that differs is still a real mismatch.
+    private static void AdoptReviewedSingingRange(AgentHumBackRequest request, SingingGoal goal)
+    {
+        if (request == null || goal == null || !request.UnifiedSing || request.RangeExplicit) return;
+        if (Finite(request.StartSeconds) || Finite(request.EndSeconds)) return;
+        if (goal.range != "current" && goal.range != "clean" && goal.range != "expanded") return;
+        if (goal.range == request.Range) return;
+        Debug.Log($"[Sing/Resolve] sing 省略 range，按已审目标绑定 {request.Range} → {goal.range}；" +
+            "refs 与成功条件未变，这不是新的范围选择。");
+        request.Range = goal.range;
+    }
+
+    // A clip still in quarantine binds revisions="pending". Confirming its source later
+    // resolves the same audio to a concrete revision: the recording did not change, and
+    // neither did what was promised. Treating the two as different material deadlocks an
+    // objective against its own stale binding, so a pending→concrete promotion is the
+    // same material here. A real re-cut bumps the revision and still needs re-registering.
+    private static bool SameSingingMaterialVersion(string bound, string actual) =>
+        bound == actual || (bound == "pending" && actual != "pending" && actual != "missing");
+
+    // Follow that promotion on the stored objective so every later comparison, and the
+    // version the character is shown, reflect the material that actually exists.
+    private string PromoteResolvedSingingMaterialVersions(string refsCsv, string revisionsCsv)
+    {
+        if (string.IsNullOrEmpty(refsCsv) || string.IsNullOrEmpty(revisionsCsv)) return revisionsCsv;
+        var refs = refsCsv.Split(',').Select(s => s.Trim()).ToArray();
+        var bound = revisionsCsv.Split(',').Select(s => s.Trim()).ToArray();
+        if (refs.Length != bound.Length) return revisionsCsv;
+        var actual = BindCurrentSingingMaterialVersions(refs).Split(',');
+        if (actual.Length != refs.Length) return revisionsCsv;
+        bool promoted = false;
+        for (int i = 0; i < bound.Length; i++)
+        {
+            if (bound[i] != "pending" || actual[i] == "pending" || actual[i] == "missing") continue;
+            bound[i] = actual[i]; promoted = true;
+        }
+        if (!promoted) return revisionsCsv;
+        string resolved = string.Join(",", bound);
+        Debug.Log($"[Sing/Goal] 素材来源已确认，目标版本随之解析 {revisionsCsv} → {resolved}；" +
+            "refs、范围与成功条件未变，这不是内容改动，也不构成新的演唱授权。");
+        return resolved;
+    }
+
+    // The rejection names the mechanism but not the material, and change_quote is matched
+    // verbatim against exactly this string. Omitting transition defaults to continue, so a
+    // genuinely new user request reads as an illegal edit of the old objective and she is
+    // left guessing both the transition and the quote. Hand her the text instead.
+    private string DescribeSingingGoalChangeQuoteHint()
+    {
+        string latest = (m_LastUserMsg ?? "").Trim().Replace('\n', ' ').Replace('\r', ' ');
+        if (latest.Length == 0) return "";
+        if (latest.Length > 140) latest = latest.Substring(0, 140) + "…";
+        return " 若这确实是用户提出的新要求，用 transition=\"revise\"，并把 change_quote 设为下面这句话里的逐字片段" +
+            "（原样截取，不要加引号或改写）：" + latest;
     }
 
     // Syntax identifies an intended transition; semantic authority remains the separate
@@ -393,15 +588,35 @@ public partial class ChatSample
         { failure = "没有可继续或修改的活动目标；请按实际新要求登记create，未回退到旧录音。"; return false; }
         if (goal.transition == "continue")
         {
+            // Resolve a quarantined clip's binding before comparing. Without this the
+            // objective is unreachable once its source is confirmed: omitting revisions
+            // inherits the stale "pending" and fails material validation, while supplying
+            // the resolved value reads as changing the objective. Only the material
+            // version moves; refs, range and the success condition are still pinned.
+            active.revisions = PromoteResolvedSingingMaterialVersions(active.refs, active.revisions);
             string Supplied(string field) => (ReadToolAttribute(attrs, field) ?? "").Trim();
             bool Different(string field, string bound) => Supplied(field).Length > 0 && Supplied(field) != bound;
+            // Copying the objective's pre-promotion "pending" back from an older frame
+            // still names the same recording, so it is not a changed objective either.
+            bool DifferentRevisions()
+            {
+                string supplied = Supplied("revisions");
+                if (supplied.Length == 0 || supplied == active.revisions) return false;
+                var a = supplied.Split(',').Select(s => s.Trim()).ToArray();
+                var b = active.revisions.Split(',').Select(s => s.Trim()).ToArray();
+                if (a.Length != b.Length) return true;
+                for (int i = 0; i < a.Length; i++)
+                    if (!SameSingingMaterialVersion(a[i], b[i]) && !SameSingingMaterialVersion(b[i], a[i])) return true;
+                return false;
+            }
             if (Different("refs", active.refs) || Different("range", active.range) ||
-                Different("revisions", active.revisions) || Different("expected", active.expected) ||
+                DifferentRevisions() || Different("expected", active.expected) ||
                 Different("completion", active.completion) || Different("intent", active.intent) ||
                 Different("repair_scope", active.repairScope) || Different("origin", active.origin) ||
                 (Supplied("start_seconds").Length > 0 && !goal.start.Equals(active.start)) ||
                 (Supplied("end_seconds").Length > 0 && !goal.end.Equals(active.end)))
-            { failure = "continue草案改变了活动目标的refs/顺序/范围/版本/成功条件；原目标完整保留。确有用户新要求才用revise/replace和change_quote，不能将追问缩为最近一段。"; return false; }
+            { failure = "continue草案改变了活动目标的refs/顺序/范围/版本/成功条件；原目标完整保留。确有用户新要求才用revise/replace和change_quote，不能将追问缩为最近一段。" +
+                DescribeSingingGoalChangeQuoteHint(); return false; }
             if (!IsActiveSingingGoalUnfinished() || active.outcome == "playback_complete_content_unverified")
             { failure = "活动目标已有完整播放事实，不能因追问原样再播。明确重复请求应登记repeat的新目标。"; return false; }
             goal.refs = active.refs; goal.range = active.range; goal.revisions = active.revisions;
@@ -415,7 +630,8 @@ public partial class ChatSample
         // is necessary evidence, not a keyword classifier or sufficient approval.
         if (!active.autonomous && (goal.changeQuote.Length == 0 ||
             (m_LastUserMsg ?? "").IndexOf(goal.changeQuote, StringComparison.Ordinal) < 0))
-        { failure = "修改/替换/取消用户活动目标须change_quote引用最新用户改变要求，随后独立审查；原任务未丢弃。"; return false; }
+        { failure = "修改/替换/取消用户活动目标须change_quote引用最新用户改变要求，随后独立审查；原任务未丢弃。" +
+            DescribeSingingGoalChangeQuoteHint(); return false; }
         if (!active.autonomous && goal.autonomous)
         { failure = "用户事项不能借autonomous改名来取消或缩减；请明确处理用户目标。"; return false; }
         if (goal.transition == "cancel")
@@ -460,8 +676,8 @@ public partial class ChatSample
         var goal = m_SingingGoal;
         if (goal == null || goal.review != "pending")
         { reason = "没有待核对的歌唱草案；审查结果不能批准另一份或已经结束的目标。"; return false; }
-        if (expected == null || expected["refs"]?.Type != JTokenType.String || expected["range"]?.Type != JTokenType.String)
-        { reason = "审查没有提供有效的独立目标refs/range；没有批准、改写或执行草案。"; return false; }
+        if (expected == null || expected["refs"]?.Type != JTokenType.String)
+        { reason = "审查没有提供有效的独立目标refs；没有批准、改写或执行草案。"; return false; }
         string refs = string.Join(",", ((string)expected["refs"] ?? "").Split(',').Select(p => p.Trim()));
         string range = ((string)expected["range"] ?? "").Trim();
         if (goal.baseVersion != (m_ActiveSingingGoal?.version ?? 0))
@@ -489,18 +705,29 @@ public partial class ChatSample
             if ((goal.transition == "revise" || goal.transition == "replace") && quote != goal.changeQuote)
             { reason = "独立审核的改变要求引文与change_quote不同；不能用失败追问默默替换原目标。"; return false; }
             if (goal.transition == "continue" && m_ActiveSingingGoal != null &&
-                (refs != m_ActiveSingingGoal.refs || range != m_ActiveSingingGoal.range))
-            { reason = "继续原任务必须满足active_goal的完整有序refs/范围，不能只审核缩水草案。"; return false; }
+                refs != m_ActiveSingingGoal.refs)
+            { reason = "继续原任务必须满足active_goal的完整有序refs，不能只审核缩水草案。"; return false; }
         }
         else if (origin != "autonomous" || goal.origin != "autonomous")
         { reason = "没有独立确认的用户回唱要求；若角色自主想唱须明确origin=autonomous，不能冒充用户任务。"; return false; }
-        if (refs != goal.refs || range != goal.range)
+        // refs 仍然逐字核对——用户确实会说"第一段和第二段"，那是可核对的事实。
+        // range 不再由审核裁决：clean/expanded/current/window 是素材内部的选段术语，
+        // 用户几乎从不提及，审核只能猜。实测 s18 turn=9：用户原话是"把第一段和第二段
+        // 连起来唱"，只字未提范围；审核猜 expanded，而草案里正确的 current（第二段此前
+        // 已被修订成 window[0,10.17]，用户刚确认过"这次没问题"）被判不符、强制 revise。
+        // 她照审核改成 expanded，第二段的尾部说话随即回来，下一轮用户就说"你又把第二段
+        // 我说话的部分复读出来了"。范围该由素材状态决定，不该由对用户原话的猜测决定。
+        if (refs != goal.refs)
         {
-            reason = $"审查独立解析的用户目标与实际草案不一致：expected_refs={refs} expected_range={range}；" +
-                $"proposal_refs={goal.refs} proposal_range={goal.range}。refs顺序必须一致；口头解释不会修改实际草案。";
+            reason = $"审查独立解析的用户目标与实际草案不一致：expected_refs={refs}；" +
+                $"proposal_refs={goal.refs}。refs顺序必须一致；口头解释不会修改实际草案。";
             return false;
         }
-        if (range == "window")
+        if (range.Length > 0 && range != goal.range && m_LogAgentLoop)
+            Debug.Log($"[Sing/GoalReview] 审核独立解析的 range={range} 与草案 range={goal.range} 不同；" +
+                "范围由素材状态决定，不作为否决依据，仅记录。");
+        // 坐标是否需要核对，取决于草案本身用的是不是 window，而不是审核猜的 range。
+        if (goal.range == "window")
         {
             if (!TryReadReviewedSingingCoordinate(expected["start_seconds"], out double start) ||
                 !TryReadReviewedSingingCoordinate(expected["end_seconds"], out double end) ||
@@ -531,6 +758,7 @@ public partial class ChatSample
         var errors = new List<string>();
         var sense = m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText;
         if (sense == null) { reason = "当前没有录音素材接口。"; return false; }
+        goal.revisions = PromoteResolvedSingingMaterialVersions(goal.refs, goal.revisions);
         var refs = goal.refs.Split(','); var versions = goal.revisions.Split(',');
         for (int i = 0; i < refs.Length; i++)
         {
@@ -538,7 +766,7 @@ public partial class ChatSample
             var pending = sense.DescribeQuarantinedSingingCandidates().Find(p => p.ClipRef == refs[i]);
             if (ready == null && pending == null) { errors.Add(refs[i] + "不存在"); continue; }
             string actual = ready == null ? "pending" : ready.Revision.ToString(CultureInfo.InvariantCulture);
-            if (i >= versions.Length || versions[i] != actual)
+            if (i >= versions.Length || !SameSingingMaterialVersion(versions[i].Trim(), actual))
                 errors.Add(refs[i] + "版本不符，实际revision=" + actual);
             if (goal.range == "current" && ready == null && pending.PlaybackStatus != "ready")
                 errors.Add(refs[i] + " current尚未选定；须据真实边界选择clean/expanded/window");
@@ -572,7 +800,8 @@ public partial class ChatSample
         if (!new[] { "approved", "revise", "waiting_user", "cancelled" }.Contains(status) || string.IsNullOrWhiteSpace(evidence)) return;
         m_SingingGoal.review = status;
         m_SingingGoal.reviewEvidence = evidence;
-        if (status != "approved") ClearDeferredSingingRequest();
+        // A line that promised an action the review did not approve stays unspoken.
+        if (status != "approved") { ClearDeferredSingingRequest(); ClearWithheldSingingSpeech("审核结果=" + status); }
         if (status == "cancelled" && m_SingingGoal.transition == "cancel" && m_ActiveSingingGoal != null &&
             m_SingingGoal.baseVersion == m_ActiveSingingGoal.version)
         {
@@ -643,7 +872,22 @@ public partial class ChatSample
         if (!m_AgentRunning && m_SingingGoal == null && m_SingingGoalTurn == 0) return true;
         var goal = m_SingingGoal;
         if (goal == null)
-            return RejectSingingResolution(out detail, "goal_required", "goal", "当前用户轮的歌唱目标未独立核对；先登记sing_goal并等待进度审查。没有确认来源、修改范围或播放。", "依据原用户请求登记sing_goal；有未完成active_goal时可用transition=continue。素材可播放不代表目标已授权。");
+        {
+            // 实测 s13：她在上一个用户轮登记了目标，审核还没回，用户就说了下一句；
+            // ResetSingingGoalForUserTurn 把它挪进 m_PreviousSingingGoal 并清空当前轮。
+            // 原文案只说"先登记"，对刚登记过的她等于没说，于是连着三轮裸发 sing 撞同一堵墙。
+            // 只在那个目标确实属于紧邻的上一轮时说，免得翻出几轮前的旧目标反而误导。
+            var discardedGoal = m_PreviousSingingGoal;
+            string discarded = discardedGoal == null || discardedGoal.turn != m_SingingGoalTurn - 1 ? ""
+                : "你在上一个用户轮登记的 version=" + discardedGoal.version + " 目标" +
+                  (discardedGoal.review == "approved"
+                      ? "已随那一轮结束"
+                      : "在 review=" + discardedGoal.review + " 时因新用户轮到达而作废") +
+                  "，它不覆盖当前轮；登记过不等于当前轮有目标。";
+            return RejectSingingResolution(out detail, "goal_required", "goal",
+                "当前用户轮的歌唱目标未独立核对；先登记sing_goal并等待进度审查。没有确认来源、修改范围或播放。" + discarded,
+                "依据原用户请求登记sing_goal；有未完成active_goal时可用transition=continue。素材可播放不代表目标已授权。");
+        }
         if (goal.turn != m_SingingGoalTurn)
             return RejectSingingResolution(out detail, "goal_stale_turn", "goal", "该目标属于旧用户轮；没有修改或播放。", "按当前用户轮继续/改变/取消原目标并独立审核。");
         if (goal.review != "approved")
@@ -655,11 +899,13 @@ public partial class ChatSample
         if (m_ActiveSingingGoal == null || m_ActiveSingingGoal.version != goal.version ||
             goal.refs != m_ActiveSingingGoal.refs || goal.completion != m_ActiveSingingGoal.completion)
         return RejectSingingResolution(out detail, "goal_version_mismatch", "goal", "当前动作没有绑定活动目标的完整成功条件；未执行。", "读取活动目标版本后重新决定，原目标仍保留。");
+        if (goal.refs == request.ClipRefs) AdoptReviewedSingingRange(request, goal);
         string requestRange = Finite(request.StartSeconds) ? "window" : request.Range;
         if (goal.refs != request.ClipRefs || goal.range != requestRange ||
             (requestRange == "window" && (Mathf.Abs(goal.start - request.StartSeconds) > .001f || Mathf.Abs(goal.end - request.EndSeconds) > .001f)))
         { failure = $"动作不符合已核对目标：expected_refs={goal.refs} range={goal.range}；actual_refs={request.ClipRefs} range={requestRange}。reason不会改变参数；没有修改或播放。";
             return RejectSingingResolution(out detail, "goal_target_mismatch", "goal", failure, "按已审目标的精确refs/范围执行；需要改变时先重新审核。"); }
+        goal.revisions = PromoteResolvedSingingMaterialVersions(goal.refs, goal.revisions);
         var versions = goal.revisions.Split(',');
         var refs = request.ClipRefs.Split(',');
         var preview = new List<SingingMaterialFact>();
@@ -668,7 +914,7 @@ public partial class ChatSample
             var phrase = sense.DescribePracticePhrases().Find(p => p.ClipRef == refs[i]);
             var pending = sense.DescribeQuarantinedSingingCandidates().Find(p => p.ClipRef == refs[i]);
             string actualVersion = phrase == null ? "pending" : phrase.Revision.ToString(CultureInfo.InvariantCulture);
-            if (versions[i] != actualVersion)
+            if (!SameSingingMaterialVersion(versions[i].Trim(), actualVersion))
             { failure = $"目标版本已过期：{refs[i]} expected_revision={versions[i]} actual_revision={actualVersion}；请根据新事实更新目标，未修改或播放。";
                 return RejectSingingResolution(out detail, "material_version_mismatch", "material", failure, "保持原任务范围，核对最新素材版本后重新审核。"); }
             if (phrase == null && pending == null) return RejectSingingResolution(out detail, "material_reference_missing", "material", "目标素材已不存在；未修改或播放。", "报告缺失事实，不自动选另一份录音。");

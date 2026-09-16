@@ -15,6 +15,16 @@ public partial class ChatSample
     private int m_SingingRejectedSpeechRound = -1, m_SingingResolvedSpeechRound = -1;
     private int m_SingingSpeechPhaseRound = -1, m_SingingDeclaredActionRound = -1;
     private SpeechActionDependency m_SingingSpeechDependency;
+    // after_action means "speak once the action is validated", and a line held only for
+    // a pending goal review is not wrong — just unverified yet. Discarding it made the
+    // protocol's own recommended shape (sing_goal + sing in one reply) guarantee that she
+    // sings with no words at all. Park it here instead; an approved review delivers it and
+    // every other outcome still drops it with the existing [外放事实].
+    private string m_WithheldSingingSpeech = "";
+    private string m_WithheldSingingSpeechLanguage;
+    private bool m_WithheldSingingSpeechPending;
+    private int m_WithheldSingingSpeechGeneration;
+    private Coroutine m_WithheldSingingSpeechRoutine;
 
     private string ReconcileListeningDraftWithFinal(string finalText)
     {
@@ -42,9 +52,99 @@ public partial class ChatSample
         return observation;
     }
 
+    // An approved review is exactly the "after action" the phase declared, so the line may
+    // now be delivered as written. It goes out before the song: the queued action then sees
+    // the output pipeline busy and keeps its existing "prepare during speech, sing after"
+    // ordering, which is the same path an already-approved goal has always used.
+    private bool ReleaseWithheldSingingSpeech()
+    {
+        if (string.IsNullOrWhiteSpace(m_WithheldSingingSpeech)) return false;
+        var tts = m_ChatSettings?.m_TextToSpeech;
+        string text = m_WithheldSingingSpeech.Trim();
+        m_WithheldSingingSpeech = "";
+        if (tts == null || m_AudioSource == null)
+        { ClearWithheldSingingSpeech("没有可用的音频输出"); return false; }
+        SpeechText speech = tts.ResolveSpeech(new SpeechText(text, m_WithheldSingingSpeechLanguage));
+        int generation = ++m_WithheldSingingSpeechGeneration;
+        m_WithheldSingingSpeechPending = true;
+        if (m_LogAgentLoop)
+            Debug.Log($"[Work/Speech] 目标已通过审核，补说这一轮被扣住的台词：\"{text}\"");
+        tts.PrepareSpeech(speech, (clip, spokenText) =>
+        {
+            if (generation != m_WithheldSingingSpeechGeneration)
+            { if (clip != null) Destroy(clip); return; }
+            if (clip == null)
+            {
+                m_WithheldSingingSpeechPending = false;
+                if (m_LogAgentLoop)
+                    Debug.LogWarning("[Work/Speech] 待验证台词合成失败；不冒充已说出，直接进入歌声");
+                TryBeginPendingHumBack();
+                return;
+            }
+            // Something already owns the output. Losing the introduction is better than
+            // cutting into audio the user is currently hearing.
+            if (IsVoiceOutputPlaying)
+            {
+                Destroy(clip);
+                m_WithheldSingingSpeechPending = false;
+                if (m_LogAgentLoop)
+                    Debug.LogWarning("[Work/Speech] 输出已被占用，放弃补说台词；未打断正在播放的音频");
+                return;
+            }
+            m_WithheldSingingSpeechRoutine =
+                StartCoroutine(PlayWithheldSingingSpeech(generation, clip, spokenText));
+        });
+        return true;
+    }
+
+    // Deliberately does not claim IsAISpeaking: the round is already closed here, and a
+    // flag this path cannot reliably clear would leave her deaf. AudioSource playback is
+    // what the output-busy checks and barge-in already read.
+    private System.Collections.IEnumerator PlayWithheldSingingSpeech(
+        int generation, AudioClip clip, string text)
+    {
+        if (m_TextBack != null) m_TextBack.text = text;
+        m_AudioSource.clip = clip;
+        m_AudioSource.loop = false;
+        m_AudioSource.Play();
+        yield return null;
+        while (generation == m_WithheldSingingSpeechGeneration && m_AudioSource != null &&
+               m_AudioSource.isPlaying && m_AudioSource.clip == clip)
+            yield return null;
+        bool current = generation == m_WithheldSingingSpeechGeneration;
+        if (m_AudioSource != null && m_AudioSource.clip == clip) m_AudioSource.clip = null;
+        Destroy(clip);
+        m_WithheldSingingSpeechRoutine = null;
+        // An interrupted line must not pull the song in behind it; the barge-in path
+        // bumped the generation and already owns cancelling the queued action.
+        if (!current) yield break;
+        m_WithheldSingingSpeechPending = false;
+        TryBeginPendingHumBack();
+    }
+
+    private void ClearWithheldSingingSpeech(string reason)
+    {
+        if (string.IsNullOrEmpty(m_WithheldSingingSpeech) && !m_WithheldSingingSpeechPending &&
+            m_WithheldSingingSpeechRoutine == null) return;
+        m_WithheldSingingSpeechGeneration++;
+        m_WithheldSingingSpeech = "";
+        m_WithheldSingingSpeechLanguage = null;
+        m_WithheldSingingSpeechPending = false;
+        if (m_WithheldSingingSpeechRoutine != null)
+        { StopCoroutine(m_WithheldSingingSpeechRoutine); m_WithheldSingingSpeechRoutine = null; }
+        if (!string.IsNullOrEmpty(reason) && m_LogAgentLoop)
+            Debug.Log("[Work/Speech] 待验证台词未外放并已丢弃：" + reason);
+    }
+
+    // One notice per no-progress episode: repeating it every rejected round would be the
+    // same noise the retry stop exists to remove.
+    private bool m_WorkNoProgressNoticeSent;
+
     private void ResetWorkProgress()
     {
         m_RejectedWorkAttempts.Clear(); m_WorkNoProgress = false; m_WorkProgressFact = "";
+        m_WorkNoProgressNoticeSent = false;
+        ClearWithheldSingingSpeech("");
         m_SingingSpeechWithheld = false;
         m_SingingRejectedSpeechRound = m_SingingResolvedSpeechRound = -1;
         m_SingingSpeechPhaseRound = m_SingingDeclaredActionRound = -1;
@@ -128,6 +228,16 @@ public partial class ChatSample
         if (!held || (!missingAction && !waitingGoal && !waitingPolicy && !deferredPolicy && m_SingingRejectedSpeechRound != m_CurrentSpeechRoundId))
         { m_SingingSpeechWithheld = false; return; }
         // Nothing has been synthesized yet. Do not count discarded promises as heard speech.
+        // Only a pending goal review is a "not yet" rather than a "no": park that line so an
+        // approved review can still deliver it as written. A missing action, a rejected
+        // action or a policy proposal all stay discarded.
+        if (waitingGoal && !missingAction && !waitingPolicy && !deferredPolicy &&
+            m_SingingRejectedSpeechRound != m_CurrentSpeechRoundId)
+        {
+            m_WithheldSingingSpeech = (spoken ?? "").Trim();
+            m_WithheldSingingSpeechLanguage = m_SentenceBuffer.LanguageCode;
+        }
+        else ClearWithheldSingingSpeech("");
         m_SentenceBuffer.Length = 0;
         spoken = "";
         m_SingingSpeechWithheld = true;

@@ -20,12 +20,15 @@ public sealed class RoleOutputChannels
     private bool probingInternalEnvelope, atSpeechBlockStart = true;
     public bool HasInvalidPublicBoundary { get; private set; }
     public string PublicBoundaryError { get; private set; }
+    // Prose written before any declaration was absorbed as an implicit thought. This
+    // is an observation about output shape, not a delivery or execution failure.
+    public bool HasAbsorbedBarePreamble { get; private set; }
     public bool HasAnyActionTag { get; private set; }
     private bool droppingMalformedTool;
     private char malformedQuote;
     private char malformedEnd;
     public bool HasMalformedTool { get; private set; }
-    private static readonly string[] ToolNames = { "sing", "clip_confirm", "clip_revise", "clip_drop",
+    private static readonly string[] ToolNames = { "sing", "clip_confirm", "clip_adopt", "clip_revise", "clip_drop",
         "hum_back", "song_sing", "song_remember", "song_catalog", "song_search", "song_rename", "song_forget",
         "memory_add", "memory_update", "memory_link", "skill_request", "look", "unlook", "next", "continue", "motion", "body_inspect", "sing_goal", "speech" };
     private bool silent, inSay, inCode;
@@ -45,7 +48,15 @@ public sealed class RoleOutputChannels
     public string SpeechPhaseExecutionFact => !HasInvalidSpeechPhase ? "" :
         "本条回复的发声阶段校验失败：" + SpeechPhaseError +
         " 依赖校验的台词仍受发声门控；歌唱、素材变更与歌唱权限提案未受理。" +
+        (WithheldMislabeledIndependentSpeech
+            ? "本轮台词声明为 independent，但同一条回复里提交了被拒的素材/演唱动作，完成投递时已不再交付该台词。" +
+              "下一句是它究竟有没有播出的程序事实。重说时先声明 after_action 再提交动作。"
+            : "") +
         "房间及上身 motion 不因该格式错误撤回，是否受理或完成以各自程序事实为准。";
+    /// independent 台词本不受发声门控，但和被拒的素材/演唱动作同处一条回复时例外：
+    /// 那句话的内容通常就是在宣称该动作已经成功。
+    public bool WithheldMislabeledIndependentSpeech => HasInvalidSpeechPhase &&
+        SpeechDependency == SpeechActionDependency.Independent && HasSingingValidationActions;
     public string SpeechPhaseCorrection => !HasInvalidSpeechPhase ? "" :
         (SpeechDependency == SpeechActionDependency.AfterAction && !HasSingingValidationActions
             ? "本轮没有提交演唱、素材变更或歌唱权限提案，不能使用 after_action。"
@@ -56,7 +67,7 @@ public sealed class RoleOutputChannels
     private bool phaseDeclared, phaseSpeechSuppressed;
     private int independentWrapperDepth;
     private static readonly string[] SingingValidationActions = { "sing_goal", "sing", "hum_back", "song_sing",
-        "clip_confirm", "clip_revise", "clip_drop", "practice_confirm", "practice_revise", "practice_drop",
+        "clip_confirm", "clip_adopt", "clip_revise", "clip_drop", "practice_confirm", "practice_revise", "practice_drop",
         "song_remember", "song_rename", "song_forget", "singing_policy" };
 
     public RoleOutputChannels(Action<SpeechText> onSpeech = null,
@@ -166,8 +177,21 @@ public sealed class RoleOutputChannels
         if (RequiresExplicitPublicSay &&
             !inSay && !silent && thoughtDepth == 0 && !inCode)
         {
-            if (!char.IsWhiteSpace(c))
-                RejectPublicBoundary("公开台词缺少 say 边界；无标记正文和其中动作未受理。内部判断用闭合的 thought，[内心] 只是历史显示；公开台词须先声明 lang、speech 并放在 say 中。");
+            if (char.IsWhiteSpace(c)) return;
+            // Prose before any declaration is the model reasoning out loud, and it is
+            // never read aloud either way. Absorbing it as an implicit thought keeps
+            // the well-formed remainder of the reply usable instead of discarding a
+            // whole turn over a preamble. Only a leading preamble qualifies: once a
+            // language/phase declaration or public speech exists, unframed prose is
+            // still a boundary error, and Finish still rejects a reply that never
+            // framed a public line at all.
+            if (!phaseDeclared && languageCode == null && !HasSpeech)
+            {
+                HasAbsorbedBarePreamble = true;
+                PrivateCharacters++;
+                return;
+            }
+            RejectPublicBoundary("公开台词缺少 say 边界；无标记正文和其中动作未受理。内部判断用闭合的 thought，[内心] 只是历史显示；公开台词须先声明 lang、speech 并放在 say 中。");
             return;
         }
         if (!silent && thoughtDepth == 0 && !inCode && !phaseSpeechSuppressed)
@@ -194,8 +218,24 @@ public sealed class RoleOutputChannels
         var emitted = new StringBuilder();
         if (RequiresExplicitPublicSay && inSay)
             RejectPublicBoundary("公开 say 块未闭合；未执行其中或后续动作。");
+        // The counterpart the unclosed-say guard above never had. An open thoughtDepth
+        // makes Emit route every remaining character to private and makes ConsumeTag
+        // return before say/lang/speech and every tool — so the reply produces nothing
+        // at all, and until now it did so with no diagnosis whatsoever: measured as six
+        // consecutive replies closing as silent-only while she re-sent the same shape,
+        // three of them carrying a correctly written clip_adopt that was eaten in silence.
+        if (RequiresExplicitPublicSay && thoughtDepth > 0)
+            RejectPublicBoundary("<thought> 未闭合：它之后的 lang、speech、say 和全部工具都被当作内部思考丢弃，" +
+                "本条回复既没有发声也没有执行任何动作。先用 </thought> 闭合，再输出 lang、speech、say 与工具。");
         foreach (char c in suspicious.ToString()) Emit(c, emitted);
         suspicious.Length = 0;
+        // Absorbing a preamble rescues the framed remainder; it does not invent one.
+        // A reply whose only prose was that preamble never framed a public line, so it
+        // stays a boundary failure and is retried rather than silently running tools
+        // with nothing said. An explicit silent tail is a real choice and is kept.
+        if (RequiresExplicitPublicSay && HasAbsorbedBarePreamble && !HasSpeech && !silent)
+            RejectPublicBoundary("整条回复都是无标记正文，没有任何 say 边界；已按内部思考处理，未发声，本条动作未执行。" +
+                "要说的话放进 <say>，内部判断放进闭合的 <thought>；确实只想在心里想时用 <silent/>。");
         // An unfinished metadata tag is discarded, never read aloud.
         if (Regex.IsMatch(tag.ToString(), @"^<\s*lang\b", RegexOptions.IgnoreCase))
             HasInvalidLanguage = true;
@@ -400,7 +440,10 @@ public sealed class RoleOutputChannels
             }
             executableActions = safe.ToString();
         }
-        bool discardedDependentSpeech = HasInvalidSpeechPhase && SpeechDependency != SpeechActionDependency.Independent;
+        // independent 台词照常播出，唯独不能在同一条回复里刚被拒掉素材/演唱动作时播：
+        // 实测那句台词（"录音我已经存下来啦"）宣布的正是被丢弃的那个动作。
+        bool discardedDependentSpeech = HasInvalidSpeechPhase &&
+            (SpeechDependency != SpeechActionDependency.Independent || HasSingingValidationActions);
         string prefix = "";
         if (includeSpeechPhase && (phaseDeclared || HasInvalidSpeechPhase) && HasSpeech)
             prefix = "<speech mode=\"" + (SpeechDependency == SpeechActionDependency.Independent ? "independent" : "after_action") +

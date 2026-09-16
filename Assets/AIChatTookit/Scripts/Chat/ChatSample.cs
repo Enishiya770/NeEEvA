@@ -5141,6 +5141,11 @@ public partial class ChatSample : MonoBehaviour
         // response remains available in a separate diagnostic log, but quoted protocol tags
         // must never be dispatched as tools or memory writes.
         full = RemoveQuotedAgentActionTags(full ?? "");
+        // Must be read before anything extracts from `full`: the extractors below strip
+        // their own tags out of it, so measuring later reported "sing" for a reply that
+        // also carried sing_goal — exactly the pair the correction needs to distinguish.
+        // Quoted protocol examples are already gone, so this counts dispatchable tags only.
+        m_RoundEmittedTagNames = DescribeEmittedToolTagNames(full);
         RecordWorkResponse(full);
         ExtractSelfInspection(ref full, !m_UserSpeechActiveForAutonomy && !m_RoundSilencedForRepeat);
         ExtractSingingGoalTags(ref full, !m_UserSpeechActiveForAutonomy && !m_RoundSilencedForRepeat);
@@ -5159,12 +5164,21 @@ public partial class ChatSample : MonoBehaviour
         //记忆写入标签的提取与应用不看 agent 开关——直接对话模式她也在记忆。
         //只在全文完成时做一次(chunk 级会重复计),剥净后再做后续解析。
         string unknownTag = DetectUnknownAgentTag(full ?? "");
+        m_UnknownTagCorrectionNote = "";
         if (!string.IsNullOrEmpty(unknownTag))
         {
             m_LastUnknownTagNote = unknownTag;
             //未知标签和同回复里的有效动作属于不同失败域。只剥掉未知标签并把事实
             //留到下一次自然感知帧，不启动工具纠错 chain；否则一个写错的调度标签
             //会让已经排队的 hum_back 被模型重复调用，形成 busy→二次纠错。
+            //但那条感知帧只在自主 tick 到达。同一条回复里的工具若也失败了，她看到的
+            //是下游症状（"先登记目标"），而真正的原因是标签名不存在——实测她因此连着
+            //三轮用同一个错名字"补登记"。把原因挂到那次已经在发生的纠错上：不新开
+            //chain、不多消耗一次机会，上面这条顾虑仍然成立。
+            m_UnknownTagCorrectionNote =
+                "\n另外，上一条回复里的 " + unknownTag + " 不是有效标签名，已被整条丢掉，" +
+                "所以那一步没有发生；标签名拼错不会单独报错。规范标签名只有：" +
+                DescribeKnownAgentTagNames() + "。";
             full = RemoveUnknownAgentTags(full ?? "");
             Debug.LogWarning($"[Agent/Tag] 输出里有不存在的标签 {unknownTag}；" +
                              "仅忽略未知标签，其它正文和有效动作继续处理");
@@ -8557,6 +8571,9 @@ public partial class ChatSample : MonoBehaviour
     {
         CancelClosedRoomPreparation("new-user-recording");
         CancelDialogueMotion("user-started-speaking");
+        // The user opening their mouth ends this delivery. Bumping the generation here is
+        // also what stops an interrupted introduction from pulling its song in behind it.
+        ClearWithheldSingingSpeech("user-started-speaking");
         PreservePendingReplyForInputCandidate();
         m_InputAudioRevision++;
         m_SingingRequestSubmittedSinceUserTurn = false;
@@ -9044,6 +9061,13 @@ public partial class ChatSample : MonoBehaviour
             {
                 NormalizeSingingGoalReview(decision);
                 ApplySingingGoalReview(decision.singing_goal_status, decision.singing_goal_evidence);
+                // Approval is the "after action" the phase declared, whether or not this
+                // same reply also carried the sing. Registering the goal and singing on a
+                // later round is an allowed shape, and its line is just as true once the
+                // objective is approved, so approval alone releases it. A review that did
+                // not approve has already dropped the line inside ApplySingingGoalReview.
+                // Releasing before queueing is also what orders a same-reply song after it.
+                ReleaseWithheldSingingSpeech();
                 if (TryTakeReviewedSingingRequest(out AgentHumBackRequest reviewedRequest))
                 {
                     // This consumes only the explicit request saved with this proposal.
@@ -10321,6 +10345,9 @@ public partial class ChatSample : MonoBehaviour
         public string ClipRefs = "";
         public bool ConfirmUser;
         public string Range = "current";
+        //区分"她写了 range=current"和"她没写 range"。没写时 current 只是程序默认值，
+        //不是她选的范围，因此可以跟随已审目标；写错了仍然是真实的不一致。
+        public bool RangeExplicit;
         public float StartSeconds = float.NaN;
         public float EndSeconds = float.NaN;
         public string Mode = "echo";
@@ -10329,6 +10356,15 @@ public partial class ChatSample : MonoBehaviour
         public string Source = "";
         public string Lyrics = "";
         public string Reason = "";
+        //目标语义并进 sing：以前必须另写一个 sing_goal 标签把同一件事说第二遍，实测
+        //s11–s18 的 49 次纠错里有 11 次只是两份参数没对齐。这些字段留空时按默认值，
+        //写了就等价于手写目标里的同名属性，程序据此补出内部审核记录。
+        public string GoalOrigin = "";       //user_request / autonomous
+        public string GoalIntent = "";       //perform / repair / repeat / observe
+        public string GoalFeedback = "";     //none / unsatisfied / satisfied
+        public string GoalCompletion = "";   //playback / user_confirmation
+        public string GoalEvidence = "";     //用户原话引文：反馈或重复演唱时必填
+        public string GoalChangeQuote = "";  //改变既有任务时的用户原话引文
         //演唱参数：她可以自己决定这一遍怎么唱。NaN/未指定时沿用按 seed 生成的默认档，
         //所以不写这些属性时行为和以前完全一样。
         public float Key = float.NaN;         //移调，半音
@@ -10373,6 +10409,13 @@ public partial class ChatSample : MonoBehaviour
 
     //上一轮出现过的不存在标签，点破一次就清掉。
     private string m_LastUnknownTagNote = "";
+    // Same fact as m_LastUnknownTagNote, but scoped to the reply that produced it: it is
+    // rebuilt on every response and consumed by that reply's own tool correction, so a
+    // stale name can never reach a later round's frame.
+    private string m_UnknownTagCorrectionNote = "";
+    // Rebuilt on every response for the same reason: a correction must describe the reply
+    // it is correcting, never an earlier one.
+    private string m_RoundEmittedTagNames = "none";
 
     /// <summary>
     /// 把角色表达的乐理目标换算成转换器实际需要的逐段半音值。
@@ -11267,7 +11310,7 @@ public partial class ChatSample : MonoBehaviour
         "note", "memory_add", "memory_update", "memory_link", "speaker_name", "speaker_manage",
         "song_search", "song_catalog", "song_remember", "song_rename", "song_forget", "song_sing",
         "practice_confirm", "practice_revise", "practice_drop",
-        "hum_back", "sing", "clip_confirm", "clip_revise", "clip_drop",
+        "hum_back", "sing", "clip_confirm", "clip_adopt", "clip_revise", "clip_drop",
     };
 
     private static readonly System.Text.RegularExpressions.Regex s_GluedTagRegex =
@@ -11363,6 +11406,8 @@ public partial class ChatSample : MonoBehaviour
 
     private void ExtractAndApplyPracticeConfirmTag(ref string text, bool apply = true)
     {
+        // Adopt first: the same reply may pull a capture in and then confirm its source.
+        ExtractAndApplyClipAdoptTags(ref text, apply);
         ExtractAndApplyClipConfirmTags(ref text, apply);
         if (string.IsNullOrEmpty(text)) return;
         var matches = s_PracticeConfirmTagRegex.Matches(text);
@@ -12311,6 +12356,32 @@ public partial class ChatSample : MonoBehaviour
             if (string.Equals(name, candidate, StringComparison.OrdinalIgnoreCase))
                 return true;
         return false;
+    }
+
+    // The tool tags this response actually carried, read from the raw text before any of
+    // them is consumed or stripped. Names only — parameters stay out of the frame.
+    private static string DescribeEmittedToolTagNames(string raw)
+    {
+        if (string.IsNullOrEmpty(raw) || raw.IndexOf('<') < 0) return "none";
+        var seen = new List<string>();
+        foreach (System.Text.RegularExpressions.Match match in
+                 System.Text.RegularExpressions.Regex.Matches(raw, @"<\s*(?<name>[a-zA-Z_][\w-]*)"))
+        {
+            string name = match.Groups["name"].Value.ToLowerInvariant();
+            // say/lang/speech/thought are absent from the tool table, so they drop out here.
+            if (!IsKnownAgentTagName(name) || seen.Contains(name)) continue;
+            seen.Add(name);
+        }
+        return seen.Count == 0 ? "none" : string.Join("、", seen);
+    }
+
+    // Built from the table the validator itself reads, so the names she is offered can
+    // never drift from the names that are actually accepted.
+    private static string DescribeKnownAgentTagNames()
+    {
+        var names = new List<string>(s_GluableTagNames) { "sing_goal", "body_inspect" };
+        names.Sort(StringComparer.Ordinal);
+        return string.Join("、", names);
     }
 
     private static string RemoveUnknownAgentTags(string raw)
@@ -13722,6 +13793,10 @@ public partial class ChatSample : MonoBehaviour
         sense.RetainCurrentSingingEvidenceClip(
             m_StreamingSemanticSingingObservedThisTurn || m_FinalModeVerdict == "singing" ||
             m_PendingSingingConfirmation);
+        // Unconditional, and deliberately last: this turn is authoritative and already past
+        // the non-speech filter, so the ring needs no judgement of its own. It exists because
+        // a reference like "刚才那一段" arrives one user turn after the audio it names.
+        sense.PushRecentCapture(m_SingingGoalTurn);
     }
 
     private bool TryHandleDirectSingAlongTurn()
@@ -14828,6 +14903,16 @@ public partial class ChatSample : MonoBehaviour
         if (request == null) return;
         if (request.UnifiedSing && m_WorkNoProgress)
         { m_SingingRejectedSpeechRound = m_CurrentSpeechRoundId; return; }
+        // 没有当轮目标就补一份（由这次 sing 的参数导出），而不是回 goal_required。
+        // 补出来的目标仍是 review=pending，授权照旧由独立审核把守。
+        if (!TryAutoRegisterSingingGoalFromSing(request, out string autoGoalFailure) &&
+            !string.IsNullOrEmpty(autoGoalFailure))
+        {
+            RecordSingingRejection(SingingRequestKey(request), autoGoalFailure);
+            ReportToolFailureForLlm("sing", "invalid_sing_goal_fields", autoGoalFailure,
+                "修正 sing 上的 origin/intent/feedback/completion/evidence 后重新决定；不要改写理由绕过。");
+            return;
+        }
         if (request.UnifiedSing && HasPendingSingingGoalReview())
         {
             bool retained = TryDeferSingingUntilGoalReview(request, out SingingResolutionFailure pendingFailure);
@@ -15403,14 +15488,26 @@ public partial class ChatSample : MonoBehaviour
                       $"variation=\"{m_PendingHumVariationDiagnostic}\" " +
                       $"reason=\"{m_PendingHumReason}\"");
         }
+        // A withheld line being synthesized is output that has not reached the AudioSource
+        // yet; without it the song would start into the middle of its own introduction.
         bool textOutputBusy = IsVoiceOutputPlaying || !m_TTSSenderDone ||
-            m_PendingChunks.Count > 0 || m_PendingClips.Count > 0;
+            m_PendingChunks.Count > 0 || m_PendingClips.Count > 0 || m_WithheldSingingSpeechPending;
         bool canPrepareStream = m_EnableNeuralHumSVC &&
             m_PendingHumSegmentWavs != null && m_PendingHumSegmentShifts != null &&
             CanPreparePlannedSingingChunks(m_PendingHumSegmentWavs.Count, m_PendingHumSegmentShifts.Length,
                 m_PendingHumIsPracticeComposition && m_PendingPracticePitchPlan != null, m_EnableStreamedFullSongSVC);
-        if (textOutputBusy && canPrepareStream && TryBeginPendingHumBack(true) && m_LogHumBack)
-            Debug.Log("[HumBack/Stream] 正文仍在播放；已并行准备歌声，实际播放等待正文结束");
+        if (textOutputBusy)
+        {
+            if (canPrepareStream && TryBeginPendingHumBack(true) && m_LogHumBack)
+                Debug.Log("[HumBack/Stream] 正文仍在播放；已并行准备歌声，实际播放等待正文结束");
+        }
+        // A reviewed sing is replayed only after its round has already closed, so the
+        // "text finished playing" handover that normally starts a queued action has
+        // already happened and nothing is left to drive it. Start here when the output
+        // pipeline is idle, the same way the song_sing resolution path does. Playback
+        // ownership is still claimed inside TryBeginPendingHumBack.
+        else if (TryBeginPendingHumBack() && m_LogHumBack)
+            Debug.Log("[HumBack] 输出空闲，已直接开始歌声（正文未外放或本轮已收尾）");
     }
 
     /// <summary>
@@ -15509,7 +15606,7 @@ public partial class ChatSample : MonoBehaviour
         }
 
         bool textOutputBusy = IsVoiceOutputPlaying || !m_TTSSenderDone ||
-            m_PendingChunks.Count > 0 || m_PendingClips.Count > 0;
+            m_PendingChunks.Count > 0 || m_PendingClips.Count > 0 || m_WithheldSingingSpeechPending;
         bool isStreamedMultiSegment = m_EnableNeuralHumSVC && m_PendingHumSegmentWavs != null &&
             m_PendingHumSegmentShifts != null &&
             CanPreparePlannedSingingChunks(m_PendingHumSegmentWavs.Count, m_PendingHumSegmentShifts.Length,
@@ -16670,7 +16767,12 @@ public partial class ChatSample : MonoBehaviour
                 m_TextOutputDrainedGeneration == m_FormalResponseGeneration,
                 m_PendingChunks.Count > 0,
                 m_PendingClips.Count > 0,
-                m_AudioSource != null && m_AudioSource.isPlaying);
+                // A withheld line already committed to synthesis owns the output next; it
+                // simply has not reached the AudioSource yet. Leaving it out lets that
+                // silent gap read as "text finished", and the song starts into its own
+                // introduction and gets cut when the line finally arrives.
+                m_WithheldSingingSpeechPending ||
+                    (m_AudioSource != null && m_AudioSource.isPlaying));
             if (m_HumStreamWaitForTextOutputDrain && textOutputDrained)
             {
                 m_HumStreamWaitForTextOutputDrain = false;
@@ -18190,7 +18292,9 @@ public partial class ChatSample : MonoBehaviour
         string code,
         string reason,
         string activeSkills,
-        string correction)
+        string correction,
+        string emittedTags,
+        string latestUserText)
     {
         bool speechPhase = code == "speech_phase_conflict";
         return "\n[工具纠错事实；来自本地程序，优先于聊天记忆和你的猜测]\n" +
@@ -18199,6 +18303,13 @@ public partial class ChatSample : MonoBehaviour
             (speechPhase ? "scope=speech_phase_only; independent_motion_status=read_runtime_facts\n" : "") +
             "code=" + SanitizeToolFeedbackValue(code, 80) + "\n" +
             "reason=" + SanitizeToolFeedbackValue(reason) + "\n" +
+            // Naming the requirement without naming the gap leaves her to re-derive what
+            // she actually sent; measured behaviour is that she re-sends the same shape.
+            "emitted_tags=" + SanitizeToolFeedbackValue(emittedTags, 200) + "\n" +
+            // Quote requirements are checked verbatim against this exact text, so give it
+            // to her rather than letting her recall it (added quote marks already failed).
+            (string.IsNullOrEmpty(latestUserText)
+                ? "" : "latest_user_text=" + SanitizeToolFeedbackValue(latestUserText, 300) + "\n") +
             "round=real_user\n" +
             "loaded_skill_rules=" + SanitizeToolFeedbackValue(activeSkills, 160) + "\n" +
             "correction=" + SanitizeToolFeedbackValue(correction, 420) + "\n" +
@@ -18249,13 +18360,50 @@ public partial class ChatSample : MonoBehaviour
             m_LastSingingRepairAt = Time.realtimeSinceStartup;
         string safeReason = SanitizeToolFeedbackValue(reason);
         NoteToolFailure(code == "speech_phase_conflict" ? "回复发声阶段校验失败：" + safeReason : $"{tool} 未执行：{safeReason}");
-        if (m_WorkNoProgress) return;
+        if (m_WorkNoProgress)
+        {
+            // Stopping the retry chain must not also stop saying why. Silencing both left
+            // four consecutive replies producing nothing while the user asked twice what
+            // was happening, and the sticky fact she did still get named the downstream
+            // symptom rather than this reason. Deliver it once as a plain fact: no extra
+            // round is started, so the concern that made this path return early holds.
+            if (!m_WorkNoProgressNoticeSent)
+            {
+                m_WorkNoProgressNoticeSent = true;
+                m_WorkProgressFact += "\n[工具事实/已停止自动重试] tool=" + tool + " code=" + code +
+                    " emitted_tags=" + m_RoundEmittedTagNames + " reason=" + safeReason +
+                    " 相同参数不会改变结果，程序已停止为它重排纠错。要推进就按 reason 改实际参数；" +
+                    "改不动就如实说明卡在哪或向用户提问，不要重复同一份草案。\n";
+                if (m_LogAgentLoop)
+                    Debug.LogWarning($"[ToolCorrection] 已停止自动重试，但失败事实仍交回 LLM tool={tool} code={code}");
+            }
+            return;
+        }
         bool realUserWaiting = m_AgentRunning && !m_AgentCurrentRoundIsTick &&
             m_AgentRoundInFlight && m_UserTurnAwaitingReplySince > 0f;
         if (!realUserWaiting) return;
 
+        // Only sing_goal carries quote requirements (evidence / change_quote), and they
+        // are matched against the latest user turn verbatim. Other tools get no benefit
+        // from repeating text that is already in context.
+        string latestUserText = tool == "sing_goal" ? (m_LastUserMsg ?? "") : "";
         string frame = BuildToolCorrectionFrame(
-            tool, code, safeReason, DescribeActiveSkillsForToolFeedback(), correction);
+            tool, code, safeReason, DescribeActiveSkillsForToolFeedback(), correction,
+            m_RoundEmittedTagNames, latestUserText);
+        // A dropped tag name is often the actual cause of the failure being reported here.
+        // It rides along with this correction rather than starting one of its own.
+        if (!string.IsNullOrEmpty(m_UnknownTagCorrectionNote))
+        {
+            frame += m_UnknownTagCorrectionNote;
+            m_UnknownTagCorrectionNote = "";
+            if (m_LogAgentLoop)
+                Debug.Log("[Agent/Tag] 未知标签事实已随本轮纠错帧交回；未另开纠错链");
+        }
+        // The frame only ever goes into the request body, so nothing about it was visible
+        // in the log — its added fields could not be confirmed from a session at all.
+        if (m_LogAgentLoop)
+            Debug.Log("[ToolCorrection/Frame] " +
+                SanitizeToolFeedbackValue(frame.Replace("\n", " | ").Trim(), 700));
         if (m_ToolCorrectionContinuationPending)
         {
             //同一份坏回复可能同时带错两个标签；它们属于同一次纠错，不消耗第二次机会。

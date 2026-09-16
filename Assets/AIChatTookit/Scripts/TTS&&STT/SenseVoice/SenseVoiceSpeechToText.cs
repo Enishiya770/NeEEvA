@@ -613,6 +613,41 @@ public partial class SenseVoiceSpeechToText : STT
         public float MelodicIslandSeconds;
         public float ContentSeconds;
     }
+
+    /// <summary>
+    /// 最近几个用户轮的完整录音。这一层**不做任何模态判断**：实测声学歌唱概率在这里是
+    /// 反指标——2.5 秒的咳嗽拿到 0.82~0.86，真正的演唱只有 0.41~0.51，按概率留存等于
+    /// 精确地留下噪声、丢掉歌。而「刚才那一段」这类指代只能由语义解析，语义又总比音频
+    /// 晚一个用户轮到达（用户先唱，下一轮才说"把刚才那段唱给我听"）。旧实现在下一次
+    /// 录音开始时就清空了唯一的证据槽，指代到达时音频已经不存在。
+    /// 这个环只负责让字节活过那一轮，谁值得用由角色在读到最新一轮语义后决定。
+    /// </summary>
+    public sealed class RecentCaptureInfo
+    {
+        public string CaptureRef;
+        public int UserTurn;
+        public float Seconds;
+        public string Text;
+        public float SingingProbability;
+        public float PitchStability;
+        public float MelodicIslandSeconds;
+        public bool Adopted;
+        public string AdoptedClipRef = "";
+    }
+
+    private sealed class RecentCapture
+    {
+        public int UserTurn;
+        // 引用而不是拷贝：环持有快照本身，字节与最新捕获、快路径共享同一份。
+        public SingingEvidenceSnapshot Evidence;
+        public bool Adopted;
+        public string AdoptedClipRef = "";
+    }
+
+    private readonly List<RecentCapture> m_RecentCaptures = new List<RecentCapture>();
+    // 3 而不是 2：常见指代只需要上一轮，但失败轮、纠错轮容易在中间插一轮。
+    private const int k_RecentCaptureRingSize = 3;
+
     //来源仍不确定的旋律进入会话级隔离集合，不能直接成为可点唱的 practice 段。
     //旧实现只有一个槽，candidate 2 会覆盖 candidate 1，用户之后说“前两段”时音频
     //已经不可恢复。现在所有候选都保留稳定 ID，直到确认/否认、显式开始新会话，或
@@ -4742,6 +4777,108 @@ public partial class SenseVoiceSpeechToText : STT
     /// Playback eligibility and an early speech verdict must not erase its identity.
     /// Never use the recent playable cache here: it may belong to an older recording.
     /// </summary>
+    /// <summary>
+    /// 把本轮已通过非语音过滤的完整录音放进环。调用点在最终用户轮成立之后、感知帧之前，
+    /// 所以被 [ASR/Rejected] 拦下的咳嗽/环境音根本走不到这里——环不需要自己再过滤一次。
+    /// 一个用户轮只留最后一次完整捕获：试探性 EOU 之后用户继续说会产生第二次捕获，
+    /// 那次才是这一轮真正说完的内容。
+    /// </summary>
+    public bool PushRecentCapture(int userTurn)
+    {
+        var evidence = m_LastSingingEvidence;
+        if (evidence == null || !HasUsableWavPayload(evidence.RawWavBytes)) return false;
+        var existing = m_RecentCaptures.Find(c => c.UserTurn == userTurn);
+        if (existing != null)
+        {
+            if (ReferenceEquals(existing.Evidence, evidence)) return false;
+            // 已经被收进清单的那一份不再被同轮后续捕获顶掉：清单里的引用必须一直指向
+            // 角色当初选中的音频。
+            if (existing.Adopted) return false;
+            existing.Evidence = evidence;
+            return true;
+        }
+        m_RecentCaptures.Add(new RecentCapture { UserTurn = userTurn, Evidence = evidence });
+        while (m_RecentCaptures.Count > k_RecentCaptureRingSize) m_RecentCaptures.RemoveAt(0);
+        return true;
+    }
+
+    public List<RecentCaptureInfo> DescribeRecentCaptures()
+    {
+        var list = new List<RecentCaptureInfo>(m_RecentCaptures.Count);
+        for (int i = 0; i < m_RecentCaptures.Count; i++)
+        {
+            RecentCapture item = m_RecentCaptures[i];
+            var evidence = item.Evidence;
+            if (evidence == null) continue;
+            list.Add(new RecentCaptureInfo
+            {
+                CaptureRef = "cap:" + item.UserTurn.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture),
+                UserTurn = item.UserTurn,
+                Seconds = evidence.RawSeconds,
+                Text = evidence.Text ?? "",
+                SingingProbability = evidence.SingingProbability,
+                PitchStability = evidence.PitchStability,
+                MelodicIslandSeconds = evidence.MelodicIslandSeconds,
+                Adopted = item.Adopted,
+                AdoptedClipRef = item.AdoptedClipRef ?? "",
+            });
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// 把环里的一条收进隔离区。这只改变「够不够得着」：来源仍然是 pending（用户 / 外放 /
+    /// 背景是另一条独立的轴），边界、版本、sing_goal 审核与用户请求引文一条不少。
+    /// </summary>
+    public bool TryAdoptRecentCapture(string captureRef, out string clipRef, out string failure)
+        => TryAdoptRecentCapture(captureRef, out clipRef, out failure, out _);
+
+    /// alreadyInList 把"这段已经收过了"和"这段取不到了"分开。两者都返回 false，但前者
+    /// 的素材就在清单里，按"不可用"上报会让她对用户说那段录音已经不在。
+    public bool TryAdoptRecentCapture(string captureRef, out string clipRef, out string failure,
+        out bool alreadyInList)
+    {
+        clipRef = ""; failure = ""; alreadyInList = false;
+        string wanted = (captureRef ?? "").Trim();
+        var item = m_RecentCaptures.Find(c =>
+            string.Equals("cap:" + c.UserTurn.ToString(
+                System.Globalization.CultureInfo.InvariantCulture), wanted,
+                StringComparison.OrdinalIgnoreCase));
+        if (item == null)
+        {
+            var available = DescribeRecentCaptures();
+            failure = wanted.Length == 0
+                ? "clip_adopt 缺少 ref；请从最近录音清单里复制 cap: 引用。"
+                : wanted + " 不在最近录音里；它可能已经被更新的录音挤出。当前可用=" +
+                  (available.Count == 0 ? "none" : string.Join(",", available.Select(a => a.CaptureRef)));
+            return false;
+        }
+        if (item.Adopted)
+        {
+            clipRef = item.AdoptedClipRef;
+            alreadyInList = true;
+            failure = wanted + " 已经收进清单，引用是 " + item.AdoptedClipRef + "；不需要再收一次。";
+            return false;
+        }
+        var evidence = item.Evidence;
+        if (evidence == null || !HasUsableWavPayload(evidence.RawWavBytes))
+        { failure = wanted + " 的音频已不可用；没有收进清单。"; return false; }
+        // 与既有留存路径同一入口：快照本身提供全部音频与音高，范围由之后的显式选择决定。
+        bool retained = QuarantineSingingEvidence(evidence, null,
+            evidence.PitchTimelineMidi, evidence.FrameSeconds, evidence.Language,
+            false, false, null, null, "", out int candidateId, out _);
+        if (!retained)
+        { failure = wanted + " 收进清单失败；素材未改变。"; return false; }
+        var candidate = m_QuarantinedSingingCandidates.Find(c => c.CandidateId == candidateId);
+        clipRef = candidate?.Phrase?.ClipRef ?? "";
+        item.Adopted = true;
+        item.AdoptedClipRef = clipRef;
+        Debug.Log($"[Audio/Adopt] {wanted} → {clipRef} raw={evidence.RawSeconds:F2}s " +
+                  $"p={evidence.SingingProbability:F2}；来源仍为 pending，播放仍需目标与审核");
+        return true;
+    }
+
     public bool RetainCurrentSingingEvidenceClip(bool semanticSingingEvidence)
     {
         var evidence = m_LastSingingEvidence;
@@ -4751,7 +4888,12 @@ public partial class SenseVoiceSpeechToText : STT
             return false;
         // This is evidence retention, not a singing/source verdict. Keep existing
         // uncertain-band policy; semantic evidence can retain lower acoustic scores.
-        if (!semanticSingingEvidence && evidence.SingingProbability < 0.52f)
+        // Acoustic score alone no longer admits anything here. Measured: 2.5s coughs score
+        // 0.82–0.86 while real singing scores 0.41–0.51, so this threshold was letting the
+        // noise in and keeping the song out. Everything it used to catch on acoustics alone
+        // now lives in the recent-capture ring, where the character claims it by reference
+        // after reading the turn that refers to it.
+        if (!semanticSingingEvidence)
             return false;
         // Follow-up text/ticks cannot resurrect an explicitly dropped clip from
         // the still-current raw snapshot. Only a new recording resets publication.

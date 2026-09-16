@@ -158,7 +158,13 @@ public partial class ChatQW : LLM
         var facts = new StringBuilder();
         foreach (string line in text.ToString().Split('\n'))
             if (line.StartsWith("[Sing/Inventory]", StringComparison.Ordinal) ||
+                // The ring is only addressable while these lines survive into later rounds.
+                line.StartsWith("[Audio/Recent]", StringComparison.Ordinal) ||
+                line.StartsWith("[Audio/Capture]", StringComparison.Ordinal) ||
                 line.StartsWith("[Sing/Clip]", StringComparison.Ordinal) ||
+                // The collapsed low-signal candidates are only addressable while this one
+                // line survives; it is the whole reason they were folded rather than cut.
+                line.StartsWith("[Sing/ClipLowSignal]", StringComparison.Ordinal) ||
                 line.StartsWith("[Sing/LatestRecording]", StringComparison.Ordinal) ||
                 line.StartsWith("[Sing/PlaybackFact]", StringComparison.Ordinal) ||
                 line.StartsWith("[Sing/Execution]", StringComparison.Ordinal))
@@ -180,6 +186,27 @@ public partial class ChatQW : LLM
     {
         string skillContext = FormalResponseContextPolicy.SkillContext(stage, ActiveSkillContext, SkillCatalogContext);
         transientSystemContext = CompactScenePromptContext(transientSystemContext);
+        // 定位每轮重算的起点。实测 s16：prompt 38–43k，服务端每次仍要评估 26–31k
+        // (timings.prompt_n)，prefill 占 LLM 时间 65%，而 prefill 与重算量严格线性
+        // (约 6.3 token/ms)。哪一块最先变化决定了后面全部要重算——逐块记下顺序、
+        // token 估算与稳定哈希，跨请求比对第一个变化的块即可。只读，不改任何顺序。
+        List<string> promptTrace = m_LogRequestStats ? new List<string>() : null;
+        int promptTraceTokens = 0;
+        void TraceBlock(string label, SendData data)
+        {
+            if (promptTrace == null) return;
+            string body = data?.content ?? "";
+            uint hash = StableBlockHash(body);
+            string image = "";
+            if (data != null && !data.imageArchived && !string.IsNullOrEmpty(data.imageDataUrl))
+            {
+                image = "+img" + data.imageDataUrl.Length;
+                hash ^= StableBlockHash(data.imageDataUrl);
+            }
+            promptTraceTokens += EstimateTokens(body);
+            promptTrace.Add(label + "/" + (data?.role ?? "?") + " tok=" + EstimateTokens(body) +
+                " cum=" + promptTraceTokens + " h=" + hash.ToString("x8") + image);
+        }
         var sb = new StringBuilder(2048);
         sb.Append('{');
         sb.Append("\"model\":");
@@ -217,18 +244,23 @@ public partial class ChatQW : LLM
         // This compact stage/capability guide does not change with each observation.
         // Keep it directly after the existing leading persona/system prefix; dynamic
         // memories and exact current results still follow history before the last user.
-        int skillsAt = trailingAt;
-        if (stage == FormalResponseStage.CommittedSpatialReply || stage == FormalResponseStage.FirstReplyRouting)
-        {
-            skillsAt = 0;
-            while (skillsAt < messages.Count && (messages[skillsAt] == null || messages[skillsAt].role == "system")) skillsAt++;
-        }
+        // 技能规则是静态文本，原先排在最后一条 user 之前（trailingAt），于是 history 里
+        // 任何一处抖动都会把它和它后面的一切一起作废。实测 s17：General 请求可复用前缀
+        // 中位只有 14905（仅人格一块），每轮重算中位 28919 token，而 prefill 与重算量线性
+        // （6.13 token/ms）、占 LLM 时间 54%；同一场里已经走这条顺序的 FirstReplyRouting
+        // 可复用 16531、重算仅约 4000。把 skill 提到人格正后方，它就不再被 history 连累，
+        // 可复用下限从 14905 抬到约 21199。
+        // 只动这一处：trailing/transient 仍在最后一条 user 之前，用户的话仍是最后一条，
+        // 上面那条"易变上下文不能拼在整个列表末尾"的结论不受影响。
+        int skillsAt = 0;
+        while (skillsAt < messages.Count && (messages[skillsAt] == null || messages[skillsAt].role == "system")) skillsAt++;
         for (int i = 0; i < messages.Count; i++)
         {
             if (i == skillsAt && !string.IsNullOrEmpty(skillContext))
             {
                 if (sb[sb.Length - 1] != '[') sb.Append(',');
                 AppendMessage(sb, new SendData("system", skillContext));
+                TraceBlock("skill", new SendData("system", skillContext));
             }
             if (i == trailingAt)
             {
@@ -236,22 +268,26 @@ public partial class ChatQW : LLM
                 {
                     if (sb[sb.Length - 1] != '[') sb.Append(',');
                     AppendMessage(sb, new SendData("system", TrailingContext));
+                    TraceBlock("trailing", new SendData("system", TrailingContext));
                 }
                 if (!string.IsNullOrEmpty(transientSystemContext))
                 {
                     if (sb[sb.Length - 1] != '[') sb.Append(',');
                     AppendMessage(sb, new SendData("system", transientSystemContext));
+                    TraceBlock("transient", new SendData("system", transientSystemContext));
                 }
             }
             var msg = MessageForRequest(messages, i);
             if (msg == null) continue;
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, msg);
+            TraceBlock("history[" + i + "]", msg);
         }
         if (skillsAt >= messages.Count && !string.IsNullOrEmpty(skillContext))
         {
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, new SendData("system", skillContext));
+            TraceBlock("skill", new SendData("system", skillContext));
         }
         if (trailingAt >= messages.Count)
         {
@@ -259,11 +295,13 @@ public partial class ChatQW : LLM
             {
                 if (sb[sb.Length - 1] != '[') sb.Append(',');
                 AppendMessage(sb, new SendData("system", TrailingContext));
+                TraceBlock("trailing", new SendData("system", TrailingContext));
             }
             if (!string.IsNullOrEmpty(transientSystemContext))
             {
                 if (sb[sb.Length - 1] != '[') sb.Append(',');
                 AppendMessage(sb, new SendData("system", transientSystemContext));
+                TraceBlock("transient", new SendData("system", transientSystemContext));
             }
         }
         //已经出声的开场排在最后：用户的话仍是最后一条 user，它跟在后面，
@@ -274,6 +312,7 @@ public partial class ChatQW : LLM
         {
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, new SendData("assistant", SpokenPrefix));
+            TraceBlock("spokenPrefix", new SendData("assistant", SpokenPrefix));
         }
         // A tool result happened AFTER the recorded assistant action. Only this short
         // execution fact goes last; ordinary memory/contracts retain their old position.
@@ -282,6 +321,7 @@ public partial class ChatQW : LLM
         {
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, new SendData("system", executionFeedback));
+            TraceBlock("execFeedback", new SendData("system", executionFeedback));
         }
         sb.Append(']');
         if (m_Backend == BackendType.Local)
@@ -292,7 +332,22 @@ public partial class ChatQW : LLM
         }
         AppendSlot(sb, k_SlotMainConversation);
         sb.Append('}');
+        if (promptTrace != null)
+            Debug.Log("[LLM/PromptBlocks] stage=" + stage + " stream=" + stream +
+                " blocks=" + promptTrace.Count + " estTokens=" + promptTraceTokens +
+                "\n  " + string.Join("\n  ", promptTrace) +
+                "\n按提交顺序排列。跨请求比对：第一个 h= 变化的块就是重算起点，它的 cum= 约等于服务端" +
+                " promptEvaluatedTokens 之前能复用的量。估算值仅用于定位块边界，不是服务端真实分词。");
         return sb.ToString();
+    }
+
+    /// FNV-1a：进程间稳定，可跨会话比对；仅用于定位 prompt 块是否变化。
+    private static uint StableBlockHash(string value)
+    {
+        uint hash = 2166136261u;
+        if (value != null)
+            for (int i = 0; i < value.Length; i++) { hash ^= value[i]; hash *= 16777619u; }
+        return hash;
     }
 
     /// <summary>
@@ -2741,6 +2796,7 @@ public partial class ChatQW : LLM
             int remaining = MaximumPrefixCharacters - prefix.Length;
             if (remaining > 0) prefix.Append(value, 0, Math.Min(value.Length, remaining));
         }
+        internal bool HasDelivery => characterCount > 0;
         internal string Describe()
         {
             if (characterCount == 0) return "";
@@ -2759,6 +2815,22 @@ public partial class ChatQW : LLM
         }
     }
 
+    // 扣住误标 independent 的台词只能作用在完成投递上：independent 台词在流式阶段就逐句
+    // 送出，而契约要求工具写在闭合 say 之后，所以动作被拒时台词通常早已播出（s13 实测：
+    // executable 已是 <silent/>，三句仍然播完）。收据是唯一能分辨这两种情况的证据；断言
+    // "没有播出"会让她为用户其实听到了的话道歉或整段重说。
+    private static string DescribeMislabeledIndependentSpeechDelivery(
+        RoleOutputChannels channels, PublicSpeechStreamReceipt publicReceipt)
+    {
+        if (!channels.WithheldMislabeledIndependentSpeech) return "";
+        if (publicReceipt == null)
+            return "本次无法确认该台词是否已经播出；不要断言用户没听到，按实际播放事实继续。";
+        return publicReceipt.HasDelivery
+            ? "该台词在格式错误被发现之前已经送往公开流，用户可能已经听到，无法撤回；" +
+              "不要整段重说，也不要说自己保持了沉默，只补上被拒的动作。"
+            : "该台词没有送往公开流，用户没有听到；可以重新组织后再说一次。";
+    }
+
     private void ReportRoleOutputFormatFactsWithReceipt(RoleOutputChannels channels, bool complete,
         PublicSpeechStreamReceipt publicReceipt)
     {
@@ -2773,13 +2845,25 @@ public partial class ChatQW : LLM
         if (!complete) currentFormatFacts.AppendLine(RoleOutputFormatFactHistory.TruncationFact);
         if (channels.HasInvalidPublicBoundary) currentFormatFacts.AppendLine(boundaryReason);
         if (channels.HasInvalidSpeechPhase)
-            currentFormatFacts.AppendLine(channels.SpeechPhaseExecutionFact + channels.SpeechPhaseCorrection);
+            currentFormatFacts.AppendLine(channels.SpeechPhaseExecutionFact +
+                DescribeMislabeledIndependentSpeechDelivery(channels, publicReceipt) +
+                channels.SpeechPhaseCorrection);
         if (channels.HasMalformedTool)
             currentFormatFacts.AppendLine(reason + "可使用标准 <工具名 属性=\"值\"/> 重新决定或询问；不能称为已执行。");
+        // A rescued preamble is a shape note, not a failure: the reply was delivered.
+        // Say so plainly so the next turn writes thought explicitly, without spending a
+        // correction round on an output that already worked.
+        if (!channels.HasInvalidPublicBoundary && channels.HasAbsorbedBarePreamble)
+            currentFormatFacts.AppendLine("[public_output_boundary/preamble] 上一条回复在首个标签之前写了无标记正文。" +
+                "它已按内部思考处理：没有朗读，也没有改变本条已交付的台词与已受理的动作。" +
+                "下次把内部判断放进闭合的 <thought>，公开台词仍放在 <say> 内。");
         // Replace before callbacks: immediate correction requests see this output's
         // facts. A valid completion clears obsolete format errors, not body history.
         RoleOutputFormatFactHistory.ReplaceCurrent(m_DataList, message => message.role,
             message => message.content, fact => new SendData("system", fact), currentFormatFacts.ToString().Trim());
+        if (channels.HasAbsorbedBarePreamble)
+            Debug.Log("[LLM/Channels] 首个标签之前的无标记正文已按内部思考吸收 privateCharacters=" +
+                channels.PrivateCharacters + " boundaryRejected=" + channels.HasInvalidPublicBoundary);
         if (channels.HasInvalidSpeechPhase)
         {
             string phaseReason = channels.SpeechPhaseExecutionFact;

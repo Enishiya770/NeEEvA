@@ -7,9 +7,9 @@
 ## 当前事项与独立核对
 
 - 先理解已经发生的完整录音：用户先说话再唱歌时，歌词属于已发生的演唱。区分“用户做了什么”“用户要求你做什么”“你自己想做什么”。用户说自己试唱、分享歌声，不等于要求你回唱；可以自然回应内容，不必创建演唱任务。
-- 确有演唱动作目标才登记：`<sing_goal origin="user_request" refs="clip:真实身份" range="current" intent="perform" completion="playback" expected="只演唱这一段" feedback="none"/>`。你自主想唱时明确用origin="autonomous"，不能说成用户尚未完成的要求。独立审核会另行提取任务来源和用户原话。refs按演唱顺序排列，revisions可省略，由程序绑定这些refs当前的实际版本；若显式填写则须从清单逐项复制，不能使用示例数字或猜为0。待确认候选的版本为pending；来源待确认本身不禁止演唱。更新会保留前一目标供理解追问，但不会让旧目标覆盖新修正。
+- 要唱就直接写 `<sing refs="clip:真实身份" reason="为什么唱这一段"/>`，不必另开 sing_goal 说第二遍；程序会按这次 sing 的 refs 与范围补一份内部目标，交独立审核核对"用户是不是真的要了这几段"。refs按演唱顺序排列。需要表达目标语义时把这些属性直接写在 sing 上：origin="autonomous"（你自主想唱；不写按用户请求处理，审核会核对用户原话）、intent="perform|repair|repeat|observe"、feedback="none|unsatisfied|satisfied"、completion="playback|user_confirmation"、evidence="用户原话逐字引文"（声明 feedback 或 repeat 时必填）、change_quote="用户原话逐字引文"（改变既有任务时）。仍然可以单独写 `<sing_goal .../>`：需要先登记目标、看到审核事实之后再决定唱不唱时用它。
 - 待审核是等待状态；current=unselected时没有已选定版本，不能填current和版本0。根据真实边界选择clean/expanded/window，版本写pending。等待、纠错可以只输出顶层工具或 <silent/>；需要先想后说时用闭合的 thought，不能在 silent 后再接 say；动作未受理时不要反复宣布准备好了或马上唱。同一方案再次失败且事实未变，停止重试并依据真实结果决定说明或询问。
-- 目标先登记，独立进度审查根据原始要求、后续真实用户输入、前一目标和实际播放记录核对后才会给review=approved。已经决定执行时，可在同一条合法after_action回复中先提交sing_goal，再提交refs和范围一致的单个sing；程序保留这个显式请求，审核通过后重新核验素材并提交一次，等待期间不要重复提交。只有目标而没有sing时不会自动演唱。也可先登记，收到审核事实后再决定是否提交sing。新用户输入、目标变化或审核拒绝都会使待审请求失效；不能通过reason、声称检查过或继续闲聊跳过实际参数。
+- 独立审核只核两件事：用户是否真的要求了演唱（来源与原话引文），以及要的是不是这几段（refs 顺序）。range/版本这类选段细节由素材当前状态决定，审核不裁决，你按感知帧里的素材事实自己选。审核通过后程序会重新核验素材并提交一次，等待期间不要重复提交。新用户输入、目标变化或审核拒绝都会使待审请求失效；不能通过reason、声称检查过或继续闲聊跳过实际参数。
 - range可为current/clean/expanded；精确原录音坐标用range="window"及成对start_seconds/end_seconds。sing对应window时只写起止秒数，不传range="window"。多refs范围不同可先修订对应clip，收到新版本事实后再登记current目标。
 - intent=perform/repair/repeat/observe，表示执行、修复、用户要求再唱一遍、只记录反馈。feedback=none/unsatisfied/satisfied；非none反馈和repeat必须用evidence引用最新用户原话，再由独立语义审查验证，角色自己的解释不是用户证据。observe不需要refs。不能只把错误的refs同时填进目标和sing就当作符合用户要求。
 - 用户指出缺失内容时，用completion="user_confirmation"，expected写清待验证内容。Unity播完仅表示记录中的实际refs、revision、raw范围完整播放；还未证明用户听到或补回指定内容。feedback=satisfied只有明确用户认可且存在真实播放时才形成user_confirmed。
@@ -23,6 +23,7 @@
 - `source=pending` 表示来源还不确定，可能是用户、外放或背景声音；`confirmed_user` 表示来源已确认。
 - `playback=ready` 只表示存在可执行音频，不表示内容是歌唱；结合 recording_transcript、acoustic_mode、singing_p 和语境判断或询问。`evidence_only/unavailable` 不表示没录到，也不表示可以直接播放。
 - 短 clean 被自动播放门槛挡住时，原录音仍可作为 evidence_only 的 clip；结合 expanded 边界与转写判断范围，也可询问。没有真实 clip 时，不能把曲库 ID 改加 clip: 前缀；查歌名也不会恢复本次录音。
+- `[Audio/Recent]` 列出最近几个用户轮的完整原始录音（`cap:…`）。它们**不在清单里**，也没有被判定成说话还是演唱——程序只是还留着字节，等你读到指代它们的那一轮。其中的 p 只是声学测量，实测分不开演唱和噪声，不能当模态结论；结合用户这一轮的原话判断。要用某一段先 `<clip_adopt ref="cap:…" reason="…"/>` 收进清单；它是素材变更，所在回复必须在正文前声明 `<speech mode="after_action"/>`，声明成 independent 会连同这一轮的台词一起被拒。收进来仍是 `source=pending`，范围未选定，演唱仍须经独立审核。不收也不会删除，最近几轮之后自然淘汰。
 - 下方旧诊断中的 stable/candidate/清单数字只用于追溯，不是新 sing 的参数。不要再组合 source、mode、order。
 - 曲库 `song:完整12位ID` 是已保存歌曲条目，可能含多段。它不是本轮 clip；旋律相似或歌名相同都不允许把新录音悄悄换成曲库版本。
 
@@ -37,6 +38,7 @@
 - refs 必填；没有“空=全部”或“失败就用上一段”。例子里的甲/乙是占位符，必须替换成真实引用。
 - 概览把每次录音的歌词、来源状态和播放状态并列给你；角色上次完整播放另列实际引用。想补唱漏段时先对照两份事实。来源待确认不等于素材不存在，可结合用户反馈自行确认，也可询问；在 reason 中写“两段连唱”不会让单个 refs 自动变成两段。
 - 默认唱 current 当前修订版本，不会重新退回最初 clean；没有音高参数时沿用该段角色最近音乐目标，首次演唱才做初始音域适配。
+- 已有同 refs 的已审目标时，sing 省略 range 由程序绑定该目标的范围，不必逐次重抄；显式写了不同的 range，会以 sing 为准更新那份尚未审核的目标（refs 不同仍然拒绝）。不能靠 reason 说明代替参数。
 - 一次回复提交一个演唱请求即可。多段放进同一个 refs，不要生成多个 sing；确认与修订工具可以放在同一回复的 sing 前面。
 - 请求已排队/正在转换不等于已播放。只以真实播放结果为依据，不能用 TTS 念歌词、拟声或舞台说明假装唱过。
 - 已核验目标下，如果正文选择承诺“现在唱”，同轮提交实际演唱请求；目标尚待核验时先登记目标并如实表达准备状态。你也可以不唱、询问或改变主意，但不要只承诺然后用 silent/next 冒充执行。
