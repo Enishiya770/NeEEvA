@@ -68,6 +68,8 @@ public static class FirstReplyChatIntegrationRegression
             Prompt=prompt;Generation++;Epoch++;Round++;settings.m_ChatModel=Model;
             Model.Reset();Other.Reset();
             Set(Chat,"m_FormalResponseGeneration",Generation);Set(Chat,"m_WorkEpoch",Epoch);
+            Set(Chat,"m_RealtimeFormalTurnGeneration",Generation);Set(Chat,"m_BypassFirstReplyRoutingInRealtime",true);
+            Set(Chat,"m_LastUserMsg",prompt);Set(Chat,"m_ActiveSingingGoal",null);Set(Chat,"m_SingingGoal",null);
             Set(Chat,"m_CurrentSpeechRoundId",Round);Set(Chat,"m_FirstReplyAttemptGeneration",-1);
             Set(Chat,"m_RoomTaskGeneration",-1);Set(Chat,"m_RoomSpeechGuardGeneration",-1);
             foreach(string name in new[]{"m_EnableFirstReplyRouting","m_AgentRunning","m_SceneTimePaused","m_UseStreaming","m_IsVoiceMode","m_MotionOutputEnabled","m_RoomMotionOutputEnabled"})Set(Chat,name,true);
@@ -144,6 +146,7 @@ public static class FirstReplyChatIntegrationRegression
             f.Check(p.Context.Contains("fixture-transient-context")&&p.Context.Contains("currentImageDeliveredInThisRequest"),"The actual request carries compact runtime context and image absence.");
             p.Speech(new SpeechText("This is a normal conversation.","en"));p.Done(Ordinary("This is a normal conversation.",true));
             f.NoFallback("Ordinary completion bypasses room planning and the general formal request.");
+            f.Check(f.Model.RoleCalls==0,"Realtime ordinary speech must not first wait for an auxiliary RoleDecision call.");
             f.Check((bool)Get(chat,"m_StreamComplete")&&!(bool)Get(chat,"m_FormalResponseInFlight")&&f.QueuedText()=="This is a normal conversation.","Ordinary public speech enters the real queue exactly once and completes.");
             Add("ordinary actual-entry delivery without planner");
 
@@ -173,6 +176,40 @@ public static class FirstReplyChatIntegrationRegression
             p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools});p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools});
             f.OneFallback("Tools selection falls back once, including duplicate provider completion.");
             Add("tools route preserves original input and single fallback");
+
+            f.Arm("请你现在走到我身边来。");p=f.Dispatch();
+            f.Check(f.Model.RoleCalls==0&&f.Model.Room.Count==0,"Realtime starts only the streaming role request before any action proposal.");
+            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools});
+            f.OneFallback("Realtime movement handoff must reach the structured room planner rather than re-entering the old general-only bypass.");
+            f.Check(f.QueuedText()==""&&f.Model.RoleCalls==0,"A room handoff must neither speak a movement promise nor add a second role request.");
+            Add("realtime movement reaches one structured planner with no premature public promise");
+
+            f.Arm("你自己在房间随便逛逛，目的地由你决定。");p=f.Dispatch();
+            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools});
+            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools});
+            f.OneFallback("Realtime delegated exploration must reach exactly one room planner with its complete original purpose.");
+            f.Check(f.QueuedText()==""&&f.Model.RoleCalls==0,"Exploration handoff cannot become public speech or a duplicate role request.");
+            Add("realtime delegated exploration preserves the full purpose and silent planner handoff");
+
+            f.Arm("请照着刚才的录音再唱一遍。");p=f.Dispatch();
+            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.RecordingSinging});
+            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.RecordingSinging});
+            f.Check(f.Model.First.Count==1&&f.Model.RoleCalls==0&&f.Model.Room.Count==0&&f.Model.FormalCalls==1&&
+                f.Model.LastFormalStage==FormalResponseStage.RecordingSingingDecision&&f.Model.RecordingDecisionContext!=null&&
+                f.Model.RecordingDecisionContext.UserText==f.Prompt&&f.QueuedText()=="",
+                "Recording route must bind current materials/user once to the existing recording decision without a room probe or public promise.");
+            Add("realtime recording route binds current decision context exactly once");
+
+            f.Arm("请照着刚才的录音再唱一遍。");f.Model.RecordingSupported=false;p=f.Dispatch();
+            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.RecordingSinging});
+            f.OneFallback("Unsupported recording decision must retain the existing tools/planner handoff, never fall back to ordinary speech.");
+            Add("unsupported recording decision preserves action handoff");
+
+            f.Arm("非实时的一轮。");Set(chat,"m_BypassFirstReplyRoutingInRealtime",false);
+            f.Check((bool)Call(chat,"TryDispatchFirstReply",f.Prompt,null,f.Generation,true,null)&&
+                f.Model.RoleCalls==1&&f.Model.First.Count==0,
+                "Non-realtime/opt-out first reply must retain its existing RoleDecision preference.");
+            Add("non-realtime role decision remains unchanged");
 
             f.Arm("看看前方。更正：只讨论怎么观察，不要执行。");p=f.Dispatch();
             p.Done(FirstReplyCompletion.Failed("fixture-disconnected"));p.Done(FirstReplyCompletion.Failed("duplicate"));
@@ -269,26 +306,53 @@ public static class FirstReplyChatIntegrationRegression
     private static FieldInfo Field(Type type,string name){for(;type!=null;type=type.BaseType){var f=type.GetField(name,Flags);if(f!=null)return f;}throw new MissingFieldException(name);}
     private static object Get(object o,string n)=>Field(o.GetType(),n).GetValue(o);
     private static void Set(object o,string n,object v)=>Field(o.GetType(),n).SetValue(o,v);
-    private static object Call(object o,string n,params object[] args)=>o.GetType().GetMethods(Flags).Single(x=>x.Name==n&&x.GetParameters().Length==args.Length).Invoke(o,args);
+    private static object Call(object o,string n,params object[] args)
+    {
+        var method=o.GetType().GetMethods(Flags).Single(x=>x.Name==n&&x.GetParameters().Length>=args.Length&&
+            x.GetParameters().Skip(args.Length).All(p=>p.IsOptional));
+        var parameters=method.GetParameters();var complete=new object[parameters.Length];
+        Array.Copy(args,complete,args.Length);
+        for(int i=args.Length;i<complete.Length;i++)complete[i]=parameters[i].DefaultValue;
+        return method.Invoke(o,complete);
+    }
 }
 
 public sealed class FirstReplyChatFixtureModel:LLM
 {
+    public sealed class PendingRole { public string Prompt,Image; public Action<bool,string,string> Done; }
     public sealed class Pending
     {
         public string Prompt,Image,Context;public bool CommitHistory;
         public Action<SpeechText> Speech;public Action<FirstReplyCompletion> Done;
     }
     public readonly List<Pending> First=new List<Pending>();public readonly List<string> Room=new List<string>();
-    public int FormalCalls,UnexpectedCalls,CancelCalls;
+    public readonly List<PendingRole> Roles=new List<PendingRole>();
+    public readonly List<Action<bool,string,string>> RoomCallbacks=new List<Action<bool,string,string>>();
+    public int FormalCalls,UnexpectedCalls,CancelCalls,RoleCalls;
+    public bool RecordingSupported=true;
+    public FormalResponseStage LastFormalStage;
     public override bool SupportsFirstReplyRouting=>true;
+    public override bool SupportsRoleDecisionMessages=>true;
+    public override bool SupportsVisualDecisionMessages=>true;
+    public override bool SupportsRecordingSingingDecision=>RecordingSupported;
     public override bool SupportsRoomTaskMessages=>true;
-    public void Reset(){First.Clear();Room.Clear();FormalCalls=0;}
+    public void Reset(){First.Clear();Room.Clear();Roles.Clear();RoomCallbacks.Clear();FormalCalls=RoleCalls=0;RecordingSupported=true;RecordingDecisionContext=null;AcceptedRoleDecision=null;}
+    public override void PostRoleDecisionMsg(string prompt,string imageDataUrl,Action<bool,string,string> callback,ConversationTrace trace)
+    {RoleCalls++;Roles.Add(new PendingRole{Prompt=prompt,Image=imageDataUrl,Done=callback});}
+    public void AnswerRole(PendingRole pending,JObject value)
+    {
+        string raw=value.ToString();
+        string envelope=new JObject{["choices"]=new JArray(new JObject{["finish_reason"]="stop",["message"]=new JObject{["content"]=raw}})}.ToString();
+        object[] args={envelope,null,null,null,null,null};
+        bool accepted=(bool)typeof(ChatQW).GetMethod("TryReadRoleDecisionResponse",BindingFlags.Static|BindingFlags.NonPublic).Invoke(null,args);
+        AcceptedRoleDecision=accepted&&DecisionCompiler.TryParse(raw,out var decision,out _)?decision:null;
+        pending.Done(accepted,(string)args[3],(string)args[4]);
+    }
     public override void PostFirstReplyStream(string message,Action<SpeechText> onSpeech,Action<FirstReplyCompletion> onComplete,string imageDataUrl=null,string transientContext=null,bool commitHistory=true)
         =>First.Add(new Pending{Prompt=message,Image=imageDataUrl,Context=transientContext,CommitHistory=commitHistory,Speech=onSpeech,Done=onComplete});
-    public override void PostRoomTaskMessage(string input,string imageDataUrl,bool reviewSpeech,Action<bool,string,string> callback)=>Room.Add(input);
-    public override void PostRoomTaskMessage(string input,bool reviewSpeech,Action<bool,string,string> callback)=>Room.Add(input);
-    public override void PostSpeechStreamForStage(string message,Action<SpeechText> onSpeech,Action<string> onComplete,string imageDataUrl,bool recordAssistantHistory,FormalResponseStage stage)=>FormalCalls++;
+    public override void PostRoomTaskMessage(string input,string imageDataUrl,bool reviewSpeech,Action<bool,string,string> callback){Room.Add(input);RoomCallbacks.Add(callback);}
+    public override void PostRoomTaskMessage(string input,bool reviewSpeech,Action<bool,string,string> callback){Room.Add(input);RoomCallbacks.Add(callback);}
+    public override void PostSpeechStreamForStage(string message,Action<SpeechText> onSpeech,Action<string> onComplete,string imageDataUrl,bool recordAssistantHistory,FormalResponseStage stage){FormalCalls++;LastFormalStage=stage;}
     public override void PostMsg(string message,Action<string> callback)=>UnexpectedCalls++;
     public override void PostMsgStream(string message,Action<string> onDelta,Action<string> onComplete,string imageDataUrl=null,bool recordAssistantHistory=true)=>UnexpectedCalls++;
     public override void PostSpeechContinuationStream(string context,Action<SpeechText> onSpeech,Action<string> onComplete,string imageDataUrl=null)=>UnexpectedCalls++;

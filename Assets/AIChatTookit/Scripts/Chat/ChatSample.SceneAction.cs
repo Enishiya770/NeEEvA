@@ -41,6 +41,7 @@ public partial class ChatSample
         public float observationStandOff;
         public float predictedObservationPitch;
         public string observationGoalId;
+        public string gazeHold;
         public string viewDirection, viewPurpose, viewPurposeStatus;
         public float requestedViewDistance;
         public Vector3 actualViewOffset;
@@ -55,13 +56,14 @@ public partial class ChatSample
         public float trackingFocusAppliedDegrees;
         public Vector3 measuredSurface, actualRoot;
         public float requestedYaw, requestedPitch, actualViewChangeDegrees;
+        public ArdyRoomDialogueBridge.SceneOrientResult bodyTurnResult;
         public bool active, reached, canReobserveTarget;
         public string scope = "visualLabel is the model's image interpretation, not verified object identity/function. " +
             "Surface and root are engine measurements. Turning/confirmation/submission are not arrival. " +
             "Movement is to legal nearby same-level ground, not onto the surface.";
     }
 
-    private static bool IsSceneVisualIntent(string intent) => intent == "look-at" || intent == "approach-object" || intent == "reposition-view" || intent == "orient-view" || intent == "turn-in-place" || intent == "inspect-object" || intent == "set-object-state";
+    private static bool IsSceneVisualIntent(string intent) => intent == "look-at" || intent == "approach-object" || intent == "move-to-ground" || intent == "reposition-view" || intent == "orient-view" || intent == "turn-in-place" || intent == "inspect-object" || intent == "reobserve-object" || intent == "set-object-state";
 
     public string SceneActionContextJson => BuildSceneActionFacts().ToString(Newtonsoft.Json.Formatting.None);
 
@@ -72,7 +74,9 @@ public partial class ChatSample
             ["active"] = m_SceneActionActive,
             ["lastAction"] = m_SceneActionFact == null ? null : JObject.Parse(JsonUtility.ToJson(m_SceneActionFact)),
             ["objectContext"] = BuildSceneObjectFacts(),
+            ["persistentGaze"] = BuildPersistentSceneAttentionFacts(),
             ["capability"] = "look-at or approach-object using captureId plus normalized visible image point; " +
+                "move-to-ground uses a current image point on visible same-level empty floor; engine geometry, support, navigation and body clearance determine whether it can be walked to. It never projects furniture down onto a hidden floor or chooses random waypoints. " +
                 "reposition-view uses a freshly confirmed entity to adjust the same-floor observation station farther/closer/left/right by 0.2 to 1.2 metres while facing that target. see-whole/read-detail/avoid-occlusion are observation purposes, not promised outcomes; assess the new image after movement. " +
                 "orient-view changes real head direction without needing an already visible target; turn-in-place turns the actual body on its current legal floor. New view is captured only after real movement. No stairs or touching. " +
                 "When objectContext.enabled, inspect-object resolves only the selected visible entity; set-object-state on/off requires its explicit registered nearby device capability and fresh confirmation. look-at can focus an unresolved image region without claiming a measured object. Autonomous view changes bounded to three per 30 seconds."
@@ -86,6 +90,8 @@ public partial class ChatSample
         var avatar = GetComponent<ArdyRoomDialogueBridge>()?.avatar;
         if (avatar != null) fact.actualRoot = avatar.transform.position;
         m_SceneActionFact = fact;
+        RememberCompletedSceneAttentionOwner(fact);
+        ObserveExplorationAction(fact);
         RecordSceneActivity(fact.actionId, fact.intent, fact.visualLabel, phase, fact.reason);
         Debug.Log("[Vision/Action] " + JsonUtility.ToJson(fact), this);
     }
@@ -93,10 +99,17 @@ public partial class ChatSample
     private void BeginSceneAction(RoomTaskProtocol.Decision decision, SceneVisionObservation observation,
         int generation, Action completedPreparation)
     {
-        if (decision.IsViewChange) { BeginSceneViewChange(decision, observation, generation, completedPreparation); return; }
+        if (decision.intent == "reobserve-object")
+        { BeginSceneObjectReobservation(decision, observation, generation, completedPreparation); return; }
         if (decision.intent == "inspect-object" || decision.IsObjectState || decision.IsViewPosition ||
             (m_EnableSceneObjectAwareness && (decision.intent == "approach-object" || decision.intent == "look-at")))
         { BeginSceneObjectAction(decision, observation, generation, completedPreparation); return; }
+        // Object preparation consumes the current view while its matcher is in flight.
+        // Its accepted action takes over that view below, before releasing the old owner.
+        // Body and unrelated view changes still release the preceding stationary gaze.
+        CancelPersistentSceneAttention("new-scene-target");
+        if (decision.intent == "move-to-ground") { BeginSceneGroundMovement(decision, observation, generation, completedPreparation); return; }
+        if (decision.IsViewChange) { BeginSceneViewChange(decision, observation, generation, completedPreparation); return; }
         var bridge = GetComponent<ArdyRoomDialogueBridge>();
         string reject = null;
         bool unresolvedPixel = false;
@@ -114,7 +127,7 @@ public partial class ChatSample
             { BeginSceneObjectAction(decision, observation, generation, completedPreparation); return; }
             unresolvedPixel = true;
         }
-        else if (decision.origin == "autonomous" && m_SceneTargetRevisitAt.TryGetValue(decision.intent + ":" + target.SurfaceId, out float next) &&
+        else if (decision.IsSelfInitiated && m_SceneTargetRevisitAt.TryGetValue(decision.intent + ":" + target.SurfaceId, out float next) &&
             Time.realtimeSinceStartup < next) reject = "same-visible-surface-autonomous-revisit-suppressed";
 
         if (!string.IsNullOrEmpty(reject))
@@ -132,6 +145,7 @@ public partial class ChatSample
         RegisterMotionAction(ref motion);
         m_RoomTaskActionId = motion.ActionId;
         var fact = new SceneActionFact { actionId = motion.ActionId, intent = decision.intent, origin = decision.origin,
+            gazeHold = decision.gazeHold,
             captureId = observation.CaptureId, visualLabel = decision.visualTarget.label,
             surfaceId = target.SurfaceId, measuredSurface = target.WorldPoint };
         m_SceneActionActive = true;
@@ -174,8 +188,9 @@ public partial class ChatSample
     private IEnumerator PrepareSceneAction(RoomTaskProtocol.Decision decision, SceneGroundedTarget target,
         SceneActionFact fact, ArdyRoomDialogueBridge bridge, int generation, int epoch, Action completed)
     {
+        var planCurrent = CaptureSceneActorPlanLease(decision, generation);
         bool Current() => epoch == m_SceneActionEpoch && generation == m_FormalResponseGeneration &&
-            isActiveAndEnabled && SceneEyesOpen && !m_UserSpeechActiveForAutonomy;
+            isActiveAndEnabled && SceneEyesOpen && !m_UserSpeechActiveForAutonomy && planCurrent();
         void FinishPreparation(string dispatch)
         {
             if (!Current()) return;
@@ -215,7 +230,7 @@ public partial class ChatSample
 
         SceneVisionObservation refreshed = null;
         bool captured = false;
-        RequestSceneObservation("scene-target-confirm", value => { refreshed = value; captured = true; });
+        RequestFreshSceneObservation("scene-target-confirm", value => { refreshed = value; captured = true; });
         deadline = Time.realtimeSinceStartup + 4.5f;
         while (Current() && !captured && Time.realtimeSinceStartup < deadline) yield return null;
         if (!Current()) yield break;
@@ -239,7 +254,7 @@ public partial class ChatSample
         {
             // Keep the actual head view through the next decision rather than immediately
             // undoing the newly acquired image before the model can use it.
-            if (!m_SceneAttention.RetainView(fact.actionId, 20f)) { Reject("attention-retention-lost"); yield break; }
+            if (!RetainSceneAttention(fact)) { Reject("attention-retention-lost"); yield break; }
             RememberSceneTarget(decision.intent, target.SurfaceId);
             m_SceneActionActive = false;
             RecordSceneAction(fact, "observed", "actual head view retained for the next fresh-image decision; no locomotion requested");
@@ -251,7 +266,8 @@ public partial class ChatSample
         if (!Current()) yield break;
         if (m_SceneAttention.IsReturning) { Reject("head-release-timeout"); yield break; }
         RememberSceneTarget(decision.intent, target.SurfaceId);
-        string ValidateTarget() => target.TryValidateGeometry(out string error) ? null : error;
+        string ValidateTarget() => !planCurrent() ? "scene-plan-owner-invalidated" :
+            target.TryValidateGeometry(out string error) ? null : error;
         BeginSceneResultWatch(bridge, fact.actionId);
         if (!bridge.ApproachSceneTarget(fact.actionId, fact.confirmedCaptureId, target.SurfaceId,
             target.WorldPoint, ValidateTarget, out failure))
@@ -288,7 +304,7 @@ public partial class ChatSample
             !IsFreshSceneObservation(observation)) failure = "view-change-reference-not-current";
         float now = Time.realtimeSinceStartup;
         while (m_SceneViewStarts.Count > 0 && now - m_SceneViewStarts.Peek() > 30f) m_SceneViewStarts.Dequeue();
-        if (failure == null && decision.origin == "autonomous" && m_SceneViewStarts.Count >= 3)
+        if (failure == null && decision.IsSelfInitiated && m_SceneViewStarts.Count >= 3)
             failure = "view-change-short-window-budget: consider the acquired observations before another turn";
         if (failure != null)
         {
@@ -300,7 +316,9 @@ public partial class ChatSample
         var motion = new DialogueMotionIntent(decision.intent, "", generation, ++m_MotionSequence);
         RegisterMotionAction(ref motion); m_RoomTaskActionId = motion.ActionId;
         var fact = new SceneActionFact { actionId = motion.ActionId, intent = decision.intent, origin = decision.origin,
+            gazeHold = decision.gazeHold,
             captureId = observation.CaptureId, visualLabel = decision.evidence,
+            requestedEntityId = decision.intent == "reobserve-object" ? decision.entityTarget?.entityId : null,
             requestedYaw = decision.viewChange.yaw, requestedPitch = decision.viewChange.pitch,
             scope = "Purpose is the model's intention, not a claim about unseen space. Angles are relative requests; only actual head/body motion and a new image establish a changed view. No root teleport, object identity or arrival is implied." };
         m_SceneActionActive = true; int epoch = ++m_SceneActionEpoch;
@@ -313,8 +331,11 @@ public partial class ChatSample
     private IEnumerator PrepareSceneViewChange(RoomTaskProtocol.Decision decision, SceneVisionObservation source,
         SceneActionFact fact, ArdyRoomDialogueBridge bridge, int generation, int epoch, Action completed)
     {
+        var planCurrent = CaptureSceneActorPlanLease(decision, generation);
+        ArdyRoomDialogueBridge.SceneOrientResult bodyTurnResult = null;
         bool Current() => epoch == m_SceneActionEpoch && generation == m_FormalResponseGeneration &&
-            isActiveAndEnabled && SceneEyesOpen && !m_UserSpeechActiveForAutonomy;
+            isActiveAndEnabled && SceneEyesOpen && !m_UserSpeechActiveForAutonomy && planCurrent() &&
+            (decision.intent != "reobserve-object" || m_EnableSceneObjectAwareness);
         void Finish(string phase, string reason, string dispatch)
         {
             if (!Current()) return;
@@ -336,6 +357,15 @@ public partial class ChatSample
             { Fail("calibrated-attention-rig-unavailable"); yield break; }
             if (m_SceneAttention == null) m_SceneAttention = GetComponent<NevaSceneAttention>() ?? gameObject.AddComponent<NevaSceneAttention>();
             if (m_SceneAttention.Target != eyes.Target) m_SceneAttention.Configure(eyes);
+            bool reobserve = decision.intent == "reobserve-object";
+            bool noTurnNeeded = reobserve && Mathf.Abs(fact.requestedYaw) < 5f;
+            if (noTurnNeeded)
+            {
+                float returnDeadline = Time.realtimeSinceStartup + 2.5f;
+                while (Current() && m_SceneAttention.IsReturning && Time.realtimeSinceStartup < returnDeadline) yield return null;
+                if (!Current()) yield break;
+                if (m_SceneAttention.IsReturning) { Fail("head-release-timeout"); yield break; }
+            }
             if (decision.intent == "orient-view")
             {
                 if (!m_SceneAttention.TryOrientView(fact.actionId, fact.requestedYaw, fact.requestedPitch, out string error))
@@ -347,14 +377,14 @@ public partial class ChatSample
                 if (!m_SceneAttention.IsSettled) { Fail("orientation-did-not-settle"); yield break; }
                 if (!m_SceneAttention.RetainView(fact.actionId, 20f)) { Fail("orientation-owner-lost"); yield break; }
             }
-            else
+            else if (!noTurnNeeded)
             {
                 m_SceneAttention.Cancel("yield-to-body-orientation");
                 float deadline = Time.realtimeSinceStartup + 2.5f;
                 while (Current() && m_SceneAttention.IsReturning && Time.realtimeSinceStartup < deadline) yield return null;
                 if (!Current()) yield break;
                 if (m_SceneAttention.IsReturning) { Fail("head-release-timeout"); yield break; }
-                string Validate() => epoch != m_SceneActionEpoch || !SceneEyesOpen || !isActiveAndEnabled ||
+                string Validate() => !Current() ||
                     m_SceneVisionCapture == null || !m_SceneVisionCapture.isActiveAndEnabled || m_SceneVisionCapture.Target != avatar ||
                     avatar == null || !avatar.gameObject.activeInHierarchy || avatar.gameObject.scene.handle != source.SceneHandle ?
                     "scene-orientation-owner-or-binding-invalid" : null;
@@ -368,20 +398,34 @@ public partial class ChatSample
                 var result = m_SceneOrientResult; EndSceneOrientWatch();
                 if (result == null || result.actionId != fact.actionId || !result.oriented)
                 { Fail(result?.reason ?? "native-orientation-result-timeout"); yield break; }
+                bodyTurnResult = result;
                 RecordSceneAction(fact, "turned", "native body turn completed; acquiring the actual resulting view");
             }
             SceneVisionObservation next = null; bool received = false;
-            RequestSceneObservation("scene-view-change-result", value => { next = value; received = true; });
+            RequestFreshSceneObservation("scene-view-change-result", value => { next = value; received = true; });
             float captureDeadline = Time.realtimeSinceStartup + 4.5f;
             while (Current() && !received && Time.realtimeSinceStartup < captureDeadline) yield return null;
             if (!Current()) yield break;
             if (!received || next == null || next.CaptureId == source.CaptureId || !IsFreshSceneObservation(next))
             { Fail("changed-view-image-unavailable"); yield break; }
             fact.actualViewChangeDegrees = Quaternion.Angle(source.CameraRotation, next.CameraRotation);
-            if (fact.actualViewChangeDegrees < 1f) { Fail("actual-view-did-not-change"); yield break; }
+            if (!noTurnNeeded && fact.actualViewChangeDegrees < 1f) { Fail("actual-view-did-not-change"); yield break; }
             fact.confirmedCaptureId = fact.resultCaptureId = next.CaptureId;
+            fact.bodyTurnResult = bodyTurnResult;
             BindFormalSceneObservation(next, generation);
-            Finish("observed", "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents", "view-change-completed");
+            if (reobserve)
+            {
+                if (!KnownSceneObjectBinding(fact.requestedEntityId, out var known) ||
+                    !m_SceneVisionCapture.TryFindObservedObject(next, fact.requestedEntityId, out var seen, out _) ||
+                    !seen.VisibleConfirmed || seen.Root != known.root || !seen.TryValidate(out _))
+                { Fail("remembered-target-not-visible-after-reobservation"); yield break; }
+                fact.entityId = seen.EntityId; fact.objectConfirmed = true; fact.focusKind = "visible-object";
+                fact.targetResolutionSource = "historical-bearing-then-current-same-entity";
+            }
+            if (decision.RequestsPersistentGaze && !RetainSceneAttention(fact))
+            { Fail("persistent-orientation-owner-lost"); yield break; }
+            Finish("observed", reobserve ? "same historical identity observed in a new image after bounded reorientation; no device state or operation is implied" :
+                "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents", "view-change-completed");
         }
         finally
         {
@@ -483,11 +527,20 @@ public partial class ChatSample
 
     private void CancelSceneAction(string reason)
     {
+        if (!IsDialogueOnlySceneCancellation(reason)) ++m_RoomActorProposalRevocation;
         CancelSceneObjectTargetMatch();
         ++m_SceneActionEpoch;
         EndSceneResultWatch(m_SceneResultActionId);
         EndSceneOrientWatch();
-        m_SceneAttention?.Cancel(reason);
+        bool preserveGaze = !m_SceneActionActive &&
+            (m_PersistentSceneAttention?.active == true || m_FastLoop.HeadTask?.Active == true) &&
+            IsDialogueOnlySceneCancellation(reason);
+        if (!preserveGaze)
+        {
+            CancelFastHeadTask(reason);
+            CancelPersistentSceneAttention(reason);
+            m_SceneAttention?.Cancel(reason);
+        }
         if (!m_SceneActionActive) return;
         m_SceneActionActive = false;
         var fact = m_SceneActionFact;

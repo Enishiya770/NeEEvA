@@ -1,8 +1,10 @@
 [CmdletBinding(DefaultParameterSetName = 'Automatic')]
 param(
+    [Alias('Host')][string]$BindHost = '127.0.0.1',
     [int]$Port = 8093,
     [string]$FeatureUrl = 'http://127.0.0.1:8080',
     [string]$ExpectedModelSha256 = '',
+    [switch]$AllowIndependentFeatureModel,
     [switch]$TestFixture,
     [Parameter(Mandatory = $true, ParameterSetName = 'Baseline')]
     [switch]$BaselineAdapter,
@@ -17,8 +19,9 @@ $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $Python = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $Python)) { throw 'Run Server/ARDY/install_core.ps1 first.' }
-$Arguments = @('-m', 'Server.ARDY.motion_service.app', '--port', $Port, '--feature-url', $FeatureUrl)
+$Arguments = @('-m', 'Server.ARDY.motion_service.app', '--host', $BindHost, '--port', $Port, '--feature-url', $FeatureUrl)
 if ($ExpectedModelSha256) { $Arguments += @('--expected-model-sha256', $ExpectedModelSha256) }
+if ($AllowIndependentFeatureModel) { $Arguments += '--allow-independent-feature-model' }
 if ($TestFixture) { $Arguments += '--test-fixture' }
 if ($BaselineAdapter) { $Arguments += '--baseline-adapter' }
 if ($AdapterRelease) { $Arguments += @('--adapter-release', $AdapterRelease) }

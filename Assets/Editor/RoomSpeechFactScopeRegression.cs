@@ -42,6 +42,56 @@ public static class RoomSpeechFactScopeRegression
             Require(model.m_DataList.Count == history + 1, "Duplicate review cannot publish the statement twice.");
             ((JArray)LastReport["cases"]).Add("inspect-image-comment-survives-real-user-camera-movement");
 
+            // Stage only the bridge's accepted-task receipt; no native movement
+            // or HTTP request is issued. Run synchronously between Unity frames,
+            // and restore every staged field before yielding again.
+            foreach (string scenario in new[] { "target-and-phase-change", "paused", "failed", "replaced", "rejected", "live-claim" })
+            {
+                bridge.userHead.position = oldUserPosition;
+                yield return Prepare(chat, bridge, model, "none");
+                string oldAction = (string)Get(bridge, "actionId"), oldPhase = (string)Get(bridge, "phase");
+                bool oldFollow = (bool)Get(bridge, "followActive"), oldActive = (bool)Get(bridge, "activeAction");
+                try
+                {
+                    const string receiptAction = "speech-review-receipt-regression";
+                    Set(bridge, "actionId", receiptAction); Set(bridge, "phase", "follow-waiting");
+                    Set(bridge, "followActive", true); Set(bridge, "activeAction", false);
+                    Set(chat, "m_RoomTaskIntent", "follow"); Set(chat, "m_RoomTaskDispatch", "follow-submitted");
+                    Set(chat, "m_RoomTaskActionId", receiptAction);
+                    generation = (int)Get(chat, "m_FormalResponseGeneration"); history = model.m_DataList.Count;
+                    const string acknowledgement = "うん、ついていけるようにしてみるね。";
+                    Call(chat, "CompleteRoomSpeech", Buffer(acknowledgement), acknowledgement, generation, true, null);
+                    review = model.Decisions.Last(); int beforeCount = model.Decisions.Count;
+                    Require((bool)JObject.Parse(review.Input)["acceptedRequest"]["available"], "The request carries the exact staged active receipt.");
+                    bridge.userHead.position += Vector3.right * .2f;
+                    Set(bridge, "phase", scenario == "paused" ? "follow-paused" : scenario == "failed" ? "failed" : "moving");
+                    if (scenario == "replaced") Set(bridge, "actionId", "another-task");
+                    var verdict = JObject.Parse(Verdict(scenario == "rejected" ? "inconsistent" : "consistent", "user-target"));
+                    if (scenario != "rejected" && scenario != "live-claim") verdict["claimBasis"] = "accepted-request";
+                    review.Complete(true, verdict.ToString(), "controlled-receipt-" + scenario);
+                    if (scenario == "live-claim")
+                    {
+                        Require(model.Decisions.Count == beforeCount + 1 && model.m_DataList.Count == history,
+                            "Live movement claims retain their target fence and one factual retry.");
+                        model.Decisions.Last().Complete(true, Verdict("inconsistent", "user-target"), "controlled-live-claim-rejected");
+                    }
+                    else
+                        Require(model.Decisions.Count == beforeCount, "Receipt/rejection handling never issues a redundant second model review.");
+                    Require(model.m_DataList.Count == history + 1 &&
+                        (model.m_DataList.Last().content == acknowledgement) == (scenario == "target-and-phase-change"),
+                        "Only the still-healthy same-task receipt retains the role's original acknowledgement.");
+                    review.Complete(true, verdict.ToString(), "duplicate-receipt");
+                    Require(model.m_DataList.Count == history + 1 && (int)Get(chat, "m_RoomSpeechGuardGeneration") == -1,
+                        "Duplicate receipt callbacks cannot republish or retain the owner.");
+                    ((JArray)LastReport["cases"]).Add("receipt-review-" + scenario);
+                }
+                finally
+                {
+                    Set(bridge, "actionId", oldAction); Set(bridge, "phase", oldPhase);
+                    Set(bridge, "followActive", oldFollow); Set(bridge, "activeAction", oldActive);
+                }
+            }
+
             // Movement language retains user dependencies even if an auxiliary
             // reviewer incorrectly tries to classify it as fact-free.
             bridge.userHead.position = oldUserPosition;

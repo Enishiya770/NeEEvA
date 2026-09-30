@@ -30,6 +30,7 @@ namespace NeEEvA.Perception
         public bool IsSettled => State == "settled";
         public bool IsReturning => State == "returning";
         public bool IsBusy => State == "turning" || IsSettled || IsReturning;
+        public bool IsPersistent { get; private set; }
         public float AngularErrorDegrees { get; private set; }
         public Vector2 CurrentHeadAngles => currentAngles;
 
@@ -68,6 +69,7 @@ namespace NeEEvA.Perception
             if (!eyeTracking.TrySetAttentionTarget(actionId, worldPoint))
             { reason = "无法取得当前角色的眼睛关注控制权。"; return false; }
             LastOwnerId = OwnerId; OwnerId = actionId; TargetPoint = worldPoint;
+            IsPersistent = false;
             State = "turning"; Status = "正在转头观察目标。";
             settledSince = -1f; AngularErrorDegrees = 180f;
             acquisitionDeadline = Time.realtimeSinceStartup + Mathf.Clamp(timeoutSeconds, .1f, 10f);
@@ -97,8 +99,66 @@ namespace NeEEvA.Perception
         public bool RetainView(string actionId, float seconds = 20f)
         {
             if (OwnerId != actionId || !IsSettled || !Finite(seconds)) return false;
+            IsPersistent = false;
             holdDeadline = Time.realtimeSinceStartup + Mathf.Clamp(seconds, 2f, 30f);
             Status = "保持实际观察视向，等待下一次判断。";
+            return true;
+        }
+
+        /// <summary>Transfer an already settled stationary pose without restoring its overlay.
+        /// This is a bounded mechanical lease for matching the current image, not renewed
+        /// object evidence. Only the exact current head AND eye owner may hand it over.</summary>
+        public bool TryTransferSettledView(string previousOwner, string nextOwner, out string reason)
+        {
+            reason = null;
+            if (!isActiveAndEnabled || string.IsNullOrEmpty(previousOwner) || string.IsNullOrEmpty(nextOwner) ||
+                previousOwner == nextOwner || OwnerId != previousOwner || !IsSettled ||
+                locomotionFocusPlayer != null || Time.realtimeSinceStartup > holdDeadline)
+                reason = "settled-view-lease-unavailable";
+            else reason = CompetingOwnerReason();
+            if (reason != null) return false;
+            if (eyeTracking.AttentionOwnerId != previousOwner || !Finite(TargetPoint) ||
+                Vector3.Distance(Target.transform.position, requestRootPosition) > .02f ||
+                Quaternion.Angle(Target.transform.rotation, requestRootRotation) > 2f)
+            { reason = "settled-view-owner-or-body-changed"; return false; }
+            // No frame, callback or bone restore is interleaved with this exchange.
+            // TryLookAt would temporarily restore the head before a new LateUpdate;
+            // that is precisely the view the asynchronous matcher must not lose.
+            eyeTracking.ReleaseAttentionTarget(previousOwner);
+            if (!eyeTracking.TrySetAttentionTarget(nextOwner, TargetPoint))
+            {
+                eyeTracking.TrySetAttentionTarget(previousOwner, TargetPoint);
+                reason = "settled-view-eye-transfer-failed"; return false;
+            }
+            LastOwnerId = previousOwner; OwnerId = nextOwner; IsPersistent = false;
+            holdDeadline = Time.realtimeSinceStartup + 30f;
+            Status = "保留已稳定视角，等待当前物体准备完成或取消。";
+            return true;
+        }
+
+        /// <summary>Renewable stationary lease, granted only after the owning scene task
+        /// validates its binding and fresh view. Loss of that verifier expires the pose;
+        /// ordinary dialogue is not a reason to revoke a healthy persistent task.</summary>
+        public bool RetainPersistentView(string actionId)
+        {
+            if (OwnerId != actionId || !IsSettled || locomotionFocusPlayer != null || CompetingOwnerReason() != null)
+                return false;
+            IsPersistent = true;
+            holdDeadline = Time.realtimeSinceStartup + 8f;
+            Status = "持续保持实际视向；目标与场景由新图定期核验，直到明确停止或条件失效。";
+            return true;
+        }
+
+        /// <summary>Short mechanical lease for an independently supervised pose task.
+        /// This establishes only an actual held head pose, never object visibility.
+        /// The task must renew it; loss of its supervisor expires within two seconds.</summary>
+        public bool RetainPoseLease(string actionId)
+        {
+            if (OwnerId != actionId || !IsSettled || locomotionFocusPlayer != null || CompetingOwnerReason() != null)
+                return false;
+            IsPersistent = true;
+            holdDeadline = Time.realtimeSinceStartup + 2f;
+            Status = "持续保持已稳定的头部姿势；不代表已确认视野内容。";
             return true;
         }
 
@@ -116,6 +176,7 @@ namespace NeEEvA.Perception
 
         private void BeginReturn(string reason)
         {
+            IsPersistent = false;
             if (locomotionFocusPlayer != null)
             { ReleaseLocomotionFocus(OwnerId, reason); return; }
             ReleaseEyes(); State = "returning"; Status = reason; settledSince = -1f;
@@ -240,6 +301,7 @@ namespace NeEEvA.Perception
 
         private void ForceRelease(string reason, string state)
         {
+            IsPersistent = false;
             ReleaseLocomotionFocus(OwnerId, reason);
             RestoreAppliedHead(); ReleaseEyes(); currentAngles = Vector2.zero;
             LastOwnerId = OwnerId; OwnerId = null; State = state; Status = reason; settledSince = -1f;

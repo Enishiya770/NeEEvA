@@ -25,6 +25,9 @@ public partial class ChatSample
         public bool autonomous;
         public string origin = "unspecified", requestQuote = "";
         public string refs, range, revisions, intent, completion, expected, feedback, evidence, repairScope;
+        public int inputTurn, inputCapture;
+        public string inputClip, sourceRelation, sourceEvidence;
+        public JObject music;
         public float start = float.NaN, end = float.NaN;
         public string review = "pending", reviewEvidence = "";
         public string outcome = "not_submitted";
@@ -43,16 +46,21 @@ public partial class ChatSample
         public string goalRefs, expected, rendering;
         public List<SingingMaterialFact> materials = new List<SingingMaterialFact>();
         public bool completed, userConfirmed, targetMatches;
+        [JsonIgnore] public List<RecordingBoundarySource> boundarySources = new List<RecordingBoundarySource>();
     }
 
     private sealed class SingingUserInputEvidence
     {
         public int turn;
         public string text;
+        public int capture;
+        public string clip;
     }
 
     private SingingGoal m_SingingGoal, m_PreviousSingingGoal, m_ActiveSingingGoal;
     private SingingPlaybackEvidence m_PendingSingingGoalPlayback, m_LastSingingGoalPlayback;
+    private readonly Dictionary<string, JObject> m_CompletedRecordingPlaybackFacts = new Dictionary<string, JObject>(StringComparer.Ordinal);
+    private int m_RecordingPlaybackSequence;
     private readonly List<SingingPlaybackEvidence> m_RejectedSingingPlans = new List<SingingPlaybackEvidence>();
     private readonly List<SingingUserInputEvidence> m_SingingUserInputs = new List<SingingUserInputEvidence>();
     private int m_SingingGoalTurn, m_SingingGoalVersion;
@@ -116,12 +124,18 @@ public partial class ChatSample
     // The caller is the current, active review callback. Taking is single-use and is
     // not approval to render: QueueHumBack must run the full resolver again.
     private bool TryTakeReviewedSingingRequest(out AgentHumBackRequest request)
+        => TryTakeReviewedSingingRequestCore(out request, null);
+
+    private bool TryTakeReviewedSingingRequestCore(out AgentHumBackRequest request,
+        DirectSingingReviewOwner directOwner)
     {
         request = null;
         var pending = m_DeferredSingingRequest;
         if (pending == null || m_SingingGoal?.review == "pending") return false;
         ClearDeferredSingingRequest();
-        if (!m_AgentRunning || m_AgentGracefulShutdownPending || !enabled || m_UserSpeechActiveForAutonomy ||
+        bool directReview = directOwner != null && directOwner.approved &&
+            DirectSingingReviewOwnerCurrent(directOwner, false);
+        if ((!m_AgentRunning && !directReview) || m_AgentGracefulShutdownPending || !enabled || m_UserSpeechActiveForAutonomy ||
             pending.userTurn != m_SingingGoalTurn || pending.workEpoch != m_WorkEpoch ||
             pending.formalGeneration != m_FormalResponseGeneration ||
             !ReferenceEquals(pending.model, m_ChatSettings?.m_ChatModel) ||
@@ -154,14 +168,22 @@ public partial class ChatSample
 
     private void ClearSingingGoalSession()
     {
+        m_SingingReviewRejections.Clear();
+        m_SingingReviewRejectionSequence = 0;
+        ClearAcceptedRecordingInputSession();
         ClearDeferredSingingRequest();
         m_SingingGoal = m_PreviousSingingGoal = m_ActiveSingingGoal = null;
         m_PendingSingingGoalPlayback = m_LastSingingGoalPlayback = null;
+        m_LastCompletedBoundarySources.Clear();
+        ClearIncrementalSingingMaterialSnapshot();
+        m_CompletedRecordingPlaybackFacts.Clear(); m_RecordingPlaybackSequence = 0;
         m_RejectedSingingPlans.Clear(); m_SingingRepairFeedbackTurn = -1;
         m_SingingUserInputs.Clear();
+        m_CompletedRoleReplies.Clear();
         m_ValidatedSingingRendering = ""; m_ValidatedSingingMaterials = null;
         m_SingingGoalOwnerAutonomous = null;
         m_SingingGoalTurn++; m_SingingGoalVersion++;
+        ClearSingingSession();
     }
 
     private const string SingingGoalContract =
@@ -187,8 +209,12 @@ public partial class ChatSample
         return "\n[Sing/Goal] " + JsonConvert.SerializeObject(new
         {
             user_turn = m_SingingGoalTurn,
-            latest_user_request = TruncateForFrame(m_LastUserMsg ?? "", 3000),
+            latest_user_request = m_LastUserMsg ?? "",
             recent_actual_user_inputs = m_SingingUserInputs,
+            current_recording_input = RecordingInputIdentity(),
+            current_intent = ReadProtectedRecordingIntent(),
+            recovery_binding = BuildRecordingRecoveryBinding(),
+            prior_rejections = BuildSingingRejectionHistoryFacts(),
             input_scope = "原始用户输入，不保证是执行请求；按完整时序区分用户表演与要求角色行动",
             review_field_scope = "requestQuote/sourceUserTurn由独立审核依据实际用户输入产生，不是sing_goal提案的必填参数；尚未核定时省略。已存在的值是前次审核保存的来源，可供continue核对。审核员在本次singing_goal_expected.request_quote中引用真实请求。",
             next_step = BuildSingingGoalNextStep(),
@@ -215,7 +241,8 @@ public partial class ChatSample
         string action = goal.intent == "observe" || goal.outcome == "playback_complete_content_unverified" || goal.outcome == "user_confirmed"
             ? "" : "<sing refs=\"" + goal.refs + "\"" + (goal.range == "window"
                 ? " start_seconds=\"" + goal.start.ToString("R", CultureInfo.InvariantCulture) + "\" end_seconds=\"" + goal.end.ToString("R", CultureInfo.InvariantCulture) + "\""
-                : " range=\"" + goal.range + "\"") + "/>";
+                : " range=\"" + goal.range + "\"") + (goal.music == null ? "" : " recording_music=\"" +
+                    Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(goal.music.ToString(Newtonsoft.Json.Formatting.None))) + "\"") + "/>";
         return new { stage = action.Length == 0 ? "no_new_performance" : "goal_approved", action,
             scope = "程序仅按已审目标列出精确参数，不是新的行动决定。已保存的同回复显式请求最多消费一次；没有请求时仍由角色决定是否演唱。" };
     }
@@ -242,6 +269,8 @@ public partial class ChatSample
         // review output as a missing field the role must fill before this review.
         if (string.IsNullOrEmpty(goal.requestQuote)) observation.Remove("requestQuote");
         if (goal.sourceUserTurn <= 0) observation.Remove("sourceUserTurn");
+        if (string.IsNullOrEmpty(goal.sourceRelation))
+            foreach (string field in new[] { "sourceRelation", "sourceEvidence", "inputTurn", "inputCapture", "inputClip" }) observation.Remove(field);
         return observation;
     }
 
@@ -291,6 +320,8 @@ public partial class ChatSample
             start = ReadToolFloatAttributeUnclamped(attrs, "start_seconds"),
             end = ReadToolFloatAttributeUnclamped(attrs, "end_seconds")
         };
+        if (!BindRecordingMusicGoal(goal, attrs, out string musicFailure))
+        { RejectSingingGoal(musicFailure); return; }
         if (!BindSingingGoalTransition(goal, attrs, out string transitionFailure))
         { RejectSingingGoal(transitionFailure); return; }
         if (!new[] { "perform", "repair", "repeat", "observe" }.Contains(goal.intent) ||
@@ -302,13 +333,30 @@ public partial class ChatSample
         if ((goal.feedback != "none" || goal.intent == "repeat") &&
             (goal.evidence.Length == 0 || !(m_LastUserMsg ?? "").Contains(goal.evidence)))
         { RejectSingingGoal("用户反馈/重复演唱意图须引用最新用户原话作为evidence，再由独立语义审查核对；角色自己的话不能代替用户证据。"); return; }
+        if (!BindRecordingGoalInput(goal, attrs, out string sourceFailure))
+        { RejectSingingGoal(sourceFailure); return; }
         if (goal.intent != "observe")
         {
             if (goal.expected.Length == 0 || goal.refs.Length == 0)
             { RejectSingingGoal("目标须明确refs和expected；不能默认全部或最近一段。"); return; }
             string[] refs = goal.refs.Split(',').Select(s => s.Trim()).ToArray();
+            string actualVersions = BindCurrentSingingMaterialVersions(refs);
+            string[] actual = actualVersions.Split(',');
+            if (refs.Any(r => r.StartsWith("clip:", StringComparison.Ordinal)) &&
+                (actual.Length != refs.Length || actual.Any(v => v == "missing" || v.Length == 0)))
+            {
+                var missing = refs.Where((r, i) => i >= actual.Length || actual[i] == "missing" || actual[i].Length == 0);
+                var sense = m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText;
+                var available = sense == null ? new string[0] : sense.DescribePracticePhrases().Select(p => p.ClipRef)
+                    .Concat(sense.DescribeQuarantinedSingingCandidates().Select(p => p.ClipRef)).Distinct().ToArray();
+                RejectSingingGoal("录音素材不存在：" + string.Join(",", missing) +
+                    "。说话人编号不是录音ref，不能自行拼接clip编号。当前真实录音refs=" +
+                    (available.Length == 0 ? "[]" : "[" + string.Join(",", available) + "]") +
+                    "；清单仅证明证据存在，不代表这些录音都是歌声或已获演唱许可。请依据原话及素材内容重选；没有默认替换、修订或播放。");
+                return;
+            }
             if (goal.revisions.Length == 0)
-                goal.revisions = BindCurrentSingingMaterialVersions(refs);
+                goal.revisions = actualVersions;
             string[] revisions = goal.revisions.Split(',').Select(s => s.Trim()).ToArray();
             if (refs.Length != revisions.Length || refs.Any(s => !s.StartsWith("clip:", StringComparison.Ordinal)) ||
                 revisions.Any(s => s != "pending" && (!int.TryParse(s, out int n) || n < 0)))
@@ -323,7 +371,7 @@ public partial class ChatSample
         { RejectSingingGoal("origin仅为user_request或autonomous；用户输入不必然包含回唱要求。"); return; }
         if (goal.autonomous && m_SingingGoalOwnerAutonomous == false)
         { RejectSingingGoal("不能将同轮用户事项改名为自主提议以获得另一份续接预算。"); return; }
-        if (SameSingingGoal(m_SingingGoal, goal))
+        if (SameSingingGoal(m_SingingGoal, goal) && !ConsumeRecordingReviewReconsideration())
         {
             if (m_SingingGoal.review == "revise")
             {
@@ -447,6 +495,7 @@ public partial class ChatSample
                 return false;
             }
             if (Different("refs", active.refs) || Different("range", active.range) ||
+                (goal.music != null && !JToken.DeepEquals(goal.music, active.music)) ||
                 DifferentRevisions() || Different("expected", active.expected) ||
                 Different("completion", active.completion) || Different("intent", active.intent) ||
                 Different("repair_scope", active.repairScope) || Different("origin", active.origin) ||
@@ -460,6 +509,7 @@ public partial class ChatSample
             goal.repairScope = active.repairScope; goal.start = active.start; goal.end = active.end;
             goal.origin = active.origin; goal.autonomous = active.autonomous; goal.requestQuote = active.requestQuote;
             goal.sourceUserTurn = active.sourceUserTurn;
+            goal.music = active.music == null ? null : (JObject)active.music.DeepClone();
             return true;
         }
         // User-owned obligations cannot be changed by a model's own promise. A quote
@@ -500,6 +550,9 @@ public partial class ChatSample
                 (a.review == "approved" && b.transition == "continue")) && a.origin == b.origin && a.autonomous == b.autonomous && a.refs == b.refs && a.range == b.range &&
             a.revisions == b.revisions && a.intent == b.intent && a.completion == b.completion &&
             a.expected == b.expected && a.feedback == b.feedback && a.evidence == b.evidence && a.repairScope == b.repairScope &&
+            a.sourceRelation == b.sourceRelation && a.sourceEvidence == b.sourceEvidence &&
+            JToken.DeepEquals(a.music, b.music) &&
+            a.inputTurn == b.inputTurn && a.inputCapture == b.inputCapture && a.inputClip == b.inputClip &&
             a.start.Equals(b.start) && a.end.Equals(b.end);
     }
 
@@ -511,6 +564,9 @@ public partial class ChatSample
         var goal = m_SingingGoal;
         if (goal == null || goal.review != "pending")
         { reason = "没有待核对的歌唱草案；审查结果不能批准另一份或已经结束的目标。"; return false; }
+        if (!ValidateRecordingGoalInput(goal, out reason)) return false;
+        if (!string.IsNullOrEmpty(goal.sourceRelation) && (string)expected?["source_relation"] != goal.sourceRelation)
+        { reason = "独立审核尚未核对本轮录音与历史录音的指代关系；不能只凭相同请求引文批准旧源。"; return false; }
         if (expected == null || expected["refs"]?.Type != JTokenType.String || expected["range"]?.Type != JTokenType.String)
         { reason = "审查没有提供有效的独立目标refs/range；没有批准、改写或执行草案。"; return false; }
         string refs = string.Join(",", ((string)expected["refs"] ?? "").Split(',').Select(p => p.Trim()));
@@ -530,11 +586,14 @@ public partial class ChatSample
         string quote = ((string)expected["request_quote"] ?? "").Trim();
         if (origin == "user_request")
         {
-            bool inherited = goal.transition == "continue" && m_ActiveSingingGoal?.origin == "user_request" &&
-                quote == m_ActiveSingingGoal.requestQuote;
-            bool retainedRequest = m_SingingUserInputs.Any(input => input.text.IndexOf(quote, StringComparison.Ordinal) >= 0);
-            if (quote.Length == 0 || ((m_LastUserMsg ?? "").IndexOf(quote, StringComparison.Ordinal) < 0 && !inherited && !retainedRequest))
-            { reason = "用户演唱任务缺少实际用户请求引文；角色承诺、歌词和素材存在不构成要求角色演唱。"; return false; }
+            if (!string.IsNullOrEmpty(goal.sourceRelation) && goal.intent == "repeat" &&
+                (quote.Length == 0 || (m_LastUserMsg ?? "").IndexOf(quote, StringComparison.Ordinal) < 0))
+            { reason = "本次重唱审核引用了历史授权；必须独立引用当前完整用户输入中的重唱要求。"; return false; }
+            var recovery = BuildRecordingRecoveryBinding();
+            bool inherited = goal.transition == "continue" && recovery != null &&
+                goal.baseVersion == recovery.GoalVersion && quote == recovery.RequestQuote;
+            if (quote.Length == 0 || ((m_LastUserMsg ?? "").IndexOf(quote, StringComparison.Ordinal) < 0 && !inherited))
+            { reason = "本次任务须引用当前用户要求；历史引文仅能绑定同一未完成活动目标的continue及版本，不能用保留的旧要求批准新的演唱。"; return false; }
             if (goal.origin == "autonomous" && goal.transition != "create")
             { reason = "既有自主任务不能改称用户请求；须明确核对任务转换，不能混用任务来源。"; return false; }
             if ((goal.transition == "revise" || goal.transition == "replace") && quote != goal.changeQuote)
@@ -564,7 +623,8 @@ public partial class ChatSample
                 return false;
             }
         }
-        if (!ValidateSingingGoalMaterials(goal, out reason)) return false;
+        if (!ValidateSingingGoalMaterials(goal, out reason) || !MatchReviewedRecordingMusic(goal, expected, out reason)) return false;
+        if (!MatchPriorSingingReviewConstraints(goal, expected, out reason)) return false;
         // A mistaken source label on an initial candidate is mechanical bookkeeping.
         // Only the independent review's actual-user quote plus an exact target match
         // can correct it. No refs, ordering, range, revision or success condition changes.
@@ -662,13 +722,14 @@ public partial class ChatSample
             }
         }
         if (status == "revise" && !m_WorkNoProgress)
-            m_WorkProgressFact += "\n[Sing/NextStep] 当前是revise，不是pending：审核已经结束并要求修改草案。根据reviewEvidence与素材事实，在本轮提交修正后的sing_goal；不要先sing。可以只输出工具标签。next/continue只排定思考，不会修改目标，也不会重新审核未修改的草案。若信息不足则明确询问，无法推进则如实说明。\n";
+            m_WorkProgressFact += "\n[Sing/NextStep] 审核已结束，当前草案为revise，未批准或执行。依据原始目标、实际素材与独立审核证据，在录唱专用结构化决策中重新核对；审核建议本身不改变素材身份或活动目标。可以提出修正提案、说明具体歧义或撤回，不将未提交视为已播放。\n";
         Debug.Log($"[Sing/GoalReview] turn={m_SingingGoalTurn} version={m_SingingGoal.version} status={status} evidence={evidence}");
     }
 
     private bool TryValidateSingingGoalPreparation(string refs, out string failure)
     {
         failure = "";
+        if (!ValidateSingingSessionSources(refs, out failure)) return false;
         if (m_SingingGoal == null) return true; // Standalone edits remain explicit tools.
         if (m_SingingGoal.review != "approved")
         { failure = "歌唱目标尚未独立核对，review=" + m_SingingGoal.review + "；没有修改素材。"; return false; }
@@ -692,6 +753,9 @@ public partial class ChatSample
         m_ValidatedSingingRendering = "";
         m_ValidatedSingingMaterials = null;
         // Legacy fixtures and a detached non-agent renderer have no user task contract.
+        if (!ValidateSingingSessionSources(request.ClipRefs, out failure))
+            return RejectSingingResolution(out detail, "session_source_unavailable", "source", failure,
+                "依据当前歌唱会话保留的演唱段重新核对；已移除的候选不能继续播放。");
         if (!m_AgentRunning && m_SingingGoal == null && m_SingingGoalTurn == 0) return true;
         var goal = m_SingingGoal;
         if (goal == null)
@@ -704,6 +768,8 @@ public partial class ChatSample
                 goal.review == "pending" ? "等待独立审核，不重提相同目标或调用执行器。" : "根据reviewEvidence修正草案或询问，未进入音频生成。", goal.review == "pending");
         if (goal.intent == "observe")
         return RejectSingingResolution(out detail, "goal_observation_only", "goal", "当前目标只登记用户反馈，没有演唱目标；不能据此播放旧素材。", "反馈记录没有演唱授权。");
+        if (!ValidateRecordingMusicRequest(request, goal, out failure))
+            return RejectSingingResolution(out detail, "music_target_mismatch", "music", failure, "依据原请求和固定参考版本重新核对音乐目标；不能静默换参考或底层半音。");
         if (m_ActiveSingingGoal == null || m_ActiveSingingGoal.version != goal.version ||
             goal.refs != m_ActiveSingingGoal.refs || goal.completion != m_ActiveSingingGoal.completion)
         return RejectSingingResolution(out detail, "goal_version_mismatch", "goal", "当前动作没有绑定活动目标的完整成功条件；未执行。", "读取活动目标版本后重新决定，原目标仍保留。");
@@ -712,6 +778,9 @@ public partial class ChatSample
             (requestRange == "window" && (Mathf.Abs(goal.start - request.StartSeconds) > .001f || Mathf.Abs(goal.end - request.EndSeconds) > .001f)))
         { failure = $"动作不符合已核对目标：expected_refs={goal.refs} range={goal.range}；actual_refs={request.ClipRefs} range={requestRange}。reason不会改变参数；没有修改或播放。";
             return RejectSingingResolution(out detail, "goal_target_mismatch", "goal", failure, "按已审目标的精确refs/范围执行；需要改变时先重新审核。"); }
+        if (!MatchRecordingBoundaryGoal(goal, null, false, out failure))
+            return RejectSingingResolution(out detail, "boundary_obligation_unresolved", "boundary", failure,
+                "保留同源排除约束并核对实际PCM边界；不得把旧clean作为已去除讲话的范围播放。");
         goal.revisions = PromoteResolvedSingingMaterialVersions(goal.refs, goal.revisions);
         var versions = goal.revisions.Split(',');
         var refs = request.ClipRefs.Split(',');
@@ -796,6 +865,8 @@ public partial class ChatSample
             evidence.materials.Add(new SingingMaterialFact { clip = p.ClipRef, revision = p.Revision,
                 start = (p.ActiveCapture == "expanded" ? p.ExpandedStartSeconds : p.CleanStartSeconds) + p.ActiveTrimHeadSeconds,
                 end = (p.ActiveCapture == "expanded" ? p.ExpandedEndSeconds : p.CleanEndSeconds) - p.ActiveTrimTailSeconds });
+            var frozen = sense.SnapshotBoundarySource(p.ClipRef);
+            if (frozen != null) evidence.boundarySources.Add(frozen);
         }
         evidence.targetMatches = goal != null && m_ActiveSingingGoal?.version == goal.version &&
             m_ActiveSingingGoal.refs == string.Join(",", evidence.materials.Select(p => p.clip)) &&
@@ -812,6 +883,25 @@ public partial class ChatSample
         if (!practice || evidence == null) return;
         evidence.completed = completed;
         m_LastSingingGoalPlayback = evidence;
+        RecordSingingSessionPlayback(evidence.goalRefs, evidence.turn, completed);
+        if (completed)
+        {
+            m_LastCompletedBoundarySources = evidence.boundarySources;
+            int sequence = ++m_RecordingPlaybackSequence;
+            for (int i = 0; i < evidence.materials.Count; i++)
+            {
+                var actual = evidence.materials[i];
+                m_CompletedRecordingPlaybackFacts[actual.clip] = new JObject {
+                    ["sequence"] = sequence, ["position"] = i + 1, ["segmentCount"] = evidence.materials.Count,
+                    ["goalVersion"] = evidence.goalVersion, ["revision"] = actual.revision,
+                    ["rawStart"] = actual.start, ["rawEnd"] = actual.end,
+                    ["contentSatisfied"] = "unverified" };
+            }
+            // Match the retained source capacity. Old receipts may age out, but
+            // never erase a retained audio source or fabricate verse numbering.
+            foreach (string clip in m_CompletedRecordingPlaybackFacts.OrderByDescending(pair => (int)pair.Value["sequence"])
+                .Skip(64).Select(pair => pair.Key).ToArray()) m_CompletedRecordingPlaybackFacts.Remove(clip);
+        }
         var goal = m_ActiveSingingGoal;
         if (goal == null || goal.turn != evidence.turn || goal.version != evidence.goalVersion) return;
         goal.outcome = !completed ? "interrupted_or_failed" : evidence.targetMatches

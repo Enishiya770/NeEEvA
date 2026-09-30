@@ -13,12 +13,21 @@ namespace NeEEvA.Perception
         public const string Label = "桌面装饰灯";
         private const string AuditedShader = "Autodesk Interactive";
 
-        public static bool EnsureRegistered(Transform environmentRoot, out SceneObjectLightSwitch device, out string failure)
+        // This is a cheap lifecycle check, not a catalog scan. OnEnable may run
+        // before the scene reports isLoaded; that is not a rejected lamp profile.
+        public static bool IsEnvironmentReady(Transform environmentRoot, out string failure)
         {
-            device = null; failure = null;
+            failure = null;
             if (!Application.isPlaying || environmentRoot == null || !environmentRoot.gameObject.activeInHierarchy ||
                 !environmentRoot.gameObject.scene.IsValid() || !environmentRoot.gameObject.scene.isLoaded)
             { failure = "需要 Play 中明确绑定且已启用的房间环境。"; return false; }
+            return true;
+        }
+
+        public static bool EnsureRegistered(Transform environmentRoot, out SceneObjectLightSwitch device, out string failure)
+        {
+            device = null;
+            if (!IsEnvironmentReady(environmentRoot, out failure)) return false;
             Transform match = null;
             foreach (Transform item in environmentRoot.GetComponentsInChildren<Transform>(true))
             {

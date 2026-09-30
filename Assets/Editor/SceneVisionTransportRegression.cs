@@ -57,6 +57,7 @@ public static class SceneVisionTransportRegression
                 Check(JToken.DeepEquals(Build(model, "BuildWorkReviewRequestJson", prompt),
                     Build(model, "BuildWorkReviewRequestJsonWithImage", prompt, null)), "Legacy work-review serializer changed.");
                 CheckContinuation(model, backend, prompt);
+                CheckFastLoop(model);
                 CheckHistory(model, prior);
             }
             CheckRequestIsolation(model, prior);
@@ -76,6 +77,77 @@ public static class SceneVisionTransportRegression
             "Auxiliary history replayed old pixels or omitted their archived status.");
         Check(!request.ToString().Contains("PRIVATE_PENDING_FORMAL") && !request.ToString().Contains("PRIVATE_SPOKEN"),
             "Silent observation consumed a formal-only request context or spoken prefix.");
+    }
+
+    private static void CheckFastLoop(ChatQW model)
+    {
+        const string user = "你现在能看到什么？";
+        const string context = "{\"vision\":{\"imageAttached\":true,\"captureId\":\"public-fixture\",\"freshAtDispatch\":true}}";
+        JObject visual = Build(model, "BuildFastLoopRequestJson", context, user, Image);
+        var messages = (JArray)visual["messages"];
+        Check(ImageCount(messages) == 1 && messages.Count == 2, "FastLoop must actually send one current image with its two-message request.");
+        var parts = (JArray)messages[1]["content"];
+        JToken imagePart = null, textPart = null;
+        foreach (JToken part in parts)
+        { if ((string)part["type"] == "image_url") imagePart = part; else if ((string)part["type"] == "text") textPart = part; }
+        Check((string)imagePart?["image_url"]?["url"] == Image,
+            "FastLoop must serialize exactly the supplied current image, not historical pixels.");
+        Check(((string)textPart?["text"] ?? "").EndsWith(FastLoopPrompt.User(context, user), StringComparison.Ordinal),
+            "Adding an image preserves the complete current-user text.");
+        Check(!visual.ToString().Contains(OldImage) && !visual.ToString().Contains("PRIVATE_HISTORY"),
+            "FastLoop visual transport cannot silently replay old image/history content.");
+        JObject plain = Build(model, "BuildFastLoopRequestJson", "{}", user, null);
+        Check(ImageCount((JArray)plain["messages"]) == 0 && plain["messages"][1]["content"].Type == JTokenType.String,
+            "No-image FastLoop stays a text request with no image placeholder.");
+        Check((bool)visual["stream"] == false && (int)visual["max_tokens"] == (int)plain["max_tokens"] &&
+            JToken.DeepEquals(visual["response_format"], plain["response_format"]),
+            "Vision preserves FastLoop's bounded structured response budget and schema.");
+    }
+
+    // Export actual production wire payloads for a separate explicitly invoked live
+    // check. The counterfactual images are public synthetic fixtures, never user pixels.
+    private static void ExportFastLoopVision(string path)
+    {
+        var host = new GameObject("FastLoop public visual wire export"); host.SetActive(false);
+        try
+        {
+            var model = host.AddComponent<ChatQW>();
+            model.m_LogRequestStats = false; model.m_Backend = ChatQW.BackendType.OpenAICompatible;
+            var rows = new JArray();
+            for (int version = 0; version < 3; version++)
+            {
+                string pixels = null;
+                if (version < 2)
+                {
+                    var texture = new Texture2D(256, 128, TextureFormat.RGB24, false);
+                    try
+                    {
+                        var colors = new Color[256 * 128];
+                        for (int y = 0; y < 128; y++)
+                            for (int x = 0; x < 256; x++)
+                            {
+                                bool left = x >= 24 && x < 104 && y >= 24 && y < 104;
+                                bool right = x >= 152 && x < 232 && y >= 24 && y < 104;
+                                colors[y * 256 + x] = left ? (version == 0 ? Color.red : Color.blue) :
+                                    right ? (version == 0 ? Color.blue : Color.red) : Color.white;
+                            }
+                        texture.SetPixels(colors); texture.Apply();
+                        pixels = "data:image/png;base64," + Convert.ToBase64String(texture.EncodeToPNG());
+                    }
+                    finally { UnityEngine.Object.DestroyImmediate(texture); }
+                }
+                var context = new JObject { ["eyesOpen"] = true,
+                    ["vision"] = new JObject { ["imageAttached"] = pixels != null, ["freshAtDispatch"] = pixels != null,
+                        ["captureId"] = "public-pattern", ["ageSeconds"] = pixels == null ? -1 : 0 } };
+                rows.Add(new JObject { ["id"] = version == 0 ? "red-left" : version == 1 ? "blue-left" : "no-image",
+                    ["expectedMeaning"] = version == 0 ? "red region on the left; blue region on the right" :
+                        version == 1 ? "blue region on the left; red region on the right" : "no current visual evidence; do not invent colors",
+                    ["request"] = Build(model, "BuildFastLoopRequestJson", context.ToString(), "请用中文简短描述你现在看到的画面，指出左右两边的颜色。", pixels) });
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
+            File.WriteAllText(path, new JObject { ["scope"] = "Actual FastLoop serializer, public synthetic counterfactual images. Export only; no HTTP or semantic pass claim.", ["cases"] = rows }.ToString());
+        }
+        finally { UnityEngine.Object.DestroyImmediate(host); }
     }
 
     private static void CheckAutonomyIntent(ChatQW model, string prompt)
@@ -175,13 +247,29 @@ public static class SceneVisionTransportRegression
         JObject request = Build(model, "BuildRequestJsonForMessagesWithFeedback", withImage, true, metadata, "Execution completed; continue the same user turn.");
         CheckSlot(request, backend, 0);
         var messages = (JArray)request["messages"];
-        Check(ImageCount(messages) == 2 && request.ToString().Contains(Image) && request.ToString().Contains(metadata.Substring(0, 18)),
-            "Formal continuation lost new pixels, existing evidence or observation identity.");
+        Check(ImageCount(messages) == 1 && request.ToString().Contains(Image) && !request.ToString().Contains(OldImage),
+            "Formal continuation must send exactly the current pixels and omit superseded historical frames.");
+        Check(request.ToString().Contains("PRIVATE_HISTORY: observation=old, captured earlier") &&
+            request.ToString().Contains(metadata.Substring(0, 18)),
+            "Formal continuation lost accepted textual history or current observation identity.");
         Check((string)messages[messages.Count - 1]["role"] == "system" &&
             (string)messages[messages.Count - 1]["content"] == "Execution completed; continue the same user turn.",
             "Visual continuation displaced the latest execution fact.");
-        Check(ReferenceEquals(history, Call(null, "CreateObservationRequestHistory", history, null)),
-            "Text-only continuation changed the history path.");
+        var withoutImage = (List<LLM.SendData>)Call(null, "CreateObservationRequestHistory", history, null);
+        Check(!ReferenceEquals(history, withoutImage) && withoutImage.Count == history.Count,
+            "No-image continuation must build its own wire copy without adding a synthetic observation.");
+        for (int i = 0; i < history.Count; i++)
+            Check(withoutImage[i].role == history[i].role && withoutImage[i].content == history[i].content &&
+                string.IsNullOrEmpty(withoutImage[i].imageDataUrl),
+                "No-image continuation changed accepted text or replayed old image data.");
+        Check(history[1].imageDataUrl == OldImage && !history[1].imageArchived &&
+            !ReferenceEquals(history[1], withoutImage[1]) && !ReferenceEquals(history[1], withImage[1]),
+            "Wire-only observation selection modified the accepted source image or reused mutable source entries.");
+        JObject textOnly = Build(model, "BuildRequestJsonForMessagesWithFeedback", withoutImage, true, null,
+            "Execution completed; continue the same user turn.");
+        Check(ImageCount((JArray)textOnly["messages"]) == 0 &&
+            textOnly.ToString().Contains("PRIVATE_HISTORY: observation=old, captured earlier"),
+            "A continuation with no current image must retain accepted text without resurrecting historical pixels.");
         Call(model, "CommitRequestHistory", history);
         var next = Build(model, "BuildRequestJsonForMessages", history, true, "next turn with no observation");
         Check(!next.ToString().Contains(Image) && !next.ToString().Contains("scene-17"),
@@ -215,7 +303,7 @@ public static class SceneVisionTransportRegression
         IEnumerator draft = (IEnumerator)Call(model, "RequestEphemeralPayload", "{}", oldAux, done);
         string autonomyJson = (string)Call(model, "BuildAutonomyIntentRequestJsonWithImage", "cancelled autonomy", Image);
         IEnumerator autonomy = (IEnumerator)Call(model, "RequestEphemeralPayload", autonomyJson, oldAux, done);
-        IEnumerator review = (IEnumerator)Call(model, "RequestWorkReviewPayload", "{}", oldAux, done);
+        IEnumerator review = (IEnumerator)Call(model, "RequestWorkReviewPayload", "{}", oldAux, done, null);
         model.CancelEphemeralMsg();
         Check(!draft.MoveNext() && !autonomy.MoveNext() && !review.MoveNext() && callbacks == 0, "Cancelled visual draft/autonomy/review payload reached HTTP or called back.");
         int oldRoom = (int)typeof(ChatQW).GetField("m_RoomTaskRequestGeneration", Flags).GetValue(model);
@@ -257,7 +345,16 @@ public static class SceneVisionTransportRegression
     }
 
     private static JObject Build(ChatQW model, string method, params object[] args) => JObject.Parse((string)Call(model, method, args));
-    private static object Call(ChatQW model, string method, params object[] args) => typeof(ChatQW).GetMethod(method, Flags).Invoke(model, args);
+    private static object Call(ChatQW model, string method, params object[] args)
+    {
+        MethodInfo target = typeof(ChatQW).GetMethod(method, Flags);
+        if (target == null) throw new MissingMethodException(typeof(ChatQW).FullName, method);
+        int expected = target.GetParameters().Length;
+        if (expected != args.Length)
+            throw new InvalidOperationException("Fixture call " + method + " supplies " + args.Length +
+                " arguments, but production currently requires " + expected + ". Supply optional arguments explicitly.");
+        return target.Invoke(model, args);
+    }
     private static void Check(bool condition, string error) { checks++; if (!condition) throw new InvalidOperationException(error); }
 
     [MenuItem("Tools/NeEEvA/Validate scene vision transport")]
@@ -266,7 +363,13 @@ public static class SceneVisionTransportRegression
     public static void RunBatch()
     {
         var report = new JObject { ["scope"] = "Actual local/cloud JSON transport, immutable observation envelopes, unsupported provider rejection and legacy text dispatch. Public synthetic pixels; no HTTP or visual understanding claim." };
-        try { RunChecks(); report["passed"] = true; }
+        try
+        {
+            RunChecks(); report["passed"] = true;
+            string[] exportArgs = Environment.GetCommandLineArgs();
+            for (int i = 0; i + 1 < exportArgs.Length; i++)
+                if (exportArgs[i] == "-fastLoopVisionExport") ExportFastLoopVision(exportArgs[i + 1]);
+        }
         catch (Exception error) { report["passed"] = false; report["error"] = error.ToString(); Debug.LogException(error); }
         report["checks"] = checks; report["checkedAtUtc"] = DateTime.UtcNow.ToString("o");
         string path = Path.GetFullPath("Server/ARDY/runtime/scene-vision-transport-regression.json");

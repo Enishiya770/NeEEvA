@@ -6,6 +6,7 @@ using UnityEngine;
 
 public class TTS : MonoBehaviour
 {
+    public ConversationTrace TraceContext { get; set; }
     /// <summary>Resolve before caching so text-identical replies in different languages cannot collide.</summary>
     public virtual SpeechText ResolveSpeech(SpeechText speech) { return speech; }
 
@@ -61,6 +62,24 @@ public class TTS : MonoBehaviour
 
     /// <summary>True only after current synthesis has finished; playback may continue.</summary>
     public virtual bool CanPrefetchNextSpeech => false;
+
+    /// <summary>One owned, silent PCM request. Dispose discards an unconsumed lookahead.</summary>
+    public abstract class PreparedSpeechStream : IDisposable
+    {
+        public abstract void Dispose();
+    }
+
+    public virtual bool SupportsStreamingLookahead => false;
+    public virtual PreparedSpeechStream PrepareStreamingSpeech(SpeechText speech) { return null; }
+
+    /// <summary>Transfer the prepared request to playback without resending its text.</summary>
+    public virtual void SpeakPreparedStreamingWithPlaybackGate(
+        PreparedSpeechStream prepared, AudioSource output, Action<string> onStarted,
+        Action<bool, string, float> onCompleted, Func<StreamingPlaybackPermission> playbackGate)
+    {
+        prepared?.Dispose();
+        onCompleted?.Invoke(false, string.Empty, 0f);
+    }
 
     /// <summary>
     /// 流式合成并直接播放。onStarted 在首批 PCM 开始播放时触发，

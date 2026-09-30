@@ -38,6 +38,7 @@ RVC_VENDOR = RVC_ROOT / "vendor" / "rvc"
 sys.path.insert(0, str(LOCAL_PACKAGES))
 
 import soundfile as sf
+import numpy as np
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -48,6 +49,36 @@ _conversion_lock = threading.Lock()
 _process_lock = threading.Lock()
 _active_process: subprocess.Popen[str] | None = None
 _active_request_id = ""
+_requests: dict[str, threading.Event] = {}
+
+
+def _check_cancelled(request_id: str) -> None:
+    with _process_lock:
+        event = _requests.get(request_id)
+        cancelled = event is not None and event.is_set()
+    if cancelled:
+        raise HTTPException(499, "voice conversion cancelled")
+
+
+def _bind_process(process, request_id: str, new_process: bool = True) -> None:
+    """Bind before model startup; a cancellation also rejects late workers."""
+    global _active_process
+    with _process_lock:
+        event = _requests.get(request_id)
+        cancelled = event is not None and event.is_set()
+        if not cancelled:
+            _active_process = process
+    if cancelled:
+        if new_process:
+            _kill_quietly(process)
+        raise HTTPException(499, "voice conversion cancelled")
+
+
+def _unbind_process(process) -> None:
+    global _active_process
+    with _process_lock:
+        if _active_process is process:
+            _active_process = None
 
 # The RVC runner releases all allocations when its child process exits and already
 # retries recoverable CUDA OOM failures on CPU.  Unity rendering can temporarily
@@ -142,6 +173,8 @@ def _normalise_result(path: Path) -> tuple[bytes, float]:
     audio, sample_rate = sf.read(str(path), dtype="float32", always_2d=True)
     if len(audio) == 0:
         raise RuntimeError("Seed-VC returned an empty WAV")
+    if not np.isfinite(audio).all() or not np.any(audio):
+        raise RuntimeError("Voice conversion returned non-finite or entirely silent audio")
     peak = float(abs(audio).max())
     if peak > 1e-5:
         audio = audio * (0.88 / max(0.88, peak))
@@ -233,8 +266,8 @@ def _finish_rvc_result(
     if not output_path.is_file():
         raise HTTPException(500, "RVC completed without producing a WAV")
 
-    wav_bytes, output_seconds = _normalise_result(output_path)
     try:
+        wav_bytes, output_seconds = _normalise_result(output_path)
         _require_complete_result(source_seconds, output_seconds)
     except RuntimeError as exc:
         raise HTTPException(500, str(exc)) from exc
@@ -301,11 +334,12 @@ class _RvcWorker:
         self._last_used = 0.0
         self._timer: threading.Timer | None = None
         self._device = ""
+        self._models = {}
         # worker 起来之后设备就固定了(CUDA_VISIBLE_DEVICES 是进程级的)，
         # 所以记住它是哪一种；下一次请求要的模式不同就得重开。
         self._force_cpu: bool | None = None
 
-    def _spawn(self, force_cpu: bool) -> bool:
+    def _spawn(self, force_cpu: bool, request_id: str = "") -> bool:
         rvc_python = _rvc_python()
         if rvc_python is None:
             return False
@@ -334,21 +368,28 @@ class _RvcWorker:
         except OSError as exc:
             print(f"[RVC/worker] spawn failed: {exc}", file=sys.stderr, flush=True)
             return False
+        if request_id:
+            _bind_process(process, request_id)
         # 启动要跑完那 11 秒 import 再加载模型，给足余量。
         ready_line = _read_line_with_timeout(process, 300.0)
         if not ready_line:
             _kill_quietly(process)
+            _unbind_process(process)
+            _check_cancelled(request_id)
             return False
         try:
             ready = json.loads(ready_line)
         except ValueError:
             _kill_quietly(process)
+            _unbind_process(process)
             return False
         if not ready.get("ready"):
             _kill_quietly(process)
+            _unbind_process(process)
             return False
         self._process = process
         self._device = str(ready.get("device", ""))
+        self._models = ready.get("models", {})
         self._force_cpu = force_cpu
         print(f"[RVC/worker] ready on {self._device}", flush=True)
         return True
@@ -356,11 +397,20 @@ class _RvcWorker:
     def _alive(self) -> bool:
         return self._process is not None and self._process.poll() is None
 
-    def warm_up(self, force_cpu: bool) -> dict[str, object]:
-        """Load imports/model without consuming or fabricating an audio request."""
+    def warm_up(self) -> dict[str, object]:
+        """Reuse live CUDA; choose a cold device or upgrade CPU only at warm-up.
+
+        Device selection and reuse are one locked operation. A live CUDA worker
+        already owns part of the reported VRAM, so the cold-start gate must never
+        evict it. A CPU worker may upgrade here when current headroom permits;
+        conversions keep their existing worker instead of repeatedly restarting.
+        """
         if RVC_WORKER_IDLE_SECONDS <= 0:
             return {"ready": False, "reason": "persistent worker disabled"}
         with self._lock:
+            free_mib = _cuda_free_mib()
+            keep_cuda = self._alive() and self._device.startswith("cuda")
+            force_cpu = not keep_cuda and free_mib is not None and free_mib < RVC_GPU_MIN_FREE_MIB
             if self._alive() and self._force_cpu != force_cpu:
                 self._shutdown_locked()
             already_ready = self._alive()
@@ -373,6 +423,7 @@ class _RvcWorker:
                 "already_ready": already_ready,
                 "device": self._device or ("cpu-low-vram" if force_cpu else "cuda"),
                 "idle_seconds": RVC_WORKER_IDLE_SECONDS,
+                "cuda_free_mib_before": free_mib,
             }
 
     def active_force_cpu(self) -> bool | None:
@@ -384,6 +435,20 @@ class _RvcWorker:
         """
         with self._lock:
             return self._force_cpu if self._alive() else None
+
+    def status_snapshot(self) -> dict[str, object]:
+        """Health must not wait for model loading or an in-flight conversion."""
+        if not self._lock.acquire(blocking=False):
+            return {"worker_status": "busy", "active_device": None}
+        try:
+            alive = self._alive()
+            return {
+                "worker_status": "ready" if alive else "stopped",
+                "active_device": self._device if alive else None,
+                "models": self._models if alive else {},
+            }
+        finally:
+            self._lock.release()
 
     def _schedule_idle_shutdown(self) -> None:
         if self._timer is not None:
@@ -419,7 +484,8 @@ class _RvcWorker:
             _kill_quietly(process)
         print("[RVC/worker] released", flush=True)
 
-    def convert(self, params: dict, timeout: float, force_cpu: bool) -> dict | None:
+    def convert(self, params: dict, timeout: float, force_cpu: bool,
+                request_id: str = "") -> dict | None:
         """成功返回 runner 元数据；返回 None 表示"用不了"，调用方走一次性进程。
 
         显存紧张时整条路会退到 CPU——而那 11 秒 import 在 CPU 上一分不少，
@@ -429,41 +495,67 @@ class _RvcWorker:
         if RVC_WORKER_IDLE_SECONDS <= 0:
             return None
         with self._lock:
-            if self._alive() and self._force_cpu != force_cpu:
-                # 设备模式是进程级的，改不了，只能换一个 worker。
-                self._shutdown_locked()
-            if not self._alive() and not self._spawn(force_cpu):
-                return None
-            process = self._process
-            assert process is not None and process.stdin is not None
             try:
-                process.stdin.write(json.dumps(params) + "\n")
-                process.stdin.flush()
-            except OSError as exc:
-                print(f"[RVC/worker] write failed: {exc}", file=sys.stderr, flush=True)
-                _kill_quietly(process)
-                self._process = None
+                return self._convert_locked(params, timeout, force_cpu, request_id)
+            except HTTPException as error:
+                if error.status_code == 499:
+                    # cancel() only signals/kills; the owning worker thread must
+                    # reap and detach the child before releasing the request slot.
+                    with _process_lock:
+                        process = (self._process if _active_request_id == request_id
+                                   and _active_process is self._process else None)
+                    if process is not None:
+                        _kill_quietly(process)
+                        _unbind_process(process)
+                        self._process = None
+                        self._force_cpu = None
+                        self._device = ""
+                        self._models = {}
+                raise
+            finally:
+                _unbind_process(self._process)
+
+    def _convert_locked(self, params, timeout, force_cpu, request_id):
+        _check_cancelled(request_id)
+        if self._alive() and self._force_cpu != force_cpu:
+            # 设备模式是进程级的，改不了，只能换一个 worker。
+            self._shutdown_locked()
+        if not self._alive():
+            if not self._spawn(force_cpu, request_id):
                 return None
-            line = _read_line_with_timeout(process, timeout)
-            if not line:
-                # 超时或进程死了：这条 worker 状态已经不可信，杀掉重来。
-                _kill_quietly(process)
-                self._process = None
-                return None
-            try:
-                result = json.loads(line)
-            except ValueError:
-                _kill_quietly(process)
-                self._process = None
-                return None
-            self._last_used = time.time()
-            self._schedule_idle_shutdown()
-            if "error" in result:
-                # 单次转换失败不代表 worker 坏了，但这一次要让调用方降级重试。
-                print(f"[RVC/worker] convert error: {result['error']}",
-                      file=sys.stderr, flush=True)
-                return None
-            return result
+        process = self._process
+        assert process is not None and process.stdin is not None
+        if request_id:
+            _bind_process(process, request_id, new_process=False)
+        try:
+            process.stdin.write(json.dumps(params) + "\n")
+            process.stdin.flush()
+        except OSError as exc:
+            print(f"[RVC/worker] write failed: {exc}", file=sys.stderr, flush=True)
+            _kill_quietly(process)
+            self._process = None
+            return None
+        line = _read_line_with_timeout(process, timeout)
+        _check_cancelled(request_id)
+        if not line:
+            # 超时或进程死了：这条 worker 状态已经不可信，杀掉重来。
+            _kill_quietly(process)
+            self._process = None
+            return None
+        try:
+            result = json.loads(line)
+        except ValueError:
+            _kill_quietly(process)
+            self._process = None
+            return None
+        self._last_used = time.time()
+        self._schedule_idle_shutdown()
+        if "error" in result:
+            # 单次转换失败不代表 worker 坏了，但这一次要让调用方降级重试。
+            print(f"[RVC/worker] convert error: {result['error']}",
+                  file=sys.stderr, flush=True)
+            return None
+        return result
 
 
 def _kill_quietly(process: "subprocess.Popen[str]") -> None:
@@ -575,7 +667,9 @@ def _run_rvc_conversion(
             },
             timeout=max(180.0, min(600.0, source_seconds * (4 if prefer_cuda else 12) + 60)),
             force_cpu=not prefer_cuda,
+            request_id=request_id,
         )
+        _check_cancelled(request_id)
         if worker_result is not None and output_path.is_file():
             return _finish_rvc_result(
                 source_path, target_path, output_path, worker_result,
@@ -613,9 +707,7 @@ def _run_rvc_conversion(
                     text=True,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
-                with _process_lock:
-                    _active_process = process
-                    _active_request_id = request_id
+                _bind_process(process, request_id)
                 try:
                     # RVC internally segments long input around its configured query/
                     # center windows.  Allow CPU conversion time to scale with the
@@ -633,10 +725,9 @@ def _run_rvc_conversion(
                         f"RVC conversion exceeded {conversion_timeout} seconds",
                     ) from exc
             finally:
-                with _process_lock:
-                    if _active_process is process:
-                        _active_process = None
-                        _active_request_id = ""
+                _unbind_process(process)
+
+            _check_cancelled(request_id)
 
             if process is not None and process.returncode == 0:
                 used_cuda = attempt_cuda
@@ -783,9 +874,7 @@ def _run_conversion(
                 text=True,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
-            with _process_lock:
-                _active_process = process
-                _active_request_id = request_id
+            _bind_process(process, request_id)
             try:
                 stdout, stderr = process.communicate(timeout=600)
             except subprocess.TimeoutExpired as exc:
@@ -793,10 +882,9 @@ def _run_conversion(
                 process.communicate()
                 raise HTTPException(504, "Seed-VC conversion exceeded 10 minutes") from exc
         finally:
-            with _process_lock:
-                if _active_process is locals().get("process"):
-                    _active_process = None
-                    _active_request_id = ""
+            _unbind_process(locals().get("process"))
+
+        _check_cancelled(request_id)
 
         if process.returncode != 0:
             details = (stderr or stdout or "Seed-VC conversion was cancelled")[-6000:]
@@ -808,8 +896,8 @@ def _run_conversion(
         if not candidates:
             raise HTTPException(500, "Seed-VC completed without producing a WAV")
         output_path = candidates[-1]
-        wav_bytes, output_seconds = _normalise_result(output_path)
         try:
+            wav_bytes, output_seconds = _normalise_result(output_path)
             _require_complete_result(source_seconds, output_seconds)
         except RuntimeError as exc:
             raise HTTPException(500, str(exc)) from exc
@@ -862,6 +950,8 @@ def health() -> dict[str, object]:
         "cuda_free_mib": free_mib,
         "cuda_min_free_mib": threshold,
         "will_use": "cuda" if free_mib is None or free_mib >= threshold else "cpu-low-vram",
+        "will_use_scope": "Cold-start device prediction only; a live worker is reused by conversion. active_device is unavailable while the worker is busy.",
+        **_rvc_worker.status_snapshot(),
     }
 
 
@@ -875,15 +965,14 @@ async def warmup() -> dict[str, object]:
     """
     if not _rvc_ready():
         raise HTTPException(503, "character RVC is not installed; warm-up unavailable")
-    free_mib = _cuda_free_mib()
-    force_cpu = free_mib is not None and free_mib < RVC_GPU_MIN_FREE_MIB
-    result = await asyncio.to_thread(_rvc_worker.warm_up, force_cpu)
+    started = time.perf_counter()
+    result = await asyncio.to_thread(_rvc_worker.warm_up)
     if not result.get("ready"):
         raise HTTPException(503, str(result.get("reason", "RVC warm-up failed")))
     return {
         "ok": True,
         "backend": "rvc-character-v2",
-        "cuda_free_mib_before": free_mib,
+        "elapsed_seconds": round(time.perf_counter() - started, 3),
         **result,
     }
 
@@ -917,23 +1006,36 @@ async def convert(
     interpretation = max(0.0, min(1.0, interpretation))
     max_seconds = max(1.0, min(120.0, max_seconds))
     request_id = (request_id or "anonymous")[:128]
+    # Register before the thread can wait on the conversion lock. Two uploads
+    # can both pass the early busy check; a queued request must remain cancellable.
+    cancellation = threading.Event()
+    with _process_lock:
+        if request_id in _requests:
+            raise HTTPException(409, "duplicate active conversion request id")
+        if len(_requests) >= 8:
+            raise HTTPException(409, "voice conversion queue is full")
+        _requests[request_id] = cancellation
 
     def locked_conversion() -> tuple[bytes, dict[str, str]]:
-        with _conversion_lock:
-            return _run_conversion(
-                source_bytes,
-                target_path,
-                diffusion_steps,
-                auto_f0_adjust,
-                semitone_shift,
-                performance_seed,
-                rms_mix_rate,
-                protect,
-                index_rate,
-                interpretation,
-                max_seconds,
-                request_id,
-            )
+        global _active_process, _active_request_id
+        try:
+            with _conversion_lock:
+                _check_cancelled(request_id)
+                with _process_lock:
+                    _active_process = None
+                    _active_request_id = request_id
+                result = _run_conversion(source_bytes, target_path, diffusion_steps,
+                    auto_f0_adjust, semitone_shift, performance_seed, rms_mix_rate,
+                    protect, index_rate, interpretation, max_seconds, request_id)
+                _check_cancelled(request_id)
+                return result
+        finally:
+            with _process_lock:
+                if _active_request_id == request_id:
+                    _active_process = None
+                    _active_request_id = ""
+                if _requests.get(request_id) is cancellation:
+                    del _requests[request_id]
 
     wav_bytes, headers = await asyncio.to_thread(locked_conversion)
     return Response(content=wav_bytes, media_type="audio/wav", headers=headers)
@@ -943,8 +1045,11 @@ async def convert(
 def cancel(request_id: str) -> dict[str, object]:
     with _process_lock:
         process = _active_process
-        matches = bool(process is not None and _active_request_id == request_id)
-        if matches and process.poll() is None:
+        event = _requests.get(request_id)
+        matches = event is not None
+        if matches:
+            event.set()
+        if matches and _active_request_id == request_id and process is not None and process.poll() is None:
             process.kill()
     return {"ok": True, "cancelled": matches, "request_id": request_id}
 

@@ -13,6 +13,7 @@ SOURCES = ["Assets/AIChatTookit/Scripts/LLM/QW/SceneFactContextCompactor.cs",
            "Assets/AIChatTookit/Scripts/LLM/QW/ChatRequestWireTiming.cs",
            "Assets/Editor/SceneFactCompactionRegression.cs",
            "Assets/AIChatTookit/Scripts/LLM/FormalResponseStage.cs",
+           "Assets/AIChatTookit/Scripts/LLM/FormalPromptProfile.cs",
            "Assets/Editor/FormalResponseStageRegression.cs"]
 HARNESS = r'''
 using System; using System.IO; using System.Collections.Generic; using System.Reflection; using System.Text;

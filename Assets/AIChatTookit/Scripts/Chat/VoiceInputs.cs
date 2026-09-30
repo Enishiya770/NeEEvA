@@ -5,6 +5,7 @@ using UnityEngine;
 
 public class VoiceInputs : MonoBehaviour
 {
+    private readonly PersonalSingingLearningRecorder personalLearningRecorder = new PersonalSingingLearningRecorder();
 
     /// <summary>
     /// 录制缓冲区长度(秒)。Microphone.Start用loop=false时这是硬上限，
@@ -13,6 +14,28 @@ public class VoiceInputs : MonoBehaviour
     public int m_RecordingLength = 60;
 
     public AudioClip recording;
+    private int pitchCursor;
+    private float nextPitchRead;
+    private bool pitchRecording;
+
+    private void Update()
+    {
+#if !UNITY_WEBGL || UNITY_EDITOR
+        if (!pitchRecording || recording == null || Time.unscaledTime < nextPitchRead) return;
+        nextPitchRead = Time.unscaledTime + .2f;
+        PumpPitch(Microphone.GetPosition(null));
+#endif
+    }
+
+    private void PumpPitch(int position)
+    {
+        if (recording == null || position <= pitchCursor || position > recording.samples) return;
+        if (!personalLearningRecorder.WantsPitch) { pitchCursor = position; return; }
+        var pcm = new float[(position - pitchCursor) * recording.channels];
+        if (recording.GetData(pcm, pitchCursor)) personalLearningRecorder.PushPitch(pcm, recording.channels, recording.frequency);
+        else personalLearningRecorder.CancelPitch();
+        pitchCursor = position;
+    }
 
     /// <summary>
     /// WebGL辅助类
@@ -26,9 +49,11 @@ public class VoiceInputs : MonoBehaviour
 #if UNITY_WEBGL && !UNITY_EDITOR
         signalManager.onAudioClipDone = null;
         signalManager.StartRecordBinding();
+        personalLearningRecorder.Begin();
 #else
         recording = null;
 		recording = Microphone.Start(null, false, m_RecordingLength, 16000);
+        if (recording != null) { personalLearningRecorder.Begin(); pitchCursor = 0; nextPitchRead = 0; pitchRecording = true; }
        
         #endif
     }
@@ -40,16 +65,20 @@ public class VoiceInputs : MonoBehaviour
     public void StopRecordAudio(Action<AudioClip> _callback)
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
-        signalManager.onAudioClipDone += _callback;
+        signalManager.onAudioClipDone += clip => { personalLearningRecorder.Seal(clip); _callback?.Invoke(clip); };
         signalManager.StopRecordBinding();
 #else
         //Microphone.GetPosition必须在Microphone.End之前取，否则返回0。
         //buffer是m_RecordingLength秒的固定长度，但用户实际只说了pos个样本——
         //如果直接送整个recording给ASR，等于让服务端处理一大段静音，识别会变慢很多。
         int pos = Microphone.GetPosition(null);
+        PumpPitch(pos); pitchRecording = false;
         Microphone.End(null);
 
         AudioClip trimmed = TrimRecording(recording, pos);
+        // A zero cursor cannot prove how much of the fixed microphone buffer
+        // was captured. Preserve legacy ASR fallback, exclude it from learning.
+        personalLearningRecorder.Seal(pos > 0 ? trimmed : null);
         _callback(trimmed);
 
 #endif

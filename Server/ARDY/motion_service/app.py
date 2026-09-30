@@ -1,4 +1,4 @@
-"""Run with python -m Server.ARDY.motion_service.app (loopback only)."""
+"""Run the native ARDY HTTP service; loopback is the safe default bind."""
 from __future__ import annotations
 
 import argparse
@@ -133,10 +133,18 @@ def adapter_configuration(args, root=ROOT):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="Bind address. Use 0.0.0.0 only on the private Spark switch.")
     parser.add_argument("--port", type=int, default=8093)
     parser.add_argument("--feature-url", default="http://127.0.0.1:8080")
     parser.add_argument("--expected-model-sha256")
+    parser.add_argument("--allow-independent-feature-model", action="store_true",
+                        help="Accept a separately hosted Qwen feature worker (shared_model=false) after validating the pinned model hash and protocol.")
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--adapter-path", type=Path,
+                        help="Explicit MLP adapter checkpoint path for a deployed Spark runtime")
+    parser.add_argument("--allow-unverified-adapter", action="store_true",
+                        help="Use an explicitly supplied adapter without the Windows evaluated-baseline hash gate")
     adapters = parser.add_mutually_exclusive_group()
     adapters.add_argument("--adapter-selection", type=Path,
                          help="Explicit isolated test of a locked eligible selection.json")
@@ -155,11 +163,14 @@ def main():
         provider = FixtureFeatureProvider(ROOT / "Tools/MotionAdapter/runtime/qwen-2000.npz",
                                           ROOT / "Tools/MotionAdapter/runtime/prompts.jsonl")
     else:
-        provider = LiveFeatureProvider(args.feature_url, args.expected_model_sha256)
-    service = MotionService(ArdyBackend(args.device, adapter_selection=selection, adapter_release=release), provider,
+        provider = LiveFeatureProvider(args.feature_url, args.expected_model_sha256,
+                                       allow_independent_model=args.allow_independent_feature_model)
+    service = MotionService(ArdyBackend(args.device, adapter_selection=selection, adapter_release=release,
+                                         adapter_path=args.adapter_path,
+                                         allow_unverified_adapter=args.allow_unverified_adapter), provider,
                             args.queue_limit, args.character_limit)
     import uvicorn
-    uvicorn.run(create_app(service), host="127.0.0.1", port=args.port, workers=1,
+    uvicorn.run(create_app(service), host=args.host, port=args.port, workers=1,
                 limit_concurrency=32, timeout_keep_alive=5)
 
 

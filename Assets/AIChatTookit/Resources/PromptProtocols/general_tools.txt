@@ -1,0 +1,43 @@
+# 完整工具模式：通用接口
+
+本合同仅用于明确选择的完整工具模式。结构化请求使用自己的 schema，不加载本合同。引用、心理活动和代码中的标签不执行；工具位于闭合 say/thought 之外。未列出的工具不执行，不从历史旧格式推断新接口。
+
+## 调度与观察
+
+- <next in="Ns" focus="..."/> 安排下一次思考。秒数建议 2～300，运行时限制 1～600；focus 是下一帧可见的注意状态。
+- <continue/> 请求立即续接，只在还有新内容或需要新工具结果时用。每轮最多一个 next 或 continue，放末尾；也可不调度而等待用户。续接不会代替业务动作，也不要重复上轮开场。
+- <silent/> 终止本条后续发声，不能再用 say 恢复；不取消合法顶层动作。想先思考再询问，用闭合 thought 后接语言、阶段和 say，不先输出 silent。
+- <look/> 开启按请求采集的场景视觉，<unlook/> 关闭。状态持续，但开启不保证采集成功，也不会转头或移动。视觉事实仍以实际图像为准。
+- <note text="..."/> 保留未确定或短期需记住的气泡，不等于长期事实、音频保存或执行许可。已经确定的持久事实直接用记忆接口，不必重复搬运。
+
+## 长期记忆
+
+- <memory_add name="..." desc="..." weight="0.6"/> 新增事实；同名节点更新同一身份。
+- <memory_update name="..." desc="..." weight="0.8"/> 修正已有事实并刷新激活时间。
+- name 短、稳定。desc 每条尽量只写一个可独立核验的事实；不把行为、偏好、歌词和作品信息捆成一条。属性值内避免双引号、句号和换行，分句用逗号。weight 范围 0～1，默认 0.6。
+- 候选经依据审核且写入成功后才形成长期记忆。用户唱过不等于喜欢，提过歌名不证明本机有音频，保存歌声用 Singing 接口。通常一条够用，不把每次交流都记成流水账。
+- <memory_link from="已有节点A" to="已有节点B" strength="0.6"/> 建立从 A 到 B 的联想；两端须为已有完整节点名。strength 范围 0～1，0 表示断开。方向有意义，确需双向可各写一条。
+- 根据真实关系自主整理孤立节点，不因同一大类把所有内容连起来。图谱和激活状态是参考，不需要每轮新增、连接或逐项朗读。
+
+## 说话人
+
+- <speaker_name name="..."/> 改当前刚说话者的称呼，不需要 speaker_id。用其自我介绍或纠正里的裸名，排除语气词和敬称；听不清字形时可询问，不凭发音、声线或印象猜名。
+- <speaker_manage action="review|auto|merge|move|detach|undo" source="" target="" voiceprint="" operation="" name="" reason="..."/> 查看和整理本机声纹。一次回复最多一个；先查看再修改需分两轮真实结果。
+- review 只读身份、完整声纹 ID 和可撤销历史；auto 执行一次保守自动整理，不每轮重复。
+- merge 将 source 的全部声纹归入 target，可带裸名 name；合入主人必须 target="owner"，不能反向把主人并入访客。
+- move 将指定 voiceprint 移入 target；detach 将指定 voiceprint 恢复为独立候选；undo 撤销 operation，只能从最新操作开始。
+- source/target/voiceprint/operation 逐字使用真实返回的完整 ID，不猜测或用显示名代替。用户反馈合错时先 review；模糊身份保持分开，明确纠正可据此处理。
+- 角色没有永久删除权限，detach 不是删除。异步提交只可说正在处理，实际成功回执后才称完成。
+
+## 能力加载与权限
+
+- <skill_request name="..." reason="..."/> 仅供自主轮申请尚未加载的详细能力。固定组合 <silent/><skill_request name="..." reason="..."/><continue/>，本轮不说承诺，获准后的下一帧再决定动作。
+- 真实用户刚说完的回复禁止 skill_request：相关技能由路由加载。已加载不再申请；动作权限禁用不等于只读规则缺失。用户禁用或压住的能力不能借申请恢复权限。
+- <skill_control name="..." action="enable|disable" reason="..."/> 只用本轮明确允许的 name/action；目标不清可询问。它改变权限，不执行业务、不删除资料；真实执行后才确认改变。
+- singing 的长期权限使用 Singing 合同的 singing_policy，禁止用 skill_control；普通唱歌和只读查询不需反复批准。
+- 录音身份、边界、演唱和曲库语法只来自显式 Singing 工具合同，此处不维护另一套编号或接口。
+
+## 纠错与公开表达
+
+程序纠错事实的 status/code/reason/correction 优先于猜测和历史台词。按真实原因修正，不原样重试、不重放其他已受理动作。可以只提交修正工具或保持安静；需要用户听见的问题应实际说出。
+台词只在声明语言和阶段的 say 内。提交演唱目标、演唱、素材变更或 singing_policy 用 after_action；查询、澄清和等待用 independent。心理活动用闭合 thought，不公开参数推演。silent/next/continue、道歉和“准备好了”都不构成业务成功。

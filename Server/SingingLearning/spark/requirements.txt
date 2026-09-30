@@ -1,0 +1,10 @@
+# Torch is provided by the existing Spark ARM64/CUDA base image, not replaced.
+fastapi==0.139.0
+uvicorn==0.50.1
+python-multipart==0.0.32
+numpy==1.26.4
+scipy==1.17.1
+soundfile==0.14.0
+librosa==0.10.2
+torchlibrosa==0.1.0
+matplotlib==3.11.2

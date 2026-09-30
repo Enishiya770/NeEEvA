@@ -58,6 +58,13 @@ public partial class ChatSample
         // Speech generations reject stale model callbacks. A committed body action
         // has its own lifetime, and may continue through a new autonomous speech frame.
         int generation = ++m_FormalResponseGeneration;
+        if (m_RealtimeFormalTurnPending)
+        {
+            m_RealtimeFormalTurnGeneration = generation;
+            m_RealtimeFormalTurnPending = false;
+            if (m_LogStreamTimings)
+                Debug.Log($"[Realtime/Turn] formal generation={generation} source=automatic-realtime");
+        }
         ClearFormalSceneObservation();
         BeginMotionPlanningResponse();
         BeginMotionFeedbackResponse();
@@ -92,15 +99,7 @@ public partial class ChatSample
         if (m_ConfiguredSemanticMotionPlanning != m_UseSemanticMotionPlanning)
             ConfigureMotionOutput(m_MotionOutputEnabled, m_GeneratedMotionEnabled);
         if (!m_MotionOutputEnabled || MotionIntentRequested == null) return context ?? "";
-        string contract = m_GeneratedMotionEnabled
-            ? (m_UseSemanticMotionPlanning ? DialogueMotionProtocol.SemanticOutputContract : DialogueMotionProtocol.GeneratedOutputContract)
-            : DialogueMotionProtocol.BasicOutputContract;
-        if (m_GeneratedMotionEnabled) contract += "\n" + DialogueMotionProtocol.MotionFeedbackOutputContract;
-        contract += "\n一次 motion 会独立执行，不会随着下一句话自动重新开始。" +
-            "continue/next 只调度后续回复，不表示身体动作已经完成；不要为同一动作在续轮中重复发送 motion。" +
-            "已有动作进行中时可以继续说话；只有确实要改变动作时才发送新 motion，停止用 none。";
-        if (m_RoomMotionOutputEnabled) contract = DialogueMotionProtocol.IncludeRoomOutput(contract)
-            .Replace("停止用 none。", "停止上身动作用 none；停止房间移动用 stop-moving。");
+        string contract = BuildMotionOutputContract();
         var sources = MotionStateContextRequested;
         if (sources != null)
         {
@@ -135,6 +134,23 @@ public partial class ChatSample
         if (m_LastMotionRepairResult != null)
             contract += "\n[最近动作修订结果；未得到新动作或公开说明]\n" + JsonUtility.ToJson(m_LastMotionRepairResult);
         return string.IsNullOrWhiteSpace(context) ? contract : context.TrimEnd() + "\n\n" + contract;
+    }
+
+    // Keep authoring instructions separate from observed body facts. A dedicated
+    // JSON stage replaces only this exact block; custom/general planners retain it.
+    private string BuildMotionOutputContract()
+    {
+        if (!m_MotionOutputEnabled || MotionIntentRequested == null) return "";
+        string contract = m_GeneratedMotionEnabled
+            ? (m_UseSemanticMotionPlanning ? DialogueMotionProtocol.SemanticOutputContract : DialogueMotionProtocol.GeneratedOutputContract)
+            : DialogueMotionProtocol.BasicOutputContract;
+        if (m_GeneratedMotionEnabled) contract += "\n" + DialogueMotionProtocol.MotionFeedbackOutputContract;
+        contract += "\n一次 motion 会独立执行，不会随着下一句话自动重新开始。" +
+            "continue/next 只调度后续回复，不表示身体动作已经完成；不要为同一动作在续轮中重复发送 motion。" +
+            "已有动作进行中时可以继续说话；只有确实要改变动作时才发送新 motion，停止用 none。";
+        if (m_RoomMotionOutputEnabled) contract = DialogueMotionProtocol.IncludeRoomOutput(contract)
+            .Replace("停止用 none。", "停止上身动作用 none；停止房间移动用 stop-moving。");
+        return contract;
     }
 
     private DialogueMotionIntent? ExtractDialogueMotion(ref string text)
@@ -247,6 +263,9 @@ public partial class ChatSample
 
     private void OnDisable()
     {
+        CancelDirectSingingGoalReview("chat-disabled");
+        InvalidateListeningThoughtPresentation();
+        CancelToolCorrectionReadWait();
         ResetSingingPolicyReview("chat-disabled");
         ClearDeferredSingingRequest();
         SuspendSceneTime("chat-disabled");

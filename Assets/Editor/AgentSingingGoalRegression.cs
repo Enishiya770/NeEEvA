@@ -13,7 +13,7 @@ using UnityEngine;
 // Production parsing, source preparation, task validation and result ledger.
 // Semantic review verdicts and playback-completion callbacks are controlled inputs;
 // this suite does not claim a model understood the private conversation or that sound was heard.
-public static class AgentSingingGoalRegression
+public static partial class AgentSingingGoalRegression
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
     private static int checks;
@@ -34,7 +34,190 @@ public static class AgentSingingGoalRegression
         ApprovalAndCorrections(); ReviewedTargetMatching(); RetryAndAcceptance(); Lifecycle(); PersistentFollowups();
         StructuredFailuresAndDeferredExecution(); StreamCompletionAndDeferredExecution();
         InitialRequestSourceRecovery(); RecoveredGoalContinuationAndPolicySpeech(); ExportPublicModelCases();
+        StructuredRecordingRangePreparation();
+        NeutralCompletedRecordingRetention();
         Debug.Log("[AgentSingingGoalRegression] passed checks=" + checks);
+    }
+
+    private static void NeutralCompletedRecordingRetention()
+    {
+        using (var f = new Fixture())
+        {
+            const string request = "初めてのルーブルはなんてことはなくたは私だけのモナリだも遠くに出会ってたか。 你能把这一段唱给我听吗？";
+            const string lyrics = "初めてのルーブル は なんて ことはなくたは 私だけ のモナリ だ。 も遠くに出会ってたから。";
+            f.Begin(request);
+            f.StageCompletedEvidence(request, lyrics, .351f, 12.93f, 9.47f, 11.87f);
+            Call(f.chat, "RetainCompletedRecordingEvidence", f.sense);
+            Call(f.chat, "BindAcceptedRecordingInput", true);
+            // No recording route or semantic singing verdict has been selected.
+            Call(f.chat, "RetainCompletedRecordingEvidence", f.sense);
+            var song = f.sense.DescribeQuarantinedSingingCandidates().Single();
+            Check(song.SourceStatus == "pending" && song.PlaybackStatus == "evidence_only" &&
+                f.sense.PracticePhraseCount == 2 && Get(f.chat, "m_SingingGoal") == null,
+                "Neutral retention granted source, practice or goal approval.");
+            Check(song.WholeTurnText == request && song.SingingSegmentText == lyrics &&
+                Math.Abs(song.RawSeconds - 12.93f) < .001f && Math.Abs(song.CleanEndSeconds - 9.47f) < .001f,
+                "Low-score completed singing lost its full request, lyrics or measured range before routing.");
+            Call(f.chat, "RetainCompletedRecordingEvidence", f.sense);
+            Check(f.sense.DescribeQuarantinedSingingCandidates().Count == 1,
+                "Repeated final-ASR retention duplicated a recording.");
+            var mixedContext = (RecordingSingingDecisionContext)Call(f.chat, "BuildRecordingSingingDecisionContext");
+            var routeRecording = JObject.FromObject(f.sense.DescribeRetainedRecordingForFinalInput(request));
+            Check((bool)routeRecording["matchesCurrentFinalInput"] && (string)routeRecording["clip"] == song.ClipRef &&
+                (string)routeRecording["recordingTranscript"] == request &&
+                (string)routeRecording["singingSegmentText"] == lyrics &&
+                Math.Abs((float)routeRecording["recoverableRanges"]["clean"][1] - 9.47f) < .001f &&
+                (string)routeRecording["sourceStatus"] == "pending" && (string)routeRecording["playbackStatus"] == "evidence_only",
+                "First reply lost the exact current retained recording/input/range binding or promoted its authority.");
+            Check(f.sense.DescribeRetainedRecordingForFinalInput(request + " 不要跟唱。") == null,
+                "A different final input borrowed the previous recording association.");
+            string firstReplyContext = (string)Call(f.chat, "BuildFirstReplyContext", "");
+            Check(firstReplyContext.Contains(song.ClipRef) && firstReplyContext.Contains("matchesCurrentFinalInput") &&
+                firstReplyContext.Contains("你能把这一段唱给我听吗？") && f.sense.PracticePhraseCount == 2 && Get(f.chat,"m_SingingGoal") == null,
+                "First-reply projection omitted current audio evidence or changed playback/goal state.");
+            string exportPath = Path.GetFullPath("work/singing-followup-20260922/retained-mixed-context.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(exportPath));
+            File.WriteAllText(exportPath, JObject.FromObject(mixedContext).ToString());
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(exportPath), "retained-mixed-firstreply-context.txt"),
+                firstReplyContext);
+
+            Call(f.chat, "SetCurrentUserInput", request, request);
+            string typedContext = (string)Call(f.chat, "BuildFirstReplyContext", "");
+            Check(typedContext.Contains("\"currentRecording\":null") && !(bool)Get(f.chat,"m_CurrentUserInputHasAudioEvidence"),
+                "Typing identical words inherited the preceding audio capture association.");
+
+            f.Begin("那你能把它唱出来吗？");
+            f.StageCompletedEvidence(f.user, "", .05f, 1.78f, 1.78f, 1.78f);
+            Call(f.chat, "RetainCompletedRecordingEvidence", f.sense);
+            var candidates = f.sense.DescribeQuarantinedSingingCandidates();
+            var speech = candidates.Single(c => c.ClipRef != song.ClipRef);
+            Check(f.sense.DescribeRetainedRecordingForFinalInput(request) == null &&
+                (string)JObject.FromObject(f.sense.DescribeRetainedRecordingForFinalInput(f.user))["clip"] == speech.ClipRef,
+                "New capture reused an older song as the current recording.");
+            Check(candidates.Single(c => c.ClipRef == song.ClipRef).WholeTurnText == request &&
+                speech.SourceStatus == "pending" && speech.PlaybackStatus == "evidence_only" &&
+                speech.WholeTurnText == f.user && speech.SingingSegmentText == "",
+                "Later ordinary speech replaced the retained song or acquired singing/source approval.");
+            var context = (RecordingSingingDecisionContext)Call(f.chat, "BuildRecordingSingingDecisionContext");
+            var songFacts = JObject.Parse(context.Materials.Single(m => m.ClipRef == song.ClipRef).Description);
+            var speechFacts = JObject.Parse(context.Materials.Single(m => m.ClipRef == speech.ClipRef).Description);
+            Check((string)songFacts["RecordingTranscript"] == request &&
+                (string)songFacts["SingingSegmentText"] == lyrics &&
+                !(bool)songFacts["currentPlayback"]["selected"] &&
+                (string)speechFacts["ContentVerdict"] == "undecided" &&
+                (string)speechFacts["AcousticMode"] == "speech",
+                "Structured facts promoted neutral speech or hid the earlier complete recording.");
+            Check(!f.Resolve(speech.ClipRef, "clean", out _) && f.sense.PracticePhraseCount == 2 &&
+                Get(f.chat, "m_SingingGoal") == null,
+                "Retaining an ordinary request allowed it to sing without independent goal approval.");
+            Check(f.sense.DiscardQuarantinedSingingCandidate(speech.CandidateId),
+                "Neutral speech candidate could not be explicitly discarded.");
+            Check(f.sense.DescribeRetainedRecordingForFinalInput(f.user) == null,
+                "Discarded recording still advertised current availability to the route.");
+            Call(f.chat, "RetainCompletedRecordingEvidence", f.sense);
+            Check(f.sense.DescribeQuarantinedSingingCandidates().All(c => c.ClipRef != speech.ClipRef),
+                "A repeated final callback resurrected explicitly discarded ordinary speech.");
+        }
+        using (var f = new Fixture())
+        {
+            f.Begin("普通讲话，不提出演唱请求。");
+            for (int i = 0; i < 66; i++)
+            {
+                f.StageCompletedEvidence("普通讲话 " + i, "", .05f, 1.1f, 1.1f, 1.1f);
+                Call(f.chat, "RetainCompletedRecordingEvidence", f.sense);
+            }
+            var candidates = f.sense.DescribeQuarantinedSingingCandidates();
+            Check(candidates.Count == 64 && candidates.All(c => c.SourceStatus == "pending") &&
+                f.sense.PracticePhraseCount == 2 && Get(f.chat, "m_SingingGoal") == null,
+                "Neutral recording retention exceeded its existing archive bound or granted playback authority.");
+        }
+    }
+
+    private static void StructuredRecordingRangePreparation()
+    {
+        JObject Plan(RecordingSingingMaterial material, string user) => new JObject {
+            ["decision"] = "perform", ["materials"] = new JArray(material.Key), ["range"] = "clean",
+            ["intent"] = "perform", ["expected"] = "只回唱合并录音后半段的旋律，不唱前面的讲话",
+            ["user_evidence"] = user, ["thought"] = "",
+            ["source_evidence"] = user,
+            ["speech"] = new JObject { ["text"] = "", ["language"] = "zh" } };
+
+        foreach (string fault in new[] { "none", "missing_raw", "invalid_clean", "missing_pitch" })
+        using (var f = new Fixture())
+        {
+            f.Begin("请把我刚才唱的旋律唱出来，不要唱前面的普通讲话。");
+            f.StageMergedEvidence(fault);
+            var context = (RecordingSingingDecisionContext)Call(f.chat, "BuildRecordingSingingDecisionContext");
+            var candidates = f.sense.DescribeQuarantinedSingingCandidates();
+            Check(f.sense.PracticePhraseCount == 2 && Get(f.chat, "m_SingingGoal") == null,
+                "Taking a recording snapshot authorized or prepared singing.");
+            if (fault == "missing_raw")
+            {
+                Check(candidates.Count == 0 && context.Materials.Count == 2,
+                    "Missing raw payload created a selectable merged recording.");
+                continue;
+            }
+            var candidate = candidates.Single();
+            var material = context.Materials.Single(m => m.ClipRef == candidate.ClipRef);
+            Check(candidate.SourceStatus == "pending" &&
+                candidate.PlaybackStatus == (fault == "missing_pitch" ? "unavailable" : "evidence_only") &&
+                candidate.ClipRef != f.first && candidate.ClipRef != f.second && material.Revision == "pending",
+                "Merged low-score recording borrowed the earlier clip identity or gained source/playback approval.");
+            Check(material.Description.Contains("shared_prefix_raw") && material.Description.Contains(f.second) &&
+                material.Description.Contains("普通讲话") && material.Description.Contains("后半段旋律") &&
+                material.Description.Contains("CleanStartSeconds"),
+                "Structured material facts hid the shared spoken prefix or measured raw range.");
+            Call(f.chat, "BuildRecordingSingingDecisionContext");
+            Check(f.sense.DescribeQuarantinedSingingCandidates().Count == 1,
+                "Snapshot rebuild duplicated the same immutable recording.");
+            bool compiled = CompileRecordingFixture(Plan(material, f.user), context,
+                out string legacy, out string compileFailure);
+            Check(compiled, "Measured recording choice failed compilation: " + compileFailure);
+            if (fault == "missing_pitch")
+            {
+                Check(legacy == RecordingSingingDecisionCompiler.Handoff &&
+                    !f.sense.TryPrepareSingingClip(candidate.ClipRef, false, "clean", out _, out _) &&
+                    f.sense.PracticePhraseCount == 2 &&
+                    f.sense.DescribeQuarantinedSingingCandidates().Single().SourceStatus == "pending",
+                    "Unavailable pitch evidence escaped the compiler or preparation/source boundary.");
+                continue;
+            }
+            if (fault == "invalid_clean")
+            {
+                Check(!material.HasCleanRange && legacy == RecordingSingingDecisionCompiler.Handoff,
+                    "Out-of-bounds clean metadata became an executable range.");
+                continue;
+            }
+            Check(legacy != RecordingSingingDecisionCompiler.Handoff && !RoleOutputChannels.Parse(legacy).HasSpeech,
+                "An explicit recoverable range was dropped or publicly promised before review.");
+            object[] proposal = { legacy, true };
+            Call(f.chat, "ExtractSingingGoalTags", proposal);
+            Check((bool)Call(f.chat, "HasPendingSingingGoalReview") &&
+                !f.Resolve(candidate.ClipRef, "clean", out _) && f.sense.PracticePhraseCount == 2,
+                "A clean selector bypassed independent goal review or prepared the spoken prefix.");
+            f.Approve();
+            bool resolved = f.Resolve(candidate.ClipRef, "clean", out string failure);
+            Check(resolved, "Reviewed explicit range did not prepare: " + failure);
+            var prepared = f.Phrase(candidate.ClipRef);
+            Check(prepared.PendingConfirmation && Math.Abs(prepared.CleanStartSeconds - 1f) < .001f &&
+                Math.Abs(prepared.CleanEndSeconds - 2.4f) < .001f && prepared.ClipRef == material.ClipRef,
+                "Preparation changed recording identity, confirmed source, or included the shared spoken prefix.");
+        }
+
+        using (var f = new Fixture())
+        {
+            f.Begin("请回唱第一段。");
+            var context = (RecordingSingingDecisionContext)Call(f.chat, "BuildRecordingSingingDecisionContext");
+            var material = context.Materials.Single(m => m.ClipRef == f.first);
+            Check(CompileRecordingFixture(Plan(material, f.user), context,
+                out string legacy, out _), "Version fixture did not compile.");
+            object[] proposal = { legacy, true }; Call(f.chat, "ExtractSingingGoalTags", proposal); f.Approve();
+            var phrases = (IList)typeof(SenseVoiceSpeechToText).GetField("m_PracticePhrases", Flags).GetValue(f.sense);
+            object selected = phrases.Cast<object>().Single(p => (string)p.GetType().GetField("ClipRef").GetValue(p) == f.first);
+            var revision = selected.GetType().GetField("Revision"); revision.SetValue(selected, (int)revision.GetValue(selected) + 1);
+            Check(!f.Resolve(f.first, "clean", out string failure) && failure.Contains("版本已过期"),
+                "Compiled snapshot silently rebound to a later clip revision.");
+        }
     }
 
     private static void ApprovalAndCorrections()
@@ -910,7 +1093,7 @@ public static class AgentSingingGoalRegression
             Check(sense.TryPrepareSingingClip(second, false, "clean", out _, out string e2), "Fixture second clip failed: " + e2);
             Check(sense.ConfirmSingingClipSource(first, out _) && sense.ConfirmSingingClipSource(second, out _), "Fixture provenance confirmation failed.");
         }
-        public void Begin(string value) { user = value; Set(chat, "m_LastUserMsg", value); Call(chat, "ResetWorkReview", true); Call(chat, "ResetSingingGoalForUserTurn"); }
+        public void Begin(string value) { user = value; Call(chat, "SetCurrentUserInput", value, value); }
         public SenseVoiceSpeechToText.PracticePhraseInfo Phrase(string clip) => sense.DescribePracticePhrases().Single(p => p.ClipRef == clip);
         public void Propose(string refs, string range, string intent = "perform", string completion = "playback", string feedback = "none", string evidence = "", string repairScope = "", string expected = "按当前用户指定的片段和范围完成演唱")
         {
@@ -954,6 +1137,51 @@ public static class AgentSingingGoalRegression
             Call(chat, "RecordPracticePlaybackOutcome", true, true);
         }
         public string Context() => (string)Call(chat, "BuildSingingGoalContext");
+        public void StageMergedEvidence(string fault)
+        {
+            var type = typeof(SenseVoiceSpeechToText);
+            sense.BeginLiveRecordingCandidateSession(); sense.SetInputCaptureOverlap(2, 1f);
+            var evidenceType = type.GetNestedType("SingingEvidenceSnapshot", Flags);
+            object evidence = Activator.CreateInstance(evidenceType, true);
+            void Field(string name, object value) { if (name == "RawWavBytes") evidenceType.GetProperty(name).SetValue(evidence, value); else evidenceType.GetField(name).SetValue(evidence, value); }
+            float[] pcm = Enumerable.Range(0, 38400).Select(i => .1f * Mathf.Sin(i * .086f)).ToArray();
+            byte[] wav = (byte[])type.GetMethod("EncodeMonoPcm16Wav", Flags).Invoke(null, new object[] { pcm, 16000 });
+            Field("CaptureSessionSerial", sense.InputCaptureSessionSerial);
+            Field("RawWavBytes", fault == "missing_raw" ? null : wav);
+            Field("PitchTimelineMidi", fault == "missing_pitch" ? new float[0] : Enumerable.Repeat(60f, 24).ToArray());
+            Field("FrameSeconds", .1f); Field("AtRealtime", Time.realtimeSinceStartup);
+            Field("RawSeconds", 2.4f); Field("CleanStartSeconds", 1f);
+            Field("CleanEndSeconds", fault == "invalid_clean" ? 3.4f : 2.4f);
+            Field("RecoveryStartSeconds", 0f); Field("RecoveryEndSeconds", 2.4f);
+            Field("SingingProbability", .28f); Field("PitchStability", .52f);
+            Field("MelodicIslandSeconds", 1.4f); Field("ContentSeconds", 2.4f);
+            Field("Text", "前半段普通讲话，后半段旋律"); Field("SingingText", "后半段旋律");
+            Field("Language", "zh"); Field("AcousticMode", "speech"); Field("AudioEvent", "Speech");
+            type.GetField("m_LastSingingEvidence", Flags).SetValue(sense, evidence);
+        }
+        public void StageCompletedEvidence(string text, string lyrics, float probability,
+            float rawSeconds, float cleanEnd, float expandedEnd)
+        {
+            var type = typeof(SenseVoiceSpeechToText);
+            sense.BeginLiveRecordingCandidateSession();
+            var evidenceType = type.GetNestedType("SingingEvidenceSnapshot", Flags);
+            object evidence = Activator.CreateInstance(evidenceType, true);
+            void Field(string name, object value) { if (name == "RawWavBytes") evidenceType.GetProperty(name).SetValue(evidence, value); else evidenceType.GetField(name).SetValue(evidence, value); }
+            float[] pcm = Enumerable.Range(0, Mathf.RoundToInt(rawSeconds * 16000f))
+                .Select(i => .1f * Mathf.Sin(i * .086f)).ToArray();
+            byte[] wav = (byte[])type.GetMethod("EncodeMonoPcm16Wav", Flags).Invoke(null, new object[] { pcm, 16000 });
+            Field("CaptureSessionSerial", sense.InputCaptureSessionSerial); Field("RawWavBytes", wav);
+            Field("PitchTimelineMidi", Enumerable.Repeat(60f, Mathf.CeilToInt(rawSeconds / .1f)).ToArray());
+            Field("FrameSeconds", .1f); Field("AtRealtime", Time.realtimeSinceStartup);
+            Field("RawSeconds", rawSeconds); Field("CleanStartSeconds", 0f); Field("CleanEndSeconds", cleanEnd);
+            Field("RecoveryStartSeconds", 0f); Field("RecoveryEndSeconds", expandedEnd);
+            Field("SingingProbability", probability); Field("PitchStability", .55f);
+            Field("MelodicIslandSeconds", cleanEnd); Field("ContentSeconds", rawSeconds);
+            Field("Text", text); Field("SingingText", lyrics); Field("Language", "ja");
+            Field("AcousticMode", "speech"); Field("AudioEvent", "Speech");
+            type.GetField("m_LastSingingEvidence", Flags).SetValue(sense, evidence);
+            type.GetProperty("LastText", Flags).SetValue(sense, text);
+        }
         private string Archive(string text, int sequence)
         {
             Type type = typeof(SenseVoiceSpeechToText), responseType = type.GetNestedType("Response", BindingFlags.NonPublic);

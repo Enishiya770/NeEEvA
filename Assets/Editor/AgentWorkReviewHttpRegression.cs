@@ -305,7 +305,7 @@ public static class AgentWorkReviewHttpRegression
                 ["work_status"] = "continue", ["proceed"] = true, ["intent"] = "Run the allowed check.",
                 ["singing_goal_status"] = "none", ["singing_goal_evidence"] = "",
                 ["singing_goal_expected"] = new JObject {
-                    ["origin"] = "none", ["request_quote"] = "",
+                    ["origin"] = "none", ["source_relation"] = "none", ["request_quote"] = "",
                     ["refs"] = "", ["range"] = "none", ["start_seconds"] = null, ["end_seconds"] = null
                 },
                 ["wait_seconds"] = 5

@@ -157,3 +157,22 @@ Server/RVC/*_headers.txt
 # Local document tooling, previews and machine-specific network diagnostics.
 /tmp/
 /Reports/network-5090-20260915/
+
+# Local experiments, conversation traces, recordings and publishing backups.
+# Keep reusable implementations in Assets/, Server/, Tools/ and docs/.
+/work/
+/_codex_backups/
+/output/
+/Reports/
+/Server/SingingLearning/data/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+**/.venv/
+# Generated motion-adapter playback reports; implementation and fixtures remain.
+/Tools/MotionAdapter/reports/
+# These are authored regression projects, not Unity-generated project files.
+!/Tools/SingingSegmentation/test_teaching_intent/TeachingIntentChecks.csproj
+!/Tools/SingingSegmentation/test_unity_capture/CaptureChecks.csproj

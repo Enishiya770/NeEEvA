@@ -84,6 +84,47 @@ namespace NeEEvA.Motion
             float desiredDistance, out ArdyRoomApproachPlan result, out string reason)
             => TryPlan(navigation, avatarGround, userAnchor, desiredDistance, out result, out reason, out _);
 
+        /// <summary>Refresh a following task's selected station using one newly audited route.
+        /// The station follows the observed user displacement; an invalid station falls back
+        /// to the ordinary bounded search. This never reuses stale collision or support facts.</summary>
+        public static bool TryRefreshFollowPlan(ArdyRoomNavigation navigation, Vector3 avatarGround, Transform userAnchor,
+            float desiredDistance, ArdyRoomApproachPlan previous, out ArdyRoomApproachPlan result, out string reason,
+            out ArdyRoomApproachObservation observation)
+        {
+            result = null; reason = null; observation = null;
+            if (previous != null && navigation != null && navigation.isActiveAndEnabled && navigation.IsBuilt &&
+                userAnchor != null && userAnchor.gameObject.activeInHierarchy && userAnchor.gameObject.scene.IsValid() &&
+                userAnchor.gameObject.scene.isLoaded && Finite(avatarGround) && Finite(userAnchor.position) &&
+                Finite(desiredDistance) && desiredDistance >= .5f && desiredDistance <= 3f &&
+                Finite(previous.GroundTarget) && Finite(previous.UserGround))
+            {
+                float radius = navigation.AgentRadius + UserBodyRadius + UserClearance;
+                float distance = Mathf.Max(desiredDistance, radius + .10f);
+                if (Mathf.Abs(distance - previous.DesiredDistance) < .001f &&
+                    navigation.TryValidatePlanStart(avatarGround, out var start, out _, out _) &&
+                    TryUserGround(navigation, userAnchor.position, userAnchor, out var userGround, out _, out var support) &&
+                    Mathf.Abs(start.y - userGround.y) <= navigation.MaxRouteHeightVariation)
+                {
+                    Vector3 candidate = userGround + (previous.GroundTarget - previous.UserGround);
+                    float separation = Horizontal(candidate - userGround).magnitude;
+                    if (separation >= radius + .05f && separation <= distance + .35f &&
+                        navigation.TryPlan(start, candidate, out var route, out _, out var routeObservation) &&
+                        RouteKeepsUserClearance(route, userGround, radius))
+                    {
+                        var target = route.Corners[route.Corners.Length - 1];
+                        observation = new ArdyRoomApproachObservation { success = true, stage = "follow-refresh",
+                            summary = "既定跟随站位已随当前用户位置更新，并重新通过地面、路线和用户净距检查。",
+                            userSupport = support, candidateCount = 1, acceptedCount = 1, selectedCandidate = 0 };
+                        observation.candidates.Add(new ArdyRoomApproachCandidateObservation { index = 0, ring = -1,
+                            candidate = candidate, accepted = true, routeLength = route.Length, navigation = routeObservation });
+                        result = Make(target, userAnchor.position, userGround, route, route.Length < .08f, distance, radius, observation);
+                        return true;
+                    }
+                }
+            }
+            return TryPlan(navigation, avatarGround, userAnchor, desiredDistance, out result, out reason, out observation);
+        }
+
         public static bool TryPlan(ArdyRoomNavigation navigation, Vector3 avatarGround, Transform userAnchor,
             float desiredDistance, out ArdyRoomApproachPlan result, out string reason, out ArdyRoomApproachObservation observation)
         {

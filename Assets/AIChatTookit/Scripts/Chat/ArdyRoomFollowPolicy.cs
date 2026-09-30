@@ -9,6 +9,10 @@ public static class ArdyRoomFollowPolicy
     public const float MovingTargetCheckInterval = .35f;
     public const float SettledTargetQuietPeriod = .30f;
     public const float SettledTargetDistance = .06f;
+    // Recheck a temporarily unverified user support without planning or requesting motion.
+    // A stationary invalid target cannot create an unbounded polling/restart loop.
+    public const float SupportCheckInterval = .5f;
+    public const int MaximumSupportChecks = 6;
 
     public static bool NeedsLeg(float distance, float desiredDistance) =>
         Finite(distance) && Finite(desiredDistance) && distance > desiredDistance + ResumeDistanceMargin + .0001f;

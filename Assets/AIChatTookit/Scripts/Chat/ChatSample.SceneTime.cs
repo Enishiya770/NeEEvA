@@ -67,6 +67,7 @@ public partial class ChatSample
     // Called from existing disable/session boundary; no additional Unity OnDisable competes with motion ownership.
     private void SuspendSceneTime(string reason)
     {
+        StopSceneExploration(reason, true);
         SceneMonotonicNow(); m_SceneTimeSuspended = true; m_SceneReviewClock.Clear();
         ClearScenePlaybackReview("scene-session-suspended");
         m_ScenePoseKnown = false; m_SceneMotionAt = m_SceneGazeAt = -1;
@@ -76,6 +77,8 @@ public partial class ChatSample
     private void OnApplicationPause(bool paused)
     {
         SceneMonotonicNow(); m_SceneTimePaused = paused;
+        if (paused) SuspendSceneExplorationStep("application-paused");
+        SetSceneVisionApplicationPaused(paused);
         m_SceneTimeLastRealtime = Time.realtimeSinceStartupAsDouble;
         if (paused)
         {
@@ -125,6 +128,8 @@ public partial class ChatSample
 
     private void RecordSceneActivity(string actionId, string intent, string label, string phase, string reason)
     {
+        RememberActionOutcome("scene-action", actionId, intent, phase, reason, null, 0,
+            0, 0, 0, null);
         if (!m_AgentRunning || m_SceneTimeSuspended) return;
         double now = SceneMonotonicNow();
         bool changed = m_SceneActivityAction != actionId || m_SceneActivity != phase;
@@ -190,8 +195,11 @@ public partial class ChatSample
 
     private void RegisterActuallySpokenRound(int generation, int round)
     {
-        if (!m_AgentRunning) return;
-        if (m_ActuallySpokenRounds.Add(generation + ":" + round)) m_ConsecutiveAITurns++;
+        if (!m_ActuallySpokenRounds.Add(generation + ":" + round)) return;
+        (m_DeliveryTrace ?? m_ResponseTrace)?.Sample("audio.round_playback_advanced", new Newtonsoft.Json.Linq.JObject {
+            ["generation"] = generation, ["speechRound"] = round,
+            ["scope"] = "first AudioSource progress in this speech round; not task completion" });
+        if (m_AgentRunning) m_ConsecutiveAITurns++;
     }
 
     private bool SceneActionIsBusy => m_SceneActionActive;

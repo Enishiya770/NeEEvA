@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
@@ -32,32 +33,56 @@ public static class AgentWorkReviewTransportRegression
             model.TrailingContext = "Read-only memory context";
             int count = model.m_DataList.Count;
             const string prompt = "Review JSON from the latest facts: playback completed both clips using current range.";
-            foreach (var backend in new[] { ChatQW.BackendType.Local, ChatQW.BackendType.Cloud })
+            foreach (var backend in new[] { ChatQW.BackendType.Local, ChatQW.BackendType.OpenAICompatible, ChatQW.BackendType.Cloud })
             {
                 model.m_Backend = backend;
                 var payload = Build(model, "BuildWorkReviewRequestJson", prompt);
                 Check((int)payload["max_tokens"] == 1024, "Work review inherited the draft token limit");
                 Check(!(bool)payload["stream"] && !(bool)payload["enable_thinking"], "Work review became a spoken/thinking stream");
-                Check((string)payload["response_format"]["type"] == "json_object", "Missing structured JSON output mode");
+                Check((string)payload["response_format"]["type"] ==
+                    (backend == ChatQW.BackendType.Cloud ? "json_object" : "json_schema"),
+                    "Local and OpenAI-compatible review need a strict schema envelope; legacy cloud retains JSON-object compatibility.");
                 var messages = (JArray)payload["messages"];
                 Check((string)messages[messages.Count - 1]["content"] == prompt, "Fresh facts are not the final review input");
                 Check(payload.ToString().Contains("Only the first clip") && payload.ToString().Contains("Sing the two clips together"),
                     "Draft history setting removed user corrections or their reference context");
-                Check((string)messages[messages.Count - 2]["role"] == "system" &&
-                    ((string)messages[messages.Count - 2]["content"]).Contains("singing_goal_status"), "Remote/local schema contract missing");
+                // OpenAI-compatible transport consolidates system instructions
+                // into the first message while preserving the final user facts.
+                Check(messages.OfType<JObject>().Any(message => (string)message["role"] == "system" &&
+                    ((string)message["content"]).Contains("singing_goal_status")), "Remote/local schema contract missing");
                 Check(model.m_DataList.Count == count && model.SpokenPrefix == "", "Review serialization mutated conversation");
-                if (backend == ChatQW.BackendType.Local)
+                if (backend != ChatQW.BackendType.Cloud)
                 {
-                    Check((int)payload["id_slot"] == 1 && !(bool)payload["chat_template_kwargs"]["enable_thinking"],
-                        "Review overwrote the main conversation slot or enabled thinking");
-                    Check((bool)payload["response_format"]["schema"]["additionalProperties"] == false &&
-                        ((JArray)payload["response_format"]["schema"]["required"]).Count == 8, "Incomplete local schema");
-                    Check(((JArray)payload["response_format"]["schema"]["properties"]["singing_goal_expected"]["required"]).Count == 6,
+                    if (backend == ChatQW.BackendType.Local)
+                        Check((int)payload["id_slot"] == 1 && !(bool)payload["chat_template_kwargs"]["enable_thinking"],
+                            "Review overwrote the main conversation slot or enabled thinking");
+                    else Check(payload["id_slot"] == null, "OpenAI-compatible review received a llama.cpp slot.");
+                    var schemaEnvelope = payload["response_format"]["json_schema"];
+                    Check((bool)schemaEnvelope["strict"] && (string)schemaEnvelope["name"] == "work_review_v1" &&
+                        payload["response_format"]["schema"] == null &&
+                        (bool)schemaEnvelope["schema"]["additionalProperties"] == false &&
+                        ((JArray)schemaEnvelope["schema"]["required"]).Count == 8, "Incomplete local schema");
+                    Check(((JArray)schemaEnvelope["schema"]["properties"]["singing_goal_expected"]["required"]).Count == 7,
                         "Expected singing goal lost its required nested fields");
                 }
                 else Check(payload["id_slot"] == null && payload["chat_template_kwargs"] == null &&
-                    payload["response_format"]["schema"] == null, "Cloud received unsupported local-only schema/slot fields");
+                    payload["response_format"]["schema"] == null && payload["response_format"]["json_schema"] == null,
+                    "Cloud received unsupported local-only schema/slot fields");
             }
+            model.m_Backend = ChatQW.BackendType.OpenAICompatible;
+            string recordingPacket = RecordingSingingDecisionCompiler.ReviewContextMarker +
+                "Complete source-aware current input, ordered user history, pending proposal and playback facts.";
+            var recordingReview = Build(model, "BuildWorkReviewRequestJson", recordingPacket);
+            var recordingMessages = (JArray)recordingReview["messages"];
+            Check(recordingMessages.Count == 2 && (string)recordingMessages[0]["role"] == "system" &&
+                (string)recordingMessages[1]["content"] == recordingPacket &&
+                !recordingReview.ToString().Contains("Public fixture persona") &&
+                !recordingReview.ToString().Contains("Bounded singing contract") &&
+                !recordingReview.ToString().Contains("Read-only memory context"),
+                "Independent recording review inherited actor persona/tool-writing context or lost its full fact packet.");
+            Check((string)recordingReview["response_format"]["type"] == "json_schema" &&
+                model.m_DataList.Count == count,
+                "Isolated recording review lost strict output format or mutated formal dialogue.");
             model.m_Backend = ChatQW.BackendType.Local;
             var draft = Build(model, "BuildEphemeralRequestJson", "old draft", 1, false);
             var boundary = Build(model, "BuildTurnBoundaryRequestJson", "boundary JSON");
@@ -93,7 +118,7 @@ public static class AgentWorkReviewTransportRegression
         ["work_status"] = "continue", ["proceed"] = true, ["intent"] = "Submit only the first clip with range expanded.",
         ["singing_goal_status"] = "revise", ["singing_goal_evidence"] = "Two current-range clips do not match the latest request.",
         ["singing_goal_expected"] = new JObject {
-            ["origin"] = "user_request", ["request_quote"] = "Only the first clip; restore its retained introduction.",
+            ["origin"] = "user_request", ["source_relation"] = "retained_recording", ["request_quote"] = "Only the first clip; restore its retained introduction.",
             ["refs"] = "clip:first", ["range"] = "expanded", ["start_seconds"] = null, ["end_seconds"] = null
         },
         ["wait_seconds"] = 5
@@ -112,6 +137,20 @@ public static class AgentWorkReviewTransportRegression
 
     private static void ValidateResponses()
     {
+        // Build a real envelope from the actual production required-field set.
+        // Do not preserve a hand-written legacy six-field object as "good".
+        var schema = JObject.Parse((string)typeof(ChatQW).GetField("k_WorkReviewSchema", Flags).GetRawConstantValue());
+        var expectedSchema = (JObject)schema["properties"]["singing_goal_expected"];
+        var expected = new JObject();
+        var sample = (JObject)Decision()["singing_goal_expected"];
+        foreach (string field in ((JArray)expectedSchema["required"]).Values<string>()) expected[field] = sample[field].DeepClone();
+        var schemaDecision = Decision(); schemaDecision["singing_goal_expected"] = expected;
+        Check((bool)Parse(Envelope(schemaDecision.ToString()))[0], "Production schema's complete expected object was rejected by its real transport parser");
+        foreach (string field in ((JArray)expectedSchema["required"]).Values<string>())
+        {
+            var missing = (JObject)schemaDecision.DeepClone(); ((JObject)missing["singing_goal_expected"]).Remove(field);
+            Check(!(bool)Parse(Envelope(missing.ToString()))[0], "Required production expected field was accepted when missing: " + field);
+        }
         string good = Decision().ToString(Newtonsoft.Json.Formatting.None);
         var accepted = Parse(Envelope(good));
         Check((bool)accepted[0] && (bool)accepted[3] && (bool)accepted[4] && (string)accepted[1] == good, "Valid complete decision rejected or rewritten");
@@ -141,6 +180,8 @@ public static class AgentWorkReviewTransportRegression
         var arrayExpected = Decision(); arrayExpected["singing_goal_expected"] = new JArray(); variants.Add(arrayExpected);
         var missingRange = Decision(); ((JObject)missingRange["singing_goal_expected"]).Remove("range"); variants.Add(missingRange);
         var invalidRange = Decision(); invalidRange["singing_goal_expected"]["range"] = "whole"; variants.Add(invalidRange);
+        var invalidRelation = Decision(); invalidRelation["singing_goal_expected"]["source_relation"] = "latest"; variants.Add(invalidRelation);
+        var nullRelation = Decision(); nullRelation["singing_goal_expected"]["source_relation"] = null; variants.Add(nullRelation);
         var tooManyRefs = Decision(); tooManyRefs["singing_goal_expected"]["refs"] = new string('x', 1025); variants.Add(tooManyRefs);
         var stringStart = Decision(); stringStart["singing_goal_expected"]["start_seconds"] = "2.5"; variants.Add(stringStart);
         var negativeEnd = Decision(); negativeEnd["singing_goal_expected"]["end_seconds"] = -1; variants.Add(negativeEnd);
@@ -148,7 +189,7 @@ public static class AgentWorkReviewTransportRegression
         var extraExpected = Decision(); extraExpected["singing_goal_expected"]["reason"] = "extra field"; variants.Add(extraExpected);
         foreach (var invalid in variants) Check(!(bool)Parse(Envelope(invalid.ToString()))[0], "Invalid typed/ranged schema accepted");
         var noGoal = Decision(); noGoal["singing_goal_status"] = "none"; noGoal["singing_goal_evidence"] = "";
-        noGoal["singing_goal_expected"] = new JObject { ["origin"] = "none", ["request_quote"] = "", ["refs"] = "", ["range"] = "none", ["start_seconds"] = null, ["end_seconds"] = null };
+        noGoal["singing_goal_expected"] = new JObject { ["origin"] = "none", ["source_relation"] = "none", ["request_quote"] = "", ["refs"] = "", ["range"] = "none", ["start_seconds"] = null, ["end_seconds"] = null };
         Check((bool)Parse(Envelope(noGoal.ToString()))[0], "No-goal empty/none/null expected shape was rejected");
         var window = Decision(); window["singing_goal_expected"]["range"] = "window";
         window["singing_goal_expected"]["start_seconds"] = 2.5; window["singing_goal_expected"]["end_seconds"] = 8.75;

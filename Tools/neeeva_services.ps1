@@ -36,9 +36,27 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Some launchers (including Codex/WSL bridges) can hand Windows PowerShell both
+# "Path" and "PATH". Start-Process rejects that duplicate case-insensitive key.
+# Keep the normal Windows spelling and value in this child controller only.
+$ProcessEnvironment = [Environment]::GetEnvironmentVariables('Process')
+$PathKeys = @($ProcessEnvironment.Keys | Where-Object { $_ -ieq 'Path' })
+if ($PathKeys.Count -gt 1) {
+    $PathValue = [string]$ProcessEnvironment['Path']
+    if ([string]::IsNullOrEmpty($PathValue)) { $PathValue = [string]$ProcessEnvironment[$PathKeys[0]] }
+    [Environment]::SetEnvironmentVariable('PATH', $null, 'Process')
+    [Environment]::SetEnvironmentVariable('Path', $PathValue, 'Process')
+}
+
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $LogDir = Join-Path $ProjectRoot 'Server\RuntimeLogs'
 $LlamaRoot = if ($env:NEEEVA_LLAMACPP_ROOT) { $env:NEEEVA_LLAMACPP_ROOT } else { 'E:\llamacpp' }
+$GptSovitsRoot = if ($env:NEEEVA_GPT_SOVITS_ROOT) {
+    [IO.Path]::GetFullPath($env:NEEEVA_GPT_SOVITS_ROOT)
+} else {
+    Join-Path $ProjectRoot 'GPT-SoVITS'
+}
 
 # 追加给 llama-server 的额外参数（空格分隔）。用途：给歌声服务腾显存。
 # qwen3.6 是 MoE，用 --n-cpu-moe N 把 N 层专家权重放内存最划算：
@@ -89,15 +107,15 @@ $Services = [ordered]@{
     }
     tts = @{
         Name = 'GPT-SoVITS TTS'; Port = 9880; Health = $null; WaitSec = 240
-        File = Join-Path $ProjectRoot 'GPT-SoVITS\runtime\python.exe'
+        File = Join-Path $GptSovitsRoot 'runtime\python.exe'
         Args = @('api_v2.py', '-a', '127.0.0.1', '-p', '9880', '-c', 'GPT_SoVITS/configs/tts_infer.yaml')
-        WorkDir = Join-Path $ProjectRoot 'GPT-SoVITS'
+        WorkDir = $GptSovitsRoot
         Note = 'Antoneva 音色'
     }
     asr = @{
         Name = 'SenseVoice ASR/歌唱感知'; Port = 9881; Health = '/health'; WaitSec = 240
         File = 'python'
-        Args = @('sensevoice_server.py')
+        Args = @('-u', 'sensevoice_server.py')
         WorkDir = Join-Path $ProjectRoot 'Server\SenseVoice'
         Note = '首次启动会自动下载模型'
     }
@@ -118,6 +136,122 @@ $Services = [ordered]@{
 }
 
 # ---------------------------------------------------------------- 工具函数
+function Resolve-AsrRuntime {
+    param(
+        [string]$ConfigPath = (Join-Path $LogDir 'asr_runtime.json'),
+        [string]$PythonOverride = $env:NEEEVA_ASR_PYTHON
+    )
+
+    $config = $null
+    if (Test-Path -LiteralPath $ConfigPath) {
+        $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($null -eq $config -or $config -is [array] -or $config -isnot [pscustomobject]) {
+            throw "ASR runtime 配置必须是 JSON 对象: $ConfigPath"
+        }
+    }
+    $python = 'python'
+    $source = 'PATH (legacy default)'
+    $device = 'cuda:0' # 与 sensevoice_server.py 原默认值一致；旧 CPU 环境仍按原逻辑回退。
+    $requireCuda = $false
+    $extraArgs = @()
+    if ($config) {
+        if ($config.device -is [string] -and -not [string]::IsNullOrWhiteSpace($config.device)) {
+            $device = $config.device
+        } elseif ($null -ne $config.device) { throw 'ASR runtime.device 必须是非空字符串。' }
+        if ($null -ne $config.requireCuda) {
+            if ($config.requireCuda -isnot [bool]) { throw 'ASR runtime.requireCuda 必须是 JSON 布尔值。' }
+            $requireCuda = $config.requireCuda
+        }
+        if ($null -ne $config.extraArgs) {
+            if ($config.extraArgs -isnot [array]) { throw 'ASR runtime.extraArgs 必须是字符串数组。' }
+            foreach ($argument in $config.extraArgs) {
+                if ($argument -isnot [string]) { throw 'ASR runtime.extraArgs 只能包含字符串。' }
+                $option = ($argument -split '=', 2)[0]
+                # 同时拒绝 argparse 接受的缩写，设备和端口只由各自配置负责。
+                if ($option.StartsWith('--') -and @('--device', '--host', '--port', '--require-cuda' | Where-Object { $_.StartsWith($option) }).Count) {
+                    throw "ASR runtime.extraArgs 不可覆盖 device/host/port/requireCuda: $argument"
+                }
+                $extraArgs += $argument
+            }
+        }
+        $python = $config.python
+        $source = $ConfigPath
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PythonOverride)) {
+        $python = $PythonOverride
+        $source = 'NEEEVA_ASR_PYTHON'
+    }
+    if ($python -isnot [string] -or [string]::IsNullOrWhiteSpace($python)) {
+        throw 'ASR runtime.python 必须指定已验收的 Python 可执行文件。'
+    }
+    if ($python -match '[\\/]') {
+        if (-not [IO.Path]::IsPathRooted($python)) { $python = Join-Path $ProjectRoot $python }
+        if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "ASR Python 不存在: $python" }
+        $python = (Resolve-Path -LiteralPath $python).Path
+    } else {
+        $python = (Get-Command $python -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+    }
+    if ($requireCuda -and $device -notmatch '^cuda(?::\d+)?$') {
+        throw 'ASR requireCuda=true 时 device 必须是 cuda 或 cuda:N。'
+    }
+    $arguments = @('-u', 'sensevoice_server.py') + $extraArgs + @('--device', $device)
+    if ($requireCuda) { $arguments += '--require-cuda' }
+    # Start-Process 会将 ArgumentList 拼成一个字符串；保留含空格的文件路径。
+    $quotedArguments = @($arguments | ForEach-Object {
+        '"' + ($_ -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
+    })
+    return @{ File = $python; Args = $quotedArguments; Device = $device; RequireCuda = $requireCuda; Source = $source }
+}
+
+function Test-AsrCudaRuntime {
+    param($Runtime)
+    if (-not $Runtime.RequireCuda) { return }
+    $probe = "import sys, torch; assert torch.cuda.is_available(), 'CUDA unavailable'; x = torch.zeros(1, device=sys.argv[1]); x.add_(1); torch.cuda.synchronize(x.device); print('torch=' + torch.__version__ + ' device=' + str(x.device))"
+    $previousErrorPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue' # 捕获 Python stderr，统一按退出码判断。
+        $result = & $Runtime.File -u -c $probe $Runtime.Device 2>&1
+        $probeExitCode = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $previousErrorPreference }
+    if ($probeExitCode -ne 0) { throw "ASR CUDA 预检失败，不会回退 CPU: $result" }
+    Write-Host ("  [ASR CUDA] {0}" -f ($result -join ' ')) -ForegroundColor DarkGray
+}
+
+function Resolve-TtsRuntime {
+    param(
+        [string]$ConfigPath = (Join-Path $LogDir 'tts_runtime.json'),
+        [string]$ThreadsOverride = $env:NEEEVA_TTS_CPU_THREADS
+    )
+
+    $threads = $null
+    $source = 'inherited environment (unchanged)'
+    if (-not [string]::IsNullOrWhiteSpace($ThreadsOverride)) {
+        $value = $ThreadsOverride.Trim()
+        $parsedThreads = 0
+        if ($value -notmatch '^[0-9]+$' -or
+            -not [int]::TryParse($value, [ref]$parsedThreads) -or
+            $parsedThreads -lt 1 -or $parsedThreads -gt 32) {
+            throw 'NEEEVA_TTS_CPU_THREADS 必须是 1..32 的正整数。'
+        }
+        $threads = $parsedThreads
+        $source = 'NEEEVA_TTS_CPU_THREADS'
+    } elseif (Test-Path -LiteralPath $ConfigPath) {
+        $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($null -eq $config -or $config -is [array] -or $config -isnot [pscustomobject]) {
+            throw "TTS runtime 配置必须是 JSON 对象: $ConfigPath"
+        }
+        if ($null -ne $config.PSObject.Properties['cpu_threads']) {
+            $value = $config.cpu_threads
+            if (($value -isnot [int] -and $value -isnot [long]) -or $value -lt 1 -or $value -gt 32) {
+                throw 'TTS runtime.cpu_threads 必须是 1..32 的 JSON 正整数。'
+            }
+            $threads = [int]$value
+            $source = $ConfigPath
+        }
+    }
+    return @{ CpuThreads = $threads; Source = $source }
+}
+
 function Get-PortPid {
     param([int]$Port)
     $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
@@ -137,7 +271,10 @@ function Test-ServiceHealthy {
     # api_v2 是先加载模型再起 uvicorn，端口开了就等于就绪
     if (-not $Svc.Health) { return $true }
     try {
-        $null = Invoke-RestMethod ("http://127.0.0.1:{0}{1}" -f $Svc.Port, $Svc.Health) -TimeoutSec 3
+        $health = Invoke-RestMethod ("http://127.0.0.1:{0}{1}" -f $Svc.Port, $Svc.Health) -TimeoutSec 3
+        if ($Svc.Port -eq 9881 -and $Svc.RequireCuda) {
+            return ($health.require_cuda -is [bool] -and $health.require_cuda -and $health.asr_device -match '^cuda(?::\d+)?$')
+        }
         return $true
     } catch {
         return $false
@@ -196,10 +333,43 @@ function Start-One {
     $env:PYTHONIOENCODING = 'utf-8'
 
     try {
-        $proc = Start-Process -FilePath $Svc.File -ArgumentList $Svc.Args `
-            -WorkingDirectory $Svc.WorkDir `
-            -RedirectStandardOutput $out -RedirectStandardError $err `
-            -WindowStyle Hidden -PassThru
+        if ($Key -eq 'asr') {
+            $selection = "python={0} device={1} requireCuda={2} source={3}" -f $Svc.File, $Svc.Device, $Svc.RequireCuda, $Svc.Source
+            Write-Host ("  [ASR runtime] {0}" -f $selection) -ForegroundColor DarkGray
+            Add-Content -LiteralPath (Join-Path $LogDir 'asr.launch.log') -Encoding UTF8 -Value ("{0:o} {1}" -f (Get-Date), $selection)
+        }
+        $ttsEnvironment = @{}
+        try {
+            if ($Key -eq 'tts') {
+                if ($null -ne $Svc.CpuThreads) {
+                    Write-Host ("  [TTS runtime] cpu_threads={0} (OMP_NUM_THREADS/MKL_NUM_THREADS), source={1}" -f $Svc.CpuThreads, $Svc.Source) -ForegroundColor DarkGray
+                    # Windows PowerShell 5.1 has no Start-Process -Environment.
+                    # Scope inherited overrides to this launch, then restore even
+                    # on failure. Never change user/machine environment or ASR.
+                    foreach ($name in @('OMP_NUM_THREADS', 'MKL_NUM_THREADS')) {
+                        $ttsEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+                        [Environment]::SetEnvironmentVariable($name, [string]$Svc.CpuThreads, 'Process')
+                    }
+                } else {
+                    Write-Host '  [TTS runtime] CPU threads unconfigured; inherited environment unchanged.' -ForegroundColor DarkGray
+                }
+            }
+            $proc = Start-Process -FilePath $Svc.File -ArgumentList $Svc.Args `
+                -WorkingDirectory $Svc.WorkDir `
+                -RedirectStandardOutput $out -RedirectStandardError $err `
+                -WindowStyle Hidden -PassThru
+        } finally {
+            foreach ($name in $ttsEnvironment.Keys) {
+                if ($null -eq $ttsEnvironment[$name]) {
+                    # PowerShell can coerce $null to an empty string. Newer .NET
+                    # preserves empty environment values, so pass a real null to
+                    # remove a variable that was absent before this launch.
+                    [Environment]::SetEnvironmentVariable($name, [NullString]::Value, 'Process')
+                } else {
+                    [Environment]::SetEnvironmentVariable($name, $ttsEnvironment[$name], 'Process')
+                }
+            }
+        }
         Write-Host ("  [启动] {0,-24} 端口 {1}  PID {2}" -f $Svc.Name, $Svc.Port, $proc.Id) -ForegroundColor Cyan
         return $true
     } catch {
@@ -279,6 +449,20 @@ $Selected = if ($Only.Count -gt 0) {
     $Only
 } else {
     @($Services.Keys)
+}
+
+# 只在准备启动 ASR 时读取 active 配置；先验证再执行 restart，坏配置不应先停旧服务。
+if ($Action -in @('start', 'restart') -and $Selected -contains 'asr') {
+    $asrRuntime = Resolve-AsrRuntime
+    Test-AsrCudaRuntime -Runtime $asrRuntime
+    foreach ($property in $asrRuntime.Keys) { $Services.asr[$property] = $asrRuntime[$property] }
+}
+
+# Optional and TTS-only. Validate before restart stops any existing service.
+# Environment override wins; without either setting, preserve inherited threads.
+if ($Action -in @('start', 'restart') -and $Selected -contains 'tts') {
+    $ttsRuntime = Resolve-TtsRuntime
+    foreach ($property in $ttsRuntime.Keys) { $Services.tts[$property] = $ttsRuntime[$property] }
 }
 
 Write-Host ''

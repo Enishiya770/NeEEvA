@@ -11,8 +11,9 @@ public static class DesktopTvSetup
 {
     public const string ScreenName = "Desktop Screen";
     public const string MaterialPath = "Assets/AIChatTookit/Materials/DesktopScreen.mat";
+    private const string ConfigureMenuPath = "NeEEvA/TV/Show Desktop on Selected tv_frame";
 
-    [MenuItem("NeEEvA/TV/Show Desktop on Selected tv_frame")]
+    [MenuItem(ConfigureMenuPath)]
     public static void ConfigureSelected()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -23,6 +24,16 @@ public static class DesktopTvSetup
         var screen = ConfigureFrame(selected, true);
         Selection.activeGameObject = screen.gameObject;
         EditorSceneManager.MarkSceneDirty(selected.scene);
+    }
+
+    [MenuItem(ConfigureMenuPath, true)]
+    private static bool ValidateConfigureSelected()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return false;
+        var selected = Selection.activeGameObject;
+        return selected != null && string.Equals(selected.name, "tv_frame", StringComparison.Ordinal) &&
+            selected.GetComponent<MeshFilter>()?.sharedMesh != null &&
+            selected.GetComponent<MeshRenderer>() != null;
     }
 
     public static DesktopTvScreen ConfigureNamedFrame(Scene scene)
@@ -36,10 +47,12 @@ public static class DesktopTvSetup
     public static DesktopTvScreen ConfigureFrame(GameObject frame, bool undo)
     {
         if (EditorUtility.IsPersistent(frame)) throw new InvalidOperationException("Select a scene instance of tv_frame.");
+        if (!string.Equals(frame.name, "tv_frame", StringComparison.Ordinal))
+            throw new InvalidOperationException("Select the scene object named tv_frame, not a duplicate or its child.");
         var mesh = frame.GetComponent<MeshFilter>()?.sharedMesh;
-        // This is the measured SailingMoon frame: one mesh includes bezel and recessed panel.
-        if (mesh == null || Vector3.Distance(mesh.bounds.size, new Vector3(0.06f, 4f, 2.7f)) > 0.02f)
-            throw new InvalidOperationException("This setup expects the SailingMoon tv_frame mesh.");
+        var renderer = frame.GetComponent<MeshRenderer>();
+        if (mesh == null || renderer == null)
+            throw new InvalidOperationException("The selected tv_frame must have a MeshFilter and MeshRenderer.");
         var material = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
         if (material == null) throw new InvalidOperationException("DesktopScreen material is missing.");
         var child = frame.transform.Find(ScreenName);
@@ -59,13 +72,15 @@ public static class DesktopTvSetup
         surface.transform.localRotation = Quaternion.LookRotation(Vector3.right, Vector3.forward);
         surface.transform.localScale = new Vector3(3.88f, 2.58f, 1f);
         surface.isStatic = false;
-        var renderer = surface.GetComponent<MeshRenderer>();
-        if (undo) Undo.RecordObject(renderer, "Set desktop screen material");
-        renderer.sharedMaterial = material;
-        renderer.shadowCastingMode = ShadowCastingMode.Off;
-        renderer.receiveShadows = false;
-        renderer.lightProbeUsage = LightProbeUsage.Off;
-        renderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+        var screenRenderer = surface.GetComponent<MeshRenderer>();
+        if (screenRenderer == null)
+            throw new InvalidOperationException("The Desktop Screen child must have a MeshRenderer.");
+        if (undo) Undo.RecordObject(screenRenderer, "Set desktop screen material");
+        screenRenderer.sharedMaterial = material;
+        screenRenderer.shadowCastingMode = ShadowCastingMode.Off;
+        screenRenderer.receiveShadows = false;
+        screenRenderer.lightProbeUsage = LightProbeUsage.Off;
+        screenRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
         var display = surface.GetComponent<DesktopTvScreen>();
         if (display == null) display = undo ? Undo.AddComponent<DesktopTvScreen>(surface) : surface.AddComponent<DesktopTvScreen>();
         if (undo) Undo.RecordObject(display, "Fit desktop aspect ratio");
@@ -89,7 +104,7 @@ public sealed class DesktopTvScreenEditor : Editor
             EditorGUILayout.LabelField("Displayed frames", display.DisplayedFrames.ToString());
             EditorGUILayout.HelpBox(display.ExclusionStatus, display.ExclusionHasError ? MessageType.Warning : MessageType.Info);
         }
-        EditorGUILayout.HelpBox("Exclude Unity Windows / 仅在电视中排除 Unity：截图和 OBS 不受此开关影响。运行时按 F8 可切换所有正在采集的电视；也可单独勾选每台电视。局部过滤目前仅支持 Windows 64 位、单显示器；失败时可关闭开关使用普通采集。", MessageType.Info);
+        EditorGUILayout.HelpBox("Exclude Unity Windows / 仅在电视中排除 Unity：优先使用电视专用过滤；显卡驱动不兼容时按 Fallback Behavior 选择全局排除，或让 OBS/截图继续看到 Unity（电视可能出现镜像）。运行时按 F8 可切换所有正在采集的电视；也可单独勾选每台电视。", MessageType.Info);
     }
 }
 

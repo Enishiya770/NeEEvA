@@ -135,7 +135,14 @@ public static class SceneObjectReferenceRegression
         var expectedWireAnchors = JArray.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(visible));
         LastReport["knownAnchorWire"] = new JObject { ["expected"] = expectedWireAnchors,
             ["actual"] = decisionInput["visibleKnownObjects"]?.DeepClone() };
-        Check(JToken.DeepEquals(decisionInput["visibleKnownObjects"], expectedWireAnchors),
+        // Distances are read separately at these two boundaries. Their measurement
+        // timestamps may differ; all entity, image, distance and gate facts must agree.
+        var actualWireAnchors = (JArray)decisionInput["visibleKnownObjects"].DeepClone();
+        expectedWireAnchors = (JArray)expectedWireAnchors.DeepClone();
+        foreach (var anchors in new[] { expectedWireAnchors, actualWireAnchors })
+            foreach (JObject anchorRow in anchors)
+                (anchorRow["deviceOperationPrerequisite"] as JObject)?.Remove("measuredAtUtc");
+        Check(JToken.DeepEquals(actualWireAnchors, expectedWireAnchors),
             "Actual room-decision input contains the same current-frame anchors after JSON numeric serialization.");
         yield return Dispatch(chat, source, ReferenceWire("set-object-state", source.CaptureId, lamp.EntityId, "on"), "reopen-known-lamp-after-other-selection");
         var reopened = Fact(chat);

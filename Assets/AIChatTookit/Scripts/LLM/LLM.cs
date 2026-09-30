@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,6 +8,7 @@ using UnityEngine;
 
 public class LLM:MonoBehaviour
 {
+    public ConversationTrace TraceContext { get; set; }
     /// <summary>
     /// User-visible runtime failures.  Consumers render these as non-character notices;
     /// they must never be inserted into dialogue history or spoken through TTS.
@@ -165,6 +166,17 @@ public class LLM:MonoBehaviour
     /// </summary>
     public virtual string BuildSystemPrompt()
     {
+        string character = BuildCharacterPrompt();
+        if (string.IsNullOrEmpty(character)) return string.Empty;
+        // Stored history is the traditional/general tool channel. Structured
+        // request builders take the character assets separately and never copy
+        // this compatibility contract into their own schema.
+        return FormalPromptProfile.RolePreferences(character) + "\n\n" +
+            FormalPromptProfile.LegacyEnvelope + "\n" + PromptProtocolAssets.GeneralTools();
+    }
+
+    protected string BuildCharacterPrompt()
+    {
         if (!HasPromptFiles) return string.Empty;
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < m_PromptFiles.Length; i++)
@@ -274,6 +286,8 @@ public class LLM:MonoBehaviour
             if (sb.Length > 0) sb.Append("\n\n");
             sb.Append("[已加载技能: ").Append(wanted).Append("]\n");
             sb.Append(match.text.Trim());
+            if (string.Equals(wanted, "singing", StringComparison.OrdinalIgnoreCase))
+                sb.Append("\n\n").Append(PromptProtocolAssets.SingingTools());
         }
         ActiveSkillContext = sb.ToString();
         return allFound;
@@ -416,6 +430,46 @@ public class LLM:MonoBehaviour
         onComplete?.Invoke(FirstReplyCompletion.Failed("first-reply-provider-unsupported"));
     }
 
+    /// <summary>
+    /// Provider-neutral structured decision fast lane.  The request is private:
+    /// it must not append user/assistant history and the returned legacy text is
+    /// still subject to the caller's normal execution/public-boundary gates.
+    /// Providers that do not have a compact JSON transport fail closed.
+    /// </summary>
+    public virtual bool SupportsRoleDecisionMessages => false;
+    // Validated result of the currently accepted role request, cleared on dispatch/cancel.
+    public RoleDecision AcceptedRoleDecision { get; protected set; }
+    public RecordingSingingDecisionContext RecordingDecisionContext { get; set; }
+    public virtual bool SupportsRecordingSingingDecision => false;
+
+    public virtual void PostRoleDecisionMsg(
+        string prompt,
+        Action<bool, string, string> callback)
+        => callback?.Invoke(false, "", "role-decision-provider-unsupported");
+
+    public virtual void PostRoleDecisionMsg(
+        string prompt,
+        string imageDataUrl,
+        Action<bool, string, string> callback)
+        => PostRoleDecisionMsg(prompt, imageDataUrl, callback, null);
+
+    public virtual void PostRoleDecisionMsg(
+        string prompt,
+        string imageDataUrl,
+        Action<bool, string, string> callback,
+        ConversationTrace trace)
+    {
+        if (string.IsNullOrEmpty(imageDataUrl))
+        {
+            PostRoleDecisionMsg(prompt, callback);
+            return;
+        }
+        ReportUnsupportedVisualInput();
+        callback?.Invoke(false, "", "role-decision-image-unsupported");
+    }
+
+    public virtual void CancelRoleDecisionMsg() { }
+
     public virtual void PostSpeechContinuationStream(string context, Action<SpeechText> onSpeech,
         Action<string> onComplete, string imageDataUrl = null)
     {
@@ -459,6 +513,16 @@ public class LLM:MonoBehaviour
     /// proposal. Shares ephemeral cancellation and never writes accepted history.</summary>
     public virtual void PostListeningPreparationMsg(string prompt, Action<string> callback)
         => PostEphemeralMsg(prompt, callback);
+
+    /// <summary>Legacy singing/listening draft with its own cancellation purpose;
+    /// serialization remains the existing ephemeral contract.</summary>
+    public virtual void PostListeningDraftMsg(string prompt, Action<string> callback)
+        => PostEphemeralMsg(prompt, callback);
+
+    /// <summary>Cancel only a request still owned by listening. Providers without
+    /// scoped ownership safely leave transport running; caller versions discard
+    /// stale callbacks. Never fall back to cancelling an unrelated shared lane.</summary>
+    public virtual void CancelListeningMsg() { }
 
     /// <summary>Provider can transmit request-local observation pixels for decisions, without adding them to history.</summary>
     public virtual bool SupportsVisualDecisionMessages => false;
@@ -519,6 +583,16 @@ public class LLM:MonoBehaviour
         if (callback != null) callback("");
     }
 
+    public virtual void PostTurnBoundaryMsgObserved(string prompt, Action<AuxiliaryReply> callback)
+        => PostTurnBoundaryMsg(prompt, text => callback?.Invoke(new AuxiliaryReply(text,
+            string.IsNullOrWhiteSpace(text) ? "empty_or_unavailable" : "received")));
+
+    // Explicit per-request diagnostic context; fallbacks preserve other providers.
+    public virtual void PostWorkReviewMsg(string prompt, string imageDataUrl, Action<string> callback, ConversationTrace trace)
+        => PostWorkReviewMsg(prompt, imageDataUrl, callback);
+    public virtual void PostAutonomyIntentMsg(string prompt, string imageDataUrl, Action<string> callback, ConversationTrace trace)
+        => PostAutonomyIntentMsg(prompt, imageDataUrl, callback);
+
     public virtual void CancelTurnBoundaryMsg()
     {
     }
@@ -541,6 +615,37 @@ public class LLM:MonoBehaviour
     public virtual void CancelUtilityMessage()
     {
     }
+
+    /// <summary>
+    /// Background perception request for the continuously refreshed character view.
+    /// It is stateless, never enters dialogue history, and has its own cancellation
+    /// lane so a visual refresh cannot cancel RoleDecision or formal speech.
+    /// The callback receives a provider response body (normally a compact JSON
+    /// scene summary) and a transport/status string; callers must validate it before
+    /// exposing any fact to the dialogue model.
+    /// </summary>
+    public virtual bool SupportsSceneVisionInference => false;
+
+    public virtual void PostSceneVisionInferenceMsg(
+        string prompt,
+        string imageDataUrl,
+        Action<bool, string, string> callback,
+        ConversationTrace trace = null)
+    {
+        if (string.IsNullOrEmpty(imageDataUrl))
+        {
+            callback?.Invoke(false, "", "scene-vision-image-missing");
+            return;
+        }
+        // Reuse the provider's existing, already-supported visual auxiliary
+        // transport. Providers with a truly independent lane may override this
+        // method later; the semantic/state owner remains provider-neutral here.
+        PostEphemeralMsg(prompt, imageDataUrl, output =>
+            callback?.Invoke(!string.IsNullOrWhiteSpace(output), output ?? "",
+                string.IsNullOrWhiteSpace(output) ? "empty_or_unavailable" : "received"));
+    }
+
+    public virtual void CancelSceneVisionInferenceMsg() { }
 
     /// <summary>Same-model, request-local spatial decision and speech consistency check. No history or side effects.</summary>
     public virtual bool SupportsRoomTaskMessages => false;

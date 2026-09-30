@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-09-26",
+  "release_sha256": "05e901197489fc462dfbe1624914034fa00d34a10bf47897ec20cf994c30a8e1",
+  "source_name": "GPT-SoVITS-v2pro-20250604",
+  "source_policy": "Exact local files; no upstream checkout or model upgrade",
+  "file_count": 337,
+  "source_bytes": 2113597471,
+  "complete_local_archive": "Server/TTS/runtime/package/release.tar",
+  "complete_local_archive_bytes": 2114273280,
+  "remote_root": "/home/spark_root_001/neeeva-voice/tts",
+  "base_image_tag": "ghcr.io/anemll/dspark-vllm-gx10:0.1.1",
+  "base_image_id": "sha256:3430d6614a8e2925f34d059af6caf05aff42387326db4d05639a60f10f2654d8",
+  "base_image_repo_digest": "ghcr.nju.edu.cn/anemll/dspark-vllm-gx10@sha256:a83948492cf13df455170fb42885f5ef4db54fefe0feff0f841ecbff464ac9d8",
+  "tested_image_tag": "neeeva-spark-tts:local-frozen-v1",
+  "tested_image_id": "sha256:239cdc7a23bd546ccc1fca1cd1f923d6b0b27d168a7702329db3d24fc559e5ef",
+  "container_name": "neeeva-spark-tts",
+  "tts_url": "http://192.168.114.163:9880/tts",
+  "health_url": "http://192.168.114.163:9880/health",
+  "reference_path": "/home/spark_root_001/neeeva-voice/tts/release/refs/41041.wav",
+  "model_version": "v2",
+  "model_hashes": {
+    "s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt": "732f94e63b148066e24c7f9d2637f3374083e637635f07fbdb695dee20ddbe1f",
+    "s2G2333k.pth": "924fdccaa3c574bf139c25c9759aa1ed3b3f99e19a7c529ee996c2bc17663695"
+  },
+  "actual_models": {
+    "t2s_model": {
+      "device": "cuda:0",
+      "dtype": "torch.float32"
+    },
+    "vits_model": {
+      "device": "cuda:0",
+      "dtype": "torch.float32"
+    }
+  },
+  "gpu": "NVIDIA GB10",
+  "torch": "2.11.0+cu130",
+  "cuda": "13.0",
+  "precision": "float32",
+  "cpu_threads": 1,
+  "local_support_file_sha256": {
+    "manifest.json": "6823eae53d59c814f6b4097008de776b4914c21d3f1563429198c34605f9b00c",
+    "serve.py": "58e0948969589b219f7936fad03a0651085f7ba9a4cfeec781a0d28faf1abbd5",
+    "requirements-lock.txt": "b8bfdd7cf7401ca19dcd56fdeee7b450f9533b43113d9a2046efc385764888d7",
+    "Dockerfile.spark": "9219bcf0fa4b2e15bbb4e26df8f04303db9c89c0e7039feb46068e7be524b1b8",
+    "manage.sh": "2b6fbdd784e5cf50674bd416cc265bb8b2d2b43dfeddea029b0832732dc49286"
+  },
+  "dependency_lock_scope": "pip freeze --local from tested isolated venv; inherited packages are fixed by base image identity",
+  "dockerfile_rebuild_status": "Constraints added after recording installed versions; current tested image was not rebuilt after that bookkeeping change",
+  "smoke": {
+    "status": "passed",
+    "path": "Server/TTS/runtime/smoke.json",
+    "scope": "Real network and CUDA synthesis; WAV validation only, not human listening or Unity playback",
+    "cases": 7
+  },
+  "owner_release_regression": "work/spark-voice-migration-20260926/tts-owner-release-review.json",
+  "counters_caveat": "disconnected includes normal client close; completed means response lifecycle returned normally, not guaranteed full synthesis",
+  "rollback": "Close Unity, run Tools/TTS/set-tts-route.ps1 -Profile local, start existing local voice services; stop only this remote TTS via manage-spark-tts.ps1 -Action stop when no longer needed"
+}

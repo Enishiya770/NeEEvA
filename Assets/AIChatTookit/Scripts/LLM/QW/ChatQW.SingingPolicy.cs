@@ -38,7 +38,7 @@ public partial class ChatQW
         AppendMessage(sb, new SendData("system", SingingPolicyReviewProtocol.Instruction)); sb.Append(',');
         AppendMessage(sb, new SendData("user", SingingPolicyReviewProtocol.BuildObservation(observation)));
         sb.Append(']');
-        if (m_Backend == BackendType.Local) sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        AppendReasoningControls(sb, false);
         AppendSlot(sb, k_SlotAuxiliary); sb.Append('}');
         return sb.ToString();
     }

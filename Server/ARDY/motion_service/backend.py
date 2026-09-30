@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
@@ -29,13 +30,16 @@ def grounded_source_root(neutral, names):
 
 
 class ArdyBackend:
-    def __init__(self, device="cuda", minimum_free_mib=3072, adapter_selection=None, adapter_release=None):
+    def __init__(self, device="cuda", minimum_free_mib=3072, adapter_selection=None,
+                 adapter_release=None, adapter_path=None, allow_unverified_adapter=False):
         if adapter_selection is not None and adapter_release is not None:
             raise ValueError("Choose one adapter selection or verified preview release")
         self.device_name = device
         self.minimum_free_mib = minimum_free_mib
         self.adapter_selection = adapter_selection
         self.adapter_release = adapter_release
+        self.adapter_path = Path(adapter_path).expanduser() if adapter_path else None
+        self.allow_unverified_adapter = bool(allow_unverified_adapter)
         self.info = {"ready": False, "languageModelsLoaded": False}
 
     def load(self):
@@ -56,7 +60,15 @@ class ArdyBackend:
         else:
             self.gpu_preflight = None
         self.lock = json.loads((ROOT / "Tools/MotionAdapter/upstream-lock.json").read_text(encoding="utf-8-sig"))
-        source = ROOT / "Server/ARDY/vendor" / ("ardy-" + self.lock["ardy"])
+        # A deployed Spark checkout reuses the existing pinned vendor and venv
+        # under <remote-root>/vendor.  The Windows layout keeps it below
+        # Server/ARDY/vendor.  Accept both locations while still requiring the
+        # exact locked revision.
+        source_candidates = [
+            ROOT / "Server/ARDY/vendor" / ("ardy-" + self.lock["ardy"]),
+            ROOT / "vendor" / ("ardy-" + self.lock["ardy"]),
+        ]
+        source = next((path for path in source_candidates if path.is_dir()), source_candidates[0])
         if not Path(ardy.__file__).resolve().is_relative_to(source.resolve()):
             raise RuntimeError("Imported ARDY differs from the pinned vendor source")
         if self.adapter_release is not None:
@@ -65,13 +77,20 @@ class ArdyBackend:
             self.adapter = self.adapter.to(self.device)
             self.adapter_sha = adapter_info["adapterSha256"]
         elif self.adapter_selection is None:
-            adapter_path = ROOT / "Tools/MotionAdapter/runtime/mlp-seed1.pt"
+            adapter_path = self.adapter_path or (ROOT / "Tools/MotionAdapter/runtime/mlp-seed1.pt")
+            if not adapter_path.is_file():
+                raise RuntimeError(f"MLP adapter checkpoint is missing: {adapter_path}")
             self.adapter_sha = hashlib.sha256(adapter_path.read_bytes()).hexdigest()
-            approved = json.loads((ROOT / "Tools/MotionAdapter/reports/unity-preview-generation.json").read_text(encoding="utf-8"))
-            if self.adapter_sha != approved["sources"]["adapter_sha256"]:
+            approved_file = ROOT / "Tools/MotionAdapter/reports/unity-preview-generation.json"
+            approved_sha = None
+            if approved_file.is_file():
+                approved = json.loads(approved_file.read_text(encoding="utf-8"))
+                approved_sha = approved.get("sources", {}).get("adapter_sha256")
+            if not self.allow_unverified_adapter and self.adapter_sha != approved_sha:
                 raise RuntimeError("Selected adapter differs from the evaluated MLP checkpoint")
             self.adapter, checkpoint = load_adapter(adapter_path, self.device, FEATURE_CONTRACT)
-            adapter_info = {"adapter": "mlp-seed1", "adapterMode": "evaluated-baseline", "candidate": False,
+            adapter_info = {"adapter": adapter_path.stem, "adapterMode": "external-unverified" if self.allow_unverified_adapter else "evaluated-baseline", "candidate": False,
+                            "approvedForRuntime": not self.allow_unverified_adapter,
                             "adapterSha256": self.adapter_sha}
         else:
             from .adapter_selection import load_candidate_cpu
@@ -80,9 +99,34 @@ class ArdyBackend:
             self.adapter_sha = adapter_info["adapterSha256"]
         if checkpoint["architecture"] != "mlp":
             raise RuntimeError("The service requires the selected MLP adapter")
-        snapshot = Path(snapshot_download(repo_id=self.lock["ardy_core_repo"],
-            revision=self.lock["ardy_core_revision"], local_files_only=True,
-            cache_dir=ROOT / "Server/ARDY/models/hf-cache/hub"))
+        direct_core = os.environ.get("NEEEVA_ARDY_CORE_DIR")
+        snapshot = Path(direct_core).expanduser() if direct_core else None
+        if snapshot is not None:
+            required = (snapshot / "config.yaml", snapshot / "denoiser.safetensors",
+                        snapshot / "tokenizer.safetensors", snapshot / "stats/motion/mean.npy",
+                        snapshot / "stats/motion/std.npy")
+            if not all(path.is_file() for path in required):
+                raise RuntimeError(f"Pinned ARDY Core directory is incomplete: {snapshot}")
+        else:
+            cache_candidates = []
+            env_cache = os.environ.get("NEEEVA_ARDY_HF_CACHE")
+            if env_cache:
+                cache_candidates.append(Path(env_cache).expanduser())
+            cache_candidates.extend([
+                ROOT / "Server/ARDY/models/hf-cache",
+                ROOT / "hf-cache",
+            ])
+            cache_error = None
+            for cache_root in cache_candidates:
+                try:
+                    snapshot = Path(snapshot_download(repo_id=self.lock["ardy_core_repo"],
+                        revision=self.lock["ardy_core_revision"], local_files_only=True,
+                        cache_dir=cache_root / "hub"))
+                    break
+                except Exception as error:
+                    cache_error = error
+            if snapshot is None:
+                raise RuntimeError("Pinned ARDY Core checkpoint is missing from the configured HF caches") from cache_error
         self.model = load_model(snapshot.name, checkpoints_dir=str(snapshot.parent),
                                 device=str(self.device), text_encoder=False)
         if self.model.text_encoder is not None:

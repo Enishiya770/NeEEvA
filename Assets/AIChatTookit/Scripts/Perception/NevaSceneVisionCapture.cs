@@ -31,7 +31,12 @@ namespace NeEEvA.Perception
             SceneVisionObservation.WithoutImage("closed", "场景视觉尚未开启。");
         public Texture PreviewTexture => preview;
         public bool IsObserving { get; private set; }
+        /// <summary>When enabled, the capture publishes a rolling latest frame even without a one-shot callback.</summary>
+        public bool IsContinuousObservation { get; private set; }
         public bool IsCapturePending => waiting.Count > 0 || inFlight != null && inFlight.generation == generation;
+        public float LatestObservationAgeSeconds => LatestObservation != null && LatestObservation.HasImage
+            ? Mathf.Max(0f, Time.realtimeSinceStartup - LatestObservation.CapturedAtRealtime)
+            : float.PositiveInfinity;
         public string Status { get; private set; } = "场景视觉尚未开启。";
         public float PreparationMilliseconds { get; private set; }
 
@@ -105,12 +110,42 @@ namespace NeEEvA.Perception
         }
 
         public bool IsCurrentViewCompatible(SceneVisionObservation observation, float maxTranslation = .25f, float maxAngle = 15f)
-        {
-            return IsObservationBindingCurrent(observation) &&
+            => IsObservationBindingCurrent(observation) &&
                 Finite(maxTranslation) && Finite(maxAngle) && maxTranslation >= 0 && maxAngle >= 0 &&
                 TryGetCurrentCameraPose(out Pose pose) &&
                 Vector3.Distance(pose.position, observation.CameraPosition) <= maxTranslation &&
                 Quaternion.Angle(pose.rotation, observation.CameraRotation) <= maxAngle;
+
+        [Serializable] public sealed class ViewCompatibility
+        {
+            public bool bindingCurrent, poseAvailable, limitsValid, compatible;
+            public float translationMeters = -1f, rotationDegrees = -1f, ageSeconds = -1f;
+            public float maximumTranslationMeters, maximumRotationDegrees;
+            public string reason;
+        }
+
+        // Read-only diagnostics from the same pose and thresholds used by the gate.
+        // A recent image can still fail due to motion; increasing its TTL cannot fix that.
+        public ViewCompatibility DescribeViewCompatibility(SceneVisionObservation observation,
+            float maxTranslation = .25f, float maxAngle = 15f)
+        {
+            var value = new ViewCompatibility {
+                bindingCurrent = IsObservationBindingCurrent(observation),
+                limitsValid = Finite(maxTranslation) && Finite(maxAngle) && maxTranslation >= 0 && maxAngle >= 0,
+                maximumTranslationMeters = maxTranslation, maximumRotationDegrees = maxAngle,
+                ageSeconds = observation != null && Finite(observation.CapturedAtRealtime)
+                    ? Time.realtimeSinceStartup - observation.CapturedAtRealtime : -1f };
+            if (!value.bindingCurrent) { value.reason = "source-binding-invalid"; return value; }
+            if (!value.limitsValid) { value.reason = "view-limits-invalid"; return value; }
+            value.poseAvailable = TryGetCurrentCameraPose(out Pose pose);
+            if (!value.poseAvailable) { value.reason = "current-camera-pose-unavailable"; return value; }
+            value.translationMeters = Vector3.Distance(pose.position, observation.CameraPosition);
+            value.rotationDegrees = Quaternion.Angle(pose.rotation, observation.CameraRotation);
+            bool translation = value.translationMeters <= maxTranslation, rotation = value.rotationDegrees <= maxAngle;
+            value.compatible = translation && rotation;
+            value.reason = value.compatible ? "compatible" : !translation && !rotation ? "translation-and-rotation-exceeded" :
+                !translation ? "translation-exceeded" : "rotation-exceeded";
+            return value;
         }
 
         internal bool IsObservationBindingCurrent(SceneVisionObservation observation)
@@ -198,6 +233,14 @@ namespace NeEEvA.Perception
             }
         }
 
+        /// <summary>Keep sampling the character view in the background. Only the newest completed frame is retained.</summary>
+        public void SetContinuousObservation(bool enabled)
+        {
+            IsContinuousObservation = enabled;
+            if (enabled && IsObserving)
+                nextCaptureAt = Mathf.Min(nextCaptureAt, Time.realtimeSinceStartup);
+        }
+
         public void RequestCapture(Action<SceneVisionObservation> callback)
         {
             if (callback == null) throw new ArgumentNullException(nameof(callback));
@@ -233,7 +276,8 @@ namespace NeEEvA.Perception
         {
             if (inFlight != null && (inFlight.generation == generation || waiting.Count > 0) && Time.realtimeSinceStartup - inFlight.time > 3f)
                 CancelPending("场景图片读回超时，未使用旧帧。", "error");
-            if (!IsObserving || waiting.Count == 0 || inFlight != null || Time.realtimeSinceStartup < nextCaptureAt) return;
+            if (!IsObserving || (!IsContinuousObservation && waiting.Count == 0) ||
+                inFlight != null || Time.realtimeSinceStartup < nextCaptureAt) return;
             if (!TryGetCurrentCameraPose(out Pose pose))
             { CancelPending("角色眼位已失效，未采集图片。", "unavailable"); return; }
             var callbacks = new List<Action<SceneVisionObservation>>(waiting); waiting.Clear();

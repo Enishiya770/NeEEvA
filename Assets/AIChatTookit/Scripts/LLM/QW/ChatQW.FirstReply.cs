@@ -10,6 +10,8 @@ using UnityEngine.Networking;
 public partial class ChatQW
 {
     private int m_FirstReplyOwnedGeneration = -1;
+    [SerializeField, Tooltip("Enable only for a verified vLLM endpoint supporting structured_outputs.regex. Other OpenAI-compatible providers retain their existing role-decision route.")]
+    private bool m_OpenAICompatibleFirstReplyStructuredOutputs = false;
     private FirstReplyUserLease m_FirstReplyUserLease;
     private sealed class FirstReplyUserLease
     {
@@ -17,10 +19,25 @@ public partial class ChatQW
         internal SendData User;
         internal bool CommitHistory, Settled, HandoffPending;
     }
-    public override bool SupportsFirstReplyRouting => m_Backend == BackendType.Local;
+    public override bool SupportsFirstReplyRouting =>
+        (m_Backend == BackendType.Local || m_Backend == BackendType.OpenAICompatible &&
+            m_OpenAICompatibleFirstReplyStructuredOutputs) && !m_EnableSemanticRoleDecision;
 
-    private void OnDisable() => CancelOwnedFirstReply();
-    private void OnApplicationPause(bool paused) { if (paused) CancelOwnedFirstReply(); }
+    private void OnDisable()
+    {
+        CancelActorIntent();
+        CancelFastLoopDecision();
+        CancelOwnedFirstReply();
+        CancelRoleDecisionMsg();
+    }
+    private void OnApplicationPause(bool paused)
+    {
+        if (!paused) return;
+        CancelActorIntent();
+        CancelFastLoopDecision();
+        CancelOwnedFirstReply();
+        CancelRoleDecisionMsg();
+    }
     private void CancelOwnedFirstReply()
     {
         if (m_FirstReplyOwnedGeneration < 0 || m_FirstReplyOwnedGeneration != m_StreamRequestGeneration) return;
@@ -52,7 +69,13 @@ public partial class ChatQW
 
     private List<SendData> CreateFirstReplyHistory(SendData current, string context)
     {
-        var source = new List<SendData>(m_DataList);
+        // Use the same fingerprint-checked authored-rule projection as the
+        // formal stages. Route selection needs capabilities and current facts,
+        // not the conflicting legacy thought/tool transport examples.
+        string projectionContext = context;
+        var projected = ProjectFormalSource(FormalResponseStage.FirstReplyRouting,
+            ref projectionContext, out _, out _, out _);
+        var source = new List<SendData>(projected);
         // Legacy providers stored persona in every user message; keep the current
         // question verbatim and supply that same fallback persona as system here.
         if (!HasPromptFiles && !string.IsNullOrWhiteSpace(m_Prompt) && !source.Exists(m => m != null && m.role == "system"))
@@ -88,12 +111,15 @@ public partial class ChatQW
             "\n\n" + RoleOutputPublicBoundary.OutputContract));
         var wire = JObject.Parse(BuildStageRequestJsonForMessages(wireHistory, true,
             context, null, FormalResponseStage.FirstReplyRouting));
-        // This opt-in protocol requires the native grammar. Cloud/legacy traffic is unchanged.
-        wire["grammar"] = FirstReplyProtocol.Grammar;
+        // The configured DGX vLLM endpoint uses its verified regex API. No
+        // llama.cpp grammar or slot fields are sent to that backend.
+        if (m_Backend == BackendType.Local) wire["grammar"] = FirstReplyProtocol.Grammar;
+        else if (m_Backend == BackendType.OpenAICompatible && m_OpenAICompatibleFirstReplyStructuredOutputs)
+            wire["structured_outputs"] = new JObject { ["regex"] = FirstReplyProtocol.StructuredRegex };
         wire["max_tokens"] = 768;
         wire["enable_thinking"] = false;
         wire["chat_template_kwargs"] = new JObject { ["enable_thinking"] = false };
-        wire["id_slot"] = preparation ? k_SlotAuxiliary : k_SlotMainConversation;
+        if (m_Backend == BackendType.Local) wire["id_slot"] = preparation ? k_SlotAuxiliary : k_SlotMainConversation;
         return wire.ToString(Formatting.None);
     }
 
@@ -107,10 +133,12 @@ public partial class ChatQW
         List<SendData> history = CreateFirstReplyHistory(current, context);
         string wire = BuildFirstReplyWire(history, context, !commitHistory);
         var clock = System.Diagnostics.Stopwatch.StartNew();
+        var trace = commitHistory ? TraceContext?.Child("llm-first-reply") : null;
         var timing = new ChatRequestWireTiming(generation, commitHistory ? "first-reply" : "first-reply-preparation");
         var parser = new FirstReplyStreamParser(Current, part => {
             if (!Current()) return;
             timing.MarkSpeech(clock.Elapsed.TotalSeconds);
+            if (!string.IsNullOrWhiteSpace(part.Text)) trace?.Mark("llm.first_valid_public_speech");
             onSpeech?.Invoke(part);
         });
         int estimate = EstimateStageRequestTokens(history, context + FirstReplyProtocol.RouteContract +
@@ -123,6 +151,7 @@ public partial class ChatQW
             var handler = new SSEDownloadHandler(delta => {
                 if (!Current()) return;
                 timing.MarkContent(clock.Elapsed.TotalSeconds);
+                if (!string.IsNullOrEmpty(delta)) trace?.Mark("llm.first_content_delta");
                 parser.Push(delta);
             });
             handler.OnFirstData = () => { if (Current()) timing.MarkBytes(clock.Elapsed.TotalSeconds); };
@@ -136,8 +165,10 @@ public partial class ChatQW
             if (!Current()) { if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null; yield break; }
             timing.MarkSent(clock.Elapsed.TotalSeconds, Time.realtimeSinceStartupAsDouble, DateTime.UtcNow.ToString("O"));
             if (m_LogRequestStats) Debug.Log("[LLM/HttpTiming] " + timing.Snapshot("sent", null, null).ToString(Formatting.None));
+            trace?.Mark("llm.send");
             yield return request.SendWebRequest();
             timing.MarkComplete(clock.Elapsed.TotalSeconds);
+            trace?.Mark(Current() ? "llm.transport_complete" : "llm.superseded");
             if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null;
             if (!Current()) yield break;
             bool success = request.responseCode == 200 && request.result == UnityWebRequest.Result.Success;
@@ -149,7 +180,8 @@ public partial class ChatQW
             if (success)
             {
                 int imageTokens = ImageTokenAllowance(history);
-                ObservePromptUsage(handler.PromptTokens, estimate - imageTokens, imageTokens > 0);
+                ObservePromptUsage(handler.PromptTokens, estimate - imageTokens, imageTokens > 0,
+                    Mathf.Max(4096, m_MaxPromptTokens));
             }
             if (m_LogRequestStats)
                 Debug.Log("[LLM/FirstReply] " + new JObject {
@@ -197,6 +229,7 @@ public partial class ChatQW
         // Keep the accepted user while the asynchronous planner runs. Removing it
         // here loses that turn if the user interrupts before legacy formal dispatch.
         if (!completion.SpeechDelivered && (completion.Disposition == FirstReplyDisposition.Tools ||
+            completion.Disposition == FirstReplyDisposition.RecordingSinging ||
             completion.Disposition == FirstReplyDisposition.Failed)) lease.HandoffPending = true;
     }
 

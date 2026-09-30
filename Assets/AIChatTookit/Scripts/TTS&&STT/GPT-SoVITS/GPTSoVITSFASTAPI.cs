@@ -57,6 +57,8 @@ public class GPTSoVITSFASTAPI : TTS
     [SerializeField, Min(10)] private int m_MaxStreamingClipSeconds = 120;
 
     private UnityWebRequest m_ActiveStreamingRequest;
+    private PcmSpeechRequest m_ActivePcmSpeech;
+    private PcmSpeechRequest m_PreparedPcmSpeech;
     private AudioSource m_ActiveStreamingOutput;
     private AudioClip m_ActiveStreamingClip;
     private bool m_StreamCancelled;
@@ -97,9 +99,49 @@ public class GPTSoVITSFASTAPI : TTS
     }
 
     public override bool SupportsStreamingPlayback => true;
+    // A concurrent synthesis can starve the active PCM stream and cause underruns.
+    // Prefetch only after its HTTP stream has completed; audio playback may continue.
     public override bool CanPrefetchNextSpeech =>
         (m_ActiveStreamingRequest == null || m_ActiveStreamingRequest.isDone) &&
-        (m_ActivePreparedRequest == null || m_ActivePreparedRequest.isDone);
+        (m_ActivePreparedRequest == null || m_ActivePreparedRequest.isDone) &&
+        (m_PreparedPcmSpeech == null || m_PreparedPcmSpeech.Disposed);
+
+    public override bool SupportsStreamingLookahead => true;
+
+    public override PreparedSpeechStream PrepareStreamingSpeech(SpeechText speech)
+    {
+        // Never overlap two model jobs. The previous audio may still be playing
+        // locally, but its entire HTTP stream must have arrived before this send.
+        if (!CanPrefetchNextSpeech) return null;
+        CancelWarmUpForRealRequest();
+        SpeechText resolved = ResolveSpeech(speech);
+        if (string.IsNullOrWhiteSpace(resolved.Text)) return null;
+        var trace = TraceContext?.Child("tts-stream-lookahead");
+        TraceContext = null;
+        m_PreparedPcmSpeech = BeginPcmRequest(resolved, trace, true);
+        return m_PreparedPcmSpeech;
+    }
+
+    public override void SpeakPreparedStreamingWithPlaybackGate(
+        PreparedSpeechStream prepared, AudioSource output, Action<string> onStarted,
+        Action<bool, string, float> onCompleted, Func<StreamingPlaybackPermission> playbackGate)
+    {
+        var job = prepared as PcmSpeechRequest;
+        if (job == null || job.Disposed || !ReferenceEquals(job, m_PreparedPcmSpeech))
+        {
+            prepared?.Dispose();
+            onCompleted?.Invoke(false, string.Empty, 0f);
+            return;
+        }
+        // Detach before cancelling the old player: ownership now belongs to StreamVoice.
+        m_PreparedPcmSpeech = null;
+        CancelStreaming();
+        m_StreamCancelled = false;
+        TraceContext = null;
+        job.Trace?.Mark("tts.lookahead_adopted");
+        StartCoroutine(StreamVoice(job.Speech.Text, output, onStarted, onCompleted,
+            playbackGate, m_StreamGeneration, job.Speech.LanguageCode, job));
+    }
 
     public override void SpeakStreaming(
         string text,
@@ -131,6 +173,8 @@ public class GPTSoVITSFASTAPI : TTS
 
     public override void CancelStreaming()
     {
+        m_PreparedPcmSpeech?.Dispose();
+        m_PreparedPcmSpeech = null;
         m_StreamGeneration++;
         m_StreamCancelled = true;
         if (m_ActiveStreamingRequest != null && !m_ActiveStreamingRequest.isDone)
@@ -359,6 +403,9 @@ public class GPTSoVITSFASTAPI : TTS
 
     private void OnDestroy()
     {
+        CancelStreaming();
+        m_ActivePcmSpeech?.Dispose();
+        m_ActivePcmSpeech = null;
         CancelPreparedSpeech();
         foreach (List<LatencyFillerEntry> entries in m_LatencyFillerClips.Values)
         {
@@ -388,11 +435,15 @@ public class GPTSoVITSFASTAPI : TTS
         CancelPreparedSpeech();
         int generation = ++m_PreparedSpeechGeneration;
         SpeechText resolved = ResolveSpeech(new SpeechText(text, speech.LanguageCode, speech.LanguageSource));
-        StartCoroutine(GetPreparedVoice(resolved.Text, generation, callback, resolved.LanguageCode));
+        ConversationTrace trace = TraceContext?.Child("tts-prepared");
+        TraceContext = null;
+        StartCoroutine(GetPreparedVoice(resolved.Text, generation, callback, resolved.LanguageCode, trace));
     }
 
     public override void CancelPreparedSpeech()
     {
+        m_PreparedPcmSpeech?.Dispose();
+        m_PreparedPcmSpeech = null;
         m_PreparedSpeechGeneration++;
         if (m_ActivePreparedRequest != null && !m_ActivePreparedRequest.isDone)
             m_ActivePreparedRequest.Abort();
@@ -402,11 +453,13 @@ public class GPTSoVITSFASTAPI : TTS
     private IEnumerator GetPreparedVoice(
         string text,
         int generation,
-        Action<AudioClip, string> callback, string languageCode)
+        Action<AudioClip, string> callback, string languageCode,
+        ConversationTrace trace)
     {
         RequestData requestData = CreateSpeechRequest(text, languageCode, 0);
 
         string postJson = JsonUtility.ToJson(requestData);
+        float requestStart = Time.realtimeSinceStartup;
         using (UnityWebRequest request = new UnityWebRequest(m_PostURL, "POST"))
         {
             m_ActivePreparedRequest = request;
@@ -415,10 +468,26 @@ public class GPTSoVITSFASTAPI : TTS
             request.SetRequestHeader("Content-Type", "application/json");
             request.timeout = 20;
 
+            trace?.Mark("tts.prepare_send", new Newtonsoft.Json.Linq.JObject
+            {
+                ["characters"] = text.Length,
+                ["language"] = languageCode ?? string.Empty
+            });
             yield return request.SendWebRequest();
+
+            trace?.Mark("tts.prepare_http_complete", new Newtonsoft.Json.Linq.JObject
+            {
+                ["httpStatus"] = request.responseCode,
+                ["transportResult"] = request.result.ToString(),
+                ["elapsedSeconds"] = Time.realtimeSinceStartup - requestStart
+            });
 
             if (generation != m_PreparedSpeechGeneration)
             {
+                trace?.Mark("tts.prepare_discarded", new Newtonsoft.Json.Linq.JObject
+                {
+                    ["reason"] = "generation-changed"
+                });
                 callback?.Invoke(null, text);
                 yield break;
             }
@@ -428,12 +497,24 @@ public class GPTSoVITSFASTAPI : TTS
             {
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(request);
                 if (clip != null) clip.name = "prepared-singing-bridge";
+                trace?.Mark("tts.prepare_clip_ready", new Newtonsoft.Json.Linq.JObject
+                {
+                    ["clipReady"] = clip != null,
+                    ["durationSeconds"] = clip != null ? clip.length : 0f,
+                    ["elapsedSeconds"] = Time.realtimeSinceStartup - requestStart
+                });
                 callback?.Invoke(clip, text);
+                trace?.Mark("tts.prepare_callback");
             }
             else
             {
                 Debug.LogWarning($"[歌唱预反应] 静默预合成失败(code={request.responseCode}): {request.error}");
                 callback?.Invoke(null, text);
+                trace?.Mark("tts.prepare_callback", new Newtonsoft.Json.Linq.JObject
+                {
+                    ["clipReady"] = false,
+                    ["error"] = request.error ?? string.Empty
+                });
             }
         }
     }
@@ -486,14 +567,18 @@ public class GPTSoVITSFASTAPI : TTS
         AudioSource output,
         Action<string> onStarted,
         Action<bool, string, float> onCompleted,
-        Func<StreamingPlaybackPermission> playbackGate, int generation, string languageCode)
+        Func<StreamingPlaybackPermission> playbackGate, int generation, string languageCode,
+        PcmSpeechRequest prepared = null)
     {
+        var trace = prepared != null ? prepared.Trace : TraceContext?.Child("tts-stream");
+        TraceContext = null; // Capture once: prewarm/later jobs must not inherit this span.
         bool gateCancelled = false;
         bool playbackInterrupted = false;
         AudioClip streamingClip = null;
         bool IsCurrent()
         {
-            if (m_StreamCancelled || generation != m_StreamGeneration || gateCancelled || playbackInterrupted) return false;
+            if (m_StreamCancelled || generation != m_StreamGeneration || gateCancelled || playbackInterrupted ||
+                (prepared != null && prepared.Disposed)) return false;
             if (streamingClip != null && (output == null || output.clip != streamingClip)) return false;
             if (playbackGate != null && playbackGate() == StreamingPlaybackPermission.Cancel)
                 gateCancelled = true;
@@ -502,29 +587,24 @@ public class GPTSoVITSFASTAPI : TTS
         text = Regex.Replace(text ?? string.Empty, "<think>.*?</think>", "", RegexOptions.Singleline).Trim();
         if (string.IsNullOrEmpty(text) || output == null)
         {
+            prepared?.Dispose();
             onCompleted?.Invoke(false, text, 0f);
             yield break;
         }
 
-        RequestData requestData = CreateSpeechRequest(text, languageCode, m_StreamingMode);
-
-        string postJson = JsonUtility.ToJson(requestData);
-        var pcmHandler = new PcmStreamingDownloadHandler();
+        var job = prepared ?? BeginPcmRequest(new SpeechText(text, languageCode), trace, false);
+        var pcmHandler = job.Pcm;
         bool started = false;
         bool playbackAdvanced = false;
         bool success = false;
-        float requestStart = Time.realtimeSinceStartup;
-        float headerAt = -1f, firstPcmAt = -1f, bufferReadyAt = -1f;
+        float requestStart = job.StartedAt;
 
-        using (UnityWebRequest request = new UnityWebRequest(m_PostURL, "POST"))
+        using (job)
         {
+            UnityWebRequest request = job.Request;
+            m_ActivePcmSpeech = job;
             m_ActiveStreamingRequest = request;
-            request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(postJson));
-            request.downloadHandler = pcmHandler;
-            request.SetRequestHeader("Content-Type", "application/json");
-            request.timeout = 30;
-
-            UnityWebRequestAsyncOperation operation = request.SendWebRequest();
+            UnityWebRequestAsyncOperation operation = job.Operation;
 
             //等 WAV 头和最小预缓冲。短句若已经完整返回，也立即开始播放。
             while (IsCurrent() && !pcmHandler.HeaderReady && !operation.isDone)
@@ -534,22 +614,16 @@ public class GPTSoVITSFASTAPI : TTS
 
             if (IsCurrent() && pcmHandler.HeaderReady && !pcmHandler.FormatError)
             {
-                headerAt = Time.realtimeSinceStartup;
-                float initialPrebuffer = Mathf.Clamp(
-                    Mathf.Max(m_StreamingPrebufferSeconds, m_AdaptivePrebufferSeconds),
-                    0.1f,
-                    m_MaxAdaptivePrebufferSeconds);
+                float initialPrebuffer = job.PrebufferSeconds;
                 int wantedSamples = Mathf.CeilToInt(
                     pcmHandler.SampleRate * pcmHandler.Channels * initialPrebuffer);
                 while (IsCurrent() && !operation.isDone && pcmHandler.BufferedSampleCount < wantedSamples)
                 {
-                    if (firstPcmAt < 0f && pcmHandler.TotalSamplesReceived > 0)
-                        firstPcmAt = Time.realtimeSinceStartup;
                     yield return null;
                 }
 
-                bufferReadyAt = Time.realtimeSinceStartup;
-                if (firstPcmAt < 0f && pcmHandler.TotalSamplesReceived > 0) firstPcmAt = bufferReadyAt;
+                job.Observe();
+                float gateEnteredAt = Time.realtimeSinceStartup;
                 // The network request and synthesis have already run. Waiting here
                 // leaves the opener's AudioSource untouched while PCM accumulates.
                 while (IsCurrent() && playbackGate != null)
@@ -559,12 +633,14 @@ public class GPTSoVITSFASTAPI : TTS
                     if (permission == StreamingPlaybackPermission.Play) break;
                     yield return null;
                 }
+                float gateWaitSeconds = Time.realtimeSinceStartup - gateEnteredAt;
 
                 if (operation.isDone) pcmHandler.MarkInputComplete();
 
                 if (IsCurrent() && pcmHandler.TotalSamplesReceived > 0)
                 {
                     m_ActiveStreamingOutput = output;
+                    float clipStartedAt = Time.realtimeSinceStartup;
                     streamingClip = AudioClip.Create(
                         "GPT-SoVITS-stream",
                         pcmHandler.SampleRate * Mathf.Max(10, m_MaxStreamingClipSeconds),
@@ -572,16 +648,19 @@ public class GPTSoVITSFASTAPI : TTS
                         pcmHandler.SampleRate,
                         true,
                         pcmHandler.ReadSamples);
+                    trace?.Mark("audio.stream_clip_created", new Newtonsoft.Json.Linq.JObject {
+                        ["elapsedSeconds"] = Time.realtimeSinceStartup - clipStartedAt });
                     output.clip = streamingClip;
                     m_ActiveStreamingClip = streamingClip;
                     output.loop = false;
                     output.Play();
+                    trace?.Mark("audio.source_play_called");
                     started = true;
                     onStarted?.Invoke(text);
-                    Debug.Log($"[TTS/Timing] header={headerAt - requestStart:F2}s " +
-                        $"firstPcm={(firstPcmAt >= 0f ? firstPcmAt - requestStart : -1f):F2}s " +
-                        $"bufferReady={bufferReadyAt - requestStart:F2}s " +
-                        $"playbackGate={Time.realtimeSinceStartup - bufferReadyAt:F2}s total={Time.realtimeSinceStartup - requestStart:F2}s");
+                    Debug.Log($"[TTS/Timing] header={job.HeaderAt - requestStart:F2}s " +
+                        $"firstPcm={job.FirstPcmAt - requestStart:F2}s " +
+                        $"bufferReady={job.ReadyAt - requestStart:F2}s " +
+                        $"playbackGate={gateWaitSeconds:F2}s total={Time.realtimeSinceStartup - requestStart:F2}s");
                     Debug.Log($"[TTS流式] 首批PCM开始播放，等待 {Time.realtimeSinceStartup - requestStart:F2}s，缓冲 {pcmHandler.BufferedSeconds:F2}s");
                 }
             }
@@ -595,6 +674,11 @@ public class GPTSoVITSFASTAPI : TTS
             float rebufferStartedAt = 0f;
             float rebufferWaitSeconds = 0f;
             int streamUnderruns = 0;
+            int rebufferEpisodes = 0;
+            long pendingUnderrunFrame = -1;
+            AudioSettings.GetDSPBufferSize(out int dspBufferFrames, out _);
+            int pauseLeadFrames = Mathf.CeilToInt(dspBufferFrames * pcmHandler.SampleRate /
+                (float)Mathf.Max(1, AudioSettings.outputSampleRate));
             while (started && IsCurrent())
             {
                 if (!playbackAdvanced && output.isPlaying && output.timeSamples > 0)
@@ -606,28 +690,54 @@ public class GPTSoVITSFASTAPI : TTS
                 { playbackInterrupted = true; break; }
                 if (operation.isDone) pcmHandler.MarkInputComplete();
 
-                int newUnderruns = pcmHandler.ConsumeUnderrunSignals();
+                int newUnderruns = pcmHandler.ConsumeUnderrunSnapshot(out long firstUnderrunSample);
                 if (newUnderruns > 0)
                 {
                     streamUnderruns += newUnderruns;
-                    if (!operation.isDone && !pausedForRebuffer && output != null)
+                    if (!pausedForRebuffer && firstUnderrunSample >= 0)
+                    {
+                        long gapFrame = firstUnderrunSample / Mathf.Max(1, pcmHandler.Channels);
+                        pendingUnderrunFrame = pendingUnderrunFrame < 0
+                            ? gapFrame : Math.Min(pendingUnderrunFrame, gapFrame);
+                    }
+                }
+
+                float resumeBuffer = Mathf.Max(m_StreamingResumeBufferSeconds, job.PrebufferSeconds);
+                if (!pausedForRebuffer && pendingUnderrunFrame >= 0)
+                {
+                    // PCMReaderCallback runs ahead of playback. Let already queued
+                    // real speech play while synthesis catches up; never seek over PCM.
+                    if (operation.isDone || pcmHandler.BufferedSeconds >= resumeBuffer)
+                        pendingUnderrunFrame = -1;
+                    else if (output.timeSamples + pauseLeadFrames >= pendingUnderrunFrame)
                     {
                         output.Pause();
                         pausedForRebuffer = true;
+                        ++rebufferEpisodes;
                         rebufferStartedAt = Time.realtimeSinceStartup;
-                        Debug.LogWarning($"[TTS stream] PCM underrun; pausing for rebuffer (buffer={pcmHandler.BufferedSeconds:F2}s)");
+                        trace?.Mark("tts.rebuffer_start", new Newtonsoft.Json.Linq.JObject {
+                            ["episode"] = rebufferEpisodes, ["bufferSeconds"] = pcmHandler.BufferedSeconds,
+                            ["firstGapFrame"] = pendingUnderrunFrame, ["playbackFrame"] = output.timeSamples,
+                            ["outputSamplesWritten"] = pcmHandler.TotalOutputSamplesWritten,
+                            ["lastRealOutputSample"] = pcmHandler.LastRealOutputSamplePosition,
+                            ["pauseLeadFrames"] = pauseLeadFrames });
+                        pendingUnderrunFrame = -1;
+                        Debug.LogWarning($"[TTS stream] playback approaching PCM gap; pausing for rebuffer (buffer={pcmHandler.BufferedSeconds:F2}s)");
                     }
                 }
 
                 if (pausedForRebuffer)
                 {
                     bool canResume = operation.isDone ||
-                        pcmHandler.BufferedSeconds >= Mathf.Max(m_StreamingResumeBufferSeconds, m_StreamingPrebufferSeconds);
+                        pcmHandler.BufferedSeconds >= resumeBuffer;
                     if (canResume && output != null)
                     {
                         rebufferWaitSeconds += Time.realtimeSinceStartup - rebufferStartedAt;
                         output.UnPause();
                         pausedForRebuffer = false;
+                        trace?.Mark("tts.rebuffer_end", new Newtonsoft.Json.Linq.JObject {
+                            ["episode"] = rebufferEpisodes, ["waitSeconds"] = Time.realtimeSinceStartup - rebufferStartedAt,
+                            ["bufferSeconds"] = pcmHandler.BufferedSeconds });
                         Debug.Log($"[TTS stream] playback resumed after {Time.realtimeSinceStartup - rebufferStartedAt:F2}s, " +
                                   $"buffer={pcmHandler.BufferedSeconds:F2}s");
                     }
@@ -650,10 +760,9 @@ public class GPTSoVITSFASTAPI : TTS
 
             if (started && IsCurrent() && streamUnderruns > 0)
             {
-                //一次流里连续饿死说明网络抖动不止一个尖峰；按次数更快抬高下一句的
-                //预缓冲。成功时慢慢回落，避免 0.5↔0.7 秒锯齿造成每隔一句又欠载。
-                float adaptiveIncrease = 0.15f +
-                    0.05f * Mathf.Min(streamUnderruns, 4);
+                // Missing PCM still matters even when download catches up before
+                // a pause. Use missing audio duration, not callback frequency.
+                float adaptiveIncrease = Mathf.Clamp(pcmHandler.InsertedSilenceSeconds, 0.3f, 0.5f);
                 m_AdaptivePrebufferSeconds = Mathf.Min(
                     m_MaxAdaptivePrebufferSeconds,
                     Mathf.Max(m_StreamingPrebufferSeconds, m_AdaptivePrebufferSeconds) +
@@ -677,6 +786,15 @@ public class GPTSoVITSFASTAPI : TTS
                 && !pcmHandler.FormatError;
 
             if (!IsCurrent() && !operation.isDone) request.Abort();
+            job.Observe();
+            trace?.Mark("tts.playback_completed", new Newtonsoft.Json.Linq.JObject {
+                ["success"] = success, ["underruns"] = streamUnderruns,
+                ["rebufferEpisodes"] = rebufferEpisodes,
+                ["maximumCallbackSamples"] = pcmHandler.MaximumCallbackSamples,
+                ["callbackSeconds"] = pcmHandler.MaximumCallbackSamples / (float)Mathf.Max(1, pcmHandler.SampleRate * pcmHandler.Channels),
+                ["rebufferWaitSeconds"] = rebufferWaitSeconds,
+                ["insertedSilenceSeconds"] = pcmHandler.InsertedSilenceSeconds
+            });
             if (!success && IsCurrent())
             {
                 Debug.LogError($"[TTS流式] 失败(code={request.responseCode}): {request.error}; {pcmHandler.FormatErrorMessage}");
@@ -688,6 +806,7 @@ public class GPTSoVITSFASTAPI : TTS
         if (streamingClip != null && output != null && output.clip == streamingClip) output.Stop();
         if (generation == m_StreamGeneration)
         {
+            m_ActivePcmSpeech = null;
             m_ActiveStreamingRequest = null;
             m_ActiveStreamingOutput = null;
             m_ActiveStreamingClip = null;
@@ -700,6 +819,98 @@ public class GPTSoVITSFASTAPI : TTS
         {
             if (output != null && output.clip == streamingClip) output.clip = null;
             Destroy(streamingClip);
+        }
+    }
+
+    private PcmSpeechRequest BeginPcmRequest(SpeechText speech, ConversationTrace trace, bool lookahead)
+    {
+        float prebuffer = Mathf.Clamp(Mathf.Max(m_StreamingPrebufferSeconds, m_AdaptivePrebufferSeconds),
+            0.1f, m_MaxAdaptivePrebufferSeconds);
+        var job = new PcmSpeechRequest(m_PostURL,
+            JsonUtility.ToJson(CreateSpeechRequest(speech.Text, speech.LanguageCode, m_StreamingMode)),
+            speech, trace, prebuffer, lookahead);
+        StartCoroutine(ObservePcmRequest(job));
+        return job;
+    }
+
+    private IEnumerator ObservePcmRequest(PcmSpeechRequest job)
+    {
+        // Runs even while this is the silent next sentence. No AudioSource is touched.
+        while (!job.Disposed)
+        {
+            job.Observe();
+            if (job.Operation.isDone) yield break;
+            yield return null;
+        }
+    }
+
+    private sealed class PcmSpeechRequest : PreparedSpeechStream
+    {
+        public readonly SpeechText Speech;
+        public readonly ConversationTrace Trace;
+        public readonly UnityWebRequest Request;
+        public readonly UnityWebRequestAsyncOperation Operation;
+        public readonly PcmStreamingDownloadHandler Pcm;
+        public readonly float StartedAt, PrebufferSeconds;
+        public float HeaderAt { get; private set; } = -1f;
+        public float FirstPcmAt { get; private set; } = -1f;
+        public float ReadyAt { get; private set; } = -1f;
+        public bool Disposed { get; private set; }
+        private bool received, ready;
+
+        public PcmSpeechRequest(string url, string json, SpeechText speech, ConversationTrace trace,
+            float prebufferSeconds, bool lookahead)
+        {
+            Speech = speech; Trace = trace; PrebufferSeconds = prebufferSeconds;
+            StartedAt = Time.realtimeSinceStartup;
+            Pcm = new PcmStreamingDownloadHandler();
+            Pcm.OnHeader = () => HeaderAt = Time.realtimeSinceStartup;
+            Pcm.OnFirstPcm = () => { FirstPcmAt = Time.realtimeSinceStartup; Trace?.Mark("tts.first_pcm"); };
+            Request = new UnityWebRequest(url, "POST");
+            Request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+            Request.downloadHandler = Pcm;
+            Request.SetRequestHeader("Content-Type", "application/json");
+            Request.timeout = 30;
+            Trace?.Mark("tts.send", new Newtonsoft.Json.Linq.JObject {
+                ["lookahead"] = lookahead, ["characters"] = speech.Text.Length,
+                ["language"] = speech.LanguageCode, ["prebufferSeconds"] = prebufferSeconds
+            });
+            Operation = Request.SendWebRequest();
+        }
+
+        public void Observe()
+        {
+            if (Disposed) return;
+            if (!received && Operation.isDone)
+            {
+                received = true;
+                Pcm.MarkInputComplete();
+                Trace?.Mark("tts.receive_complete", new Newtonsoft.Json.Linq.JObject {
+                    ["httpStatus"] = Request.responseCode, ["result"] = Request.result.ToString(),
+                    ["elapsedSeconds"] = Time.realtimeSinceStartup - StartedAt,
+                    ["audioSeconds"] = Pcm.AudioDuration, ["bufferSeconds"] = Pcm.BufferedSeconds
+                });
+            }
+            if (!ready && Pcm.HeaderReady && !Pcm.FormatError && Pcm.TotalSamplesReceived > 0 &&
+                (Operation.isDone || Pcm.BufferedSeconds >= PrebufferSeconds))
+            {
+                ready = true;
+                ReadyAt = Time.realtimeSinceStartup;
+                Trace?.Mark("tts.buffer_ready", new Newtonsoft.Json.Linq.JObject {
+                    ["receiveComplete"] = Operation.isDone, ["bufferSeconds"] = Pcm.BufferedSeconds,
+                    ["elapsedSeconds"] = Time.realtimeSinceStartup - StartedAt
+                });
+            }
+        }
+
+        public override void Dispose()
+        {
+            if (Disposed) return;
+            Observe();
+            Disposed = true;
+            if (!Operation.isDone) Request.Abort();
+            Trace?.Mark("tts.request_released");
+            Request.Dispose();
         }
     }
 
@@ -749,6 +960,8 @@ public class GPTSoVITSFASTAPI : TTS
     /// </summary>
     private sealed class PcmStreamingDownloadHandler : DownloadHandlerScript
     {
+        public Action OnHeader;
+        public Action OnFirstPcm;
         private readonly object m_Gate = new object();
         private readonly List<byte> m_Header = new List<byte>(44);
         private readonly Queue<float[]> m_Blocks = new Queue<float[]>();
@@ -759,6 +972,8 @@ public class GPTSoVITSFASTAPI : TTS
         private long m_LastRealOutputSamplePosition;
         private long m_InsertedSilenceSamples;
         private int m_PendingUnderrunSignals;
+        private long m_FirstPendingUnderrunOutputSample = -1;
+        private int m_MaximumCallbackSamples;
         private bool m_InputComplete;
         private bool m_HasOddByte;
         private byte m_OddByte;
@@ -768,6 +983,7 @@ public class GPTSoVITSFASTAPI : TTS
         public string FormatErrorMessage { get; private set; } = string.Empty;
         public int SampleRate { get; private set; } = 32000;
         public int Channels { get; private set; } = 1;
+        public int MaximumCallbackSamples { get { lock (m_Gate) return m_MaximumCallbackSamples; } }
 
         public int BufferedSampleCount
         {
@@ -817,12 +1033,22 @@ public class GPTSoVITSFASTAPI : TTS
             lock (m_Gate) m_InputComplete = true;
         }
 
+        // Normal EOF padding must not raise the next turn's adaptive buffer.
+        protected override void CompleteContent() => MarkInputComplete();
+
         public int ConsumeUnderrunSignals()
+        {
+            return ConsumeUnderrunSnapshot(out _);
+        }
+
+        public int ConsumeUnderrunSnapshot(out long firstOutputSample)
         {
             lock (m_Gate)
             {
                 int count = m_PendingUnderrunSignals;
+                firstOutputSample = m_FirstPendingUnderrunOutputSample;
                 m_PendingUnderrunSignals = 0;
+                m_FirstPendingUnderrunOutputSample = -1;
                 return count;
             }
         }
@@ -831,8 +1057,11 @@ public class GPTSoVITSFASTAPI : TTS
         {
             if (data == null || dataLength <= 0) return true;
 
+            bool headerArrived, firstPcmArrived;
             lock (m_Gate)
             {
+                bool hadHeader = HeaderReady;
+                long previousSamples = m_TotalSamples;
                 int offset = 0;
                 while (m_Header.Count < 44 && offset < dataLength)
                 {
@@ -848,7 +1077,12 @@ public class GPTSoVITSFASTAPI : TTS
                 {
                     AppendPcm16(data, offset, dataLength - offset);
                 }
+                headerArrived = !hadHeader && HeaderReady;
+                firstPcmArrived = previousSamples == 0 && m_TotalSamples > 0;
             }
+            // Trace callbacks may allocate/log: keep them outside the audio lock.
+            if (headerArrived) OnHeader?.Invoke();
+            if (firstPcmArrived) OnFirstPcm?.Invoke();
             return true;
         }
 
@@ -925,18 +1159,9 @@ public class GPTSoVITSFASTAPI : TTS
             int written = 0;
             lock (m_Gate)
             {
-                // Do not consume a partial block while the network stream is still open.
-                // Preserve it for resume and emit at most one DSP buffer of silence before
-                // the main thread pauses the AudioSource to rebuffer.
-                if (!m_InputComplete && m_BufferedSamples < output.Length)
-                {
-                    Array.Clear(output, 0, output.Length);
-                    m_TotalOutputSamples += output.Length;
-                    m_InsertedSilenceSamples += output.Length;
-                    m_PendingUnderrunSignals++;
-                    return;
-                }
-
+                m_MaximumCallbackSamples = Math.Max(m_MaximumCallbackSamples, output.Length);
+                // Consume available PCM in order and pad only the shortage.
+                // Holding partial audio used to insert an entire silent callback.
                 while (written < output.Length && m_Blocks.Count > 0)
                 {
                     float[] block = m_Blocks.Peek();
@@ -959,6 +1184,13 @@ public class GPTSoVITSFASTAPI : TTS
                 if (written > 0)
                 {
                     m_LastRealOutputSamplePosition = m_TotalOutputSamples - (output.Length - written);
+                }
+                if (!m_InputComplete && written < output.Length)
+                {
+                    if (m_FirstPendingUnderrunOutputSample < 0)
+                        m_FirstPendingUnderrunOutputSample = m_TotalOutputSamples - output.Length + written;
+                    m_InsertedSilenceSamples += output.Length - written;
+                    ++m_PendingUnderrunSignals;
                 }
             }
 
@@ -1139,12 +1371,16 @@ public class GPTSoVITSFASTAPI : TTS
             return m_TargetTextLan;
         }
 
-        Language detected = DetectLanguage(text, m_TargetTextLan);
-        if (m_LogLanguageChanges && detected != m_TargetTextLan)
+        // m_TargetTextLan is the Inspector-configured fallback, not a conversation
+        // state. Mutating it here made an untyped Han-only utterance in one request
+        // change the fallback used by the next request ("了解" could alternate
+        // between zh and ja depending on what ran immediately before it).
+        Language fallback = m_TargetTextLan;
+        Language detected = DetectLanguage(text, fallback);
+        if (m_LogLanguageChanges && detected != fallback)
         {
-            Debug.Log($"[TTS语言] 自动识别 {ConvertLanguageEnum(m_TargetTextLan)} -> {ConvertLanguageEnum(detected)}");
+            Debug.Log($"[TTS语言] 自动识别 fallback={ConvertLanguageEnum(fallback)} -> {ConvertLanguageEnum(detected)}");
         }
-        m_TargetTextLan = detected;
         return detected;
     }
 
@@ -1168,7 +1404,7 @@ public class GPTSoVITSFASTAPI : TTS
         // Legacy callers may include private analysis; detect only the spoken text.
         speech = new SpeechText(Regex.Replace(speech.Text ?? string.Empty,
             "<think>.*?</think>", "", RegexOptions.Singleline).Trim(),
-            speech.LanguageCode, speech.LanguageSource);
+            speech.LanguageCode, speech.LanguageSource, speech.ActionDependency, speech.SuppressTts);
         string source;
         string code;
         if (m_TargetLanguageMode == TargetLanguageMode.固定语言)
@@ -1181,6 +1417,17 @@ public class GPTSoVITSFASTAPI : TTS
             // A queued or prefetched utterance must not change another request's language.
             source = speech.LanguageSource ?? "declared";
             code = speech.LanguageCode;
+
+            // Prefetch and playback both call this method. An earlier correction must
+            // not be treated as a new model declaration.
+            string correctedCode = string.Equals(source, "declared", StringComparison.Ordinal)
+                ? ResolveDeclaredLanguageConflict(speech.Text, code) : code;
+            if (!string.Equals(correctedCode, code, StringComparison.Ordinal))
+            {
+                Debug.LogWarning($"[TTS语言] 声明与正文脚本冲突，按强证据修正: declared={code} -> {correctedCode} text=\"{speech.Text}\"");
+                source = "declared-conflict-auto";
+                code = correctedCode;
+            }
         }
         else
         {
@@ -1189,7 +1436,66 @@ public class GPTSoVITSFASTAPI : TTS
         }
         if (m_LogLanguageChanges)
             Debug.Log($"[TTS语言] source={source} lang={code} text=\"{speech.Text}\"");
-        return new SpeechText(speech.Text, code, source);
+        return new SpeechText(speech.Text, code, source, speech.ActionDependency, speech.SuppressTts);
+    }
+
+    private static string ResolveDeclaredLanguageConflict(string text, string declaredCode)
+    {
+        CountCjkScripts(text, out int kanaCount, out int hanCount);
+        bool hasStrongChinese = ContainsStrongSimplifiedChineseCharacter(text);
+
+        // Explicit language wins for ambiguous mixed text. In particular, a Japanese
+        // suffix must not turn a declared Chinese quotation into Japanese audio. Keep
+        // correcting pure kana and clearly kana-dominant Japanese mislabeled as zh.
+        if (string.Equals(declaredCode, "zh", StringComparison.Ordinal) && !hasStrongChinese &&
+            kanaCount > 0 && (hanCount == 0 || (kanaCount >= 2 && kanaCount >= hanCount)) &&
+            !ContainsHanQuotationWithoutKana(text))
+            return "ja";
+
+        // A Chinese quotation inside Japanese does not change the enclosing language.
+        // This rule and the kana rule must not contradict each other on a mixed span.
+        if (string.Equals(declaredCode, "ja", StringComparison.Ordinal) &&
+            hasStrongChinese && kanaCount == 0)
+            return "zh";
+
+        return declaredCode;
+    }
+
+    private static bool ContainsHanQuotationWithoutKana(string text)
+    {
+        // A short declared Chinese quote (e.g. 「了解」です。) remains ambiguous even
+        // when the surrounding Japanese has more kana than the quote has Han letters.
+        // Japanese-declared quotes are unaffected; the declaration supplies intent.
+        const string quotedText = @"「(?<quote>[^」]+)」|『(?<quote>[^』]+)』|“(?<quote>[^”]+)”|""(?<quote>[^""]+)""";
+        foreach (Match match in Regex.Matches(text ?? string.Empty, quotedText))
+        {
+            CountCjkScripts(match.Groups["quote"].Value, out int kanaCount, out int hanCount);
+            if (hanCount > 0 && kanaCount == 0) return true;
+        }
+        return false;
+    }
+
+    private static void CountCjkScripts(string text, out int kanaCount, out int hanCount)
+    {
+        kanaCount = 0;
+        hanCount = 0;
+        foreach (char c in text ?? string.Empty)
+        {
+            if ((c >= '\u3040' && c <= '\u30ff') || (c >= '\uff66' && c <= '\uff9d'))
+                kanaCount++;
+            else if (c >= '\u4e00' && c <= '\u9fff')
+                hanCount++;
+        }
+    }
+
+    private static bool ContainsStrongSimplifiedChineseCharacter(string text)
+    {
+        const string strongChineseOnly = "们这么说听让还过见为实现样时问间";
+        foreach (char c in text ?? string.Empty)
+        {
+            if (strongChineseOnly.IndexOf(c) >= 0) return true;
+        }
+        return false;
     }
 
     private static Language DetectLanguage(string text, Language fallback)

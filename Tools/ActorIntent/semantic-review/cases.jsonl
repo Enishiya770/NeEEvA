@@ -1,0 +1,24 @@
+{"id": "live01", "draft": "听到了哦，涅瓦在这里呢。", "user": "喂喂喂，能听到吗？", "expected": "non_action"}
+{"id": "live02", "draft": "ふふっ、ごめんね、ちょっと真面目すぎたかしら。ただ、ちゃんとあなたの声が届いてるってことを確認したかっただけだから。無事に繋がっててよかったね。", "user": "我只是在打招呼，什么动作没有确认。", "expected": "non_action"}
+{"id": "live04", "draft": "ふふっ、大丈夫、大丈夫。ただの機械的な勘違いだったみたいね。私、ちゃんと聞こえているよ。", "user": "什么情况？", "expected": "non_action"}
+{"id": "live06", "draft": "部屋は明るくて、窓の外には紫陽花が見えるわ。壁のモニターにはコードや文字が並んでいるね。", "user": "现在能看到什么吗？", "expected": "non_action"}
+{"id": "live09", "draft": "ふふっ、わかったわ。この小さなランプね。消すね。", "user": "把它关掉呀。", "expected": "adopted_action"}
+{"id": "live13", "draft": "ふふっ、また同じ話ね。でも、この部屋には飾り灯なんて見当たらないわよ。", "user": "左转九十度，找到装饰灯，靠近并关掉。", "expected": "non_action"}
+{"id": "greet-en", "draft": "I can hear you. Sorry for the confusing reply.", "user": "Can you hear me?", "expected": "non_action"}
+{"id": "refusal-zh", "draft": "我现在不想走过去，只想继续聊聊。", "user": "走到我面前。", "expected": "non_action"}
+{"id": "refusal-ja", "draft": "今はそこへ行かない。あなたの話を聞きたいの。", "user": "近くに来て。", "expected": "non_action"}
+{"id": "perception-ja", "draft": "ちゃんと見えているし、音も聞こえているよ。", "user": "抬头看我。", "expected": "non_action"}
+{"id": "head-act", "draft": "我现在把头抬起来。", "user": "试一下。", "expected": "adopted_action"}
+{"id": "head-claim", "draft": "我已经把头抬起来了。", "user": "刚才完成了吗？", "expected": "reported_action"}
+{"id": "head-ja-act", "draft": "少し右に首を向けるね。", "user": "好きにして。", "expected": "adopted_action"}
+{"id": "head-ja-claim", "draft": "首はもう右を向いているよ。", "user": "どうなった？", "expected": "reported_action"}
+{"id": "light-zh-act", "draft": "我来关掉那盏灯。", "user": "把它关掉。", "expected": "adopted_action"}
+{"id": "light-zh-claim", "draft": "我已经关掉那盏灯了。", "user": "关好了没？", "expected": "reported_action"}
+{"id": "light-ja-claim", "draft": "あのランプはもう消したよ。", "user": "消してくれた？", "expected": "reported_action"}
+{"id": "future-ja", "draft": "これからあなたのところへ歩いていくね。", "user": "近くに来て。", "expected": "adopted_action"}
+{"id": "compound", "draft": "我先向左转九十度，找到装饰灯后靠近它，再把它关掉。", "user": "试试左边。", "expected": "adopted_action"}
+{"id": "wait", "draft": "等你数到三，我再抬头。", "user": "准备好了吗？", "expected": "adopted_action"}
+{"id": "cancel", "draft": "那我就解除现在的抬头保持。", "user": "不用保持了。", "expected": "adopted_action"}
+{"id": "agency", "draft": "那盏灯我先不碰。我想走到你身边聊聊。", "user": "去关灯。", "expected": "adopted_action"}
+{"id": "quote", "draft": "你刚才说“把灯关掉”，我听见了。", "user": "你听到什么？", "expected": "non_action"}
+{"id": "hypothesis", "draft": "如果我走过去，也许能看清那盏灯，但我还没决定这么做。", "user": "走过去吧。", "expected": "non_action"}

@@ -7,23 +7,34 @@ using UnityEngine.UI;
 /// <summary>
 /// 麦克风实时聊天
 /// </summary>
-public class RTSpeechHandler : MonoBehaviour
+public partial class RTSpeechHandler : MonoBehaviour
 {
     /// <summary>
-    /// 麦克风名称
+    /// 麦克风名称。显式指定时始终使用该设备；留空时桌面和 XR 都使用
+    /// 系统默认输入，不根据设备品牌猜测。VR/PTT 复用同一个连续输入。
     /// </summary>
     public string m_MicrophoneName = null;
+    private string m_ActiveMicrophoneName;
+    private bool m_HasMicrophoneSelection;
+    private bool m_MicrophoneSelectionXr;
+    private string m_MicrophoneSelectionSetting;
+    private bool m_HasLoggedMicrophoneSelection;
+    private string m_LastLoggedMicrophoneName;
+    private bool m_LastLoggedMicrophoneXr;
+    private NeEEvA.Player.PlayerCameraController m_MicrophoneCameraController;
+    private readonly List<UnityEngine.XR.XRDisplaySubsystem> m_MicrophoneXrDisplays =
+        new List<UnityEngine.XR.XRDisplaySubsystem>();
     /// <summary>
     /// 音量大于这个值，就开始录制
     /// </summary>
     public float m_SilenceThreshold = 0.01f;
     /// <summary>
-    /// 沉默限制时长。中文/日文说话时句间停顿、思考停顿很容易超过2秒，
-    /// 设短了会经常切到一半。设到3.5秒能容忍绝大多数自然停顿；
-    /// 真正没说完的边界 case 交给 LLM 用 backchannel 处理 (见 behavior.txt)。
+    /// 普通语音的硬收束兜底。短停顿仍由 tentative EOU + final ASR 保护；
+    /// 这里不再承担等待长自然停顿的职责，否则任何未被 tentative 提前确认的
+    /// 普通轮次都会白等数秒。歌唱模式仍单独使用 m_SingingEouSilence。
     /// </summary>
     [Header("设置几秒没声音，就停止录制")]
-    public float m_RecordingTimeLimit = 3.5f;
+    public float m_RecordingTimeLimit = 1.5f;
 
     /// <summary>
     /// 录音"预卷"：每次StartRecording时，把起始位置往回拨这么多秒，
@@ -35,7 +46,7 @@ public class RTSpeechHandler : MonoBehaviour
     [Header("录音预卷时长(秒) — 防丢首音节")]
     public float m_RecordingPreRollSeconds = 0.25f;
 
-    [Header("Tentative-EOU — 把'等满3.5s沉默'压成'短沉默+ASR尾部判定'")]
+    [Header("Tentative-EOU — 把普通语音的硬等待压成'短沉默+ASR尾部判定'")]
     /// <summary>
     /// 启用临时EOU：沉默达到m_TentativeEouSilence时先做一次预测识别，
     /// 看转写文本是否以终结性标点/语气词收尾——是就立即EOU，跳过m_RecordingTimeLimit的硬等待。
@@ -180,6 +191,8 @@ public class RTSpeechHandler : MonoBehaviour
     [SerializeField] private SenseVoiceSpeechToText m_NeuralVadClient;
     [Tooltip("每次送给 VAD 的最近音频长度。短了容易漏首音，长了会增加少量传输开销。")]
     public float m_NeuralVadProbeSeconds = 0.5f;
+    [Tooltip("短探针连续否定但 RMS 仍持续时，自动录音兜底的等待时长；完整 ASR 仍是最终人声判定。")]
+    public float m_NeuralVadFallbackSeconds = 0.8f;
     [Tooltip("角色说话时用于声纹判定的探测窗口。CAM++ 需要比普通 VAD 更长的语音。")]
     public float m_BargeInSpeakerProbeSeconds = 1.0f;
     [Tooltip("只有已知真人身份达到此置信度才允许打断角色。")]
@@ -221,6 +234,7 @@ public class RTSpeechHandler : MonoBehaviour
     private bool m_NeuralVadProbeInFlight = false;
     private float m_NextNeuralVadProbeTime = 0f;
     private float m_LastNeuralVadCandidateTime = -1f;
+    private float m_NeuralVadCandidateSince = -1f;
     private int m_PendingSpeechStartPos = -1;
     private int m_NeuralVadSequence = 0;
     /// <summary>
@@ -272,27 +286,65 @@ public class RTSpeechHandler : MonoBehaviour
     private float m_UnheardCaptureClosedAt = -1f, m_RecordingCapturedAt;
     private float m_UnheardCapturedAt;
     private int m_UnheardCaptureSessionSerial;
+    private int m_LastDeferredRmsContinuationCapture = -1;
+    private int m_RecordingFirstCaptureSerial;
+    private string m_RecordingFirstCloseUtc;
+    private string m_UnheardFirstCloseUtc, m_UnheardCloseUtc;
+    private int m_UnheardFirstCaptureSerial;
     private int m_UnheardEndPos, m_UnheardFrames, m_UnheardChannels, m_UnheardFrequency, m_UnheardVoiceRevision;
     private AudioClip m_UnheardMic;
+    private AudioClip m_RejectedContinuationMic;
+    private int m_RejectedContinuationEndPos = -1;
+    private float m_RejectedContinuationClosedAt = -1f;
     private int m_RecordingCaptureLastPos = -1;
     private int m_RecordingCapturedFrames = 0;
     private int m_RecordingCaptureChannels = 1;
     private int m_RecordingCaptureFrequency = 16000;
     private float m_NextRecordingCaptureTime = 0f;
 
+    // Manual push-to-talk owns the same PCM chunks as the VAD path.  It never
+    // starts a second Microphone session, so XR/desktop PTT and realtime VAD
+    // cannot silently select different input devices.
+    [Header("按住说话 — 共享实时麦克风环形缓冲")]
+    [Tooltip("按住说话允许的最长时长；到达后自动提交当前片段并结束本次捕获。")]
+    [Range(1f, 120f)] public float m_ManualCaptureMaxSeconds = 30f;
+    [Tooltip("按住说话开始时从环形缓冲回收的首音节预卷时长。")]
+    [Range(0f, 1f)] public float m_ManualCapturePreRollSeconds = 0.15f;
+    [Tooltip("控制器抖动或极短点击产生的最短音频；低于此时长会丢弃空片段。")]
+    [Range(0f, 0.5f)] public float m_ManualCaptureMinSeconds = 0.05f;
+    private bool m_ManualCaptureActive = false;
+    private int m_ManualCaptureInputOwner = -1;
+    private float m_ManualCaptureStartedAt = -1f;
+    private int m_ManualCaptureStartPos = -1;
+    // Keep automatic VAD quiet for a short settle window when realtime mode
+    // is enabled; stale mic/ring-buffer state must not become a user turn.
+    private float m_AutoListeningBlockedUntil = -1f;
+    private float m_NextMicrophoneStartTime = 0f;
+    private float m_NextMicrophoneWarningTime = 0f;
+    private int m_LastMicrophonePosition = -1;
+    private bool m_MicrophoneHasWrapped = false;
+
     // —— Tentative-EOU 运行时状态 ——
     /// <summary>当前正在做预测ASR(送了clip在等回包)。第二次沉默到点不重发——避免刷请求</summary>
     private bool m_TentativePreviewInFlight = false;
     /// <summary>临时EOU机制的轮次序号。每次发预测ASR递增，回调用它判断是否过期</summary>
     private int m_TentativeSeq = 0;
-    /// <summary>临时EOU已经派发但还没确认。3.5s硬规则触发或用户重新开口时清掉</summary>
+    /// <summary>临时EOU已经派发但还没确认。普通语音硬规则触发或用户重新开口时清掉</summary>
     private bool m_TentativeFired = false;
     /// <summary>预测ASR派发时的时间戳——用来日志显示"省了多少秒"</summary>
     private float m_TentativePreviewSentTime = 0f;
+    /// <summary>
+    /// 同一录音至多派发一次完整快照预览。用户重新开口会使第一次预览失效，
+    /// 但不应在同一 capture 上取消并重新上传整段音频；最终 ASR 会负责收口。
+    /// </summary>
+    private bool m_TentativeFullPreviewAttempted = false;
+    private bool m_TentativeFullPreviewRetrySuppressed = false;
     private bool m_TentativeCompletePending = false;
     private string m_TentativeCompleteText = "";
     private bool m_TentativeUsedFullAsr = false;
     private bool m_TentativeFullAsrResultReady = false;
+    private int m_TentativeFullAsrActivityRevision = -1;
+    private float m_TentativeFullAsrSoundAt = -1f;
     private string m_TentativeFullAsrText = "";
     private string m_TentativeFullAsrTranscriptKey = "";
     private string m_TentativeFullAsrRawText = "";
@@ -330,11 +382,39 @@ public class RTSpeechHandler : MonoBehaviour
         m_TurnActivity.CoversRecentAudio(
             Mathf.RoundToInt(m_StreamSubmittedSeconds * 1000f),
             m_StreamPartialMaxLagMs);
+
+    private bool HasDegradedQuietTailEvidence(float now)
+    {
+        if (!m_EnableStreamingRecognition || m_TurnActivity.PendingText ||
+            m_TurnActivity.LevelActive || m_TurnActivity.MelodyActive ||
+            m_TurnActivity.TextActivityActive)
+            return false;
+
+        float quietSeconds = m_TurnActivity.QuietSeconds(now);
+        if (quietSeconds < m_DegradedAsrCloseSilence) return false;
+
+        // CoversQuietTail proves that the ASR packet reached the quiet suffix;
+        // AsrHealthy/progress checks separately cover a dead or stalled stream.
+        // This deliberately does not require fresh coverage of the whole capture:
+        // the original PCM remains available for deferred final ASR.
+        bool streamStale = !m_TurnActivity.AsrHealthy(now) ||
+            m_LastStreamProgressTime < 0f ||
+            now - m_LastStreamProgressTime > m_StreamPartialMaxAgeSeconds;
+        return m_TurnActivity.CoversQuietTail || streamStale;
+    }
     private float m_LastStreamProgressTime = -1f;
     private float m_BoundaryCandidateTime = -1f;
     private float m_LastReviewedDropSince = -1f;
     private float m_StalledRequiredUnchangedSeconds = 0f;
     private int m_StalledReviewActivityRevision;
+    private int m_StalledReviewTextRevision;
+    // Backend timing survives capture boundaries. A cancelled request is only a
+    // lower bound; a synchronous prepared decision is not a network sample.
+    private float m_ObservedBoundarySeconds;
+    private float m_LastBoundaryRemoteAttemptAt = -999f;
+    private bool m_StalledReviewRemoteAllowed;
+    private bool m_BoundaryRemoteTimingArmed;
+    private bool m_BoundaryRequestTimingRecorded;
     private float m_StalledReviewSoundAt = -1f;
     private int m_BoundaryRenewedSoundCount;
     private int m_StalledReviewFailures;
@@ -347,6 +427,8 @@ public class RTSpeechHandler : MonoBehaviour
     private float m_NextStalledTranscriptReviewTime = 0f;
     private bool m_StalledTranscriptReviewRequested = false;
     private float m_StalledTranscriptReviewRequestTime = -999f;
+    private ConversationTrace m_PendingSemanticEouTrace;
+    private float m_NextCloseBlockTraceAt;
     private bool m_PendingSemanticEou = false;
     private string m_PendingSemanticEouStatus = "";
     private string m_PendingSemanticEouTextKey = "";
@@ -369,14 +451,30 @@ public class RTSpeechHandler : MonoBehaviour
     [Header("流式倾听 — partial 只用于临时理解，EOU 后仍做最终 ASR")]
     [Tooltip("复用 SenseVoice WebSocket partial；关闭后完全回落到原整段 ASR 流程。")]
     public bool m_EnableStreamingRecognition = true;
+    [Tooltip("保留普通说话的稳定 partial 作为预判证据；正式 RoleDecision 仍等待完整 final ASR，避免长句回滚污染正式输入。")]
+    [SerializeField] private bool m_EnableStablePartialPromotion = true;
     [Tooltip("从 microphone ring buffer 向流式服务发送新音频的间隔。")]
     [Range(0.05f, 0.5f)] public float m_StreamAudioFrameSeconds = 0.10f;
     [Tooltip("Tentative-EOU 可复用的 partial 最长回包年龄。")]
     [Range(0.3f, 2.5f)] public float m_StreamPartialMaxAgeSeconds = 1.25f;
-    [Tooltip("partial 覆盖的音频比当前录音最多落后多少毫秒，超出则仍调用旧预览 ASR。")]
-    [Range(200, 2000)] public int m_StreamPartialMaxLagMs = 1000;
+    [Tooltip("partial 覆盖的音频比当前录音最多落后多少毫秒，超出则仍调用旧预览 ASR。实验基线为1800ms；仍受年龄、revision、activity和coverage门控约束。")]
+    [Range(200, 2000)] public int m_StreamPartialMaxLagMs = 1800;
+    [Tooltip("ASR流式覆盖落后时，普通语音仍有稳定静音尾部就允许提前收束。歌唱模式不使用此门控。")]
+    [Range(1.2f, 3.5f)] public float m_DegradedAsrCloseSilence = 1.8f;
+    [Tooltip("语义EOU在等待新鲜ASR覆盖前的最短降级等待；完整录音仍交给后台最终ASR。")]
+    [Range(0.3f, 2.5f)] public float m_DegradedCoverageGraceSeconds = 0.8f;
     [Tooltip("已约定跟唱且流式确认歌唱后，提前截取开头这段交给角色做声线转换。它会在用户继续唱时后台完成，用来让真正歌声在EOU后立即开始。")]
     [Range(6f, 30f)] public float m_StreamHumBackPrefixSeconds = 20f;
+
+    [Header("录音生命周期 watchdog")]
+    [Tooltip("单次用户录音的最长保留时间。超过后仍保留已采集 PCM，并交给最终 ASR；只收束当前 capture。")]
+    [Range(15f, 600f)] public float m_MaxRecordingSeconds = 120f;
+    [Tooltip("流式 ASR 已启动但没有新进度时，最长等待多久后收束 capture。断流会先给一个更短的 terminal grace。")]
+    [Range(2f, 60f)] public float m_AsrStreamStallSeconds = 12f;
+    [Tooltip("收到 WebSocket remote-close/error 后给主线程回调和最后一帧音频留下的宽限时间。")]
+    [Range(0.2f, 5f)] public float m_AsrStreamTerminalGraceSeconds = 1f;
+    [Tooltip("语义 EOU 已选择结束但流式尾部没有覆盖时，最多保留 pending decision 的时间。")]
+    [Range(0.5f, 10f)] public float m_CoverageWaitTimeoutSeconds = 2.5f;
 
     private int m_StreamLastSentPos = -1;
     private float m_StreamSubmittedSeconds;
@@ -385,7 +483,19 @@ public class RTSpeechHandler : MonoBehaviour
     private string m_LatestStreamPartial = "";
     private int m_LatestStreamPartialAudioMs = 0;
     private float m_LatestStreamPartialTime = -1f;
+    // Stable transcript is kept separately from the latest (possibly revised)
+    // hypothesis.  EOU may promote only this lane for ordinary speech; the
+    // complete clip still goes to final ASR in parallel.
+    private string m_LatestStreamStablePartial = "";
+    private int m_LatestStreamStablePartialAudioMs = 0;
+    private float m_LatestStreamStablePartialTime = -1f;
     private bool m_StreamHumBackPrefixOffered = false;
+    private float m_StreamingStartedAt = -1f;
+    private float m_StreamingTerminalAt = -1f;
+    private string m_StreamingTransportState = "idle";
+    private string m_StreamingTransportReason = "";
+    private int m_StreamingTransportGeneration = -1;
+    private bool m_StreamingPushStopped = false;
     private readonly ClosedSpeechEvidenceTracker m_ClosedSpeechTracker = new ClosedSpeechEvidenceTracker();
     public int CurrentCaptureSerial => m_NeuralVadClient != null ? m_NeuralVadClient.InputCaptureSessionSerial : 0;
 
@@ -418,7 +528,123 @@ public class RTSpeechHandler : MonoBehaviour
     public bool IsRealtimeEnabled { get { return m_AwakeState; } }
     public bool IsRealtimeClosing { get { return m_GracefulDisablePending; } }
     public bool IsRecording { get { return m_IsRecording; } }
+    /// <summary>当前是否有一轮按住说话捕获正在进行。</summary>
+    public bool IsManualCaptureActive { get { return m_ManualCaptureActive; } }
     public ChatSample ChatOwner { get { return m_ChatSample; } }
+
+    /// <summary>
+    /// 从已经运行的连续麦克风环形缓冲开始一次手动按住说话捕获。
+    /// 返回 false 表示没有可用麦克风，或实时 VAD 已占用捕获状态。
+    /// </summary>
+    public bool BeginManualCapture()
+    {
+        if (m_ManualCaptureActive || m_IsRecording)
+            return false;
+
+        if (!TryEnsureMicrophone(out int currentPos))
+        {
+            Debug.LogWarning("[RTSpeech] PTT开始失败：没有可用的已选麦克风。");
+            return false;
+        }
+
+        float preRoll = Mathf.Max(0f, m_ManualCapturePreRollSeconds);
+        int preRollSamples = Mathf.RoundToInt(preRoll * Mathf.Max(1, m_RecordedClip.frequency));
+        int startPos = !m_MicrophoneHasWrapped && currentPos < preRollSamples
+            ? Mathf.Max(0, currentPos - preRollSamples)
+            : CalculateRecordingStartPos(currentPos, preRoll);
+
+        // Reuse the same chunk accumulator as realtime VAD.  There can only be
+        // one owner because m_IsRecording and m_ManualCaptureActive are guarded
+        // above, so the two paths never interleave their PCM.
+        m_UnheardCapture.Clear();
+        m_UnheardMic = null;
+        EndStreamingRecognition();
+        ResetNeuralVadGate("manual-ptt-start");
+        m_SmoothedRms = 0f;
+        m_SilenceTimer = 0f;
+        m_BargeInTimer = 0f;
+        m_RecordingStartPos = -1;
+        personalLearningRecorder.Begin();
+        BeginRecordingCapture(startPos, currentPos);
+        m_ManualCaptureActive = true;
+        m_ManualCaptureStartedAt = Time.realtimeSinceStartup;
+        m_ManualCaptureStartPos = startPos;
+        m_ChatSample?.NotifyManualCaptureStarted();
+        m_ManualCaptureInputOwner = m_ChatSample != null ? m_ChatSample.ManualCaptureInputOwner : -1;
+        if (m_LogTimings)
+            Debug.Log($"[RTSpeech] PTT开始：device='{m_ActiveMicrophoneName ?? "system-default (null)"}' preRoll={preRoll:F2}s");
+        return true;
+    }
+
+    /// <summary>
+    /// 结束手动按住说话捕获，并把环形缓冲中实际录到的短片段提交给 ChatSample。
+    /// 返回 false 表示没有活动捕获或片段无效；调用方可以安全地重复调用。
+    /// </summary>
+    public bool EndManualCapture()
+    {
+        if (!m_ManualCaptureActive)
+            return false;
+        int inputOwner = m_ManualCaptureInputOwner;
+        m_ManualCaptureInputOwner = -1;
+        try
+        {
+            m_ManualCaptureActive = false;
+            float elapsed = m_ManualCaptureStartedAt >= 0f
+                ? Time.realtimeSinceStartup - m_ManualCaptureStartedAt : 0f;
+            m_ManualCaptureStartedAt = -1f;
+            ResetNeuralVadGate("manual-ptt-end");
+            m_SmoothedRms = 0f;
+            m_SilenceTimer = 0f;
+            m_BargeInTimer = 0f;
+            m_RecordingStartPos = -1;
+
+            int currentPos;
+            if (!TryGetMicrophonePosition(out currentPos))
+            {
+                personalLearningRecorder.Seal(null);
+                ResetRecordingCapture();
+                m_ManualCaptureStartPos = -1;
+                Debug.LogWarning("[RTSpeech] PTT结束失败：麦克风位置无效，丢弃本次片段。");
+                return false;
+            }
+
+            CaptureRecordingAudio(currentPos, true);
+            AudioClip clip = BuildAccumulatedRecordingClip();
+            int startPos = m_ManualCaptureStartPos;
+            m_ManualCaptureStartPos = -1;
+
+            if (clip == null && startPos >= 0)
+                clip = SnapshotFromBuffer(startPos, currentPos);
+
+            SealPersonalLearningCapture(clip, false);
+
+            float minSeconds = Mathf.Max(0f, m_ManualCaptureMinSeconds);
+            if (clip == null || clip.samples <= 0 ||
+                clip.length < minSeconds)
+            {
+                if (clip != null) Destroy(clip);
+                if (m_LogTimings)
+                    Debug.Log($"[RTSpeech] PTT片段过短，丢弃 ({elapsed:F2}s)");
+                return false;
+            }
+
+            // AcceptClip owns the ASR/LLM/TTS handoff.  The microphone ring keeps
+            // running, so releasing PTT never changes the realtime listener's mic.
+            if (m_ChatSample == null)
+            {
+                Destroy(clip);
+                Debug.LogWarning("[RTSpeech] PTT结束失败：未配置 ChatSample。");
+                return false;
+            }
+            // Use the independent-input overload so SenseVoice discards any stale
+            // realtime preview/session state before recognizing this PTT clip.
+            m_ChatSample.AcceptClip(clip);
+            if (m_LogTimings)
+                Debug.Log($"[RTSpeech] PTT结束：提交 {clip.length:F2}s");
+            return true;
+        }
+        finally { m_ChatSample?.NotifyManualCaptureEnded(inputOwner); }
+    }
     /// <summary>
     /// 启用时是否播放问候语(如果m_GreatingVoice配置了的话)，
     /// 模拟原唤醒词路径的"对方应了一声"感觉。
@@ -432,10 +658,13 @@ public class RTSpeechHandler : MonoBehaviour
 
     private void OnInit()
     {
+        m_MicrophoneCameraController = FindObjectOfType<NeEEvA.Player.PlayerCameraController>();
         if (m_NeuralVadClient == null)
         {
             m_NeuralVadClient = FindObjectOfType<SenseVoiceSpeechToText>();
         }
+        if (m_NeuralVadClient != null)
+            m_NeuralVadClient.OnStreamingTransportChanged += HandleStreamingTransportChanged;
 
         //AI回复结束回调
         if (m_ChatSample != null)
@@ -462,6 +691,12 @@ public class RTSpeechHandler : MonoBehaviour
 
     private void OnDestroy()
     {
+        // Scene unloads and component disables can happen while a controller
+        // trigger is held.  Drop the chunk accumulator so the next scene cannot
+        // submit stale audio from the previous one.
+        CancelManualCapture();
+        if (m_NeuralVadClient != null)
+            m_NeuralVadClient.OnStreamingTransportChanged -= HandleStreamingTransportChanged;
         if (m_ChatSample != null)
         {
             m_ChatSample.OnAISpeakDone -= SpeachDoneCallBack;
@@ -471,31 +706,168 @@ public class RTSpeechHandler : MonoBehaviour
         }
     }
 
+    private void OnDisable()
+    {
+        // XR can be disabled before the owning ChatSample is destroyed. Do not
+        // leave a manual capture armed across a temporary component disable.
+        CancelManualCapture();
+        personalLearningRecorder.CancelPitch();
+    }
+
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        // Losing Windows focus to SteamVR is not a release of the held XR trigger.
+        // XR input release, mode exit and OnDisable still end/cancel the capture.
+        if (!hasFocus && m_ManualCaptureActive && !IsMicrophoneXrActive())
+            CancelManualCapture();
+    }
+
+    private void CancelManualCapture()
+    {
+        if (!m_ManualCaptureActive && m_ManualCaptureStartPos < 0)
+            return;
+        personalLearningRecorder.Seal(null);
+        int inputOwner = m_ManualCaptureInputOwner;
+        m_ManualCaptureInputOwner = -1;
+        m_ManualCaptureActive = false;
+        m_ManualCaptureStartedAt = -1f;
+        m_ManualCaptureStartPos = -1;
+        m_RecordingStartPos = -1;
+        ResetRecordingCapture();
+        ResetNeuralVadGate("manual-ptt-cancelled");
+        m_SmoothedRms = 0f;
+        m_SilenceTimer = 0f;
+        m_BargeInTimer = 0f;
+        m_ChatSample?.NotifyManualCaptureEnded(inputOwner);
+    }
+
+    private bool TryEnsureMicrophone(out int currentPos)
+    {
+        currentPos = -1;
+        bool xrActive = IsMicrophoneXrActive();
+        // Never switch underneath an in-flight capture. Re-evaluate the automatic
+        // choice at the next idle boundary without overwriting the inspector setting.
+        if (m_HasMicrophoneSelection && !m_IsRecording && !m_ManualCaptureActive &&
+            (m_MicrophoneSelectionXr != xrActive ||
+             !string.Equals(m_MicrophoneSelectionSetting, m_MicrophoneName, StringComparison.Ordinal)))
+            ReleaseMicrophone();
+        if (!m_HasMicrophoneSelection)
+        {
+            string[] devices = GetMicrophoneDevices();
+            if (devices == null || devices.Length == 0)
+                return false;
+            m_ActiveMicrophoneName = SelectMicrophoneName(m_MicrophoneName);
+            m_MicrophoneSelectionXr = xrActive;
+            m_MicrophoneSelectionSetting = m_MicrophoneName;
+            m_HasMicrophoneSelection = true;
+            if (!m_HasLoggedMicrophoneSelection || m_LastLoggedMicrophoneXr != xrActive ||
+                !string.Equals(m_LastLoggedMicrophoneName, m_ActiveMicrophoneName, StringComparison.Ordinal))
+            {
+                Debug.Log($"[RTSpeech/Microphone] mode={(xrActive ? "XR" : "desktop")} " +
+                    $"input={m_ActiveMicrophoneName ?? "system-default (null)"} " +
+                    $"selection={(string.IsNullOrWhiteSpace(m_MicrophoneName) ? "automatic" : "explicit")}");
+                m_HasLoggedMicrophoneSelection = true;
+                m_LastLoggedMicrophoneName = m_ActiveMicrophoneName;
+                m_LastLoggedMicrophoneXr = xrActive;
+            }
+        }
+
+        if (m_RecordedClip == null || !MicrophoneIsRecording(m_ActiveMicrophoneName))
+        {
+            if (Time.realtimeSinceStartup < m_NextMicrophoneStartTime)
+                return false;
+            m_NextMicrophoneStartTime = Time.realtimeSinceStartup + 0.25f;
+            try
+            {
+                m_RecordedClip = StartMicrophone(m_ActiveMicrophoneName);
+            }
+            catch (Exception e)
+            {
+                if (m_LogTimings) Debug.LogWarning($"[RTSpeech] 启动麦克风失败: {e.Message}");
+                m_RecordedClip = null;
+                return false;
+            }
+            m_LastMicrophonePosition = -1;
+            m_MicrophoneHasWrapped = false;
+            if (m_RecordedClip == null)
+                return false;
+        }
+
+        return TryGetMicrophonePosition(out currentPos);
+    }
+
+    private static string SelectMicrophoneName(string configuredName)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredName)) return configuredName;
+        // A working headset input can have a generic USB name (for example,
+        // Capture Input terminal / AC Interface), while stale PICO virtual
+        // inputs remain listed. Honor the user's system default in XR as well.
+        // Unity's null device is the system default, not the first enumerated input.
+        return null;
+    }
+
+    protected virtual bool IsMicrophoneXrActive()
+    {
+        if (m_MicrophoneCameraController != null)
+            return m_MicrophoneCameraController.isActiveAndEnabled && m_MicrophoneCameraController.IsVRActive;
+        UnityEngine.SubsystemManager.GetInstances(m_MicrophoneXrDisplays);
+        foreach (var display in m_MicrophoneXrDisplays)
+            if (display.running) return true;
+        return false;
+    }
+
+    // Keep the native input boundary replaceable for offline lifecycle regression.
+    protected virtual string[] GetMicrophoneDevices() => Microphone.devices;
+    protected virtual bool MicrophoneIsRecording(string device) => Microphone.IsRecording(device);
+    protected virtual int GetMicrophonePosition(string device) => Microphone.GetPosition(device);
+    protected virtual AudioClip StartMicrophone(string device) =>
+        Microphone.Start(device, true, Mathf.Max(1, m_MicrophoneBufferSeconds), 16000);
+    protected virtual void EndMicrophone(string device) => Microphone.End(device);
+
+    private void ReleaseMicrophone()
+    {
+        // A desktop manual recording also uses null. Once our clip is released,
+        // the idle loop must not keep stopping that independently owned recording.
+        if (m_HasMicrophoneSelection && m_RecordedClip != null && MicrophoneIsRecording(m_ActiveMicrophoneName))
+            EndMicrophone(m_ActiveMicrophoneName);
+        m_RecordedClip = null;
+        m_HasMicrophoneSelection = false;
+        m_ActiveMicrophoneName = null;
+        m_NextMicrophoneStartTime = 0f;
+    }
+
+    private bool TryGetMicrophonePosition(out int currentPos)
+    {
+        currentPos = -1;
+        if (m_RecordedClip == null || !m_HasMicrophoneSelection)
+            return false;
+        int total = m_RecordedClip.samples;
+        if (total <= 0 || !MicrophoneIsRecording(m_ActiveMicrophoneName))
+            return false;
+        try
+        {
+            currentPos = GetMicrophonePosition(m_ActiveMicrophoneName);
+        }
+        catch (Exception e)
+        {
+            if (m_LogTimings) Debug.LogWarning($"[RTSpeech] 获取麦克风位置失败: {e.Message}");
+            return false;
+        }
+        if (currentPos >= 0 && currentPos < total)
+        {
+            if (m_LastMicrophonePosition >= 0 && currentPos < m_LastMicrophonePosition)
+                m_MicrophoneHasWrapped = true;
+            m_LastMicrophonePosition = currentPos;
+            return true;
+        }
+        return false;
+    }
+
     private void Start()
     {
-
-        if (m_MicrophoneName == null)
-        {
-            // 如果没有指定麦克风名称，则使用系统默认麦克风
-            m_MicrophoneName = Microphone.devices[0];
-        }
-
-        // 确保麦克风准备好
-        if (Microphone.IsRecording(m_MicrophoneName))
-        {
-            Microphone.End(m_MicrophoneName);
-        }
-
-        // 启动麦克风监听。loop=true 是关键：实时对话路径下 mic 一直跑，
-        // 只有用户真的在说话才会被StopRecording短暂End掉再立刻重启。
-        // 用loop=false的话，启用后只要30秒没有人说话(没触发StopRecording重启mic)，
-        // buffer就被填满、mic自动停录，GetData会报"invalid parameter"——
-        // Agent Loop 长时间没用户开口的场景必触发这个bug。
-        m_RecordedClip = Microphone.Start(m_MicrophoneName, true, m_MicrophoneBufferSeconds, 16000);
-
-        while (Microphone.GetPosition(null) <= 0) { }
-
-        // 启动录制状态检测协程
+        // 启动录制状态检测协程。麦克风权限/设备初始化是异步的，不能在
+        // Start() 中用无界 while 阻塞主线程；DetectRecording 会在设备出现后
+        // 自动重试并维持同一个 loop=true 环形缓冲。
         StartCoroutine(DetectRecording());
     }
 
@@ -507,6 +879,17 @@ public class RTSpeechHandler : MonoBehaviour
     {
         while (true)
         {
+            DiscardRejectedUnheardCapture();
+            // Automatic realtime VAD must not keep listening or uploading while
+            // realtime mode is off. Explicit push-to-talk remains allowed, as
+            // does the configured wake-word listener.
+            if (!m_AwakeState && !m_ManualCaptureActive && !m_IsRecording &&
+                m_VoiceAWake == null)
+            {
+                ReleaseMicrophone();
+                yield return null;
+                continue;
+            }
             if (!m_IsRecording && m_UnheardCapture.Count > 0 &&
                 !CanResumeUnheardCapture(true, Time.realtimeSinceStartup - m_UnheardCaptureClosedAt,
                     m_ChatSample != null && (m_ChatSample.IsVoiceOutputPlaying ||
@@ -517,19 +900,43 @@ public class RTSpeechHandler : MonoBehaviour
                 m_UnheardMic = null;
                 EndStreamingRecognition();
             }
+            // Evaluate capture bounds before reading the microphone position.  A
+            // device that reports a frozen/invalid position must not bypass the
+            // lifecycle watchdog indefinitely.
+            if (m_IsRecording && TryApplyCaptureWatchdog(Time.realtimeSinceStartup))
+            {
+                yield return null;
+                continue;
+            }
             //守卫：万一mic被外部停掉(loop=false过期、设备断开、其他脚本调End)，
             //GetPosition会一直返回0/无效值，整个VAD永远不工作。检测到就重启mic。
             //loop=true保证沉默期间buffer不会被填满自动停录(那个bug已经在Start里修了，这里做兜底)。
-            if (!Microphone.IsRecording(m_MicrophoneName))
+            int position;
+            if (!TryEnsureMicrophone(out position))
             {
-                if (m_LogTimings) Debug.LogWarning("[RTSpeech] mic未在录制，重启监听buffer");
-                m_RecordedClip = Microphone.Start(m_MicrophoneName, true, m_MicrophoneBufferSeconds, 16000);
+                if (m_ManualCaptureActive)
+                    CancelManualCapture();
+                if (m_LogTimings && Time.realtimeSinceStartup >= m_NextMicrophoneWarningTime)
+                {
+                    Debug.LogWarning("[RTSpeech] mic未就绪，等待设备/权限后重试");
+                    m_NextMicrophoneWarningTime = Time.realtimeSinceStartup + 2f;
+                }
+                yield return new WaitForSecondsRealtime(0.25f);
+                continue;
+            }
+
+            // Give the realtime lifecycle a short quiet boundary before VAD
+            // starts promoting any stale/echo PCM to a new user turn.
+            if (m_AwakeState && !m_IsRecording && !m_ManualCaptureActive &&
+                Time.realtimeSinceStartup < m_AutoListeningBlockedUntil)
+            {
+                m_SmoothedRms = 0f;
+                m_SilenceTimer = 0f;
                 yield return null;
                 continue;
             }
 
             float[] samples = new float[128]; // 选择合适的样本大小
-            int position = Microphone.GetPosition(null);
             if (position < samples.Length)
             {
                 yield return null;
@@ -566,14 +973,35 @@ public class RTSpeechHandler : MonoBehaviour
             //裸rms会在每个音节边界都跌破阈值，导致计时器频繁清零、永远累不到0.3s。
             m_SmoothedRms = (1f - m_RmsSmoothAlpha) * m_SmoothedRms + m_RmsSmoothAlpha * rms;
 
+            // PTT 捕获期间，整段音频由共享 ring buffer 累计；暂停 VAD 自动
+            // 开始/收束，避免同一批 PCM 同时进入两条录音状态机。
+            if (m_ManualCaptureActive)
+            {
+                CaptureRecordingAudio(position, false);
+                if (m_ManualCaptureStartedAt >= 0f &&
+                    Time.realtimeSinceStartup - m_ManualCaptureStartedAt >=
+                    Mathf.Max(1f, m_ManualCaptureMaxSeconds))
+                {
+                    EndManualCapture();
+                }
+                yield return null;
+                continue;
+            }
+
             //barge-in分支：角色正在出声时，VAD的语义不是"开新一轮录音"而是"用户在打断"
             //单独处理可以避免和正常录音逻辑互相打架(m_LockState、m_IsRecording等)
             bool aiSpeaking = (m_ChatSample != null && m_ChatSample.IsAISpeaking);
-            bool playbackProtected = m_ChatSample != null &&
-                m_ChatSample.IsAIPlaybackProtected(m_PostPlaybackEchoGuardSeconds);
+            bool greetingPlaying = m_Greeting != null && m_Greeting.isPlaying;
+            bool playbackProtected = greetingPlaying ||
+                (m_ChatSample != null &&
+                 m_ChatSample.IsAIPlaybackProtected(m_PostPlaybackEchoGuardSeconds));
             //完整最终录音独立于临时 partial 的回声保护持续累计。用户可能正是在
             //角色出声时插话；若像 WebSocket 一样跳过保护窗，会丢掉 barge-in 开头。
-            if (m_IsRecording) CaptureRecordingAudio(position, false);
+            if (m_IsRecording)
+            {
+                CaptureRecordingAudio(position, false);
+                if (aiSpeaking || playbackProtected) MarkRecordingPlaybackOverlap();
+            }
             if (!m_IsRecording && !aiSpeaking && !playbackProtected)
             {
                 ObserveAmbientRms(m_SmoothedRms, false);
@@ -633,10 +1061,22 @@ public class RTSpeechHandler : MonoBehaviour
                 //`period >= 0.67` 这个门槛实际上是在挑选噪音。
                 //所以改为拆开两件事：豁免仍可**启动录音**(真哼唱不会漏)，但**不打断**。
                 //代价是你哼歌打断她时她会把当前这句说完——比被环境音掐掉自然得多。
-                if (m_RecordingRescuedByTonalOverride)
+                if (!m_RecordingInputConfirmed || m_RecordingRescuedByTonalOverride)
                 {
                     if (m_LogTimings)
-                        Debug.Log("[Turn] 本次录音来自哼唱豁免(语音VAD未认可)，不打断当前回复");
+                        Debug.Log("[Turn] 本次录音尚未确认真人讲话或来自调性豁免，继续取证，不打断当前回复");
+                    // Keep the same PCM capture, but allow a subsequently arriving
+                    // real human to prove barge-in through the strict AEC/identity
+                    // lane. Suspending partials must not suspend that lane too.
+                    if (m_EnableNeuralVad && m_NeuralVadClient != null &&
+                        m_SmoothedRms > startActivityThreshold)
+                    {
+                        if (m_BargeInTimer <= 0f) m_BargeInWindowStartTime = Time.realtimeSinceStartup;
+                        m_BargeInTimer += Time.deltaTime;
+                        if (m_BargeInTimer >= m_BargeInTriggerSeconds)
+                            RequestNeuralVadProbe(position, true);
+                    }
+                    else m_BargeInTimer = Mathf.Max(0f, m_BargeInTimer - m_BargeInDecayRate * Time.deltaTime);
                     m_StreamLastSentPos = position;
                     yield return null;
                     continue;
@@ -740,9 +1180,10 @@ public class RTSpeechHandler : MonoBehaviour
 
             // RMS 只负责发现“值得检查的声音”；真正开始录音由神经 VAD 确认。
             // 使用平滑 RMS 可以先滤掉单帧碰撞脉冲，减少无意义的 /vad 请求。
+            float candidateActivityThreshold = ResolveCandidateActivityThreshold(startActivityThreshold);
             float activeRmsThreshold = m_IsRecording
                 ? recordingActivityThreshold
-                : startActivityThreshold;
+                : candidateActivityThreshold;
             bool effectiveActivity = m_IsRecording
                 ? m_TurnActivity.LevelActive || m_TurnActivity.MelodyActive || m_TurnActivity.TextActivityActive
                 : m_SmoothedRms > activeRmsThreshold;
@@ -817,20 +1258,53 @@ public class RTSpeechHandler : MonoBehaviour
                     ConfirmEouFromPreview(confirmedText);
                 }
 
-                //歌唱使用独立停顿：不等普通对话的3.5秒，也不被0.6秒句尾预测切碎。
+                //歌唱使用独立停顿：不等普通对话的硬收束，也不被短句尾预测切碎。
                 float activeEouSilence = (m_EnableSingingMode && (m_LikelySinging || m_MelodicEouProtectionActive))
                     ? m_SingingEouSilence
                     : m_RecordingTimeLimit;
                 bool asrTailReady = !m_EnableStreamingRecognition ||
                     (HasFreshStreamingCoverage &&
                      m_TurnActivity.TailAvailable && m_TurnActivity.CoversQuietTail && !m_TurnActivity.PendingText);
-                //ASR outage is not silence. Only the old, stricter physical-quiet fallback
-                //may close without coverage; the full audio is still sent to final ASR.
+                bool preparedOrdinaryClose = CanUsePreparedOrdinaryEndpoint(
+                    m_RecordingInputConfirmed, m_TentativeUsedFullAsr && m_TentativeFullAsrResultReady &&
+                        !m_TentativePreviewInFlight && !string.IsNullOrWhiteSpace(m_TentativeFullAsrText),
+                    m_LikelySinging || m_MelodicEouProtectionActive || m_TurnActivity.MelodyActive,
+                    HasFreshStreamingCoverage && m_TurnActivity.TailAvailable && m_TurnActivity.CoversQuietTail,
+                    m_TurnActivity.LevelActive || m_TurnActivity.TextActivityActive || m_TurnActivity.PendingText,
+                    m_TentativeFullAsrActivityRevision == m_TurnActivity.ActivityRevision &&
+                        !HasSoundAdvanced(m_TentativeFullAsrSoundAt, m_TurnActivity.LatestSoundAt));
+                if (preparedOrdinaryClose)
+                    activeEouSilence = Mathf.Min(activeEouSilence,
+                        Mathf.Max(m_TentativeEouSilence, m_TentativeEouConfirmSilence));
+                bool pendingTextQuiet = HasFreshStreamingCoverage && !m_LikelySinging &&
+                    !m_MelodicEouProtectionActive &&
+                    m_TurnActivity.CanClosePendingTextOnQuietTail(Time.realtimeSinceStartup, activeEouSilence);
+                if (m_IsRecording && m_SilenceTimer >= activeEouSilence && !asrTailReady &&
+                    Time.realtimeSinceStartup >= m_NextCloseBlockTraceAt)
+                {
+                    m_NextCloseBlockTraceAt = Time.realtimeSinceStartup + 1f;
+                    m_ChatSample?.TurnBoundaryTrace?.Sample("capture.close_evidence", new Newtonsoft.Json.Linq.JObject {
+                        ["captureSerial"] = CurrentCaptureSerial, ["quietSeconds"] = m_SilenceTimer,
+                        ["pendingText"] = m_TurnActivity.PendingText, ["freshCoverage"] = HasFreshStreamingCoverage,
+                        ["tailAvailable"] = m_TurnActivity.TailAvailable, ["coversQuietTail"] = m_TurnActivity.CoversQuietTail,
+                        ["melodicProtection"] = m_MelodicEouProtectionActive, ["pendingTextQuietClose"] = pendingTextQuiet,
+                        ["scope"] = "capture gate only; final ASR remains required" });
+                }
+                bool degradedAsrTailReady = !m_EnableSingingMode ||
+                    (!m_LikelySinging && !m_MelodicEouProtectionActive &&
+                     HasDegradedQuietTailEvidence(Time.realtimeSinceStartup));
+                //ASR outage is not silence by itself. A degraded close additionally
+                //requires quiet-tail evidence and no active speech; the full audio
+                //is still sent to final ASR.
                 bool physicalQuietFallback = m_BoundaryAcoustics.QuietSince >= 0f &&
                     Time.realtimeSinceStartup - m_BoundaryAcoustics.QuietSince >= m_RecordingTimeLimit &&
                     (!m_TurnActivity.PendingText || !m_TurnActivity.AsrHealthy(Time.realtimeSinceStartup));
-                if (m_AwakeState && m_IsRecording && m_SilenceTimer >= activeEouSilence &&
-                    (asrTailReady || physicalQuietFallback))
+                bool shouldCloseOnDegradedTail = degradedAsrTailReady &&
+                    (!asrTailReady || !m_TurnActivity.TailAvailable) &&
+                    m_SilenceTimer >= Mathf.Min(activeEouSilence, m_DegradedAsrCloseSilence);
+                if (m_AwakeState && m_IsRecording &&
+                    ((m_SilenceTimer >= activeEouSilence && (asrTailReady || physicalQuietFallback || pendingTextQuiet)) ||
+                     shouldCloseOnDegradedTail))
                 {
                     //若同一份完整预测ASR已经覆盖了所有有效声音，硬EOU新增的只是
                     //静音尾巴。保留并晋升它，避免再对几十秒音频做一次完整分析。
@@ -844,12 +1318,19 @@ public class RTSpeechHandler : MonoBehaviour
                     if (m_LogTimings)
                         Debug.Log($"[Listening/Endpoint] 有效输入静默={m_SilenceTimer:F2}s " +
                                   $"reference={recordingActivityThreshold:F4} noiseUpper={EffectiveNoiseUpper:F4} " +
-                                  $"asrTailReady={asrTailReady} recentMelody={m_TurnActivity.MelodyActive} " +
-                                  $"role={m_LastStalledDecisionStatus} reuseFullAsr={reuseTentativeFullAsr}；收束采集，不强制接话");
+                                  $"asrTailReady={asrTailReady} degradedTail={shouldCloseOnDegradedTail} " +
+                                  $"recentMelody={m_TurnActivity.MelodyActive} role={m_LastStalledDecisionStatus} " +
+                                  $"reuseFullAsr={reuseTentativeFullAsr}；收束采集，不强制接话");
                     if (m_LastStalledDecisionStatus == "continue" && m_ChatSample != null)
                         m_ChatSample.CommitStalledTurnDecisionNote("continue",
                             m_LastStalledDecisionConfidence, "uncertain", 0f, "uncertain");
-                    m_RecordingCloseReason = asrTailReady ? "effective-quiet" : "physical-quiet-asr-unavailable";
+                    TraceInputEvidence("endpoint", new Newtonsoft.Json.Linq.JObject {
+                        ["quietSeconds"] = m_SilenceTimer, ["requiredQuietSeconds"] = activeEouSilence,
+                        ["preparedOrdinary"] = preparedOrdinaryClose, ["freshCoverage"] = HasFreshStreamingCoverage,
+                        ["singingProtected"] = m_LikelySinging || m_MelodicEouProtectionActive,
+                        ["confirmedHuman"] = m_RecordingInputConfirmed, ["outputOverlap"] = m_RecordingOutputOverlap });
+                    m_RecordingCloseReason = pendingTextQuiet ? "quiet-tail-await-final" : preparedOrdinaryClose ? "prepared-final-quiet" : asrTailReady ? "effective-quiet" :
+                        (shouldCloseOnDegradedTail ? "coverage-degraded-quiet" : "physical-quiet-asr-unavailable");
                     StopRecording(reuseTentativeFullAsr);
                 }
 
@@ -932,6 +1413,12 @@ public class RTSpeechHandler : MonoBehaviour
         m_AwakeState = true;
         m_SilenceTimer = 0f;
         m_BargeInTimer = 0f;
+        m_SmoothedRms = 0f;
+        m_AutoListeningBlockedUntil =
+            Time.realtimeSinceStartup + 0.75f;
+        m_UnheardCapture.Clear();
+        m_UnheardMic = null;
+        EndStreamingRecognition();
 
         m_LastEnvSpikeNotifyTime = -1f;
         InvalidateTentativeEou("EnableRealtimeMode");
@@ -943,10 +1430,7 @@ public class RTSpeechHandler : MonoBehaviour
         if (m_ChatSample != null) m_ChatSample.StartAgentLoop();
 
         //保证mic在跑——刚启动应用时已经在跑了，但用户可能先关闭再开启，这里兜底
-        if (!Microphone.IsRecording(m_MicrophoneName))
-        {
-            m_RecordedClip = Microphone.Start(m_MicrophoneName, true, m_MicrophoneBufferSeconds, 16000);
-        }
+        TryEnsureMicrophone(out _);
 
         PrintLog("Link->实时对话已启用");
         UpdateRealtimeBtnLabel();
@@ -1070,7 +1554,10 @@ public class RTSpeechHandler : MonoBehaviour
         if (m_RecordedClip == null || m_NeuralVadClient == null) return;
 
         if (m_PendingSpeechStartPos < 0)
+        {
             m_PendingSpeechStartPos = CalculateRecordingStartPos(currentPos);
+            m_NeuralVadCandidateSince = now;
+        }
         if (m_NeuralVadProbeInFlight || now < m_NextNeuralVadProbeTime) return;
 
         int totalSamples = m_RecordedClip.samples;
@@ -1115,6 +1602,7 @@ public class RTSpeechHandler : MonoBehaviour
                                  localResidualRatio <= m_LocalEchoVetoResidualRatio;
             if (echoDominated)
             {
+                TraceInputProbeEvidence(true, false, null, aecResult);
                 if (vadProbe != probe) Destroy(vadProbe);
                 Destroy(probe);
                 m_BargeInTimer = 0f;
@@ -1144,6 +1632,8 @@ public class RTSpeechHandler : MonoBehaviour
         if (vadProbe != probe) Destroy(vadProbe);
         Destroy(probe);
 
+        int probeCaptureSerial = CurrentCaptureSerial;
+        bool probeStartedInRecording = m_IsRecording;
         bool handlingAecResidual = false;
         string rawSpeakerIdForResidual = string.Empty;
         float rawSpeakerScoreForResidual = 0f;
@@ -1151,6 +1641,11 @@ public class RTSpeechHandler : MonoBehaviour
         System.Action<SenseVoiceSpeechToText.VoiceActivityResult> handleVadResult = vadResult =>
         {
             if (sequence != m_NeuralVadSequence) return;
+            if (!IsVadProbeCaptureCurrent(probeCaptureSerial, probeStartedInRecording))
+            {
+                ResetNeuralVadGate("probe-capture-changed");
+                return;
+            }
 
             m_NeuralVadProbeInFlight = false;
             float retrySeconds = forBargeIn ? m_BargeInVadRetrySeconds : m_NeuralVadRetrySeconds;
@@ -1163,8 +1658,39 @@ public class RTSpeechHandler : MonoBehaviour
                           $"is_singing={(vadResult != null && vadResult.IsSinging)} " +
                           $"speech_ms={(vadResult != null ? vadResult.SpeechMs : 0)} " +
                           $"forBargeIn={forBargeIn} (seq={sequence})");
+            TraceInputProbeEvidence(forBargeIn, isSpeech, vadResult, aecResult);
             if (!isSpeech)
             {
+                // A short onset probe can finish before the first syllable is
+                // represented strongly enough for FSMN-VAD. If RMS has stayed
+                // active across repeated probes, let the complete ASR decide
+                // instead of silently losing the realtime turn. This fallback
+                // is only for normal capture; barge-in keeps its stricter gate.
+                if (!forBargeIn && m_AwakeState && !m_IsRecording &&
+                    m_PendingSpeechStartPos >= 0 &&
+                    m_NeuralVadCandidateSince >= 0f &&
+                    Time.realtimeSinceStartup - m_NeuralVadCandidateSince >=
+                        Mathf.Max(0.25f, m_NeuralVadFallbackSeconds) &&
+                    m_SmoothedRms > ResolveCandidateActivityThreshold(
+                        ResolveAdaptiveStartThreshold(
+                            m_SilenceThreshold,
+                            m_AmbientRmsFloor,
+                            m_AmbientNoiseCalibrated,
+                            m_QuietStartThreshold,
+                            m_AmbientStartMultiplier,
+                            m_MaxAdaptiveStartThreshold)))
+                {
+                    if (TryDeferRmsContinuation(vadResult, now, probeSecondsForLog, forBargeIn))
+                        return;
+                    int fallbackStart = m_PendingSpeechStartPos;
+                    if (m_LogTimings)
+                        Debug.Log($"[VAD] 短探针连续否定但 RMS 持续；转完整 ASR 兜底录音 (wait={Time.realtimeSinceStartup - m_NeuralVadCandidateSince:F2}s)");
+                    ResetNeuralVadGate("rms-fallback-after-vad-reject");
+                    StartRecording(fallbackStart, true,
+                        vadResult != null && vadResult.IsSinging,
+                        vadResult != null ? vadResult.SingingProbability : 0f, false);
+                    return;
+                }
                 if (m_LogTimings) Debug.Log($"[VAD] 拒绝非人声候选 (seq={sequence})");
                 if (forBargeIn) m_BargeInTimer = 0f;
                 else ObserveAmbientRms(m_SmoothedRms, true);
@@ -1174,7 +1700,15 @@ public class RTSpeechHandler : MonoBehaviour
             bool aiSpeaking = m_ChatSample != null && m_ChatSample.IsAISpeaking;
             if (forBargeIn)
             {
-                if (!m_AwakeState || m_IsRecording || !aiSpeaking)
+                if (vadResult.SpeakerStatus == "error" || vadResult.SpeakerVoiceprintStatus == "error")
+                {
+                    m_BargeInTimer = 0f;
+                    m_BargeInWindowStartTime = 0f;
+                    ResetNeuralVadGate("speaker-verification-unavailable");
+                    return;
+                }
+                if (!m_AwakeState || !aiSpeaking ||
+                    (m_IsRecording && m_RecordingInputConfirmed && !m_RecordingRescuedByTonalOverride))
                 {
                     ResetNeuralVadGate("barge-in-state-changed");
                     return;
@@ -1266,7 +1800,13 @@ public class RTSpeechHandler : MonoBehaviour
         m_NeuralVadClient.CheckVoiceActivityDetailed(rawProbeBytes, true, rawResult =>
         {
             if (sequence != m_NeuralVadSequence) return;
+            if (!IsVadProbeCaptureCurrent(probeCaptureSerial, probeStartedInRecording))
+            {
+                ResetNeuralVadGate("probe-capture-changed");
+                return;
+            }
 
+            TraceInputProbeEvidence(true, rawResult != null && rawResult.IsSpeech, rawResult, aecResult);
             bool rawConfirmedHuman = rawResult != null && rawResult.IsSpeech &&
                 (rawResult.SpeakerKind == "owner" || rawResult.SpeakerKind == "guest") &&
                 rawResult.SpeakerStatus == "confirmed" &&
@@ -1345,6 +1885,20 @@ public class RTSpeechHandler : MonoBehaviour
             Debug.Log($"[Timing] ★ Barge-in 人声确认：连续说话 {spoken:F2}s");
         }
         PrintLog("Barge-in->用户打断角色发言");
+        if (m_IsRecording)
+        {
+            // This capture already contains the onset. Reopening it would lose
+            // evidence and could bind a stale probe to a different input owner.
+            m_CurrentRecordingAllowsSpeakerLearning = false;
+            m_RecordingRescuedByTonalOverride = false;
+            bool alreadyConfirmed = m_RecordingInputConfirmed;
+            ConfirmRecordingInput("aec-identity-barge-in");
+            if (alreadyConfirmed) m_ChatSample.Interrupt();
+            m_BargeInTimer = 0f;
+            m_BargeInWindowStartTime = 0f;
+            ResetNeuralVadGate("existing-capture-barge-in-confirmed");
+            return;
+        }
         m_ChatSample.Interrupt();
         m_BargeInTimer = 0f;
         m_BargeInWindowStartTime = 0f;
@@ -1354,10 +1908,15 @@ public class RTSpeechHandler : MonoBehaviour
 
     private int CalculateRecordingStartPos(int currentPos)
     {
+        return CalculateRecordingStartPos(currentPos, m_RecordingPreRollSeconds);
+    }
+
+    private int CalculateRecordingStartPos(int currentPos, float preRollSeconds)
+    {
         int totalSamples = m_RecordedClip != null ? m_RecordedClip.samples : 16000 * 30;
         int frequency = m_RecordedClip != null ? Mathf.Max(1, m_RecordedClip.frequency) : 16000;
         int preRollSamples = Mathf.Clamp(
-            Mathf.RoundToInt(m_RecordingPreRollSeconds * frequency),
+            Mathf.RoundToInt(Mathf.Max(0f, preRollSeconds) * frequency),
             0,
             Mathf.Max(0, totalSamples - 1));
         int startPos = currentPos - preRollSamples;
@@ -1373,7 +1932,48 @@ public class RTSpeechHandler : MonoBehaviour
         m_NeuralVadProbeInFlight = false;
         m_NextNeuralVadProbeTime = 0f;
         m_LastNeuralVadCandidateTime = -1f;
+        m_NeuralVadCandidateSince = -1f;
         m_PendingSpeechStartPos = -1;
+    }
+
+    private bool TryDeferRmsContinuation(SenseVoiceSpeechToText.VoiceActivityResult vad,
+        float probeEndedAt, float probeSeconds, bool forBargeIn)
+    {
+        var provider = m_NeuralVadClient;
+        var evidence = new RecordingContinuationGate.Evidence {
+            CurrentCapture = CurrentCaptureSerial, RetainedCapture = m_UnheardCaptureSessionSerial,
+            FinalCapture = provider != null ? provider.LastFinalCaptureSerial : 0,
+            FinalSource = provider != null ? provider.LastFinalTranscriptSource : "",
+            FinalText = provider != null ? provider.LastFinalRawText : "",
+            HasRetainedAudio = m_UnheardCapture.Count > 0, SameMicrophone = m_UnheardMic == m_RecordedClip,
+            Replied = m_ChatSample != null && (m_ChatSample.IsVoiceOutputPlaying ||
+                m_ChatSample.VoiceOutputRevision != m_UnheardVoiceRevision),
+            RejectedSelfSpeech = provider != null && provider.IsCaptureRejectedSelfSpeech(m_UnheardCaptureSessionSerial),
+            BargeIn = forBargeIn, VadAvailable = vad != null && vad.Available,
+            Speech = vad != null && vad.IsSpeech, Tonal = vad != null && vad.IsSinging,
+            SpeechMs = vad != null ? vad.SpeechMs : -1, Now = Time.realtimeSinceStartup,
+            ClosedAt = m_UnheardCaptureClosedAt, ProbeEndedAt = probeEndedAt, ProbeSeconds = probeSeconds
+        };
+        if (!RecordingContinuationGate.ShouldDeferRmsFallback(evidence)) return false;
+        if (m_LastDeferredRmsContinuationCapture != m_UnheardCaptureSessionSerial)
+        {
+            m_LastDeferredRmsContinuationCapture = m_UnheardCaptureSessionSerial;
+            TraceInputEvidence("continuation_deferred", new Newtonsoft.Json.Linq.JObject {
+                ["retainedCaptureSerial"] = m_UnheardCaptureSessionSerial,
+                ["firstCaptureSerial"] = m_UnheardFirstCaptureSerial,
+                ["firstCaptureRetainedUtc"] = m_UnheardFirstCloseUtc,
+                ["previousCaptureRetainedUtc"] = m_UnheardCloseUtc,
+                ["probeAgeSeconds"] = evidence.Now - probeEndedAt,
+                ["probeSeconds"] = probeSeconds,
+                ["retainedAgeSeconds"] = evidence.Now - evidence.ClosedAt,
+                ["probeStartAfterCloseSeconds"] = probeEndedAt - probeSeconds - evidence.ClosedAt,
+                ["reason"] = "fresh-negative-vad-rms-only",
+                ["scope"] = "keep pending reply and onset cursor; no new capture or transcript deduplication"
+            });
+        }
+        // Keep m_PendingSpeechStartPos and candidate time: a later positive VAD
+        // uses the original onset/pre-roll. No capture, ASR, or reply is cancelled.
+        return true;
     }
 
     private void ObserveAmbientRms(float observedRms, bool vadConfirmedNonSpeech)
@@ -1540,6 +2140,19 @@ public class RTSpeechHandler : MonoBehaviour
             upper);
     }
 
+    private float ResolveCandidateActivityThreshold(float adaptiveStartThreshold)
+    {
+        if (!m_EnableNeuralVad || m_NeuralVadClient == null)
+            return adaptiveStartThreshold;
+
+        // Neural VAD is the expensive/noisy gate; let RMS nominate a quieter
+        // candidate so low-level speech can reach it. The full ASR/final turn
+        // still decides whether the captured clip contains usable speech.
+        return Mathf.Min(
+            adaptiveStartThreshold,
+            Mathf.Max(m_QuietStartThreshold, m_SilenceThreshold * 1.25f));
+    }
+
     private static float ResolveAdaptiveEouThreshold(
         float configuredThreshold,
         float ambientFloor,
@@ -1612,17 +2225,169 @@ public class RTSpeechHandler : MonoBehaviour
     /// <summary>
     /// 开始监听说话声音。forcedStartPos 用于神经 VAD 异步确认后恢复首个候选起点。
     /// </summary>
+    private bool m_RecordingInputConfirmed;
+    private int m_ConfirmationLastAudioMs = -1;
+    private int m_ConfirmationMelodyAudioMs = -1;
+    private int m_ConfirmationMelodyFrames;
+    private int m_InheritedFinalCapture, m_InheritedContinuationCapture;
+    private string m_InheritedFinalText;
+    private AudioClip m_InheritedFinalMicrophone;
+    private float m_ContinuationJoinSeconds;
+
+    // A repeated transcript alone is never a duplicate-input test. This applies
+    // only to a known copied PCM prefix with no independently confirmed new voice.
+    public bool IsUnconfirmedInheritedFinal(int acceptedCapture, int finalCapture, string rawText) =>
+        !m_IsRecording && !m_RecordingInputConfirmed && acceptedCapture > 0 &&
+        acceptedCapture == m_InheritedFinalCapture && finalCapture == m_InheritedContinuationCapture &&
+        finalCapture == CurrentCaptureSerial && m_InheritedFinalMicrophone != null && m_RecordedClip != null &&
+        m_InheritedFinalMicrophone == m_RecordedClip &&
+        !string.IsNullOrWhiteSpace(m_InheritedFinalText) &&
+        string.Equals(rawText, m_InheritedFinalText, System.StringComparison.Ordinal);
+
+    private bool m_RecordingOutputOverlap;
+    private ConversationTrace m_InputEvidenceTrace;
+    private int m_InputEvidenceCount;
+    private float m_NextInputProbeTraceAt;
+
+    private bool IsVadProbeCaptureCurrent(int serial, bool startedInRecording) =>
+        CurrentCaptureSerial == serial && m_IsRecording == startedInRecording;
+
+    private static bool CanUsePreparedOrdinaryEndpoint(bool confirmedHuman, bool fullFinalReady,
+        bool singingProtected, bool freshCoveredQuiet, bool activeOrPending, bool sameActivityRevision) =>
+        confirmedHuman && fullFinalReady && !singingProtected && freshCoveredQuiet &&
+        !activeOrPending && sameActivityRevision;
+
+    private void MarkRecordingPlaybackOverlap()
+    {
+        // Mixed microphone/playback is usable evidence, but not a clean voiceprint
+        // enrolment sample. Do not discard quiet near-end speech or singing PCM.
+        m_CurrentRecordingAllowsSpeakerLearning = false;
+        if (m_RecordingOutputOverlap) return;
+        m_RecordingOutputOverlap = true;
+        TraceInputEvidence("playback_overlap", new Newtonsoft.Json.Linq.JObject {
+            ["confirmedHuman"] = m_RecordingInputConfirmed, ["speakerLearning"] = false,
+            ["scope"] = "raw PCM retained; partial echo guard and strict barge-in remain separate" });
+    }
+
+    private void TraceInputEvidence(string stage, Newtonsoft.Json.Linq.JObject fields)
+    {
+        if (m_InputEvidenceCount++ >= 32) return;
+        if (m_InputEvidenceTrace == null)
+            m_InputEvidenceTrace = new ConversationTrace("capture-evidence", line => Debug.Log("[ConversationTrace] " + line));
+        fields["captureSerial"] = CurrentCaptureSerial;
+        m_InputEvidenceTrace.Sample("input." + stage, fields);
+    }
+
+    private void TraceInputProbeEvidence(bool bargeIn, bool speech,
+        SenseVoiceSpeechToText.VoiceActivityResult vad, ManagedEchoCanceller.Result aec)
+    {
+        if (Time.realtimeSinceStartup < m_NextInputProbeTraceAt) return;
+        m_NextInputProbeTraceAt = Time.realtimeSinceStartup + 2f;
+        TraceInputEvidence("vad_probe", new Newtonsoft.Json.Linq.JObject {
+            ["bargeIn"] = bargeIn, ["speech"] = speech, ["speechMs"] = vad?.SpeechMs ?? 0,
+            ["tonalOverride"] = vad?.IsSinging ?? false, ["speakerKind"] = vad?.SpeakerKind ?? "",
+            ["speakerStatus"] = vad?.SpeakerStatus ?? "", ["aecApplied"] = aec.Applied,
+            ["aecCorrelation"] = aec.Correlation, ["aecInputRms"] = aec.InputRms,
+            ["aecOutputRms"] = aec.OutputRms, ["rms"] = m_SmoothedRms,
+            ["noiseUpper"] = EffectiveNoiseUpper });
+    }
+
+    private void ResetRecordingInputConfirmation()
+    {
+        m_RecordingInputConfirmed = false;
+        m_ConfirmationLastAudioMs = m_ConfirmationMelodyAudioMs = -1;
+        m_ConfirmationMelodyFrames = 0;
+    }
+
+    private void ConfirmRecordingInput(string evidence)
+    {
+        if (m_RecordingInputConfirmed) return;
+        m_RecordingInputConfirmed = true;
+        TraceInputEvidence("confirmed", new Newtonsoft.Json.Linq.JObject {
+            ["basis"] = evidence, ["rms"] = m_SmoothedRms, ["noiseUpper"] = EffectiveNoiseUpper,
+            ["outputOverlap"] = m_RecordingOutputOverlap });
+        m_ChatSample?.NotifyUserStartedSpeaking();
+        if (m_LogTimings) Debug.Log($"[Input/Candidate] capture={CurrentCaptureSerial} confirmed={evidence}");
+    }
+
+    private void ObserveRecordingInputConfirmation(
+        SenseVoiceSpeechToText.StreamingTranscript transcript, bool outputProtected)
+    {
+        if (!m_IsRecording || m_RecordingInputConfirmed || transcript == null) return;
+        if (outputProtected)
+        {
+            // Playback observations cannot accumulate authority for a later
+            // interruption when the echo guard ends, even if the packet repeats.
+            m_ConfirmationMelodyFrames = 0;
+            m_ConfirmationMelodyAudioMs = -1;
+            m_ConfirmationLastAudioMs = Mathf.Max(m_ConfirmationLastAudioMs, transcript.AudioMs);
+            return;
+        }
+        if (transcript.AudioMs <= m_ConfirmationLastAudioMs) return;
+        m_ConfirmationLastAudioMs = transcript.AudioMs;
+        float now = Time.realtimeSinceStartup;
+        float audioEndTime = m_LastStreamAudioSubmittedAt < 0f ? -1f :
+            m_LastStreamAudioSubmittedAt - Mathf.Max(0f, m_StreamSubmittedSeconds - transcript.AudioMs / 1000f);
+        bool currentTail = transcript.ActivityAvailable && transcript.ActivityWindowMs >= 200 &&
+            transcript.ActivityWindowMs <= 1000 && audioEndTime >= 0f && audioEndTime <= now &&
+            now - audioEndTime <= 2f &&
+            transcript.AudioMs - transcript.ActivityWindowMs >= m_ContinuationJoinSeconds * 1000f;
+        float noiseUpper = EffectiveNoiseUpper;
+        bool speechObserved = currentTail && transcript.ActivityVadAvailable &&
+            transcript.ActivitySpeechMs >= 120 && transcript.ActivitySpeechEndAgeMs >= 0 &&
+            transcript.ActivitySpeechEndAgeMs <= transcript.ActivityWindowMs &&
+            transcript.ActivityRms > noiseUpper * 1.15f;
+        if (speechObserved)
+        {
+            ConfirmRecordingInput("stream-speech-vad");
+            return;
+        }
+        // Use the same current periodic/voiced/above-noise support as
+        // TurnActivityEvidence, independently of full-clip IsSinging and the
+        // EOU protection counter preloaded by likelySinging at recording start.
+        bool strongMelody = m_EnableSingingMode && currentTail &&
+            transcript.ActivityRms >= Mathf.Max(0.001f, noiseUpper * 1.35f) &&
+            transcript.ActivityPeriodicity >= 0.70f && transcript.ActivityVoicedRatio >= 0.60f &&
+            m_TurnActivity.RecentRms >= Mathf.Max(noiseUpper * 1.2f, transcript.ActivityRms * 0.5f);
+        if (!strongMelody)
+        {
+            m_ConfirmationMelodyFrames = 0;
+            m_ConfirmationMelodyAudioMs = -1;
+            return;
+        }
+        if (m_ConfirmationMelodyAudioMs >= 0 && transcript.AudioMs - m_ConfirmationMelodyAudioMs > 2500)
+            m_ConfirmationMelodyFrames = 0;
+        // Text revisions or almost identical windows are not three independent
+        // observations. Each counted current-tail sample must advance >=200ms.
+        if (m_ConfirmationMelodyAudioMs >= 0 && transcript.AudioMs - m_ConfirmationMelodyAudioMs < 200)
+            return;
+        m_ConfirmationMelodyAudioMs = transcript.AudioMs;
+        if (++m_ConfirmationMelodyFrames >= 3)
+            ConfirmRecordingInput("sustained-current-stream-melody");
+    }
+
     private void StartRecording(
         int forcedStartPos = -1,
         bool allowSpeakerLearning = true,
         bool likelySinging = false,
-        float singingProbability = 0f)
+        float singingProbability = 0f,
+        bool confirmedSpeech = true)
     {
+        DiscardRejectedUnheardCapture();
         bool resumeCapture = CanResumeUnheardCapture(
             m_UnheardCapture.Count > 0, Time.realtimeSinceStartup - m_UnheardCaptureClosedAt,
             m_ChatSample != null && (m_ChatSample.IsVoiceOutputPlaying ||
                 m_ChatSample.VoiceOutputRevision != m_UnheardVoiceRevision),
             m_UnheardMic == m_RecordedClip);
+        m_ContinuationJoinSeconds = resumeCapture ? m_UnheardFrames / (float)Mathf.Max(1, m_UnheardFrequency) : 0f;
+        m_InheritedFinalCapture = resumeCapture && m_NeuralVadClient != null &&
+            m_NeuralVadClient.LastFinalCaptureSerial == m_UnheardCaptureSessionSerial &&
+            (m_NeuralVadClient.LastFinalTranscriptSource == "full-asr" ||
+             m_NeuralVadClient.LastFinalTranscriptSource == "full-preview" ||
+             m_NeuralVadClient.LastFinalTranscriptSource == "closed-stream-recovery")
+            ? m_UnheardCaptureSessionSerial : 0;
+        m_InheritedFinalText = m_InheritedFinalCapture > 0 ? m_NeuralVadClient.LastFinalRawText : null;
+        m_InheritedFinalMicrophone = m_InheritedFinalCapture > 0 ? m_RecordedClip : null;
         DiscardRecentAmbientSamples(m_AmbientSpeechRollbackSeconds);
         if (m_LogTimings)
         {
@@ -1641,9 +2406,14 @@ public class RTSpeechHandler : MonoBehaviour
             AbandonAwaitingTentativeFinal();
         else
             ClearTentativeReuseState(true);
+        // A resumed continuation is a new capture boundary from the ASR
+        // scheduler's perspective, so it gets one fresh prefetch budget.
+        m_TentativeFullPreviewAttempted = false;
+        m_TentativeFullPreviewRetrySuppressed = false;
         ResetNeuralVadGate("recording-started");
         m_StreamHumBackPrefixOffered = false;
-        m_CurrentRecordingAllowsSpeakerLearning = allowSpeakerLearning;
+        bool resumedPlaybackOverlap = resumeCapture && m_RecordingOutputOverlap;
+        m_CurrentRecordingAllowsSpeakerLearning = allowSpeakerLearning && !resumedPlaybackOverlap;
         m_LikelySinging = m_EnableSingingMode && likelySinging;
         m_MelodicEouProtectionActive = m_EnableSingingMode && likelySinging;
         m_MelodicEouEvidenceFrames = likelySinging ? 3 : 0;
@@ -1668,32 +2438,74 @@ public class RTSpeechHandler : MonoBehaviour
                 m_NeuralVadClient.SetInputCaptureOverlap(m_UnheardCaptureSessionSerial,
                     m_UnheardFrames / (float)Mathf.Max(1, m_UnheardFrequency));
         }
+        m_RecordingFirstCaptureSerial = resumeCapture ? m_UnheardFirstCaptureSerial : CurrentCaptureSerial;
+        personalLearningRecorder.Begin();
+        m_InheritedContinuationCapture = m_InheritedFinalCapture > 0 ? CurrentCaptureSerial : 0;
+        m_RecordingFirstCloseUtc = resumeCapture ? m_UnheardFirstCloseUtc : null;
 
         //用户主动开口——通知 agent loop：撤销待 tick、清零连续 AI 轮次计数。
         //即将到来的用户文本会自动触发新一轮 LLM 调用(走 SendData → PrepareUserTurn → StartStreaming)。
-        if (m_ChatSample != null) m_ChatSample.NotifyUserStartedSpeaking();
+        ResetRecordingInputConfirmation();
+        m_RecordingOutputOverlap = resumedPlaybackOverlap;
+        m_InputEvidenceCount = 0;
+        m_InputEvidenceTrace = new ConversationTrace("capture-evidence", line => Debug.Log("[ConversationTrace] " + line));
+        TraceInputEvidence("candidate", new Newtonsoft.Json.Linq.JObject {
+            ["speechVad"] = confirmedSpeech && !likelySinging, ["tonalOverride"] = likelySinging,
+            ["noiseCalibrated"] = m_AmbientNoiseCalibrated, ["noiseUpper"] = EffectiveNoiseUpper,
+            ["rms"] = m_SmoothedRms, ["startThreshold"] = ResolveAdaptiveStartThreshold(
+                m_SilenceThreshold, m_AmbientRmsFloor, m_AmbientNoiseCalibrated,
+                m_QuietStartThreshold, m_AmbientStartMultiplier, m_MaxAdaptiveStartThreshold),
+            ["quietThreshold"] = EffectiveQuietThreshold });
+        if (resumeCapture)
+            TraceInputEvidence("continuation", new Newtonsoft.Json.Linq.JObject {
+                ["previousCaptureSerial"] = m_UnheardCaptureSessionSerial,
+                ["firstCaptureSerial"] = m_RecordingFirstCaptureSerial,
+                ["firstCaptureRetainedUtc"] = m_RecordingFirstCloseUtc,
+                ["previousCaptureRetainedUtc"] = m_UnheardCloseUtc,
+                ["scope"] = "recorder handoff UTC; use firstCaptureSerial eot.capture_closed for exact audited latency"
+            });
+        m_ChatSample?.NotifyUserRecordingCandidate();
+        if (confirmedSpeech && !likelySinging) ConfirmRecordingInput("speech-vad");
+        else if (m_LogTimings)
+            Debug.Log("[Input/Candidate] 仅启动音频取证；弱调性或RMS候选不撤销正在准备/播放的回复");
 
         //★ 关键：不再End/Start mic！老逻辑那一刻会丢掉触发帧的音节
         //  ("换个话题吧"被识别成"个话题吧"就是这个原因)。
         //  现在mic从应用启动起就一直跑(loop=true 30s ringbuffer)，
         //  这里只需在ring buffer里标个起始位置——并往回拨pre-roll把
         //  VAD滞后期间已经被录到、但还没触发的开头音节抢回来。
-        if (!Microphone.IsRecording(m_MicrophoneName))
+        // 兜底：mic 意外停了就按已选择的设备重启；不会回退到
+        // VoiceInputs 的默认 Microphone.Start(null) 路径。
+        if (!TryEnsureMicrophone(out int ensuredPos))
         {
-            //兜底：mic意外停了就重启(应该不会走到这里)
-            m_RecordedClip = Microphone.Start(m_MicrophoneName, true, m_MicrophoneBufferSeconds, 16000);
+            // The VAD coroutine normally guarantees a live device before this
+            // point. If the device disappears between frames, unwind the
+            // capture state instead of leaving IsRecording latched forever.
+            m_IsRecording = false;
+            m_RecordingStartPos = -1;
+            personalLearningRecorder.Seal(null);
+            ResetRecordingCapture();
+            return;
         }
 
-        int curPos = Microphone.GetPosition(m_MicrophoneName);
+        int curPos = ensuredPos;
         int totalSamples = m_RecordedClip != null ? m_RecordedClip.samples : 16000 * 30;
         m_RecordingStartPos = forcedStartPos >= 0
             ? Mathf.Clamp(forcedStartPos, 0, totalSamples - 1)
             : CalculateRecordingStartPos(curPos);
+        if (!resumeCapture && m_RejectedContinuationMic == m_RecordedClip &&
+            Time.realtimeSinceStartup - m_RejectedContinuationClosedAt >= 0f &&
+            Time.realtimeSinceStartup - m_RejectedContinuationClosedAt <= 3f)
+            m_RecordingStartPos = RecordingContinuationIsolation.ClampPreRoll(
+                m_RecordingStartPos, curPos, m_RejectedContinuationEndPos, totalSamples);
 
         BeginRecordingCapture(m_RecordingStartPos, curPos);
         m_RecordingCapturedAt = Time.realtimeSinceStartup;
         if (resumeCapture)
         {
+            // The authoritative original is being reconstructed from an older prefix.
+            // Recompute its pitch from the sealed WAV instead of reusing a partial stream.
+            personalLearningRecorder.CancelPitch();
             // The ring cursor now marks the join, not the beginning of the song.
             // Full PCM analysis remains available; do not pre-convert a tail as a prefix.
             m_StreamHumBackPrefixOffered = true;
@@ -1709,6 +2521,7 @@ public class RTSpeechHandler : MonoBehaviour
             CaptureRecordingAudio(curPos, true);
             Debug.Log("[Listening/Continuation] 首次回复前声音恢复，合并原始录音与续音；不把歌词尾音另立一轮");
         }
+        m_ChatSample?.TraceCaptureStarted(CurrentCaptureSerial, resumeCapture, m_RecordingRescuedByTonalOverride);
         m_NeuralVadClient?.SetInputCaptureTime(m_RecordingCapturedAt);
         m_ClosedSpeechTracker.Begin(CurrentCaptureSerial, m_RecordingCapturedAt);
         m_UnheardCapture.Clear();
@@ -1724,6 +2537,16 @@ public class RTSpeechHandler : MonoBehaviour
     /// </summary>
     private void StopRecording(bool reuseTentativeFullAsr = false)
     {
+        float stopNow = Time.realtimeSinceStartup;
+        ObserveBoundaryRequestDuration(stopNow, false);
+        m_ChatSample?.TraceCaptureStopRequested(
+            CurrentCaptureSerial,
+            m_RecordingCloseReason,
+            m_RecordingCapturedAt >= 0f ? stopNow - m_RecordingCapturedAt : -1f,
+            m_StreamSubmittedSeconds,
+            m_RecordingCapturedFrames,
+            MicrophoneIsRecording(m_ActiveMicrophoneName));
+        EndPendingSemanticEou("recording_closed:" + m_RecordingCloseReason);
         HoldAmbientLearningAtHandoff();
         m_IsRecording = false;
         bool allowSpeakerLearning = m_CurrentRecordingAllowsSpeakerLearning;
@@ -1734,21 +2557,23 @@ public class RTSpeechHandler : MonoBehaviour
         //★ mic不再End/Start：保持continuous loop=true运行(StartRecording时已用m_RecordingStartPos标好起点)。
         //  从ring buffer里截出[m_RecordingStartPos, currentPos)给ASR——这段就是用户的整段发言
         //  (含开头pre-roll，避免首音节被切掉)。老逻辑那一刻End/Start会丢触发帧的音节。
-        int curPos = Microphone.GetPosition(m_MicrophoneName);
+        int curPos = GetMicrophonePosition(m_ActiveMicrophoneName);
         CaptureRecordingAudio(curPos, true);
         PumpStreamingAudio(curPos, true);
         RetainUnheardCapture(curPos);
+        string stablePartialForPromotion = "";
+        bool canPromoteStablePartial = !reuseTentativeFullAsr &&
+            TryGetDispatchableStablePartial(curPos, out stablePartialForPromotion);
         AudioClip toSend = BuildAccumulatedRecordingClip();
         if (toSend == null && m_RecordingStartPos >= 0)
             toSend = SnapshotFromBuffer(m_RecordingStartPos, curPos);
+        SealPersonalLearningCapture(toSend, true);
+        if (toSend == null) canPromoteStablePartial = false;
         if (m_UnheardCapture.Count == 0) EndStreamingRecognition();
         m_RecordingStartPos = -1;
 
         //兜底：mic若被外部停掉就重启，确保后续idle期VAD/barge-in仍有数据
-        if (!Microphone.IsRecording(m_MicrophoneName))
-        {
-            m_RecordedClip = Microphone.Start(m_MicrophoneName, true, m_MicrophoneBufferSeconds, 16000);
-        }
+        TryEnsureMicrophone(out _);
         //AI说话期间不锁定——VAD要靠m_BargeInTimer工作，m_LockState只在录用户正经发言时用
         m_LockState = false;
 
@@ -1761,12 +2586,16 @@ public class RTSpeechHandler : MonoBehaviour
             //EOU锚点：必须在AcceptClip之前调用，ChatSample的DealingTextCallback/StartStreaming
             //会用这个时间戳算ASR延迟和"EOU→首音"总延迟。
             m_ChatSample.MarkEOU(m_RecordingRescuedByTonalOverride);
+            bool partialHeld = canPromoteStablePartial &&
+                m_ChatSample.AcceptStablePartialText(stablePartialForPromotion);
             if (m_LogTimings)
             {
                 float clipLen = toSend != null ? toSend.length : 0f;
                 string dispatchState = reuseTentativeFullAsr
                     ? "复用/等待同轮预测ASR"
-                    : "已发送最终ASR";
+                    : partialHeld
+                        ? "稳定partial已保留作预判；正式等待完整ASR"
+                        : "已发送最终ASR";
                 Debug.Log($"[Timing] EOU 触发 (程序收束采集) — clip长度 {clipLen:F2}s, " +
                           dispatchState);
             }
@@ -1775,7 +2604,8 @@ public class RTSpeechHandler : MonoBehaviour
                 bool streamingExit = m_ChatSample.BeginDeferredFinalAsr(toSend);
                 if (m_LogTimings)
                     Debug.Log("[T-EOU] 复用已完成的完整预测ASR作为最终结果；跳过重复识别");
-                m_NeuralVadClient?.PublishReusedFinalTranscript(CurrentCaptureSerial, m_TentativeFullAsrRawText);
+                m_NeuralVadClient?.PublishReusedFinalTranscript(CurrentCaptureSerial, m_TentativeFullAsrRawText,
+                    m_TentativeFullAsrText);
                 m_ChatSample.AcceptDeferredFinalAsrText(
                     m_TentativeFullAsrText,
                     streamingExit);
@@ -1828,6 +2658,22 @@ public class RTSpeechHandler : MonoBehaviour
     private static bool CanResumeUnheardCapture(bool hasAudio, float gap, bool replied, bool sameMic) =>
         hasAudio && sameMic && !replied && gap >= 0f && gap <= 3f;
 
+    private void DiscardRejectedUnheardCapture()
+    {
+        if (m_UnheardCapture.Count == 0 || m_NeuralVadClient == null ||
+            !m_NeuralVadClient.IsCaptureRejectedSelfSpeech(m_UnheardCaptureSessionSerial)) return;
+        m_RejectedContinuationMic = m_UnheardMic;
+        m_RejectedContinuationEndPos = m_UnheardEndPos;
+        m_RejectedContinuationClosedAt = m_UnheardCaptureClosedAt;
+        m_UnheardCapture.Clear();
+        m_UnheardMic = null;
+        // Clear the cumulative partial stream as well as PCM. New speech still
+        // starts normally, including barge-in while external speakers are active.
+        if (!m_IsRecording) EndStreamingRecognition();
+        Debug.Log($"[Listening/Continuation] rejected self-speech capture={m_UnheardCaptureSessionSerial}; " +
+            "discard old PCM/stream, preserve fresh input after its endpoint");
+    }
+
     private void RetainUnheardCapture(int endPos)
     {
         m_UnheardCapture.Clear();
@@ -1835,6 +2681,10 @@ public class RTSpeechHandler : MonoBehaviour
             return;
         m_UnheardCapture.AddRange(m_RecordingPcmChunks);
         m_UnheardCaptureClosedAt = Time.realtimeSinceStartup;
+        m_UnheardCloseUtc = DateTime.UtcNow.ToString("O");
+        if (string.IsNullOrEmpty(m_RecordingFirstCloseUtc)) m_RecordingFirstCloseUtc = m_UnheardCloseUtc;
+        m_UnheardFirstCloseUtc = m_RecordingFirstCloseUtc;
+        m_UnheardFirstCaptureSerial = m_RecordingFirstCaptureSerial;
         m_UnheardCapturedAt = m_RecordingCapturedAt;
         m_UnheardCaptureSessionSerial = m_NeuralVadClient != null ? m_NeuralVadClient.InputCaptureSessionSerial : 0;
         m_UnheardEndPos = endPos;
@@ -1874,6 +2724,7 @@ public class RTSpeechHandler : MonoBehaviour
         if (frames <= 0) return;
         m_RecordingPcmChunks.Add(samples);
         m_RecordingCapturedFrames += frames;
+        personalLearningRecorder.PushPitch(samples, channels, m_RecordingCaptureFrequency);
     }
 
     private AudioClip BuildAccumulatedRecordingClip(bool consume = true)
@@ -2028,8 +2879,17 @@ public class RTSpeechHandler : MonoBehaviour
         m_LatestStreamPartial = "";
         m_LatestStreamPartialAudioMs = 0;
         m_LatestStreamPartialTime = -1f;
+        m_LatestStreamStablePartial = "";
+        m_LatestStreamStablePartialAudioMs = 0;
+        m_LatestStreamStablePartialTime = -1f;
         m_LastStreamProgressTime = -1f;
         m_NextStreamAudioPushTime = 0f;
+        m_StreamingStartedAt = -1f;
+        m_StreamingTerminalAt = -1f;
+        m_StreamingTransportState = "idle";
+        m_StreamingTransportReason = "";
+        m_StreamingTransportGeneration = -1;
+        m_StreamingPushStopped = false;
 
         if (!m_EnableStreamingRecognition || m_NeuralVadClient == null ||
             !m_NeuralVadClient.StreamingPreviewEnabled || m_RecordingStartPos < 0)
@@ -2037,7 +2897,14 @@ public class RTSpeechHandler : MonoBehaviour
 
         bool started = m_NeuralVadClient.BeginStreamingPreview(OnStreamingTranscript);
         if (!started) return;
+        m_StreamingTransportGeneration = m_NeuralVadClient.StreamingGeneration;
+        m_StreamingStartedAt = Time.realtimeSinceStartup;
+        m_StreamingTransportState = "starting";
         m_StreamLastSentPos = m_RecordingStartPos;
+        if (m_LogTimings)
+            Debug.Log($"[Listening/ASR] partial coverage policy capture={CurrentCaptureSerial} " +
+                      $"lag<={m_StreamPartialMaxLagMs}ms age<={m_StreamPartialMaxAgeSeconds:F2}s " +
+                      $"coverageWait<={m_CoverageWaitTimeoutSeconds:F2}s");
         PumpStreamingAudio(currentPos, true);
     }
 
@@ -2046,6 +2913,102 @@ public class RTSpeechHandler : MonoBehaviour
         if (m_NeuralVadClient != null) m_NeuralVadClient.CancelStreamingPreview();
         m_StreamLastSentPos = -1;
         m_NextStreamAudioPushTime = 0f;
+        m_StreamingPushStopped = true;
+    }
+
+    private void HandleStreamingTransportChanged(int generation, string state, string reason)
+    {
+        if (generation != m_StreamingTransportGeneration) return;
+        if (!m_IsRecording && state != "cancelled") return;
+
+        float now = Time.realtimeSinceStartup;
+        m_StreamingTransportState = state ?? "";
+        m_StreamingTransportReason = reason ?? "";
+        if (state == "started" && m_StreamingStartedAt < 0f)
+            m_StreamingStartedAt = now;
+        if (state == "closed" || state == "error")
+        {
+            m_StreamingTerminalAt = now;
+            // Keep collecting the original microphone PCM for final ASR, but do
+            // not keep feeding a dead preview transport.
+            m_StreamingPushStopped = true;
+        }
+
+        m_ChatSample?.TraceCaptureStreamChanged(
+            CurrentCaptureSerial,
+            state,
+            reason,
+            generation,
+            m_StreamSubmittedSeconds,
+            m_RecordingCapturedAt >= 0f ? now - m_RecordingCapturedAt : -1f);
+        if (m_LogTimings && (state == "closed" || state == "error"))
+            Debug.LogWarning($"[Listening/ASR] 流式传输 {state} reason={reason}；保留原始PCM并等待收束 watchdog");
+    }
+
+    private bool TryApplyCaptureWatchdog(float now)
+    {
+        if (!m_IsRecording) return false;
+
+        float captureAge = m_RecordingCapturedAt >= 0f
+            ? Mathf.Max(0f, now - m_RecordingCapturedAt)
+            : 0f;
+        string reason = "";
+        float triggerAge = captureAge;
+        if (m_MaxRecordingSeconds > 0f && captureAge >= m_MaxRecordingSeconds)
+        {
+            reason = "capture-watchdog";
+        }
+        else if (m_EnableStreamingRecognition && m_StreamingStartedAt >= 0f)
+        {
+            float terminalAge = m_StreamingTerminalAt >= 0f
+                ? now - m_StreamingTerminalAt : -1f;
+            float progressAge = m_LastStreamProgressTime >= 0f
+                ? now - m_LastStreamProgressTime
+                : now - m_StreamingStartedAt;
+            bool submittedEnough = m_StreamSubmittedSeconds >= 2f;
+            if (terminalAge >= Mathf.Max(0.2f, m_AsrStreamTerminalGraceSeconds))
+            {
+                reason = "asr-stream-stalled";
+                triggerAge = terminalAge;
+            }
+            else if (submittedEnough && progressAge >= Mathf.Max(2f, m_AsrStreamStallSeconds))
+            {
+                reason = "asr-stream-stalled";
+                triggerAge = progressAge;
+            }
+        }
+
+        if (string.IsNullOrEmpty(reason)) return false;
+        bool reuseTentativeFullAsr = m_TentativeUsedFullAsr &&
+            (m_TentativePreviewInFlight || m_TentativeFullAsrResultReady);
+        m_RecordingCloseReason = reason;
+        m_ChatSample?.TraceCaptureStopRequested(
+            CurrentCaptureSerial,
+            reason,
+            captureAge,
+            m_StreamSubmittedSeconds,
+            m_RecordingCapturedFrames,
+            MicrophoneIsRecording(m_ActiveMicrophoneName));
+        m_ChatSample?.TraceCaptureWatchdog(
+            CurrentCaptureSerial,
+            reason,
+            triggerAge,
+            m_StreamingTransportState,
+            m_StreamingTransportReason,
+            m_StreamSubmittedSeconds);
+        if (m_LogTimings)
+            Debug.LogWarning($"[Listening/Watchdog] 收束 capture reason={reason} " +
+                $"captureAge={captureAge:F1}s triggerAge={triggerAge:F1}s " +
+                $"stream={m_StreamingTransportState}/{m_StreamingTransportReason} " +
+                $"submitted={m_StreamSubmittedSeconds:F1}s");
+        // RetainUnheardCapture intentionally keeps PCM for a possible short
+        // handoff, which normally also keeps a healthy preview stream alive.
+        // A watchdog conclusion is different: the preview has no trustworthy
+        // progress, so terminate it before the handoff rather than carrying a
+        // dead socket into the next capture. Final ASR still uses the chunks.
+        EndStreamingRecognition();
+        StopRecording(reuseTentativeFullAsr);
+        return true;
     }
 
     private void ObserveStreamingTurnActivity(
@@ -2082,6 +3045,7 @@ public class RTSpeechHandler : MonoBehaviour
     private void OnStreamingTranscript(SenseVoiceSpeechToText.StreamingTranscript transcript)
     {
         if (!m_IsRecording || transcript == null) return;
+        m_ChatSample?.TracePartialAsr(CurrentCaptureSerial, transcript);
         string rawTranscript = transcript.Text ?? "";
         if (!string.Equals(rawTranscript, m_PreparedBoundaryRawTranscript, StringComparison.Ordinal))
         {
@@ -2125,6 +3089,12 @@ public class RTSpeechHandler : MonoBehaviour
             latestSingingProbability);
         m_LastStreamingPitchStability = Mathf.Clamp01(transcript.PitchStability);
         UpdateMelodicEouProtection(transcript);
+        // Candidate recording is evidence collection. Only independent current
+        // speech or sustained melody while no AI audio is present may supersede
+        // a pending answer. Real barge-in keeps the stricter AEC/identity path.
+        bool outputProtected = m_ChatSample != null &&
+            m_ChatSample.IsAIPlaybackProtected(m_PostPlaybackEchoGuardSeconds);
+        ObserveRecordingInputConfirmation(transcript, outputProtected);
         //ChatSample 会综合连续帧后通过 OnStableUserSingingObserved 回传稳定事实。
         //它存在时不能再由单个 p>=0.58 帧直接锁死歌唱 EOU；仅在没有语义协调器的
         //降级场景保留旧的纯声学入口。
@@ -2142,12 +3112,18 @@ public class RTSpeechHandler : MonoBehaviour
         }
         if (!string.IsNullOrWhiteSpace(transcript.Text))
             m_LatestStreamPartial = transcript.Text.Trim();
+        if (!string.IsNullOrWhiteSpace(transcript.StableText))
+        {
+            m_LatestStreamStablePartial = transcript.StableText.Trim();
+            m_LatestStreamStablePartialAudioMs = transcript.AudioMs;
+            m_LatestStreamStablePartialTime = Time.realtimeSinceStartup;
+        }
         if (transcript.AudioMs > m_LatestStreamPartialAudioMs)
             m_LastStreamProgressTime = Time.realtimeSinceStartup;
         m_LatestStreamPartialAudioMs = transcript.AudioMs;
         m_LatestStreamPartialTime = Time.realtimeSinceStartup;
         PublishPreparedTurnBoundaryEvidence();
-        if (m_ChatSample != null) m_ChatSample.UpdateStreamingTranscript(transcript);
+        if (m_ChatSample != null && m_RecordingInputConfirmed) m_ChatSample.UpdateStreamingTranscript(transcript);
 
         // A requested sing-along can hide almost all RVC latency behind the user's own
         // performance.  Once singing is stable and the prefix is long enough, snapshot
@@ -2165,7 +3141,7 @@ public class RTSpeechHandler : MonoBehaviour
                 Mathf.RoundToInt(humBackPrefixSeconds * m_RecordedClip.frequency));
             int availableFrames = RingSampleDistance(
                 m_RecordingStartPos,
-                Microphone.GetPosition(m_MicrophoneName),
+                GetMicrophonePosition(m_ActiveMicrophoneName),
                 m_RecordedClip.samples);
             if (availableFrames >= prefixFrames)
             {
@@ -2195,10 +3171,29 @@ public class RTSpeechHandler : MonoBehaviour
         m_StalledContinueDecisionCount = 0;
         m_LastStalledDecisionStatus = "";
         m_LastStalledDecisionConfidence = 0f;
-        if (m_StalledTranscriptReviewRequested && m_ChatSample != null)
-            m_ChatSample.CancelTurnBoundaryReview();
-        m_StalledTranscriptReviewRequested = false;
-        m_PendingSemanticEou = false;
+        // Do not cancel an in-flight boundary decision for every ordinary ASR
+        // suffix update. The callback re-checks the current text/activity lease
+        // before it can close the capture; if the transcript changed, it rejects
+        // the stale decision and the normal retry path uses the newest text.
+        // Cancelling here created a serial request storm (request A cancelled by
+        // suffix B, then B by suffix C) and pushed EOT several seconds later.
+        bool boundaryRequestInFlight = m_StalledTranscriptReviewRequested;
+        if (boundaryRequestInFlight && m_ChatSample != null)
+        {
+            m_ChatSample.TurnBoundaryTrace?.Mark("eou.request_coalesced", new Newtonsoft.Json.Linq.JObject {
+                ["reason"] = "partial-suffix-update",
+                ["textLength"] = trimmed.Length,
+                ["audioMs"] = m_LastMeaningfulStreamTextAudioMs,
+                ["scope"] = "in-flight boundary request retained; callback must revalidate current text/activity"
+            });
+        }
+        EndPendingSemanticEou("transcript_changed");
+        // Keep the existing boundary request alive while ASR appends a suffix.
+        // Its completion path compares the captured text/activity revision with
+        // the current turn and rejects stale decisions. Clearing this flag here
+        // would allow every partial suffix to launch another request before the
+        // prior one has returned.
+        m_StalledTranscriptReviewRequested = boundaryRequestInFlight;
         m_PendingSemanticEouStatus = "";
         m_PendingSemanticEouTextKey = "";
         //等待时长由证据选择，不能在这里再串联一个固定的 2.8 秒门槛。
@@ -2227,6 +3222,7 @@ public class RTSpeechHandler : MonoBehaviour
         if (m_StalledTranscriptReviewRequested)
         {
             if (now - m_StalledTranscriptReviewRequestTime < 7f) return;
+            ObserveBoundaryRequestDuration(now, false);
             m_ChatSample.CancelTurnBoundaryReview();
             m_StalledTranscriptReviewRequested = false;
             m_StalledReviewFailures++;
@@ -2253,12 +3249,25 @@ public class RTSpeechHandler : MonoBehaviour
         if (unchanged < required || (now < m_NextStalledTranscriptReviewTime && !newDrop))
             return;
 
+        float closeQuietSeconds = m_EnableSingingMode && (m_LikelySinging || m_MelodicEouProtectionActive)
+            ? m_SingingEouSilence : m_RecordingTimeLimit;
+        bool coveredQuiet = heldQuiet && HasFreshStreamingCoverage && m_TurnActivity.TailAvailable &&
+            !m_TurnActivity.LevelActive && !m_TurnActivity.MelodyActive && !m_TurnActivity.TextActivityActive;
+        string admissionReason;
+        bool allowRemoteRequest = ShouldStartRemoteBoundaryReview(coveredQuiet,
+            closeQuietSeconds - m_SilenceTimer, m_ObservedBoundarySeconds,
+            now - m_LastBoundaryRemoteAttemptAt, out admissionReason);
+
         string trigger = heldDrop ? "level-drop" : heldQuiet ? "quiet" :
             hasThought ? "prepared-thought" : "stable-text";
         if (m_BoundaryCandidateTime < 0f) m_BoundaryCandidateTime = now;
         m_StalledRequiredUnchangedSeconds = required;
-        m_StalledReviewActivityRevision = m_TurnActivity.Revision;
+        m_StalledReviewActivityRevision = m_TurnActivity.ActivityRevision;
+        m_StalledReviewTextRevision = m_TurnActivity.Revision - m_TurnActivity.ActivityRevision;
         m_StalledReviewSoundAt = m_TurnActivity.LatestSoundAt;
+        m_StalledReviewRemoteAllowed = allowRemoteRequest;
+        m_BoundaryRemoteTimingArmed = false;
+        m_BoundaryRequestTimingRecorded = false;
         //先设置状态，以兼容 provider 同步失败回调；失败不能被调用后的赋值重新锁住。
         m_StalledTranscriptReviewRequested = true;
         m_StalledTranscriptReviewRequestTime = now;
@@ -2294,7 +3303,19 @@ public class RTSpeechHandler : MonoBehaviour
             $"近期人声证据={m_TurnActivity.TextActivityActive}；最近有效声音结束距今={m_SilenceTimer:F2}s；" +
             $"之前有{m_BoundaryRenewedSoundCount}次接话判断期间继续发声，未切开录音。" +
             "音量下降可能只是长音/换气，不等于整段结束；如需要主动打断请明确选择 interrupt_user。" +
-            "这只是输入活动证据，不是是否应接话的命令。旧歌词和整窗歌唱概率不证明此刻仍在唱。");
+            "这只是输入活动证据，不是是否应接话的命令。旧歌词和整窗歌唱概率不证明此刻仍在唱。",
+            allowRemoteRequest);
+        // The provider may synchronously consume an already prepared decision.
+        // Do not count that path as a backend request or train its latency estimate.
+        if (requested && allowRemoteRequest && m_StalledTranscriptReviewRequested)
+        {
+            m_LastBoundaryRemoteAttemptAt = now;
+            m_BoundaryRemoteTimingArmed = true;
+        }
+        if (m_LogTimings || !allowRemoteRequest)
+            Debug.Log($"[Semantic EOU/Admission] capture={CurrentCaptureSerial} remote={m_BoundaryRemoteTimingArmed} " +
+                $"reason={admissionReason} remainingQuiet={closeQuietSeconds - m_SilenceTimer:F3}s " +
+                $"observed={m_ObservedBoundarySeconds:F3}s synchronousCompletion={requested && !m_StalledTranscriptReviewRequested}");
         if (!requested)
         {
             m_StalledTranscriptReviewRequested = false;
@@ -2318,6 +3339,36 @@ public class RTSpeechHandler : MonoBehaviour
         return acousticCandidate ? Mathf.Max(0.4f, fastSeconds) :
             preparedThought ? Mathf.Min(Mathf.Max(0.4f, fallbackSeconds), 1.2f) :
             Mathf.Max(1f, fallbackSeconds);
+    }
+
+    private static bool ShouldStartRemoteBoundaryReview(bool coveredQuiet, float remainingQuietSeconds,
+        float observedSeconds, float secondsSinceLastAttempt, out string reason)
+    {
+        // An active/uncertain tail or an abnormally stalled stream still needs the
+        // role's decision. This admission rule never closes a capture itself.
+        if (!coveredQuiet) { reason = "not-covered-quiet"; return true; }
+        if (remainingQuietSeconds <= 0f) { reason = "capture-close-due"; return false; }
+        if (observedSeconds <= 0f) { reason = "initial-measurement"; return true; }
+        if (observedSeconds + .10f < remainingQuietSeconds) { reason = "fits-quiet-budget"; return true; }
+        // Periodic exploration can discover a faster/recovered backend. Ordinary
+        // quiet turns between probes continue to use the unchanged physical gate.
+        if (secondsSinceLastAttempt >= 30f) { reason = "latency-refresh-probe"; return true; }
+        reason = "slower-than-remaining-quiet"; return false;
+    }
+
+    private void ObserveBoundaryRequestDuration(float now, bool completed)
+    {
+        if (!m_StalledReviewRemoteAllowed || !m_BoundaryRemoteTimingArmed || m_BoundaryRequestTimingRecorded ||
+            !m_StalledTranscriptReviewRequested || m_StalledTranscriptReviewRequestTime < 0f) return;
+        float elapsed = now - m_StalledTranscriptReviewRequestTime;
+        m_BoundaryRequestTimingRecorded = true;
+        if (elapsed <= 0f || float.IsNaN(elapsed) || float.IsInfinity(elapsed)) return;
+        elapsed = Mathf.Min(7f, elapsed);
+        m_ObservedBoundarySeconds = !completed || m_ObservedBoundarySeconds <= 0f
+            ? Mathf.Max(m_ObservedBoundarySeconds, elapsed)
+            : Mathf.Lerp(m_ObservedBoundarySeconds, elapsed, .25f);
+        Debug.Log($"[Semantic EOU/Latency] capture={CurrentCaptureSerial} seconds={elapsed:F3} " +
+            $"sample={(completed ? "response" : "cancelled-lower-bound")} estimate={m_ObservedBoundarySeconds:F3}");
     }
 
     private static float ResolveReviewDelayWithCoveredQuiet(float textDelay, float quietSeconds,
@@ -2393,6 +3444,14 @@ public class RTSpeechHandler : MonoBehaviour
             m_LastMeaningfulStreamTextTime, m_BoundaryCandidateTime, m_RecordingCloseReason);
     }
 
+    private void EndPendingSemanticEou(string outcome)
+    {
+        m_PendingSemanticEouTrace?.Mark("eou.consumer_end", new Newtonsoft.Json.Linq.JObject {
+            ["outcome"] = outcome, ["action"] = m_PendingSemanticEouStatus });
+        m_PendingSemanticEouTrace = null;
+        m_PendingSemanticEou = false;
+    }
+
     private void HandleStalledUserTurnDecision(
         string status,
         float confidence,
@@ -2402,22 +3461,42 @@ public class RTSpeechHandler : MonoBehaviour
         string sourceTranscript,
         int audioMs)
     {
+        ObserveBoundaryRequestDuration(Time.realtimeSinceStartup, true);
         m_StalledTranscriptReviewRequested = false;
         m_StalledTranscriptReviewRequestTime = -999f;
-        if (!m_IsRecording) return;
+        var boundaryTrace = m_ChatSample?.TurnBoundaryTrace;
+        if (!m_IsRecording)
+        {
+            boundaryTrace?.Mark("eou.consumer_end", new Newtonsoft.Json.Linq.JObject { ["outcome"] = "recording_closed" });
+            return;
+        }
         string normalizedStatus = (status ?? "").Trim().ToLowerInvariant();
-        bool fresh = string.Equals(NormalizeSemanticTranscript(sourceTranscript),
-            NormalizeSemanticTranscript(m_LatestStreamPartial), StringComparison.Ordinal) &&
-            m_StalledReviewActivityRevision == m_TurnActivity.Revision && !m_TurnActivity.PendingText;
+        bool sameText = string.Equals(NormalizeSemanticTranscript(sourceTranscript),
+            NormalizeSemanticTranscript(m_LatestStreamPartial), StringComparison.Ordinal);
+        bool sameActivity = m_StalledReviewActivityRevision == m_TurnActivity.ActivityRevision;
+        bool sameTextRevision = m_StalledReviewTextRevision ==
+            m_TurnActivity.Revision - m_TurnActivity.ActivityRevision;
+        bool fresh = sameText && sameTextRevision && sameActivity && !m_TurnActivity.PendingText;
         bool newSound = HasSoundAdvanced(m_StalledReviewSoundAt, m_TurnActivity.LatestSoundAt);
         if (newSound && normalizedStatus != "interrupt_user")
         {
             m_BoundaryRenewedSoundCount++;
             fresh = false;
         }
+        var checkedEvidence = BoundaryDecisionObservation.Fields(
+            normalizedStatus, confidence, sameText, sameActivity, m_TurnActivity.PendingText,
+            newSound, HasFreshStreamingCoverage, m_StalledReviewActivityRevision, m_TurnActivity.ActivityRevision,
+            audioMs, m_LatestStreamPartialAudioMs);
+        checkedEvidence["sameTextRevision"] = sameTextRevision;
+        checkedEvidence["sourceTextRevision"] = m_StalledReviewTextRevision;
+        checkedEvidence["currentTextRevision"] = m_TurnActivity.Revision - m_TurnActivity.ActivityRevision;
+        boundaryTrace?.Mark("eou.consumer_checked", checkedEvidence);
         if (!fresh || !TurnBoundaryDecision.IsAction(normalizedStatus))
         {
-            m_PendingSemanticEou = false;
+            boundaryTrace?.Mark("eou.consumer_end", new Newtonsoft.Json.Linq.JObject {
+                ["outcome"] = fresh ? "invalid_decision" : "input_changed",
+                ["action"] = normalizedStatus });
+            EndPendingSemanticEou("replaced_by_rejected_decision");
             if (fresh) m_StalledReviewFailures++;
             m_NextStalledTranscriptReviewTime = Time.realtimeSinceStartup + 0.8f;
             if (m_LogTimings) Debug.Log("[Semantic EOU] 释放结果并重试：" +
@@ -2429,7 +3508,9 @@ public class RTSpeechHandler : MonoBehaviour
         if (normalizedStatus == "continue")
         {
             m_StalledContinueDecisionCount++;
-            m_PendingSemanticEou = false;
+            boundaryTrace?.Mark("eou.consumer_end", new Newtonsoft.Json.Linq.JObject {
+                ["outcome"] = "continue_listening", ["action"] = normalizedStatus });
+            EndPendingSemanticEou("continue_listening");
             m_NextStalledTranscriptReviewTime =
                 Time.realtimeSinceStartup + Mathf.Max(2f, m_StalledTranscriptReviewCooldown);
             return;
@@ -2437,6 +3518,9 @@ public class RTSpeechHandler : MonoBehaviour
         if (normalizedStatus != "complete" && normalizedStatus != "ask_user" && normalizedStatus != "interrupt_user" &&
             normalizedStatus != "take_turn") return;
 
+        EndPendingSemanticEou("superseded");
+        m_PendingSemanticEouTrace = boundaryTrace;
+        m_PendingSemanticEouTrace?.Mark("eou.consumer_pending");
         m_PendingSemanticEou = true;
         m_PendingSemanticDecisionAt = Time.realtimeSinceStartup;
         m_LoggedSemanticCoverageWait = false;
@@ -2446,6 +3530,17 @@ public class RTSpeechHandler : MonoBehaviour
         m_PendingSemanticEouModeConfidence = Mathf.Clamp01(modeConfidence);
         m_PendingSemanticEouSource = sourceLikelihood ?? "uncertain";
         m_PendingSemanticEouTextKey = NormalizeSemanticTranscript(sourceTranscript);
+        m_PendingSemanticEouTrace?.Mark("eou.semantic_eot", new Newtonsoft.Json.Linq.JObject {
+            ["status"] = m_PendingSemanticEouStatus,
+            ["confidence"] = m_PendingSemanticEouConfidence,
+            ["mode"] = m_PendingSemanticEouObservedMode,
+            ["source"] = m_PendingSemanticEouSource,
+            ["textKeyCharacters"] = m_PendingSemanticEouTextKey == null ? 0 : m_PendingSemanticEouTextKey.Length,
+            ["partialMaxLagMs"] = m_StreamPartialMaxLagMs,
+            ["partialMaxAgeSeconds"] = m_StreamPartialMaxAgeSeconds,
+            ["coverageWaitTimeoutSeconds"] = m_CoverageWaitTimeoutSeconds,
+            ["scope"] = "semantic close candidate; recorder remains open until final evidence gate"
+        });
     }
 
     private bool TryApplyPendingSemanticEou()
@@ -2455,7 +3550,7 @@ public class RTSpeechHandler : MonoBehaviour
             HasSoundAdvanced(m_StalledReviewSoundAt, m_TurnActivity.LatestSoundAt))
         {
             m_BoundaryRenewedSoundCount++;
-            m_PendingSemanticEou = false;
+            EndPendingSemanticEou("new_sound");
             m_NextStalledTranscriptReviewTime = Time.realtimeSinceStartup;
             Debug.Log("[Semantic EOU] 判断后声音继续，即使文字没变也保留同一录音；交给角色更新时机判断");
             return false;
@@ -2469,31 +3564,84 @@ public class RTSpeechHandler : MonoBehaviour
             NormalizeSemanticTranscript(m_LatestStreamPartial),
             unchanged,
             m_StalledRequiredUnchangedSeconds) &&
-            m_StalledReviewActivityRevision == m_TurnActivity.Revision && !m_TurnActivity.PendingText;
+            m_StalledReviewActivityRevision == m_TurnActivity.ActivityRevision &&
+            m_StalledReviewTextRevision == m_TurnActivity.Revision - m_TurnActivity.ActivityRevision &&
+            !m_TurnActivity.PendingText;
+        bool coverageDegraded = false;
         if (accepted && !HasFreshStreamingCoverage)
         {
             // Retain a valid role choice while one ASR packet catches up, rather than
             // asking the same question again. New input/outage still invalidates it.
             float waiting = Time.realtimeSinceStartup - m_PendingSemanticDecisionAt;
-            if (m_PendingSemanticDecisionAt >= 0f && waiting <= 2.5f)
+            float coverageLimit = Mathf.Max(0.5f, m_CoverageWaitTimeoutSeconds);
+            bool quietTailEvidence = HasDegradedQuietTailEvidence(Time.realtimeSinceStartup);
+            float degradedGrace = Mathf.Max(0.3f, m_DegradedCoverageGraceSeconds);
+            if (quietTailEvidence && waiting >= degradedGrace)
+            {
+                coverageDegraded = true;
+                m_PendingSemanticEouTrace?.Mark("eou.coverage_degraded", new Newtonsoft.Json.Linq.JObject {
+                    ["waitingSeconds"] = waiting, ["graceSeconds"] = degradedGrace,
+                    ["sourceAudioMs"] = m_LastMeaningfulStreamTextAudioMs,
+                    ["currentAudioMs"] = m_LatestStreamPartialAudioMs,
+                    ["partialMaxLagMs"] = m_StreamPartialMaxLagMs,
+                    ["scope"] = "quiet tail and stable decision accepted; final ASR still gates formal dispatch"
+                });
+            }
+            else if (m_PendingSemanticDecisionAt >= 0f && waiting <= coverageLimit)
             {
                 if (!m_LoggedSemanticCoverageWait && m_LogTimings)
                     Debug.Log($"[Semantic EOU] 保留 {m_PendingSemanticEouStatus}，等待尾部ASR覆盖；不重复请求LLM");
+                m_PendingSemanticEouTrace?.Mark("eou.coverage_wait", new Newtonsoft.Json.Linq.JObject {
+                    ["waitingSeconds"] = waiting, ["limitSeconds"] = coverageLimit,
+                    ["sourceAudioMs"] = m_LastMeaningfulStreamTextAudioMs,
+                    ["currentAudioMs"] = m_LatestStreamPartialAudioMs,
+                    ["partialMaxLagMs"] = m_StreamPartialMaxLagMs,
+                    ["partialMaxAgeSeconds"] = m_StreamPartialMaxAgeSeconds });
                 m_LoggedSemanticCoverageWait = true;
                 return false;
             }
+            m_PendingSemanticEouTrace?.Mark("eou.coverage_timeout", new Newtonsoft.Json.Linq.JObject {
+                ["waitingSeconds"] = waiting, ["limitSeconds"] = coverageLimit,
+                ["sourceAudioMs"] = m_LastMeaningfulStreamTextAudioMs,
+                ["currentAudioMs"] = m_LatestStreamPartialAudioMs,
+                ["partialMaxLagMs"] = m_StreamPartialMaxLagMs,
+                ["partialMaxAgeSeconds"] = m_StreamPartialMaxAgeSeconds,
+                ["streamState"] = m_StreamingTransportState,
+                ["streamReason"] = m_StreamingTransportReason
+            });
             accepted = false;
         }
         if (!accepted)
         {
             //无论是低置信度、过期文字还是用户恢复发声，都必须释放 pending。
             //旧实现只清理文字变动，导致 ask_user/0.60 永久卡住并阻止一切后续复核。
-            m_PendingSemanticEou = false;
+            m_PendingSemanticEouTrace?.Mark("eou.apply_rejected", BoundaryDecisionObservation.Fields(
+                m_PendingSemanticEouStatus, m_PendingSemanticEouConfidence,
+                m_PendingSemanticEouTextKey == NormalizeSemanticTranscript(m_LatestStreamPartial),
+                m_StalledReviewActivityRevision == m_TurnActivity.ActivityRevision, m_TurnActivity.PendingText,
+                false, HasFreshStreamingCoverage, m_StalledReviewActivityRevision, m_TurnActivity.ActivityRevision,
+                m_LastMeaningfulStreamTextAudioMs, m_LatestStreamPartialAudioMs,
+                unchanged, m_StalledRequiredUnchangedSeconds, m_StalledTurnDecisionMinConfidence));
+            EndPendingSemanticEou("acceptance_conditions_not_met");
             m_NextStalledTranscriptReviewTime = Time.realtimeSinceStartup + 0.8f;
             if (m_LogTimings) Debug.Log($"[Semantic EOU] 未采纳 {m_PendingSemanticEouStatus}/" +
                 $"{m_PendingSemanticEouConfidence:F2}，pending已释放，稍后重新听取角色判断");
             return false;
         }
+
+            m_PendingSemanticEouTrace?.Mark("eou.final_evidence_ready", new Newtonsoft.Json.Linq.JObject {
+            ["status"] = m_PendingSemanticEouStatus,
+            ["confidence"] = m_PendingSemanticEouConfidence,
+            ["coverage"] = HasFreshStreamingCoverage,
+            ["coverageDegraded"] = coverageDegraded,
+            ["sourceAudioMs"] = m_LastMeaningfulStreamTextAudioMs,
+            ["currentAudioMs"] = m_LatestStreamPartialAudioMs,
+            ["partialMaxLagMs"] = m_StreamPartialMaxLagMs,
+            ["partialMaxAgeSeconds"] = m_StreamPartialMaxAgeSeconds,
+            ["scope"] = coverageDegraded
+                ? "semantic decision accepted on quiet-tail fallback; final ASR still gates formal dispatch"
+                : "semantic decision accepted and final ASR evidence gate passed"
+        });
 
         if (m_LogTimings)
             Debug.Log($"[Semantic EOU] 采纳LLM轮次判断 {m_PendingSemanticEouStatus}/" +
@@ -2506,8 +3654,10 @@ public class RTSpeechHandler : MonoBehaviour
                 m_PendingSemanticEouObservedMode,
                 m_PendingSemanticEouModeConfidence,
                 m_PendingSemanticEouSource);
-        m_PendingSemanticEou = false;
-        m_RecordingCloseReason = "llm-" + m_PendingSemanticEouStatus;
+        EndPendingSemanticEou("accepted_close");
+        m_RecordingCloseReason = coverageDegraded
+            ? "llm-" + m_PendingSemanticEouStatus + "-coverage-degraded"
+            : "llm-" + m_PendingSemanticEouStatus;
         StopRecording(m_TentativeUsedFullAsr &&
             (m_TentativePreviewInFlight || m_TentativeFullAsrResultReady));
         return true;
@@ -2564,6 +3714,7 @@ public class RTSpeechHandler : MonoBehaviour
 
     private void ResetStalledTurnState()
     {
+        ObserveBoundaryRequestDuration(Time.realtimeSinceStartup, false);
         m_TurnActivity.Reset(Time.realtimeSinceStartup);
         m_BoundaryAcoustics.Reset();
         m_BoundaryCandidateTime = -1f;
@@ -2571,6 +3722,10 @@ public class RTSpeechHandler : MonoBehaviour
         m_LastBoundaryEvidenceLogTime = -1f;
         m_StalledRequiredUnchangedSeconds = 0f;
         m_StalledReviewActivityRevision = 0;
+        m_StalledReviewTextRevision = 0;
+        m_StalledReviewRemoteAllowed = false;
+        m_BoundaryRemoteTimingArmed = false;
+        m_BoundaryRequestTimingRecorded = false;
         m_StalledReviewSoundAt = -1f;
         m_BoundaryRenewedSoundCount = 0;
         m_StalledReviewFailures = 0;
@@ -2582,7 +3737,7 @@ public class RTSpeechHandler : MonoBehaviour
         m_NextStalledTranscriptReviewTime = 0f;
         m_StalledTranscriptReviewRequested = false;
         m_StalledTranscriptReviewRequestTime = -999f;
-        m_PendingSemanticEou = false;
+        EndPendingSemanticEou("listening_reset");
         m_PendingSemanticEouStatus = "";
         m_PendingSemanticEouTextKey = "";
         m_PendingSemanticEouConfidence = 0f;
@@ -2671,7 +3826,8 @@ public class RTSpeechHandler : MonoBehaviour
 
     private void PumpStreamingAudio(int currentPos, bool force)
     {
-        if (m_StreamLastSentPos < 0 || m_NeuralVadClient == null || m_RecordedClip == null) return;
+        if (m_StreamLastSentPos < 0 || m_NeuralVadClient == null || m_RecordedClip == null ||
+            m_StreamingPushStopped) return;
         if (!force && Time.realtimeSinceStartup < m_NextStreamAudioPushTime) return;
         if (currentPos == m_StreamLastSentPos) return;
 
@@ -2680,10 +3836,26 @@ public class RTSpeechHandler : MonoBehaviour
         m_NextStreamAudioPushTime = Time.realtimeSinceStartup + Mathf.Max(0.05f, m_StreamAudioFrameSeconds);
         if (samples == null || samples.Length == 0) return;
         // Stream time excludes playback-quarantined chunks; the final PCM retains them.
+        bool accepted = m_NeuralVadClient.TryPushStreamingSamples(
+            samples, m_RecordedClip.channels, m_RecordedClip.frequency);
+        if (!accepted)
+        {
+            // The preview queue is bounded.  Once it rejects a chunk, stop
+            // claiming coverage and retain only the authoritative PCM capture.
+            m_StreamingPushStopped = true;
+            m_StreamingTerminalAt = Time.realtimeSinceStartup;
+            m_StreamingTransportState = "error";
+            m_StreamingTransportReason = "queue-backpressure";
+            m_ChatSample?.TraceCaptureStreamChanged(
+                CurrentCaptureSerial, "error", m_StreamingTransportReason,
+                m_StreamingTransportGeneration, m_StreamSubmittedSeconds,
+                m_RecordingCapturedAt >= 0f
+                    ? Time.realtimeSinceStartup - m_RecordingCapturedAt : -1f);
+            return;
+        }
         m_StreamSubmittedSeconds += samples.Length /
             (float)(Mathf.Max(1, m_RecordedClip.channels) * Mathf.Max(1, m_RecordedClip.frequency));
         m_LastStreamAudioSubmittedAt = Time.realtimeSinceStartup;
-        m_NeuralVadClient.PushStreamingSamples(samples, m_RecordedClip.channels, m_RecordedClip.frequency);
     }
 
     /// <summary>从环形 AudioClip 复制交错 samples，不创建临时 AudioClip，避免 10Hz GC 抖动。</summary>
@@ -2742,15 +3914,56 @@ public class RTSpeechHandler : MonoBehaviour
     }
 
     /// <summary>
+    /// Returns a stable speech transcript suitable for provisional evidence at
+    /// EOU.  It is never formal input; whole-clip final ASR remains authoritative.
+    /// Singing, tonal rescue, stale coverage and low-confidence frames are
+    /// filtered before even recording this provisional evidence.
+    /// </summary>
+    private bool TryGetDispatchableStablePartial(int currentPos, out string text)
+    {
+        text = "";
+        if (!m_EnableStablePartialPromotion || !m_EnableStreamingRecognition || m_ChatSample == null ||
+            m_RecordedClip == null ||
+            m_RecordingStartPos < 0 || string.IsNullOrWhiteSpace(m_LatestStreamStablePartial) ||
+            m_LatestStreamStablePartialTime < 0f)
+            return false;
+
+        // Any positive singing latch or tonal rescue means the final transcript
+        // must carry the acoustic/mixed-turn evidence before routing.
+        if (m_LikelySinging || m_MelodicEouProtectionActive ||
+            m_RecordingRescuedByTonalOverride || m_CurrentSingingProbability >= 0.48f ||
+            m_LatestStreamingSingingProbability >= 0.48f)
+            return false;
+
+        string candidate = m_LatestStreamStablePartial.Trim();
+        if (candidate.Length < 2) return false;
+        float now = Time.realtimeSinceStartup;
+        float age = now - m_LatestStreamStablePartialTime;
+        int currentMs = Mathf.RoundToInt(
+            RingSampleDistance(m_RecordingStartPos, currentPos, m_RecordedClip.samples) *
+            1000f / Mathf.Max(1, m_RecordedClip.frequency));
+        int lagMs = Mathf.Max(0, currentMs - m_LatestStreamStablePartialAudioMs);
+        if (age > m_StreamPartialMaxAgeSeconds || lagMs > m_StreamPartialMaxLagMs)
+            return false;
+
+        text = candidate;
+        return true;
+    }
+
+    /// <summary>
     /// 兜底：保证mic处于监听态。新流程下StopRecording已经会立刻重启mic，
     /// 所以多数情况下这里只是确认。仍保留以应对Microphone被外部停掉的场景。
     /// </summary>
     public void ReStartRecord()
     {
-        if (!Microphone.IsRecording(m_MicrophoneName))
+        if (!m_AwakeState && !m_ManualCaptureActive && !m_IsRecording &&
+            m_VoiceAWake == null)
         {
-            m_RecordedClip = Microphone.Start(m_MicrophoneName, true, m_MicrophoneBufferSeconds, 16000);
+            ReleaseMicrophone();
+            m_LockState = false;
+            return;
         }
+        TryEnsureMicrophone(out _);
         m_LockState = false;
     }
 
@@ -2785,7 +3998,7 @@ public class RTSpeechHandler : MonoBehaviour
     /// <summary>
     /// 沉默达到m_TentativeEouSilence时调用：
     /// 1) 截当前正在录的clip(从start到now的位置)
-    /// 2) 异步发预测ASR——回调里看尾部是否"说完了"再决定提前EOU还是兜底等3.5s
+    /// 2) 异步发预测ASR——回调里看尾部是否"说完了"再决定提前EOU还是走普通硬收束
     /// </summary>
     private void TryFireTentativeEou()
     {
@@ -2793,7 +4006,25 @@ public class RTSpeechHandler : MonoBehaviour
         if (m_RecordedClip == null) return;
         if (m_RecordingStartPos < 0) return;  //不在录用户发言
 
-        int curPos = Microphone.GetPosition(m_MicrophoneName);
+        // Invalidation is deliberately cancellable, but the cancelled HTTP
+        // request may still be winding down on the server.  Do not launch a
+        // second full analysis for the same capture after a brief breath or
+        // VAD revision; the final ASR path already owns the authoritative
+        // complete clip.  Streaming partial reuse remains available because
+        // it does not enqueue another snapshot upload.
+        if (m_TentativeFullPreviewAttempted &&
+            (RoleChoosesBoundary || !TryGetFreshStreamingPartial(
+                GetMicrophonePosition(m_ActiveMicrophoneName), out _)))
+        {
+            if (m_LogTentativeEou && !m_TentativeFullPreviewRetrySuppressed)
+            {
+                Debug.Log("[T-EOU] 跳过同一 capture 的重复完整预览；等待最终 ASR 收口");
+                m_TentativeFullPreviewRetrySuppressed = true;
+            }
+            return;
+        }
+
+        int curPos = GetMicrophonePosition(m_ActiveMicrophoneName);
         string streamingText;
         if (!RoleChoosesBoundary && TryGetFreshStreamingPartial(curPos, out streamingText))
         {
@@ -2819,6 +4050,9 @@ public class RTSpeechHandler : MonoBehaviour
         if (snapshot == null) snapshot = SnapshotFromBuffer(m_RecordingStartPos, curPos);
         if (snapshot == null) return;
 
+        m_TentativeFullPreviewAttempted = true;
+        m_TentativeFullAsrActivityRevision = m_TurnActivity.ActivityRevision;
+        m_TentativeFullAsrSoundAt = m_TurnActivity.LatestSoundAt;
         m_TentativeFired = true;
         m_TentativePreviewInFlight = true;
         m_TentativeUsedFullAsr = true;
@@ -2851,7 +4085,7 @@ public class RTSpeechHandler : MonoBehaviour
     /// 预测ASR回包。可能在以下任一时刻到达：
     /// - 用户仍在沉默中(m_IsRecording=true) → 进入分类器决定确认/继续等
     /// - 用户已重新开口 → seq不匹配，丢弃
-    /// - 3.5s硬规则已触发 → seq不匹配 OR m_IsRecording=false，丢弃
+    /// - 普通语音硬规则已触发 → seq不匹配 OR m_IsRecording=false，丢弃
     /// </summary>
     private void OnPreviewAsrResult(int seqAtFire, string text)
     {
@@ -2875,7 +4109,7 @@ public class RTSpeechHandler : MonoBehaviour
             return;
         }
 
-        //过期判定：用户开口/3.5s兜底已经使Invalidate把seq推进了
+        //过期判定：用户开口/硬收束兜底已经使Invalidate把seq推进了
         if (seqAtFire != m_TentativeSeq)
         {
             if (m_LogTentativeEou)
@@ -2939,7 +4173,7 @@ public class RTSpeechHandler : MonoBehaviour
     {
         if (!m_IsRecording) return;
 
-        int curPos = Microphone.GetPosition(m_MicrophoneName);
+        int curPos = GetMicrophonePosition(m_ActiveMicrophoneName);
         CaptureRecordingAudio(curPos, true);
         PumpStreamingAudio(curPos, true);
         m_RecordingCloseReason = "tentative-eou";
@@ -2947,6 +4181,7 @@ public class RTSpeechHandler : MonoBehaviour
         AudioClip finalClip = BuildAccumulatedRecordingClip();
         if (finalClip == null && m_RecordingStartPos >= 0)
             finalClip = SnapshotFromBuffer(m_RecordingStartPos, curPos);
+        SealPersonalLearningCapture(finalClip, true);
         //A full preview ASR ran on the same captured content; between its snapshot
         //and confirmation only trusted silence elapsed.  It is already the
         //authoritative full analysis, unlike a WebSocket partial.
@@ -2969,10 +4204,7 @@ public class RTSpeechHandler : MonoBehaviour
 
         //★ mic保持continuous loop=true运行，不再End/Start——文本已经在手，clip角色完成使命；
         //  保留ring buffer持续监听，下一轮VAD/barge-in才能立刻检测到用户开口。
-        if (!Microphone.IsRecording(m_MicrophoneName))
-        {
-            m_RecordedClip = Microphone.Start(m_MicrophoneName, true, m_MicrophoneBufferSeconds, 16000);
-        }
+        TryEnsureMicrophone(out _);
         m_LockState = false;
 
         if (m_ChatSample != null)
@@ -2990,14 +4222,28 @@ public class RTSpeechHandler : MonoBehaviour
             }
             if (useFinalAsr)
             {
-                //partial 可能在最后几个字发生回滚；完整 ASR 是唯一可写入历史的权威版本。
+                // A stable ordinary-speech partial is retained for speculative
+                // listening only.  The complete clip remains authoritative and
+                // every formal RoleDecision stays on the final-ASR-first path.
+                bool safeSpeechPartial = !m_LikelySinging &&
+                    !m_MelodicEouProtectionActive && !m_RecordingRescuedByTonalOverride &&
+                    m_CurrentSingingProbability < 0.48f &&
+                    m_LatestStreamingSingingProbability < 0.48f &&
+                    !string.IsNullOrWhiteSpace(text);
+                bool partialHeld = m_EnableStablePartialPromotion && safeSpeechPartial &&
+                    m_ChatSample.AcceptStablePartialText(text);
+                //partial 可能在最后几个字发生回滚；它只用于内部预判，
+                //完整 ASR 回调才会进入正式 RoleDecision/历史。
                 m_ChatSample.AcceptClip(finalClip, allowSpeakerLearning);
+                if (m_LogTimings && partialHeld)
+                    Debug.Log("[T-EOU] 稳定 speech partial 已保留作预判；正式 LLM 等待完整 ASR");
             }
             else
             {
                 //关闭流式功能，或完整预测已经覆盖有效内容时，避免第二次识别。
                 m_NeuralVadClient?.PublishReusedFinalTranscript(CurrentCaptureSerial,
-                    reuseFullPreview ? m_TentativeFullAsrRawText : text);
+                    reuseFullPreview ? m_TentativeFullAsrRawText : text,
+                    reuseFullPreview ? m_TentativeFullAsrText : text);
                 m_ChatSample.AcceptText(reuseFullPreview
                     ? m_TentativeFullAsrText
                     : text);
@@ -3056,7 +4302,7 @@ public class RTSpeechHandler : MonoBehaviour
         // do not overwrite that provenance with an empty preview raw text.
         if (m_NeuralVadClient != null &&
             m_NeuralVadClient.LastFinalTranscriptSource != "closed-stream-recovery")
-            m_NeuralVadClient.PublishReusedFinalTranscript(CurrentCaptureSerial, m_TentativeFullAsrRawText);
+            m_NeuralVadClient.PublishReusedFinalTranscript(CurrentCaptureSerial, m_TentativeFullAsrRawText, text);
         ClearTentativeReuseState(true);
         if (m_ChatSample != null)
             m_ChatSample.AcceptDeferredFinalAsrText(text, streamingExit);
@@ -3105,7 +4351,7 @@ public class RTSpeechHandler : MonoBehaviour
     }
 
     /// <summary>
-    /// 用户重新开口或3.5s硬规则触发时调用——
+    /// 用户重新开口或普通语音硬规则触发时调用——
     /// 推进seq让任何还在飞的预测ASR回包失效，同时清tentative标志。
     /// </summary>
     private void InvalidateTentativeEou(string reason)
@@ -3212,7 +4458,7 @@ public class RTSpeechHandler : MonoBehaviour
             if (body.EndsWith(terminalParticles[i])) return "complete";
         }
 
-        //—— 5) 兜底：让3.5s硬规则决定 ——
+        //—— 5) 兜底：让普通语音硬规则决定 ——
         return "ambiguous";
     }
 

@@ -10,7 +10,7 @@ namespace NeEEvA.Presentation
 {
     /// <summary>Quiet desktop HUD and a summonable VR panel, sharing the existing conversation pipeline.</summary>
     [DisallowMultipleComponent, DefaultExecutionOrder(1000)]
-    public sealed class CompanionPresentation : MonoBehaviour
+    public sealed partial class CompanionPresentation : MonoBehaviour
     {
         [SerializeField] private Font interfaceFont;
         [SerializeField] private Camera playerCamera;
@@ -56,6 +56,11 @@ namespace NeEEvA.Presentation
         private string lastSource = string.Empty, lastTranslation = string.Empty, lastTranscript = string.Empty;
         private int lastHistoryVersion = -1, selectedPage;
         private bool built, vrActive, panelVisible, recording, preview;
+        private bool recordingUsesPico;
+        private enum RecordInput { None, Pointer, LeftTrigger }
+        private RecordInput recordingInput;
+        private int recordingPointerId;
+        private bool vrPanelInitialized;
         private bool editorScenePreview;
         private bool compositionWasActive;
         private string previewSource, previewTranslation;
@@ -67,10 +72,15 @@ namespace NeEEvA.Presentation
         private bool desktopSubtitlesEnabled, desktopSubtitlesFailed;
         private Button desktopSubtitlesButton;
         private Text desktopSubtitlesLabel;
+        private CompanionThoughtBubble thoughtBubble;
+        private bool thoughtBubbleEnabled;
+        private Button thoughtBubbleButton;
+        private Text thoughtBubbleLabel;
         private string projectedSource, projectedTranslation;
         private bool projectedOriginalVisible, projectedTranslationVisible;
         private int projectedFontSize;
         private float subtitleLayoutWidth = 790f;
+        private float vrSpeechLayoutTop = float.NaN;
 
         public bool IsPanelVisible => panelVisible;
         public bool IsVRPresentation => vrActive;
@@ -96,8 +106,17 @@ namespace NeEEvA.Presentation
             cameraController = playerCamera.GetComponent<PlayerCameraController>();
             baseFontSize = Mathf.Clamp(PlayerPrefs.GetInt("NeEEvA.UI.SubtitleSize", 28), 24, 34);
             desktopSubtitlesEnabled = PlayerPrefs.GetInt("NeEEvA.UI.DesktopSubtitles", 1) != 0;
+            thoughtBubbleEnabled = PlayerPrefs.GetInt("NeEEvA.UI.ThoughtBubble", 1) != 0;
             hudCanvas = CreateCanvas("Companion • Subtitles", 50, out hudRoot);
             panelCanvas = CreateCanvas("Companion • Controls", 60, out panelRoot);
+            if (!preview)
+            {
+                var thoughtRoot = new GameObject("Companion • Thoughts", typeof(RectTransform));
+                UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(thoughtRoot, gameObject.scene);
+                thoughtBubble = thoughtRoot.AddComponent<CompanionThoughtBubble>();
+                thoughtBubble.Configure(chat, playerCamera, interfaceFont);
+                thoughtBubble.SetDisplayEnabled(thoughtBubbleEnabled);
+            }
             BuildHud();
             BuildPanel();
             if (!editorScenePreview)
@@ -106,6 +125,8 @@ namespace NeEEvA.Presentation
                 xr.Configure(playerCamera, new[] { hudCanvas, panelCanvas });
                 xr.TogglePanelRequested += TogglePanel;
                 xr.RecenterRequested += RecenterPanel;
+                xr.PushToTalkStarted += BeginTriggerRecord;
+                xr.PushToTalkEnded += EndTriggerRecord;
             }
             SetPanelVisible(false);
             ApplyPresentationMode(false);
@@ -163,7 +184,9 @@ namespace NeEEvA.Presentation
             var options = MakeButton("Open settings", controls, CompanionIconKind.More, string.Empty, () => OpenPage(2), 44, 44);
             Anchor(options.GetComponent<RectTransform>(), Vector2.one, new Vector2(-58, -46));
 
-            transcriptCard = Rect("Live recognition", controls, Vector2.zero, Vector2.zero, new Vector2(266, 106), new Vector2(468, 42));
+            // User speech is part of the shared HUD, not the desktop-only buttons.
+            // Keeping it below Desktop controls disables it whenever XR starts.
+            transcriptCard = Rect("Live recognition", hudRoot, Vector2.zero, Vector2.zero, new Vector2(266, 106), new Vector2(468, 42));
             var surface = transcriptCard.gameObject.AddComponent<CompanionSurface>(); surface.color = Surface; surface.radius = 12;
             transcript = transcriptCard.gameObject.AddComponent<CanvasGroup>(); transcript.blocksRaycasts = false; transcript.alpha = 0;
             transcriptSpeakerText = SpeakerLabel("User name", transcriptCard, "您", 16, Accent);
@@ -187,19 +210,26 @@ namespace NeEEvA.Presentation
             var recenter = MakeButton("Recenter panel", panelCard, CompanionIconKind.Recenter, string.Empty, RecenterPanel, 40, 40);
             recenterControl = recenter.gameObject;
             Anchor(recenter.GetComponent<RectTransform>(), Vector2.one, new Vector2(-86, -42));
-            var names = new[] { "说点什么", "对话记录", "偏好设置" };
-            var icons = new[] { CompanionIconKind.Chat, CompanionIconKind.History, CompanionIconKind.Settings };
-            for (int i = 0; i < 3; i++)
+            var names = new[] { "说点什么", "对话记录", "偏好设置", "声音学习" };
+            var icons = new[] { CompanionIconKind.Chat, CompanionIconKind.History, CompanionIconKind.Settings, CompanionIconKind.Microphone };
+            for (int i = 0; i < names.Length; i++)
             {
                 int page = i;
-                var tab = MakeButton("Tab " + i, panelCard, icons[i], names[i], () => SelectPage(page), 148, 44);
-                Anchor(tab.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(100 + i * 160, -100));
+                var tab = MakeButton("Tab " + i, panelCard, icons[i], names[i], () => SelectPage(page), 110, 44);
+                // Four navigation tabs need narrower icon spacing than ordinary actions.
+                var tabIcon = tab.GetComponentInChildren<CompanionIcon>();
+                tabIcon.rectTransform.sizeDelta = new Vector2(18, 18);
+                tabIcon.rectTransform.anchoredPosition = new Vector2(18, 0);
+                var tabLabel = tab.GetComponentInChildren<Text>(); tabLabel.fontSize = 16;
+                Place(tabLabel.rectTransform, Vector2.zero, Vector2.one, new Vector2(32, 3), new Vector2(-6, -3));
+                Anchor(tab.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(81 + i * 120, -100));
                 tabButtons.Add(tab);
             }
             textPage = Page("Text and voice"); historyPage = Page("History"); settingsPage = Page("Preferences");
             BuildComposer(textPage.transform);
             BuildHistory(historyPage.transform);
             BuildSettings(settingsPage.transform);
+            BuildLearningPage();
             panelHint = Label("Panel hint", panelCard, "Esc 收起  ·  Enter 发送  ·  Shift + Enter 换行", 13, Muted, TextAnchor.MiddleLeft);
             Place(panelHint.rectTransform, Vector2.zero, new Vector2(1, 0), new Vector2(26, 16), new Vector2(-24, 44));
             SelectPage(0);
@@ -243,9 +273,9 @@ namespace NeEEvA.Presentation
             recordLabel = recordButton.GetComponentInChildren<Text>();
             var events = recordButton.gameObject.AddComponent<EventTrigger>();
             var down = new EventTrigger.Entry { eventID = EventTriggerType.PointerDown };
-            down.callback.AddListener(_ => BeginRecord()); events.triggers.Add(down);
+            down.callback.AddListener(RecordPointerDown); events.triggers.Add(down);
             var up = new EventTrigger.Entry { eventID = EventTriggerType.PointerUp };
-            up.callback.AddListener(_ => EndRecord()); events.triggers.Add(up);
+            up.callback.AddListener(RecordPointerUp); events.triggers.Add(up);
             var note = Label("Speech hint", parent, "实时对话开启后，直接说话即可。", 14, Muted, TextAnchor.UpperLeft);
             speechHint = note;
             Top(note.rectTransform, 346, 28);
@@ -274,31 +304,35 @@ namespace NeEEvA.Presentation
                 var button = MakeButton("Subtitle mode " + i, parent, CompanionIconKind.Subtitles, modes[i], () => { if (chat != null) chat.SetSubtitleDisplayMode(mode); RefreshSettings(); }, 108, 42);
                 Anchor(button.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(54 + 120 * i, -57)); subtitleButtons.Add(button);
             }
-            var language = Label("Language label", parent, "翻译语言", 17, Muted, TextAnchor.MiddleLeft); Top(language.rectTransform, 84, 42);
+            var language = Label("Language label", parent, "翻译语言", 17, Muted, TextAnchor.MiddleLeft); Top(language.rectTransform, 78, 42);
             languageDropdown = MakeDropdown(parent, new[] { "简体中文", "繁體中文", "日本語", "English", "한국어", "Français", "Deutsch", "Español" });
-            Anchor(languageDropdown.GetComponent<RectTransform>(), Vector2.one, new Vector2(-120, -105));
+            Anchor(languageDropdown.GetComponent<RectTransform>(), Vector2.one, new Vector2(-120, -99));
             languageDropdown.onValueChanged.AddListener(value => { if (chat != null) chat.SetSubtitleTargetLanguage(value); });
-            var size = Label("Size label", parent, "字幕字号", 17, Muted, TextAnchor.MiddleLeft); Top(size.rectTransform, 138, 42);
+            var size = Label("Size label", parent, "字幕字号", 17, Muted, TextAnchor.MiddleLeft); Top(size.rectTransform, 128, 42);
             var smaller = MakeButton("Smaller subtitles", parent, CompanionIconKind.Minimize, "小", () => SetSubtitleSize(baseFontSize - 2), 108, 42);
-            Anchor(smaller.GetComponent<RectTransform>(), Vector2.one, new Vector2(-186, -159));
+            Anchor(smaller.GetComponent<RectTransform>(), Vector2.one, new Vector2(-186, -149));
             var larger = MakeButton("Larger subtitles", parent, CompanionIconKind.Plus, "大", () => SetSubtitleSize(baseFontSize + 2), 108, 42);
-            Anchor(larger.GetComponent<RectTransform>(), Vector2.one, new Vector2(-54, -159));
-            var noticeLabel = Label("Notice label", parent, "系统提示", 17, Muted, TextAnchor.UpperLeft); Top(noticeLabel.rectTransform, 202, 28);
+            Anchor(larger.GetComponent<RectTransform>(), Vector2.one, new Vector2(-54, -149));
+            var noticeLabel = Label("Notice label", parent, "系统提示", 17, Muted, TextAnchor.UpperLeft); Top(noticeLabel.rectTransform, 180, 28);
             // Existing enum is Hidden / ErrorsOnly / All; labels are checked against that contract.
             var options = new[] { "关闭", "仅错误", "全部" };
             for (int i = 0; i < 3; i++)
             {
                 int mode = i;
                 var b = MakeButton("Notice mode " + i, parent, CompanionIconKind.More, options[i], () => { if (chat != null) chat.SetSystemNoticeMode(mode); RefreshSettings(); }, 148, 42);
-                Anchor(b.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(74 + 160 * i, -254)); noticeButtons.Add(b);
+                Anchor(b.GetComponent<RectTransform>(), new Vector2(0, 1), new Vector2(74 + 160 * i, -233)); noticeButtons.Add(b);
             }
             desktopSubtitlesButton = MakeButton("Desktop subtitles", parent, CompanionIconKind.Subtitles,
                 "桌面悬浮字幕", ToggleDesktopSubtitles, 468, 42);
             desktopSubtitlesLabel = desktopSubtitlesButton.GetComponentInChildren<Text>();
-            Anchor(desktopSubtitlesButton.GetComponent<RectTransform>(), new Vector2(.5f, 1), new Vector2(0, -316));
+            Anchor(desktopSubtitlesButton.GetComponent<RectTransform>(), new Vector2(.5f, 1), new Vector2(0, -282));
+            thoughtBubbleButton = MakeButton("Thought bubble", parent, CompanionIconKind.Chat,
+                "心里话气泡", ToggleThoughtBubble, 468, 42);
+            thoughtBubbleLabel = thoughtBubbleButton.GetComponentInChildren<Text>();
+            Anchor(thoughtBubbleButton.GetComponent<RectTransform>(), new Vector2(.5f, 1), new Vector2(0, -330));
             var note = Label("Settings hint", parent, WindowsDesktopSubtitleWindow.IsSupported
-                ? "切到其他应用时置顶显示，鼠标可穿透。" : "桌面悬浮字幕可在 Windows 电脑上使用。",
-                14, Muted, TextAnchor.UpperLeft); Top(note.rectTransform, 346, 26);
+                ? "桌面字幕可跨应用置顶；心里话显示在角色旁。" : "桌面字幕仅支持 Windows；心里话显示在角色旁。",
+                12, Muted, TextAnchor.UpperLeft); Top(note.rectTransform, 352, 20);
         }
 
         private Dropdown MakeDropdown(Transform parent, string[] options)
@@ -327,17 +361,37 @@ namespace NeEEvA.Presentation
 
         private void Update()
         {
+            RefreshLearningPage();
             if (!built) return;
             if (!preview)
             {
                 bool active = cameraController != null && cameraController.IsVRActive;
                 if (active != vrActive) ApplyPresentationMode(active);
+                if (vrActive && !vrPanelInitialized && cameraController != null && cameraController.HasValidWorldPose)
+                {
+                    // The headset pose is unavailable for the first few frames after XR
+                    // starts. Show and place the panel only after the real pose is valid.
+                    if (panelVisible) RecenterPanel();
+                    else SetPanelVisible(true);
+                    vrPanelInitialized = true;
+                }
                 // Legacy components remain valid data sources but their old graphics cannot reappear.
                 SetLegacyViewsHidden(true);
             }
             if (!vrActive) PositionDesktopSubtitles();
             UpdateSubtitles(); UpdateSpeechStatus();
             UpdateDesktopSubtitles();
+            // A long PTT is bounded by RTSpeechHandler. Clear the presentation
+            // edge state when that guard submits the clip automatically, so the
+            // next trigger press can start a fresh capture.
+            if (recording && recordingUsesPico && chat != null &&
+                !chat.IsPicoPushToTalkActive)
+            {
+                Debug.Log("[CompanionPTT] recorder ended capture; clearing owner=" + recordingInput, this);
+                recording = false;
+                recordingUsesPico = false;
+                recordingInput = RecordInput.None;
+            }
             if (panelVisible && selectedPage == 1 && Time.unscaledTime >= nextHistoryRefresh)
             { nextHistoryRefresh = Time.unscaledTime + .3f; RefreshHistory(false); }
             var keyboard = Keyboard.current;
@@ -396,7 +450,6 @@ namespace NeEEvA.Presentation
                 subtitleCard.sizeDelta = new Vector2(subtitleLayoutWidth, originalHeight + translationHeight + gap + 24);
                 Place(originalText.rectTransform, new Vector2(0, 1), Vector2.one, new Vector2(24, -12 - originalHeight), new Vector2(-24, -12));
                 Place(translationText.rectTransform, new Vector2(0, 1), Vector2.one, new Vector2(24, -12 - originalHeight - gap - translationHeight), new Vector2(-24, -12 - originalHeight - gap));
-                if (vrActive && panelVisible) subtitleTargetPosition = SubtitlePosition(HorizontalForward());
             }
             float wanted = alive && (originalText.text.Length > 0 || translationText.text.Length > 0) ? 1 : 0;
             subtitles.alpha = Mathf.MoveTowards(subtitles.alpha, wanted, Time.unscaledDeltaTime * 5f);
@@ -412,6 +465,37 @@ namespace NeEEvA.Presentation
             // Expire only after capture has ended, never in the middle of a live turn.
             if (transcribing) transcriptChangedAt = Time.unscaledTime;
             transcript.alpha = heard.Length > 0 && (transcribing || Time.unscaledTime - transcriptChangedAt < 5f) ? 1 : 0;
+            if (vrActive) PositionVrSpeechCards();
+        }
+
+        private void PositionVrSpeechCards()
+        {
+            // Leave room for each speaker label above its card as bilingual captions grow.
+            float halfCaption = subtitleCard.rect.height * .5f;
+            Anchor(transcriptCard, new Vector2(.5f, .5f),
+                new Vector2(0, -halfCaption - 44f - transcriptCard.rect.height * .5f));
+            var noticeCard = noticeText.transform.parent as RectTransform;
+            Anchor(noticeCard, new Vector2(.5f, .5f),
+                new Vector2(0, halfCaption + 48f + noticeCard.rect.height * .5f));
+            float top = VrSpeechTop();
+            if (!Mathf.Approximately(top, vrSpeechLayoutTop))
+            {
+                vrSpeechLayoutTop = top;
+                // Content can change the panel clearance, but small head movements
+                // still belong to LateUpdate's spatial following dead zone.
+                if (panelVisible) subtitleTargetPosition.y = SubtitlePosition(HorizontalForward()).y;
+            }
+        }
+
+        private float VrSpeechTop()
+        {
+            float top = subtitleCard.rect.height * .5f + 30f; // character name
+            if (notices.alpha > 0f)
+            {
+                var noticeCard = noticeText.transform.parent as RectTransform;
+                top = Mathf.Max(top, noticeCard.anchoredPosition.y + noticeCard.rect.height * .5f);
+            }
+            return top;
         }
 
         private string projectedTranscript;
@@ -454,7 +538,10 @@ namespace NeEEvA.Presentation
             realtimeText.text = closing ? "结束中 · 点击恢复" : active ? "关闭实时对话" : "开启实时对话";
             recordButton.interactable = !active && !closing;
             recordLabel.text = recording ? "松开发送" : "按住说话";
-            speechHint.text = active || closing ? "实时对话开启时，直接说话；关闭后可按住录音。" : "开启实时对话，或按住右侧按钮说话。";
+            speechHint.text = active || closing
+                ? "实时对话开启时，直接说话；关闭后可按住录音。"
+                : vrActive ? "开启实时对话，或按住左手扳机说话。"
+                : "开启实时对话，或按住右侧按钮说话。";
             interruptButton.interactable = speaking || busy;
             sendButton.interactable = !string.IsNullOrWhiteSpace(composer.text);
         }
@@ -503,8 +590,9 @@ namespace NeEEvA.Presentation
 
         private void ApplyPresentationMode(bool active)
         {
-            vrActive = active;
             EndRecord();
+            vrActive = active;
+            if (thoughtBubble != null) thoughtBubble.SetPresentationMode(active);
             hudCanvas.renderMode = active ? RenderMode.WorldSpace : RenderMode.ScreenSpaceOverlay;
             panelCanvas.renderMode = active ? RenderMode.WorldSpace : RenderMode.ScreenSpaceOverlay;
             hudCanvas.worldCamera = playerCamera; panelCanvas.worldCamera = playerCamera;
@@ -516,30 +604,39 @@ namespace NeEEvA.Presentation
             composePlaceholder.text = active ? "连接实体键盘后在这里输入…" : "在这里输入…";
             if (active)
             {
-                hudRoot.sizeDelta = new Vector2(900, 260); hudRoot.localScale = Vector3.one * .00125f;
+                vrPanelInitialized = false;
+                hudRoot.sizeDelta = new Vector2(900, 520); hudRoot.localScale = Vector3.one * .00125f;
                 panelRoot.sizeDelta = new Vector2(520, 566); panelRoot.localScale = Vector3.one * .0015f;
                 Anchor(subtitleCard, new Vector2(.5f, .5f), Vector2.zero);
                 subtitleLayoutWidth = 790f;
                 subtitleCard.sizeDelta = new Vector2(subtitleLayoutWidth, subtitleCard.sizeDelta.y);
                 projectedSource = null;
-                Anchor(noticeText.transform.parent as RectTransform, new Vector2(.5f, 1), new Vector2(0, -22));
+                transcriptCard.sizeDelta = new Vector2(680, 52);
+                transcriptText.fontSize = 22;
+                transcriptSpeakerText.fontSize = transcriptSpeakerText.resizeTextMaxSize = 18;
+                PositionVrSpeechCards();
                 Anchor(panelCard, new Vector2(.5f, .5f), Vector2.zero);
                 Vector3 forward = HorizontalForward();
                 subtitleTargetPosition = SubtitlePosition(forward);
                 subtitleTargetRotation = Quaternion.LookRotation(forward, Vector3.up);
                 hudRoot.SetPositionAndRotation(subtitleTargetPosition, subtitleTargetRotation);
-                panelHint.text = "左手 Y：收起 / 呼出  ·  长按 Y：移到面前";
-                RecenterPanel();
+                panelHint.text = "左手扳机：按住说话  ·  左手 Y：收起 / 呼出  ·  长按 Y：移到面前";
             }
             else
             {
+                vrPanelInitialized = false;
                 hudRoot.localScale = panelRoot.localScale = Vector3.one;
                 hudRoot.rotation = panelRoot.rotation = Quaternion.identity;
                 Anchor(subtitleCard, new Vector2(.5f, 0), new Vector2(0, 164));
+                Anchor(transcriptCard, Vector2.zero, new Vector2(266, 106));
+                transcriptCard.sizeDelta = new Vector2(468, 42);
+                transcriptText.fontSize = 17;
+                transcriptSpeakerText.fontSize = transcriptSpeakerText.resizeTextMaxSize = 16;
                 Anchor(noticeText.transform.parent as RectTransform, new Vector2(.5f, 1), new Vector2(0, -64));
                 Anchor(panelCard, new Vector2(1, 0), new Vector2(-296, 365));
                 panelHint.text = "Esc 收起  ·  Enter 发送  ·  Shift + Enter 换行";
             }
+            ResizeLearningPanel();
             xr?.SetVRActive(active);
             SetPanelVisible(false);
         }
@@ -549,7 +646,7 @@ namespace NeEEvA.Presentation
         {
             if (!built) return;
             bool opening = visible && !panelVisible;
-            if (!visible) EndRecord();
+            if (!visible) EndPointerRecord();
             panelVisible = visible; panelBody.SetActive(visible);
             if (!editorScenePreview && cameraController != null) cameraController.InteractionBlocked = visible && !vrActive;
             if (opening && vrActive) RecenterPanel();
@@ -590,15 +687,14 @@ namespace NeEEvA.Presentation
             {
                 // Keep the caption below the panel's projected lower edge, even at a different depth.
                 float panelBottom = .1f + panelRoot.rect.height * panelRoot.localScale.y * .5f;
-                float captionHalfHeight = subtitleCard.rect.height * hudRoot.localScale.y * .5f;
-                down = Mathf.Max(down, panelBottom * vrSubtitleDistance / vrPanelDistance + captionHalfHeight + .06f);
+                down = Mathf.Max(down, panelBottom * vrSubtitleDistance / vrPanelDistance + VrSpeechTop() * hudRoot.localScale.y + .06f);
             }
             return playerCamera.transform.position + forward * vrSubtitleDistance + Vector3.down * down;
         }
 
         public void RecenterPanel()
         {
-            if (!built || !vrActive) return;
+            if (!built || !vrActive || (cameraController != null && !cameraController.HasValidWorldPose)) return;
             Vector3 forward = HorizontalForward();
             panelRoot.SetPositionAndRotation(playerCamera.transform.position + forward * vrPanelDistance + Vector3.down * .1f, Quaternion.LookRotation(forward, Vector3.up));
         }
@@ -618,11 +714,14 @@ namespace NeEEvA.Presentation
         private void SelectPage(int page)
         {
             selectedPage = page;
+            ResizeLearningPanel();
             textPage.SetActive(page == 0); historyPage.SetActive(page == 1); settingsPage.SetActive(page == 2);
-            if (page != 0) EndRecord();
+            if (learningPage != null) learningPage.SetActive(page == 3);
+            if (page != 0) EndPointerRecord();
             for (int i = 0; i < tabButtons.Count; i++) Tint(tabButtons[i], i == page);
             if (page == 1) RefreshHistory(true);
             if (page == 2) RefreshSettings();
+            if (page == 3) RefreshLearningPage(true);
         }
 
         private void Submit()
@@ -640,17 +739,83 @@ namespace NeEEvA.Presentation
             if (!preview && chat.PresentationRealtime != null) chat.PresentationRealtime.ToggleRealtimeMode();
         }
 
-        private void BeginRecord()
+        private void BeginTriggerRecord() => BeginRecord(RecordInput.LeftTrigger, 0);
+
+        private void EndTriggerRecord()
         {
-            if (preview || recording || !recordButton.interactable || chat == null) return;
-            recording = true; chat.StartRecord();
+            if (recordingInput == RecordInput.LeftTrigger) FinishRecord("trigger-released");
         }
 
-        private void EndRecord()
+        private void RecordPointerDown(BaseEventData data)
+        {
+            if (data is PointerEventData pointer && pointer.button == PointerEventData.InputButton.Left)
+                BeginRecord(RecordInput.Pointer, pointer.pointerId);
+        }
+
+        private void RecordPointerUp(BaseEventData data)
+        {
+            if (data is PointerEventData pointer && pointer.button == PointerEventData.InputButton.Left &&
+                recordingInput == RecordInput.Pointer && recordingPointerId == pointer.pointerId)
+                FinishRecord("pointer-released");
+        }
+
+        private void EndPointerRecord()
+        {
+            // Closing/changing the UI ends only the hold that began on that UI.
+            // The physical left-trigger shortcut also works with the panel closed.
+            if (recordingInput == RecordInput.Pointer) FinishRecord("ui-hidden");
+        }
+
+        private void BeginRecord(RecordInput input, int pointerId)
+        {
+            if (preview || recording || chat == null) return;
+            // Read current business state, not the button's previous rendered frame.
+            var realtime = chat.PresentationRealtime;
+            if (realtime != null && (realtime.IsRealtimeEnabled || realtime.IsRealtimeClosing))
+            {
+                Debug.Log("[CompanionPTT] press ignored: realtime mode is active or closing; source=" + input, this);
+                return;
+            }
+            // VR/XR PTT must reuse RTSpeechHandler's already-running ring buffer.
+            // The desktop button keeps the legacy VoiceInputs path. Both paths
+            // use the system default unless RTSpeechHandler explicitly selects a device.
+            if (vrActive)
+            {
+                recording = chat.StartPicoPushToTalk();
+                recordingUsesPico = recording;
+            }
+            else
+            {
+                recording = true;
+                recordingUsesPico = false;
+                chat.StartRecord();
+            }
+            if (recording)
+            {
+                recordingInput = input;
+                recordingPointerId = pointerId;
+                Debug.Log("[CompanionPTT] capture started; source=" + input + " pointer=" + pointerId, this);
+            }
+            else Debug.LogWarning("[CompanionPTT] capture did not start; source=" + input + "; release and press again after the microphone is ready.", this);
+        }
+
+        private void EndRecord() => FinishRecord("lifecycle");
+
+        private void FinishRecord(string reason)
         {
             if (!recording) return;
+            Debug.Log("[CompanionPTT] capture ending; source=" + recordingInput + " reason=" + reason, this);
+            bool usePico = recordingUsesPico;
             recording = false;
-            if (chat != null) chat.StopRecord();
+            recordingUsesPico = false;
+            recordingInput = RecordInput.None;
+            if (chat == null) return;
+            if (usePico)
+            {
+                chat.StopPicoPushToTalk();
+                return;
+            }
+            chat.StopRecord();
         }
 
         private void SetSubtitleSize(int value)
@@ -671,6 +836,18 @@ namespace NeEEvA.Presentation
                 if (desktopSubtitlesEnabled && WindowsDesktopSubtitleWindow.IsSupported)
                     Application.runInBackground = true;
                 else DisposeDesktopSubtitles();
+            }
+            RefreshSettings();
+        }
+
+        private void ToggleThoughtBubble()
+        {
+            thoughtBubbleEnabled = !thoughtBubbleEnabled;
+            if (thoughtBubble != null) thoughtBubble.SetDisplayEnabled(thoughtBubbleEnabled);
+            if (!preview)
+            {
+                PlayerPrefs.SetInt("NeEEvA.UI.ThoughtBubble", thoughtBubbleEnabled ? 1 : 0);
+                PlayerPrefs.Save();
             }
             RefreshSettings();
         }
@@ -717,6 +894,11 @@ namespace NeEEvA.Presentation
             for (int i = 0; i < subtitleButtons.Count; i++) Tint(subtitleButtons[i], mode == i);
             for (int i = 0; i < noticeButtons.Count; i++) Tint(noticeButtons[i], noticeMode == i);
             if (languageDropdown != null) languageDropdown.SetValueWithoutNotify(chat != null ? chat.PresentationSubtitleLanguage : 0);
+            if (thoughtBubbleButton != null)
+            {
+                thoughtBubbleLabel.text = thoughtBubbleEnabled ? "心里话气泡 · 已开启" : "心里话气泡 · 已关闭";
+                Tint(thoughtBubbleButton, thoughtBubbleEnabled);
+            }
             if (desktopSubtitlesButton != null)
             {
                 desktopSubtitlesButton.interactable = WindowsDesktopSubtitleWindow.IsSupported;
@@ -862,14 +1044,20 @@ namespace NeEEvA.Presentation
             foreach (var icon in button.GetComponentsInChildren<CompanionIcon>()) icon.color = selected ? Accent : Muted;
         }
 
-        private void OnApplicationFocus(bool focused) { if (!focused) EndRecord(); }
+        private void OnApplicationFocus(bool focused)
+        {
+            // PC VR can keep receiving controller input while SteamVR owns desktop focus.
+            if (!focused && !vrActive) FinishRecord("desktop-focus-lost");
+        }
         private void OnDisable()
         {
+            if (learningClient != null) { learningClient.Pause(); learningClient.StopPreview(); }
             DisposeDesktopSubtitles();
             EndRecord();
             if (!editorScenePreview && cameraController != null) cameraController.InteractionBlocked = false;
             if (hudCanvas != null) hudCanvas.gameObject.SetActive(false);
             if (panelCanvas != null) panelCanvas.gameObject.SetActive(false);
+            if (thoughtBubble != null) thoughtBubble.gameObject.SetActive(false);
             if (xr != null) xr.SetVRActive(false);
             // Unity also calls OnDisable during domain reload. Only an actual opt-out restores old UI.
             SetLegacyViewsHidden(enabled && gameObject.activeInHierarchy);
@@ -878,16 +1066,27 @@ namespace NeEEvA.Presentation
         {
             if (!built) return;
             hudCanvas.gameObject.SetActive(true); panelCanvas.gameObject.SetActive(true);
+            if (thoughtBubble != null) thoughtBubble.gameObject.SetActive(true);
             SetLegacyViewsHidden(true);
+            if (vrActive) vrPanelInitialized = false;
             xr?.SetVRActive(vrActive); xr?.SetPanelVisible(panelVisible);
             if (!editorScenePreview && cameraController != null) cameraController.InteractionBlocked = panelVisible && !vrActive;
         }
         private void OnDestroy()
         {
+            if (learningClient != null) RemoveObject(learningClient);
             DisposeDesktopSubtitles();
-            if (xr != null) { xr.TogglePanelRequested -= TogglePanel; xr.RecenterRequested -= RecenterPanel; RemoveObject(xr); }
+            if (xr != null)
+            {
+                xr.TogglePanelRequested -= TogglePanel;
+                xr.RecenterRequested -= RecenterPanel;
+                xr.PushToTalkStarted -= BeginTriggerRecord;
+                xr.PushToTalkEnded -= EndTriggerRecord;
+                RemoveObject(xr);
+            }
             if (hudCanvas != null) RemoveObject(hudCanvas.gameObject);
             if (panelCanvas != null) RemoveObject(panelCanvas.gameObject);
+            if (thoughtBubble != null) RemoveObject(thoughtBubble.gameObject);
         }
 
         private static void RemoveObject(UnityEngine.Object value)
@@ -954,7 +1153,7 @@ namespace NeEEvA.Presentation
         public void SetPreviewPanel(string page)
         {
             if (page == "closed") SetPanelVisible(false);
-            else OpenPage(page == "history" ? 1 : page == "settings" ? 2 : 0);
+            else OpenPage(page == "history" ? 1 : page == "settings" ? 2 : page == "learning" ? 3 : 0);
         }
         public void SetPreviewSubtitle(string source, string translation)
         {

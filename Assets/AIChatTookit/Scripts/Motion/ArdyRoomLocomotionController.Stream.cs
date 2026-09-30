@@ -34,6 +34,7 @@ namespace NeEEvA.Motion
         }
         private sealed class WarmPose
         {
+            public int unityFrame;
             public float time;
             public Vector3 hips, root;
             public Quaternion rotation;
@@ -81,6 +82,13 @@ namespace NeEEvA.Motion
         private bool streamRecovering;
         private int streamConsecutiveRecoveries;
         private float streamRecoverAfter, streamHealthyPlaySince;
+        // The coroutine resumes before Animator/LateUpdate. Admit history immediately after
+        // the actual pose capture, then consume that exact rendered-frame snapshot. Testing
+        // its age before this frame's capture made every 4 FPS Editor frame look stale.
+        private ArdyRoomHistoryFrame[] preparedWarmStreamHistory;
+        private int preparedWarmStreamFrame = -1, preparedWarmStreamOperation;
+        private float preparedWarmStreamAt;
+        private const float MaximumSlowIdleFrameSeconds = .35f;
 
         public void BeginContinuousFollow(ArdyRoomRoute route, Vector3 userGround, Vector3 facePoint,
             Vector3 userVelocity, float desiredSpeed, bool userMoving)
@@ -174,14 +182,16 @@ namespace NeEEvA.Motion
                     motionScale = (reference.Get(HumanBodyBones.Hips).positionInRoot.y - reference.groundY) * worldScale / sourceRootHeight;
                     ArdyRoomHistoryFrame[] history = null;
                     Stage = "stream-history";
+                    preparedWarmStreamHistory = null;
                     float historyDeadline = Time.realtimeSinceStartup + 3f;
-                    while (Current(token) && !TryWarmStreamHistory(out history))
+                    while (Current(token) && !TryTakePreparedWarmStreamHistory(token, out history))
                     {
                         if (Time.realtimeSinceStartup > historyDeadline)
                             throw CreatePoseHistoryException();
-                        yield return null; PrepareAnchor();
+                        yield return null;
                     }
                     if (!Current(token)) yield break;
+                    CheckContinuousStreamPlayerOwnership(); CheckWaitingAnchor();
                     streamSessionId = Guid.NewGuid().ToString("N"); streamWireRevision = ++wireRevision;
                     streamControlPath.Clear();
                     streamStepIndex = streamNextFrame = streamBaseFrame = 0; streamPreviousRequestId = null;
@@ -610,7 +620,7 @@ namespace NeEEvA.Motion
             try
             {
                 var hips = avatar.Humanoid.GetBoneTransform(HumanBodyBones.Hips);
-                warmStreamPoses.Add(new WarmPose { time = now, hips = hips.position, root = avatar.transform.position,
+                warmStreamPoses.Add(new WarmPose { unityFrame = Time.frameCount, time = now, hips = hips.position, root = avatar.transform.position,
                     rotation = avatar.transform.rotation, parent = avatar.transform.parent, scale = avatar.transform.lossyScale.y,
                     worldRotations = player.CaptureFullBodyHistoryFrame(Quaternion.identity).globalRotations });
                 warmHistoryCaptureError = null;
@@ -629,6 +639,55 @@ namespace NeEEvA.Motion
             try { RejectForeignPlayerOwner(); }
             catch (InvalidOperationException error)
             { throw new ExecutionException(error.Message, ArdyRoomExecutionReason.OwnershipLost); }
+        }
+
+        private void PrepareWarmStreamHistoryAfterPose()
+        {
+            if (!IsContinuousFollowActive || Stage != "stream-history" || !Current(OperationRevision)) return;
+            try
+            {
+                CheckContinuousStreamPlayerOwnership(); PrepareAnchor();
+                if (!TryWarmStreamHistory(out var history)) { preparedWarmStreamHistory = null; return; }
+                preparedWarmStreamHistory = history;
+                preparedWarmStreamFrame = Time.frameCount; preparedWarmStreamOperation = OperationRevision;
+                preparedWarmStreamAt = Time.realtimeSinceStartup;
+            }
+            catch (Exception error)
+            {
+                preparedWarmStreamHistory = null;
+                RecordStreamEvent("failed", error.Message, StreamFailureCategory(error));
+                Fail(error.Message, (error as ExecutionException)?.Reason ?? ArdyRoomExecutionReason.GenerationFailed);
+            }
+        }
+
+        private bool TryTakePreparedWarmStreamHistory(int token, out ArdyRoomHistoryFrame[] history)
+        {
+            history = null;
+            if (preparedWarmStreamHistory == null) return false;
+            float age = Time.realtimeSinceStartup - preparedWarmStreamAt;
+            int frames = Time.frameCount - preparedWarmStreamFrame;
+            if (preparedWarmStreamOperation != token || frames < 0 || frames > 1 || age > MaximumSlowIdleFrameSeconds)
+            {
+                preparedWarmStreamHistory = null;
+                return RejectWarmHistory("prepared-history-stale", "已审核姿态快照未在紧邻的实际帧内消费。", measured: age, limit: MaximumSlowIdleFrameSeconds);
+            }
+            history = preparedWarmStreamHistory; preparedWarmStreamHistory = null;
+            return true;
+        }
+
+        private static bool IsContinuousSlowIdleInterval(WarmPose a, WarmPose b)
+        {
+            // Sparse moving poses, skipped observations and long stalls remain rejected.
+            // A consecutively rendered, nearly still idle interval can be interpolated just
+            // like the normal 20 Hz wire history; these are measured endpoints, not invented
+            // catch-up captures or rewritten timestamps.
+            if (a.unityFrame <= 0 || b.unityFrame != a.unityFrame + 1 || b.time - a.time > MaximumSlowIdleFrameSeconds ||
+                Vector3.Distance(a.root, b.root) > .005f || Quaternion.Angle(a.rotation, b.rotation) > .5f ||
+                Vector3.Distance(a.hips, b.hips) > .025f || a.worldRotations == null || b.worldRotations == null ||
+                a.worldRotations.Length != 27 || b.worldRotations.Length != 27) return false;
+            for (int joint = 0; joint < 27; joint++)
+                if (Quaternion.Angle(a.worldRotations[joint], b.worldRotations[joint]) > 12f) return false;
+            return true;
         }
 
         private bool TryWarmStreamHistory(out ArdyRoomHistoryFrame[] history)
@@ -652,7 +711,8 @@ namespace NeEEvA.Motion
                 float time = start + i / 20f;
                 while (cursor < warmStreamPoses.Count - 1 && warmStreamPoses[cursor].time < time) cursor++;
                 var a = warmStreamPoses[cursor - 1]; var b = warmStreamPoses[cursor];
-                if (b.time - a.time > .15f) return RejectWarmHistory("sample-gap", "连续实际姿态的采样间隔超过 0.15 秒。", i, b.time - a.time, .15f);
+                if (b.time - a.time > .15f && !IsContinuousSlowIdleInterval(a, b))
+                    return RejectWarmHistory("sample-gap", "实际姿态采样间隔超过 0.15 秒，且不是连续渲染的短暂静止帧。", i, b.time - a.time, .15f);
                 if (a.parent != anchorParent || b.parent != anchorParent)
                     return RejectWarmHistory("parent-changed", "实际姿态历史中的角色父节点与本次动作基准不同。", i);
                 float scaleError = Mathf.Max(Mathf.Abs(a.scale - worldScale), Mathf.Abs(b.scale - worldScale));
@@ -699,6 +759,7 @@ namespace NeEEvA.Motion
 
         private void CancelContinuousStream()
         {
+            preparedWarmStreamHistory = null; preparedWarmStreamFrame = -1;
             if (IsContinuousFollowActive) RecordStreamEvent("cancelled");
             IsContinuousFollowActive = false;
             streamRequestPending = false; streamRecovering = false; streamPreparedClip = null;

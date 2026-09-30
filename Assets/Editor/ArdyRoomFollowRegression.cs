@@ -137,9 +137,11 @@ public static class ArdyRoomFollowRegression
             Check(bridge.FollowForTarget("follow-fixture-support", snapshot.currentTargetRevision, out failure), failure);
             user.position += Vector3.up * 10;
             Call(bridge, "TickFollow", Time.realtimeSinceStartup + 2);
-            Check(!bridge.IsFollowing && bridge.Phase == "unavailable" && !bridge.ReservesBody,
-                "Losing a supported user anchor left a follow task able to resume automatically.");
-            report.cases.Add("stale-start-is-rejected-and-lost-support-ends-follow");
+            Check(bridge.IsFollowing && bridge.Phase == "follow-paused" && !bridge.ReservesBody &&
+                bridge.PeekCurrentTargetEvidence().followSupportRecoveryPending,
+                "Losing user support must stop displacement while retaining the explicitly requested follow intent.");
+            bridge.StopMovement();
+            report.cases.Add("stale-start-is-rejected-and-lost-support-pauses-follow");
 
             user.position = FindNearUser(bridge);
             snapshot = bridge.ReadCurrentTargetEvidence(true);

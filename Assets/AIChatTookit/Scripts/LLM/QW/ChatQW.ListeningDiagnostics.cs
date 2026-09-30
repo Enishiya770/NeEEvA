@@ -22,7 +22,8 @@ public partial class ChatQW
             var request = JObject.Parse(requestJson);
             record["maxTokens"] = request["max_tokens"]?.DeepClone();
             record["messageCount"] = (request["messages"] as JArray)?.Count;
-            record["schemaBound"] = request["response_format"]?["schema"] != null;
+            record["schemaBound"] = request["response_format"]?["schema"] != null ||
+                request["response_format"]?["json_schema"]?["schema"] != null;
             if (!string.IsNullOrEmpty(responseJson))
             {
                 var wire = JObject.Parse(responseJson);

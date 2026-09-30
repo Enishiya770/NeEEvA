@@ -14,6 +14,10 @@ public static class FirstReplyProtocolRegression
     public static int RunChecks()
     {
         checks = 0;
+        Check(System.Text.RegularExpressions.Regex.IsMatch(JapaneseReply,"\\A"+FirstReplyProtocol.StructuredRegex+"\\z") &&
+            System.Text.RegularExpressions.Regex.IsMatch(FirstReplyProtocol.RecordingSingingHead,"\\A"+FirstReplyProtocol.StructuredRegex+"\\z") &&
+            !System.Text.RegularExpressions.Regex.IsMatch("<thought>旧格式</thought>"+JapaneseReply,"\\A"+FirstReplyProtocol.StructuredRegex+"\\z"),
+            "Configured vLLM grammar must require the same leading route and reject legacy thought preambles");
         string bilingual = "<route>ordinary</route>\n<lang code=\"zh\"/><speech mode=\"independent\"/><say>可以。这里先解释原因。</say>\n<lang code=\"en\"/><say>Here is the reason.</say>";
         string trilingual = bilingual + "\n<lang code=\"ja\"/><say>理由を順番に説明するね。</say>";
         const string completeEnglish = "Take your time with the project; if you get stuck, tell me what happened and we can work through it together. I'll be right here, waiting for a chance to hear how it goes.";
@@ -44,17 +48,24 @@ public static class FirstReplyProtocolRegression
                 Check(parser.Finish(true, "stop") == null, "A completed parser delivered twice");
             }
         }
-        {
-            int called = 0;
-            var parser = new FirstReplyStreamParser(() => true, _ => called++);
-            foreach (char c in FirstReplyProtocol.ToolsHead) parser.Push(c.ToString());
-            var result = parser.Finish(true, "stop");
-            Check(result.Disposition == FirstReplyDisposition.Tools && called == 0 && result.SafeOutput == "",
-                "Tool routing leaked a candidate into public or executable output");
-        }
+        foreach (string route in new[] { FirstReplyProtocol.ToolsHead, FirstReplyProtocol.RecordingSingingHead })
+            for (int split = 0; split <= route.Length; split++)
+            {
+                int called = 0;
+                var parser = new FirstReplyStreamParser(() => true, _ => called++);
+                parser.Push(route.Substring(0, split)); parser.Push(route.Substring(split));
+                var result = parser.Finish(true, "stop");
+                var expected = route == FirstReplyProtocol.ToolsHead ? FirstReplyDisposition.Tools : FirstReplyDisposition.RecordingSinging;
+                Check(result.Disposition == expected && called == 0 && result.SafeOutput == "",
+                    "Action routing leaked a candidate into public/executable output or changed across packet boundaries");
+            }
         foreach (string invalid in new[] {
             "Before the route" + JapaneseReply,
             "<route>tools</route><say>已经打开了。</say>",
+            FirstReplyProtocol.RecordingSingingHead + "<say>已经唱过了。</say>",
+            FirstReplyProtocol.RecordingSingingHead + "<hum_back/>",
+            FirstReplyProtocol.ToolsHead + FirstReplyProtocol.RecordingSingingHead,
+            "<route>recording_sing</route>",
             JapaneseReply + "<motion name=\"wave\"/>",
             JapaneseReply + "<route>tools</route>",
             JapaneseReply.Replace("空の青さ", "<memory_add text=\"x\"/>空の青さ"),
@@ -103,11 +114,24 @@ public static class FirstReplyProtocolRegression
                 !forwarded.ToString().Contains("NEVER_PUBLIC_AFTER_TOTAL_LIMIT") && result.SpeechCharacters == forwarded.Length,
                 "Removing a per-say limit disabled the total response bound or lost its failure evidence");
         }
+        foreach (string route in new[] { FirstReplyProtocol.ToolsHead, FirstReplyProtocol.RecordingSingingHead })
         foreach (string ending in new[] { "", "\n", "\n \r\t", "\n\n\n\n\n" })
         {
-            var parser = new FirstReplyStreamParser(() => true, _ => { }); parser.Push(FirstReplyProtocol.ToolsHead + ending);
-            Check((parser.Finish(true, "stop").Disposition == FirstReplyDisposition.Tools) == (ending.Length <= 4),
-                "Tools completion whitespace differs from its finite grammar envelope");
+            var parser = new FirstReplyStreamParser(() => true, _ => { }); parser.Push(route + ending);
+            Check((parser.Finish(true, "stop").Disposition != FirstReplyDisposition.Failed) == (ending.Length <= 4),
+                "Action-route completion whitespace differs from its finite grammar envelope");
+        }
+        foreach (string finish in new[] { "length", "error", "", null })
+        {
+            var parser = new FirstReplyStreamParser(() => true, _ => { }); parser.Push(FirstReplyProtocol.RecordingSingingHead);
+            Check(parser.Finish(true, finish).Disposition == FirstReplyDisposition.Failed,
+                "Incomplete recording-singing route acquired a planner handoff");
+        }
+        {
+            bool active = true;
+            var parser = new FirstReplyStreamParser(() => active, _ => { });
+            parser.Push(FirstReplyProtocol.RecordingSingingHead); active = false;
+            Check(parser.Finish(true, "stop") == null, "Cancelled recording route acquired a late handoff");
         }
         {
             var parser = new FirstReplyStreamParser(() => true, _ => { }); parser.Push(FirstReplyProtocol.ToolsHead);

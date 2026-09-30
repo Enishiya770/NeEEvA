@@ -7,6 +7,7 @@ namespace NeEEvA.Motion
     [Serializable]
     public sealed class ArdyRoomStreamTelemetry
     {
+        public ArdyServiceErrorObservation serviceError;
         public string eventName, requestId, sessionId, stage, lastFailureCategory, lastFailureReason;
         public string historyCode, historyReason;
         public int latestRejectedPrefixOrdinal;
@@ -25,8 +26,10 @@ namespace NeEEvA.Motion
             public float elapsedMs;
             public int deadlineMs;
         }
-        [Serializable] private sealed class ServiceErrorDetails { public ServiceStreamDiagnostic streamDiagnostic; }
-        [Serializable] private sealed class ServiceErrorBody { public string code; public ServiceErrorDetails details; }
+        [Serializable] private sealed class ServiceErrorDetails { public ServiceStreamDiagnostic streamDiagnostic; public ServiceQualityTimings timings; }
+        [Serializable] private sealed class ServiceQualityTimings { public int qualityAttempts; public ServiceQualityCandidate[] qualityCandidates; }
+        [Serializable] private sealed class ServiceQualityCandidate { public int attempt; public float windowMs; public bool accepted; public ArdyServiceQualityReason[] reasons; }
+        [Serializable] private sealed class ServiceErrorBody { public string code, message; public ServiceErrorDetails details; }
         [Serializable] private sealed class ServiceErrorEnvelope { public ServiceErrorBody error; }
         private static string DescribeServiceFailure(string response)
         {
@@ -53,11 +56,12 @@ namespace NeEEvA.Motion
         private sealed class ServiceRequestException : InvalidOperationException
         {
             public readonly string Code;
-            public ServiceRequestException(string message, string response) : base(message + DescribeServiceFailure(response))
+            public ServiceRequestException(string message, string response) : base(message + DescribeServiceFailure(response) + ServiceFailureCodeSuffix(response))
             {
                 // Error bodies can be empty or non-JSON (proxy/transport failures).
                 // Only the machine-readable code is used for diagnosis, never execution.
-                try { if (!string.IsNullOrEmpty(response)) Code = JsonUtility.FromJson<ServiceErrorEnvelope>(response)?.error?.code; }
+                try { if (!string.IsNullOrEmpty(response) && response.Length <= 32768)
+                    Code = SafeServiceCode(JsonUtility.FromJson<ServiceErrorEnvelope>(response)?.error?.code); }
                 catch (ArgumentException) { }
             }
         }
@@ -72,6 +76,7 @@ namespace NeEEvA.Motion
         private bool streamRequestPending;
 
         public ArdyRoomStreamTelemetry StreamTelemetry => new ArdyRoomStreamTelemetry {
+            serviceError = LastErrorResponseJson == null ? null : lastServiceError,
             eventName = streamEventName, requestId = requestId, sessionId = streamSessionId, stage = Stage,
             lastFailureCategory = streamLastFailureCategory, lastFailureReason = streamLastFailureReason,
             historyCode = warmHistoryObservation?.code, historyReason = warmHistoryObservation?.reason,
@@ -106,7 +111,9 @@ namespace NeEEvA.Motion
         {
             if (error is PoseHistoryException) return "pose-history";
             var execution = error as ExecutionException;
-            if ((error as ServiceRequestException)?.Code == "stream_quality_rejected") return "motion-quality";
+            // Structured service codes, never the server's free-form prose, classify a transport fault.
+            if (error is ServiceRequestException service)
+                return service.Code == "stream_quality_rejected" ? "motion-quality" : "service-request";
             if (execution?.Reason == ArdyRoomExecutionReason.OwnershipLost) return "ownership";
             if (error.Message.Contains("净距")) return "user-clearance";
             if (error.Message.Contains("步态") || error.Message.Contains("关节") || error.Message.Contains("stream_quality_rejected")) return "motion-quality";

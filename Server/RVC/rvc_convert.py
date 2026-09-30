@@ -12,6 +12,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))  # Embedded Python does not automatically include the script directory.
 VENDOR = ROOT / "vendor" / "rvc"
 LOCAL_PACKAGES = ROOT / "python_packages"
 if LOCAL_PACKAGES.is_dir():
@@ -185,6 +186,8 @@ def _boot(model: Path, index: Path):
 
     import torch
 
+    from hubert_compat import install_hubert_checkpoint_compatibility
+    install_hubert_checkpoint_compatibility()
     from configs.config import Config
     from infer.vc.modules import VC
 
@@ -239,6 +242,17 @@ def _warm_up(converter, index: Path) -> None:
             print(f"[rvc] warm-up skipped: {exc}", file=sys.stderr, flush=True)
 
 
+def _actual_models(converter) -> dict:
+    models = {"rvc": converter.net_g, "hubert": converter.hubert_model,
+              "rmvpe": getattr(getattr(converter.pipeline, "model_rmvpe", None), "model", None)}
+    result = {}
+    for name, model in models.items():
+        if model is not None:
+            parameter = next(model.parameters())
+            result[name] = {"device": str(parameter.device), "dtype": str(parameter.dtype)}
+    return result
+
+
 def _convert(torch, config, converter, force_cpu, index: Path, params: dict) -> dict:
     source = Path(params["source"]).resolve()
     output = Path(params["output"]).resolve()
@@ -275,12 +289,15 @@ def _convert(torch, config, converter, force_cpu, index: Path, params: dict) -> 
     sample_rate, audio = result
     if sample_rate is None or audio is None or len(audio) == 0:
         raise RuntimeError("RVC conversion failed: " + str(status))
+    if not np.isfinite(audio).all() or not np.any(audio):
+        raise RuntimeError("RVC returned non-finite or entirely silent audio; conversion was not completed")
     output.parent.mkdir(parents=True, exist_ok=True)
     sf.write(str(output), audio, int(sample_rate), subtype="PCM_16")
     return {
         "backend": "rvc-character-v2",
         "device": str(config.device),
         "execution_mode": "cpu-fp32" if force_cpu else "cuda",
+        "models": _actual_models(converter),
         "source_median_f0": None if source_f0 is None else round(source_f0, 3),
         "target_median_f0": target_median_f0,
         "semitone_shift": shift,
@@ -298,7 +315,8 @@ def serve(model: Path, index: Path) -> None:
     准备好之后先打一行 {"ready": true}，服务端据此知道可以发请求了。
     """
     torch, config, converter, force_cpu = _boot(model, index)
-    print(json.dumps({"ready": True, "device": str(config.device)}), flush=True)
+    print(json.dumps({"ready": True, "device": str(config.device),
+                      "models": _actual_models(converter)}), flush=True)
     for line in sys.stdin:
         line = line.strip()
         if not line:

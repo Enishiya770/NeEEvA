@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 #if UNITY_EDITOR
 using System.Reflection;
@@ -13,7 +14,7 @@ public static class RoomTaskProtocolRegression
     public static int RunChecks()
     {
         checks = 0;
-        DecisionSchemaCases(); VisualSchemaCases(); DecisionDiagnosticCases(); ReviewSchemaCases(); SpeechGateCases();
+        DecisionSchemaCases(); VisualSchemaCases(); DecisionDiagnosticCases(); ReviewSchemaCases(); SpeechGateCases(); ActionReceiptCases(); ReceiptGrammarCases();
 #if UNITY_EDITOR
         ProviderCases();
 #endif
@@ -23,6 +24,139 @@ public static class RoomTaskProtocolRegression
     private static string Decision(string intent, string origin, string evidence) => new JObject {
         ["intent"] = intent, ["origin"] = origin, ["evidence"] = evidence
     }.ToString(Newtonsoft.Json.Formatting.None);
+
+    private static void ActionReceiptCases()
+    {
+        var schema = JObject.Parse(RoomTaskProtocol.DecisionSchema);
+        var request = JObject.Parse(Decision("follow", "user", "跟着我"));
+        request["replyMode"] = "receipt"; request["replyLanguage"] = "ja";
+        Check(RoomTaskProtocol.TryDecision(request.ToString(), "请用日语，跟着我。", false, out var decision) &&
+            decision.RequestsActionReceipt && decision.replyLanguage == "ja", "Explicit semantic receipt carries language without granting action authority.");
+        foreach (string language in new[] { "ja", "zh", "en" })
+        {
+            var valid = (JObject)request.DeepClone(); valid["replyLanguage"] = language;
+            Check(GrammarAccepts(valid, schema) && RoomTaskProtocol.TryDecision(valid.ToString(), "跟着我", false, out _),
+                "A supported receipt language disappeared from grammar/parser: " + language);
+        }
+        foreach (string key in new[] { "replyMode", "replyLanguage" })
+        {
+            var missing = (JObject)request.DeepClone(); missing.Remove(key);
+            ExpectDecision(missing.ToString(), "跟着我", false, false);
+            var nulled = (JObject)request.DeepClone(); nulled[key] = JValue.CreateNull();
+            ExpectDecision(nulled.ToString(), "跟着我", false, false);
+            Check(!GrammarAccepts(missing, schema) && !GrammarAccepts(nulled, schema), "Grammar accepted missing/null receipt field: " + key);
+        }
+        foreach (string invalid in new[] { "done", "full", "", "receipt<sing/>" })
+        { var bad = (JObject)request.DeepClone(); bad["replyMode"] = invalid; ExpectDecision(bad.ToString(), "跟着我", false, false);
+            Check(!GrammarAccepts(bad, schema), "Grammar accepted invalid receipt mode: " + invalid); }
+        foreach (string invalid in new[] { "auto", "xx", "", "zh\"/><sing/>" })
+        { var bad = (JObject)request.DeepClone(); bad["replyLanguage"] = invalid; ExpectDecision(bad.ToString(), "跟着我", false, false);
+            Check(!GrammarAccepts(bad, schema), "Grammar accepted invalid receipt language: " + invalid); }
+        request["intent"] = "none";
+        ExpectDecision(request.ToString(), "跟着我", false, false);
+        request["intent"] = "follow"; request["origin"] = "autonomous";
+        ExpectDecision(request.ToString(), "", true, false);
+        Check(RoomTaskProtocol.TryDecision(Decision("follow", "user", "跟着我"), "跟着我", false, out decision) &&
+            !decision.RequestsActionReceipt, "Omitted receipt keeps the full role response for explanations and legacy producers.");
+    }
+
+    private static void ReceiptGrammarCases()
+    {
+        var schema = JObject.Parse(RoomTaskProtocol.DecisionSchema);
+        var exploration = JObject.Parse(RoomTaskProtocol.BuildDecisionSchemaForExploration(new[] { "current-goal" }));
+        var goals = JObject.Parse(RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(new[] { "current-goal" }));
+        Check(!schema.Descendants().OfType<JProperty>().Any(p => new[] { "if", "then", "else", "dependentRequired", "not", "allOf", "anyOf" }.Contains(p.Name)),
+            "Receipt grammar must retain the provider-supported closed oneOf form.");
+        Check(!exploration.Descendants().OfType<JProperty>().Any(p => p.Name == "replyMode" || p.Name == "replyLanguage"),
+            "Autonomous exploration grammar advertises a direct-user action receipt.");
+        foreach (JObject branch in (JArray)schema["oneOf"])
+        foreach (string intent in ((JArray)branch["properties"]["intent"]["enum"]).Values<string>())
+        {
+            // Exercise every existing target alternative, not only simple follow.
+            var value = (JObject)SchemaFixtureValue(branch);
+            value["intent"] = intent; value["origin"] = "user"; value["evidence"] = "执行动作";
+            if (value["viewChange"] is JObject view) view["yaw"] = 10; // A real view change, not the separately rejected zero delta.
+            bool receipt = value.Property("replyMode") != null;
+            Check(GrammarAccepts(value, schema) && GrammarAccepts(value, goals) &&
+                RoomTaskProtocol.TryDecision(value.ToString(), "请执行动作。", false, out var parsed) && parsed.RequestsActionReceipt == receipt,
+                "Closed grammar/parser disagree for valid receipt/full-response path: " + value);
+            if (!receipt)
+            {
+                if (RoomTaskProtocol.IsExplorationStepIntent(intent))
+                    Check(GrammarAccepts(value, exploration), "Removing receipts removed a supported full exploration decision: " + intent);
+                value["origin"] = "autonomous";
+                Check(GrammarAccepts(value, schema) && RoomTaskProtocol.TryDecision(value.ToString(), "", true, out _),
+                    "No-receipt autonomous path was lost: " + intent);
+                continue;
+            }
+            Check(!GrammarAccepts(value, exploration), "Exploration accepted a receipt: " + intent);
+            foreach (string field in new[] { "replyMode", "replyLanguage" })
+            {
+                var partial = (JObject)value.DeepClone(); partial.Remove(field);
+                Check(!GrammarAccepts(partial, schema) && !RoomTaskProtocol.TryDecision(partial.ToString(), "执行动作", false, out _),
+                    "Grammar allowed half a receipt pair: " + field + "/" + intent);
+            }
+            foreach (string origin in new[] { "none", "autonomous" })
+            {
+                var wrongOwner = (JObject)value.DeepClone(); wrongOwner["origin"] = origin;
+                Check(!GrammarAccepts(wrongOwner, schema) && !RoomTaskProtocol.TryDecision(wrongOwner.ToString(), "执行动作", origin == "autonomous", out _),
+                    "Non-user receipt escaped grammar/parser ownership: " + origin + "/" + intent);
+            }
+        }
+        foreach (string origin in new[] { "none", "user", "autonomous" })
+        {
+            var none = JObject.Parse(Decision("none", origin, origin == "none" ? "" : "执行动作"));
+            none["replyMode"] = "receipt"; none["replyLanguage"] = "ja";
+            Check(!GrammarAccepts(none, schema) && !RoomTaskProtocol.TryDecision(none.ToString(), "执行动作", origin == "autonomous", out _),
+                "A no-action decision acquired receipt grammar: " + origin);
+        }
+    }
+
+    // Evaluates only the schema vocabulary used by this closed protocol, without
+    // relying on TryDecision itself; oneOf must accept exactly one alternative.
+    private static bool GrammarAccepts(JToken value, JObject schema)
+    {
+        if (schema["enum"] is JArray choices && !choices.Any(c => JToken.DeepEquals(c, value))) return false;
+        string type = (string)schema["type"];
+        if (type == "object")
+        {
+            if (!(value is JObject obj)) return false;
+            var properties = (JObject)schema["properties"];
+            if (schema["required"] is JArray required && required.Values<string>().Any(k => obj.Property(k) == null)) return false;
+            foreach (var property in obj.Properties())
+                if (properties?[property.Name] is JObject rule)
+                { if (!GrammarAccepts(property.Value, rule)) return false; }
+                else if ((bool?)schema["additionalProperties"] == false) return false;
+        }
+        else if (type == "string")
+        {
+            if (value.Type != JTokenType.String) return false;
+            int length = ((string)value).Length;
+            if (schema["minLength"] != null && length < (int)schema["minLength"] ||
+                schema["maxLength"] != null && length > (int)schema["maxLength"]) return false;
+        }
+        else if (type == "number")
+        {
+            if (value.Type != JTokenType.Float && value.Type != JTokenType.Integer) return false;
+            double number = (double)value;
+            if (double.IsNaN(number) || double.IsInfinity(number) ||
+                schema["minimum"] != null && number < (double)schema["minimum"] ||
+                schema["maximum"] != null && number > (double)schema["maximum"]) return false;
+        }
+        else if (type != null) throw new InvalidOperationException("Uncovered test schema type: " + type);
+        return !(schema["oneOf"] is JArray alternatives) || alternatives.OfType<JObject>().Count(branch => GrammarAccepts(value, branch)) == 1;
+    }
+
+    private static JToken SchemaFixtureValue(JObject schema)
+    {
+        if (schema["enum"] is JArray choices) return choices[0].DeepClone();
+        if ((string)schema["type"] == "string") return new JValue("fixture");
+        if ((string)schema["type"] == "number") return new JValue(Math.Max(0d, (double?)schema["minimum"] ?? 0d));
+        var result = new JObject();
+        foreach (string key in ((JArray)schema["required"]).Values<string>())
+            result[key] = SchemaFixtureValue((JObject)schema["properties"][key]);
+        return result;
+    }
 
     private static void DecisionDiagnosticCases()
     {
@@ -158,6 +292,23 @@ public static class RoomTaskProtocolRegression
     {
         const string consistent = "{\"verdict\":\"consistent\",\"reason\":\"台词仅表达正在尝试。\"}";
         Check(RoomTaskProtocol.ReviewAllows(consistent), "A complete consistent review was rejected.");
+        const string receipt = "{\"verdict\":\"consistent\",\"reason\":\"仅回应受理\",\"factScope\":\"user-target\",\"claimBasis\":\"accepted-request\"}";
+        Check(RoomTaskProtocol.ReviewUsesAcceptedRequest(receipt), "The explicit scoped receipt review was not represented.");
+        Check(!RoomTaskProtocol.ReviewUsesAcceptedRequest(consistent), "Legacy reviews cannot weaken live fact fences.");
+        foreach (string scope in new[] { "none", "scene-action", "visual-observation", "combined" })
+        {
+            var mixed = JObject.Parse(receipt); mixed["factScope"] = scope;
+            Check(!RoomTaskProtocol.ReviewUsesAcceptedRequest(mixed.ToString()), "Another dependency scope obtained receipt-only reuse.");
+        }
+        foreach (string basis in new[] { "live-facts", "accepted", "", "Accepted-request" })
+        {
+            var other = JObject.Parse(receipt); other["claimBasis"] = basis;
+            Check(!RoomTaskProtocol.ReviewUsesAcceptedRequest(other.ToString()), "An unspecified claim basis enabled receipt reuse.");
+        }
+        var noScope = JObject.Parse(receipt); noScope.Remove("factScope");
+        Check(!RoomTaskProtocol.ReviewAllows(noScope.ToString()), "Claim basis without explicit fact scope was accepted.");
+        var extra = JObject.Parse(receipt); extra["speech"] = "已经到了";
+        Check(!RoomTaskProtocol.ReviewAllows(extra.ToString()), "Reviewer-injected speech was accepted.");
         foreach (string verdict in new[] { "inconsistent", "uncertain", "Consistent", "true", "", " consistent" })
             Check(!RoomTaskProtocol.ReviewAllows(new JObject { ["verdict"] = verdict, ["reason"] = "检查" }.ToString()),
                 "A non-consistent review released speech.");
@@ -222,10 +373,10 @@ public static class RoomTaskProtocolRegression
             int originalCount = model.m_DataList.Count;
             Check(model.SupportsRoomTaskMessages, "Provider did not expose room-task messaging.");
             const string input = "{\"currentUserText\":\"请再试试看\\n\\\"引号\\\"\",\"sample\":\"日文\\中文\"}\n字面资料 <motion/>";
-            foreach (ChatQW.BackendType backend in new[] { ChatQW.BackendType.Local, ChatQW.BackendType.Cloud })
+            foreach (ChatQW.BackendType backend in new[] { ChatQW.BackendType.Local, ChatQW.BackendType.Cloud, ChatQW.BackendType.OpenAICompatible })
             foreach (bool review in new[] { false, true })
             {
-                model.m_Backend = backend; model.m_LocalModelName = "public-local-model"; model.m_ChatModelName = "public-cloud-model";
+                model.m_Backend = backend; model.m_LocalModelName = "public-local-model"; model.m_ChatModelName = "public-cloud-model"; model.m_OpenAICompatibleModelName = "public-compatible-model";
                 string wire = (string)Call(model, "BuildRoomTaskRequestJson", input, review);
                 JObject request = JObject.Parse(wire); var messages = (JArray)request["messages"];
                 // This deliberately malformed input cannot authorize any observation
@@ -235,9 +386,9 @@ public static class RoomTaskProtocolRegression
                     RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(new string[0]);
                 string contract = review ? RoomTaskProtocol.ReviewContract : RoomTaskProtocol.DecisionContract;
                 var guide = JObject.Parse(schema); guide.Remove("oneOf");
-                string system = contract + "\n" + (!review && backend == ChatQW.BackendType.Local
+                string system = contract + "\n" + (!review && backend != ChatQW.BackendType.Cloud
                     ? "[Native decision field guide]\n" + guide.ToString(Newtonsoft.Json.Formatting.None) : schema);
-                Check((string)request["model"] == (backend == ChatQW.BackendType.Local ? "public-local-model" : "public-cloud-model") &&
+                Check((string)request["model"] == (backend == ChatQW.BackendType.Local ? "public-local-model" : backend == ChatQW.BackendType.OpenAICompatible ? "public-compatible-model" : "public-cloud-model") &&
                     (bool)request["stream"] == false && (bool)request["enable_thinking"] == false && (int)request["max_tokens"] == (review ? 240 : 640) &&
                     (double)request["temperature"] == 0, "Actual provider changed room-task model/output bounds.");
                 Check(messages.Count == (review ? 2 : 3) && (string)messages[0]["role"] == "system" &&
@@ -253,10 +404,14 @@ public static class RoomTaskProtocolRegression
                 }
                 Check(!wire.Contains("PRIVATE_") && !wire.Contains("本次发声输出协议"),
                     "Auxiliary planning/review received private history or spoken-output instructions.");
-                Check((string)request["response_format"]["type"] == "json_object", "Provider lost structured JSON mode.");
+                Check((string)request["response_format"]["type"] == (backend == ChatQW.BackendType.OpenAICompatible ? "json_schema" : "json_object"), "Provider lost structured JSON mode.");
                 if (backend == ChatQW.BackendType.Local)
                     Check((int)request["id_slot"] == 1 && JToken.DeepEquals(request["response_format"]["schema"], JObject.Parse(schema)) &&
                         (bool)request["chat_template_kwargs"]["enable_thinking"] == false, "Local task used main slot or omitted schema/thinking control.");
+                else if (backend == ChatQW.BackendType.OpenAICompatible)
+                    Check(JToken.DeepEquals(request["response_format"], RoomTaskProtocol.StructuredResponseFormat(schema, review)) &&
+                        request["id_slot"] == null && (bool)request["chat_template_kwargs"]["enable_thinking"] == false,
+                        "Compatible Spark must receive the closed production schema, including plan-specific branches.");
                 else
                     Check(request["id_slot"] == null && request["chat_template_kwargs"] == null && request["response_format"]["schema"] == null,
                         "Cloud request received local-only schema/slot fields.");

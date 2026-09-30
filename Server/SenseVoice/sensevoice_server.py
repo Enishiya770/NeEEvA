@@ -38,6 +38,7 @@ import argparse
 import asyncio
 import base64
 import collections
+from streaming_windows import WindowTranscript, next_window_start
 import difflib
 import hashlib
 import io
@@ -50,6 +51,7 @@ from typing import Optional
 
 import numpy as np
 import soundfile as sf
+import torch
 import uvicorn
 from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
@@ -60,9 +62,16 @@ from singing_analysis import SingingAnalyzer
 from song_search import SongSearchEngine
 from asr_timing import AsrTiming
 from asr_window_cache import AsrWindowCache
+from asr_runtime import (is_cuda_device, model_device_details, torch_runtime_details,
+                         require_cuda_before_load, require_cuda_after_load,
+                         warmup_asr, RequiredCudaWarmupError)
 from streaming_activity import recent_activity_fields
 from asr_scheduler import AnalysisScheduler, checkpoint
 from mixed_turn_asr import transcribe_segments, dump_mixed_sample
+from singing_boundary_http import install_boundary_routes
+from singing_boundary_refinement import ALGORITHM as SINGING_BOUNDARY_ALGORITHM
+from final_speech_windows import (POLICY as FINAL_SPEECH_WINDOW_POLICY,
+                                  speech_context_reason, plan_speech_windows)
 
 # ------------------------------ 模型 ------------------------------
 
@@ -72,6 +81,8 @@ _speaker_model: Optional[AutoModel] = None
 _speaker_store: Optional[SpeakerIdentityStore] = None
 _singing_analyzer: Optional[SingingAnalyzer] = None
 _song_search_engine: Optional[SongSearchEngine] = None
+_runtime_details = {}
+_model_devices = {}
 _vad_min_speech_ms = 160
 # SenseVoice 的同一个模型实例不保证并发 generate 安全。流式 partial 与
 # EOU 后的正式 /asr 共用这一把锁；单次 SenseVoice 推理很短，正式请求最多
@@ -86,17 +97,103 @@ _final_asr_scheduler = AnalysisScheduler()
 # Fast probes have their own analyzer: mutable nested-island state from a final
 # analysis must not leak into concurrent streaming/VAD evidence.
 _streaming_analyzer = SingingAnalyzer(enable_torchcrepe=False)
+# SenseVoice quality and latency degrade when a single request grows into a long,
+# mixed turn. Keep the ordinary final path bounded and overlap adjacent windows so
+# words at a cut remain available to both hypotheses. Short requests retain the
+# original one-pass behavior.
+_ASR_LONG_WINDOW_SECONDS = 9.0
+_ASR_LONG_WINDOW_OVERLAP_SECONDS = 0.8
+_ASR_LONG_WINDOW_THRESHOLD_SECONDS = 10.0
 
 
-def generate_asr(wav: np.ndarray, language: str = "auto"):
-    with _asr_lock:
+def _generate_asr_once(wav: np.ndarray, language: str = "auto"):
+    checkpoint()
+    result, reused = _asr_window_cache.resolve(
+        id(_model), language, wav.shape, wav.dtype, wav.tobytes(),
+        lambda: _model.generate(input=wav, cache={}, language=language, use_itn=True))
+    if reused:
+        print(f"[ASR/WindowCache] exact window reused samples={wav.size} language={language}", flush=True)
+    return result
+
+
+def _windowed_asr(wav: np.ndarray, language: str = "auto", windows=None):
+    sample_rate = 16000
+    window_samples = max(1, int(_ASR_LONG_WINDOW_SECONDS * sample_rate))
+    overlap_samples = min(window_samples - 1,
+                          max(1, int(_ASR_LONG_WINDOW_OVERLAP_SECONDS * sample_rate)))
+    step_samples = window_samples - overlap_samples
+    pieces = []
+    metadata = None
+    start = 0
+    total = int(wav.size)
+    if windows is None:
+        windows = []
+        while start < total:
+            end = min(total, start + window_samples)
+            # Do not create a tiny trailing inference; extend the preceding window.
+            if end < total and total - end < int(1.4 * sample_rate):
+                end = total
+            windows.append((start, end))
+            if end >= total:
+                break
+            start += step_samples
+    for start, end in windows:
+        result = _generate_asr_once(wav[start:end], language)
+        raw = result[0].get("text", "") if result and isinstance(result[0], dict) else ""
+        text, lang, emotion, audio_event = parse_output(raw)
+        text = (text or "").strip()
+        if metadata is None and (text or raw):
+            metadata = (lang, emotion, audio_event, _tag_re.findall(raw))
+        if text:
+            pieces.append(text)
+        if end >= total:
+            break
         checkpoint()
-        result, reused = _asr_window_cache.resolve(
-            id(_model), language, wav.shape, wav.dtype, wav.tobytes(),
-            lambda: _model.generate(input=wav, cache={}, language=language, use_itn=True))
-        if reused:
-            print(f"[ASR/WindowCache] exact window reused samples={wav.size} language={language}", flush=True)
-        return result
+
+    merged = ""
+    for piece in pieces:
+        merged = merge_streaming_transcripts(merged, piece)
+    # The overlap helper keeps original punctuation/spacing. Remove only spaces
+    # inserted between adjacent CJK characters by the conservative fallback.
+    merged = re.sub(r"(?<=[\u3400-\u4dbf\u4e00-\u9fff\u3040-\u30ff])\s+(?=[\u3400-\u4dbf\u4e00-\u9fff\u3040-\u30ff])", "", merged)
+    tags = metadata[3] if metadata else []
+    prefix = "".join(f"<|{tag}|>" for tag in tags[:4])
+    print(f"[ASR/Windowed] duration={total / sample_rate:.2f}s windows={len(pieces)} "
+          f"bounds={[(round(a / sample_rate, 2), round(b / sample_rate, 2)) for a, b in windows]} "
+          f"characters={len(merged)}", flush=True)
+    return [{"text": prefix + merged}]
+
+
+def generate_asr(wav: np.ndarray, language: str = "auto", *, windows=None):
+    with _asr_lock:
+        if wav is None or wav.size == 0:
+            return []
+        duration = float(wav.size) / 16000.0
+        if duration < _ASR_LONG_WINDOW_THRESHOLD_SECONDS or (windows is not None and len(windows) == 1):
+            return _generate_asr_once(wav, language)
+        return _windowed_asr(wav, language, windows=windows)
+
+
+def generate_final_asr(wav, language="auto", *, quick_analysis=None,
+                       raw_duration=0.0, vad_has_speech=False, vad_segments=None,
+                       content_start_seconds=0.0, expect_singing=False,
+                       singing_vad_override=False):
+    """Select one final decode path using evidence already computed by /asr."""
+    windows = None
+    reason = "short-audio"
+    if wav.size / 16000.0 >= _ASR_LONG_WINDOW_THRESHOLD_SECONDS:
+        reason = speech_context_reason(
+            quick_analysis, raw_duration, vad_has_speech=vad_has_speech,
+            expect_singing=expect_singing, singing_vad_override=singing_vad_override)
+        if reason == "ordinary-speech-evidence":
+            windows = plan_speech_windows(int(wav.size), vad_segments, content_start_seconds)
+            if windows is None:
+                reason = "invalid-vad-boundaries"
+    print(f"[ASR/FinalWindows] policy={FINAL_SPEECH_WINDOW_POLICY if windows else 'legacy'} "
+          f"reason={reason} bounds={windows}", flush=True)
+    if windows is None:
+        return generate_asr(wav, language)
+    return generate_asr(wav, language, windows=windows)
 
 
 def load_model(
@@ -111,9 +208,27 @@ def load_model(
     pitch_device: str = "cpu",
     enable_torchcrepe: bool = True,
     song_catalog_path: str = "song_catalog.json",
+    require_cuda: bool = False,
 ):
     global _model, _vad_model, _speaker_model, _speaker_store
     global _singing_analyzer, _song_search_engine
+    global _runtime_details, _model_devices
+    _runtime_details = dict(torch_runtime_details(torch),
+                            requested_asr_device=device, require_cuda=bool(require_cuda))
+    _model_devices = {}
+    print("[SenseVoice/Runtime] " + json.dumps(_runtime_details), flush=True)
+    require_cuda_before_load(device, require_cuda, _runtime_details)
+
+    def record_device(name, model, requested):
+        details = model_device_details(model, requested)
+        _model_devices[name] = details
+        print("[SenseVoice/Device] " + name + " " + json.dumps(details), flush=True)
+        if is_cuda_device(requested) and not all(
+                is_cuda_device(actual) for actual in details["actual_devices"] or ["unknown"]):
+            print(f"[SenseVoice/Device] WARNING: {name} requested {requested}, "
+                  f"actual={details['actual_device']}; CUDA execution is not confirmed.", flush=True)
+        return details
+
     print(f"[SenseVoice] 加载模型 (device={device}) ...")
     t0 = time.time()
     _model = AutoModel(
@@ -122,6 +237,7 @@ def load_model(
         disable_update=True,
         device=device,
     )
+    require_cuda_after_load(device, require_cuda, record_device("asr", _model, device))
     print(f"[SenseVoice] 模型就绪，耗时 {time.time() - t0:.2f}s")
 
     # VAD 很小，默认放在 CPU，避免和 SenseVoice / GPT-SoVITS 抢显存。
@@ -132,6 +248,7 @@ def load_model(
         disable_update=True,
         device=vad_device,
     )
+    record_device("vad", _vad_model, vad_device)
     print(f"[SenseVoice] FSMN-VAD 就绪，耗时 {time.time() - vad_t0:.2f}s")
 
     print(f"[SenseVoice] 加载 CAM++ 声纹模型 (device={speaker_device}) ...")
@@ -141,6 +258,7 @@ def load_model(
         disable_update=True,
         device=speaker_device,
     )
+    record_device("speaker", _speaker_model, speaker_device)
     _speaker_store = SpeakerIdentityStore(
         speaker_profile_path,
         match_threshold=speaker_match_threshold,
@@ -196,18 +314,20 @@ def load_model(
                     print(f"[Speaker] AI_SELF enrolled from {ai_path}")
             except Exception as exc:
                 print(f"[Speaker] AI_SELF enrollment skipped: {exc}")
-    _warmup()
+    _warmup(require_asr_cuda=require_cuda and is_cuda_device(device))
 
 
-def _warmup():
+def _warmup(require_asr_cuda=False):
     """用 1 秒静音触发一次推理，消除首次请求的冷启动延迟"""
     try:
         silent = np.zeros(16000, dtype=np.float32)
         t0 = time.time()
-        generate_asr(silent, "auto")
+        warmup_asr(lambda: generate_asr(silent, "auto"), require_asr_cuda)
         _vad_model.generate(input=silent, cache={}, disable_pbar=True)
         _speaker_model.generate(input=np.zeros(32000, dtype=np.float32), cache={}, disable_pbar=True)
         print(f"[SenseVoice] 预热完成，耗时 {time.time() - t0:.2f}s")
+    except RequiredCudaWarmupError:
+        raise
     except Exception as e:
         print(f"[SenseVoice] 预热失败（不影响使用）: {e}")
 
@@ -522,6 +642,8 @@ def dump_band_sample(
                 result.get("singing_expected_override", False)),
             "language": str(result.get("language", "")),
             "text": text,
+            "input_status": str(result.get("input_status", "")),
+            "input_evidence_reason": str(result.get("input_evidence_reason", "")),
             "singing_text": str(result.get("singing_text", "")),
             # 人工标注用：这一轮到底唱了没有。落盘时留空，离线看波形/听音频后填。
             "label": "",
@@ -722,6 +844,49 @@ def is_expected_singing_performance(analysis: Optional[dict]):
     return legacy_gate or conservative_recovery
 
 
+def has_mixed_singing_candidate(
+    analysis: Optional[dict],
+    total_seconds: float,
+    *,
+    acoustic_segment_candidate: bool = False,
+    singing_vad_override: bool = False,
+) -> bool:
+    """Decide whether the expensive per-window ASR pass is warranted.
+
+    A normal speech turn still receives the authoritative whole-turn SenseVoice
+    result above.  Segment ASR is reserved for an explicit singing verdict,
+    the armed humming override, or a timestamped acoustic island candidate.
+    The latter is allowed to remain ``is_singing=false`` because mixed turns
+    intentionally expose ambiguous islands for semantic review.  A full-window
+    speech analysis (0..total) is not a candidate by itself.
+    """
+    if not analysis:
+        return False
+    if bool(analysis.get("is_singing", False)):
+        return True
+    if acoustic_segment_candidate or singing_vad_override:
+        return True
+    if not bool(analysis.get("analysis_available", False)):
+        return False
+    try:
+        start = max(0.0, float(analysis.get("singing_start_seconds", 0.0) or 0.0))
+        end = min(float(total_seconds), float(analysis.get("singing_end_seconds", 0.0) or 0.0))
+    except (TypeError, ValueError):
+        return False
+    # Require a real island and at least one independent acoustic/boundary
+    # signal.  This avoids opening the segment path for ordinary 8s+ speech
+    # where plan_segments would otherwise manufacture unresolved windows.
+    if end - start < 1.2 or (start < 0.45 and total_seconds - end < 0.45):
+        return False
+    probability = float(analysis.get("singing_probability", 0.0) or 0.0)
+    stability = float(analysis.get("pitch_stability", 0.0) or 0.0)
+    voiced = float(analysis.get("voiced_ratio", 0.0) or 0.0)
+    return bool(
+        analysis.get("asr_boundary_candidates")
+        or (voiced >= 0.25 and (probability >= 0.35 or stability >= 0.52))
+    )
+
+
 def describe_expected_singing_gate(analysis: Optional[dict]):
     """Compact reason string for tuning expected-performance false negatives."""
     if not analysis or not analysis.get("analysis_available"):
@@ -859,13 +1024,27 @@ def trim_to_speech_with_offset(
     return wav[begin:end], begin / 16000.0
 
 
+class SpeakerInferenceFailure(RuntimeError):
+    """A failure of the optional model call, not an identity-store/code failure."""
+
+    def __init__(self, elapsed: float):
+        super().__init__("speaker_inference_failed")
+        self.elapsed = max(0.0, float(elapsed))
+
+
 def extract_speaker_embedding(wav: np.ndarray):
     """Extract a normalized 192-D CAM++ embedding."""
     if _speaker_model is None or wav.size < 16000 * 0.6:
         return None, 0.0
     t0 = time.time()
-    with _speaker_model_lock:
-        result = _speaker_model.generate(input=wav, cache={}, disable_pbar=True)
+    try:
+        with _speaker_model_lock:
+            result = _speaker_model.generate(input=wav, cache={}, disable_pbar=True)
+    except RuntimeError as exc:
+        # CAM++ is auxiliary to transcription. Torch/Xbyak failures at this
+        # exact boundary must not discard an otherwise valid full utterance.
+        # Shape/parsing/store/program errors outside it still fail visibly.
+        raise SpeakerInferenceFailure(time.time() - t0) from exc
     elapsed = time.time() - t0
     if not result or not isinstance(result[0], dict):
         return None, elapsed
@@ -895,6 +1074,9 @@ def unknown_speaker_meta():
         "speaker_is_new": False,
         "speaker_persistent": False,
         "speaker_enrollment_progress": 0.0,
+        "speaker_verification_available": False,
+        "speaker_error_code": "",
+        "speaker_learning_allowed": False,
     }
 
 
@@ -922,6 +1104,24 @@ def _is_hallucinated_transcript(text: str, emotion: str, speaker_meta: dict) -> 
     return str((speaker_meta or {}).get("speaker_kind", "")) != "owner"
 
 
+def retain_tonal_evidence_only(text: str, emotion: str, speaker_meta: dict,
+                              raw_vad_has_speech: bool, analysis: Optional[dict],
+                              expect_singing: bool, singing_vad_override: bool) -> bool:
+    """A weak acoustic candidate is retainable data, not a new textual turn.
+
+    Reuse the established multi-frame performance gate; caller expectation or
+    the quick VAD override alone must not authorize a hallucinated short fragment.
+    Real VAD speech and strongly supported wordless humming keep their paths.
+    """
+    if raw_vad_has_speech:
+        return False
+    no_lexical_text = not re.sub(r"[\s\W_]+", "", str(text or ""), flags=re.UNICODE)
+    weak_text = no_lexical_text or _is_hallucinated_transcript(text, emotion, speaker_meta)
+    candidate = (expect_singing or singing_vad_override or is_tonal_vocal(analysis) or
+                 bool((analysis or {}).get("is_singing", False)))
+    return bool(weak_text and candidate and not is_expected_singing_performance(analysis))
+
+
 def identify_speaker(wav: np.ndarray, speech_ms: int, learn: bool = True):
     """返回 (identity, elapsed, pending_embedding)。
 
@@ -934,22 +1134,38 @@ def identify_speaker(wav: np.ndarray, speech_ms: int, learn: bool = True):
     """
     if _speaker_store is None:
         return unknown_speaker_meta(), 0.0, None
-    # New confirmed identities are organized on the next speaker-bearing request.
-    # The store uses conservative mutual-nearest matching and is internally locked.
     try:
-        _speaker_store.auto_organize()
-    except Exception as exc:
-        print(f"[Speaker/Auto] organize failed (recognition continues): {exc}", flush=True)
-    embedding, elapsed = extract_speaker_embedding(wav)
+        embedding, elapsed = extract_speaker_embedding(wav)
+    except SpeakerInferenceFailure as exc:
+        import traceback
+        traceback.print_exc()
+        identity = unknown_speaker_meta()
+        identity.update(speaker_status="error", speaker_voiceprint_status="error",
+                        speaker_error_code="speaker_inference_failed")
+        print("[Speaker/Inference] unavailable; final ASR continues with unknown "
+              "identity and no speaker learning", flush=True)
+        return identity, exc.elapsed, None
     if embedding is None:
         return unknown_speaker_meta(), elapsed, None
+    # New confirmed identities are organized on the next speaker-bearing request.
+    # The store uses conservative mutual-nearest matching and is internally locked.
+    # A read-only replay (learn=False) must not organize the repository either.
+    if learn:
+        try:
+            _speaker_store.auto_organize()
+        except Exception as exc:
+            print(f"[Speaker/Auto] organize failed (recognition continues): {exc}", flush=True)
     identity = _speaker_store.identify_only(embedding, speech_ms)
+    identity.update(speaker_verification_available=True, speaker_error_code="",
+                    speaker_learning_allowed=bool(learn))
     return identity, elapsed, (embedding if learn else None)
 
 
 def commit_speaker_learning(embedding, speech_ms: int, identified: dict) -> dict:
     """幻听闸放行之后，才真正把这段音频记进声纹库。"""
-    if _speaker_store is None or embedding is None:
+    if (_speaker_store is None or embedding is None or
+            (identified or {}).get("speaker_learning_allowed") is False or
+            (identified or {}).get("speaker_status") == "error"):
         return identified
     learned = _speaker_store.identify_and_learn(embedding, speech_ms)
     # identify_and_learn 不产出 speaker_self_confidence，而 barge-in 的 AI 自回声
@@ -958,6 +1174,9 @@ def commit_speaker_learning(embedding, speech_ms: int, identified: dict) -> dict
         learned.setdefault(
             "speaker_self_confidence", identified["speaker_self_confidence"]
         )
+    for key in ("speaker_verification_available", "speaker_error_code", "speaker_learning_allowed"):
+        if key in (identified or {}):
+            learned[key] = identified[key]
     return learned
 
 
@@ -969,19 +1188,36 @@ app = FastAPI(title="SenseVoiceSmall ASR Server")
 @app.get("/health")
 def health():
     return {
+        "speaker_failure_isolation_schema": 1,
+        "input_status_schema": 1,
+        "speaker_window_policy": "whole-input-unknown-on-runtime-failure-v1",
+        "torch_version": _runtime_details.get("torch_version"),
+        "torch_cuda_build": _runtime_details.get("torch_cuda_build"),
+        "cuda_available": _runtime_details.get("cuda_available"),
+        "requested_asr_device": _runtime_details.get("requested_asr_device"),
+        "asr_device": _model_devices.get("asr", {}).get("actual_device", "unknown"),
+        "require_cuda": _runtime_details.get("require_cuda", False),
+        "model_devices": _model_devices,
         "turn_segments_schema": 1,
         "turn_segments_revision": "2026-09-07-recovery-context",
+        "singing_boundary_schema": 1,
+        "singing_boundary_algorithm": SINGING_BOUNDARY_ALGORITHM,
+        "singing_boundary_ready": _model is not None,
         "stream_activity_schema": 2,
         "analysis_dispatch_schema": 2,
         "final_asr_worker": True,
         "asr_timing_schema": 1,
         "asr_window_cache_schema": 1,
+        "asr_long_window_seconds": _ASR_LONG_WINDOW_SECONDS,
+        "asr_long_window_overlap_seconds": _ASR_LONG_WINDOW_OVERLAP_SECONDS,
+        "asr_long_window_threshold_seconds": _ASR_LONG_WINDOW_THRESHOLD_SECONDS,
         "ok": _model is not None and _vad_model is not None and _speaker_model is not None,
         "asr_ok": _model is not None,
         "vad_ok": _vad_model is not None,
         "speaker_ok": _speaker_model is not None and _speaker_store is not None,
         "speaker_profiles": len(_speaker_store.list_profiles(False)) if _speaker_store else 0,
         "streaming_preview": True,
+        "final_speech_window_policy": FINAL_SPEECH_WINDOW_POLICY,
         "singing_analysis": _singing_analyzer is not None,
         "singing_score_schema": 1 if _singing_analyzer is not None else 0,
         "song_search": _song_search_engine is not None,
@@ -1001,8 +1237,8 @@ async def stream_asr(websocket: WebSocket):
 
       server json  {"event":"partial","text":...,"stable_text":...}
 
-    这是低显存设备上的滚动推理后端。Unity 只依赖这个协议；将来替换为
-    真正的流式模型时，上层临时理解/草稿逻辑无需再改。
+    SenseVoice 不是原生流式模型，因此 partial 只对固定长度的最近窗口推理。
+    收音循环与推理解耦；推理期间只保留最新快照，过时窗口直接合并丢弃。
     """
     await websocket.accept()
     if _model is None:
@@ -1013,19 +1249,164 @@ async def stream_asr(websocket: WebSocket):
     language = "auto"
     partial_interval_ms = 850
     min_audio_ms = 800
-    # SenseVoice is not a native streaming model.  Keep each inference bounded to a
-    # 30 second rolling window, but retain overlap and return cumulative text/time.
-    # The old implementation simply stopped appending at 30 seconds, which made
-    # Unity believe a long song had gone silent while recording continued.
+    partial_window_ms = 6000
+    # Keep the retained audio bounded for long sessions.  Partial inference uses the
+    # smaller fixed window above; this retained buffer is only for rolling continuity.
     max_audio_ms = 30000
     overlap_audio_ms = 8000
     audio = bytearray()
     total_audio_bytes = 0
     last_inferred_total_bytes = 0
     window_start_bytes = 0
-    committed_text = ""
+    transcript = WindowTranscript(merge_streaming_transcripts)
+    partial_anchor_ms = 0
     last_text = ""
     started = False
+    stream_started_at = time.monotonic()
+    partial_task = None
+    partial_snapshot = None
+    partial_sequence = 0
+    coalesced_snapshots = 0
+    # Number of partial intervals already counted while the current inference is
+    # in flight.  Audio arrives in small frames, so counting on every frame would
+    # make ``stream_coalesced`` grow once per frame rather than once per skipped
+    # inference opportunity.
+    coalesced_due_count = 0
+    coalesced_base_total_bytes = 0
+
+    async def finish_partial_if_ready():
+        """Publish one completed latest-snapshot inference without blocking receive."""
+        nonlocal partial_task, partial_snapshot, last_inferred_total_bytes
+        nonlocal last_text
+        nonlocal coalesced_due_count, coalesced_base_total_bytes
+        if partial_task is None or not partial_task.done():
+            return False
+
+        task = partial_task
+        snapshot = partial_snapshot
+        partial_task = None
+        partial_snapshot = None
+        coalesced_due_count = 0
+        coalesced_base_total_bytes = 0
+        try:
+            payload = task.result()
+        except asyncio.CancelledError:
+            return False
+        except Exception as exc:
+            print(f"[Stream/Partial] inference failed: {exc}", flush=True)
+            return False
+
+        last_inferred_total_bytes = snapshot["total_audio_bytes"]
+        result = dict(payload["result"] or {})
+        window_text = result.get("text", "") or ""
+        current = transcript.update(snapshot["window_start_bytes"] // 32, window_text)
+        stable = common_prefix(last_text, current) if last_text else ""
+        revision = bool(last_text and not current.startswith(last_text))
+        last_text = current
+        result.update(
+            {
+                "event": "partial",
+                "text": current,
+                "stable_text": stable,
+                "unstable_text": current[len(stable):],
+                "revision": revision,
+                "audio_ms": snapshot["audio_ms"],
+                "window_start_ms": snapshot["window_start_bytes"] // (16 * 2),
+                "stream_window_ms": snapshot["window_ms"],
+                "stream_infer_ms": round(payload["infer_seconds"] * 1000.0, 1),
+                "stream_rtf": round(
+                    payload["infer_seconds"]
+                    / max(snapshot["window_ms"] / 1000.0, 0.001),
+                    3,
+                ),
+                "stream_lag_ms": round(payload["lag_ms"], 1),
+                "stream_snapshot": snapshot["sequence"],
+                "stream_assembly": "anchored-window-v2",
+                "stream_coalesced": coalesced_snapshots,
+            }
+        )
+        print(
+            f"[Stream/Timing] snapshot={snapshot['sequence']} "
+            f"audio={snapshot['audio_ms']}ms window={snapshot['window_ms']}ms "
+            f"infer={payload['infer_seconds']:.3f}s "
+            f"rtf={payload['infer_seconds'] / max(snapshot['window_ms'] / 1000.0, 0.001):.3f} "
+            f"lag={payload['lag_ms']:.0f}ms coalesced={coalesced_snapshots}",
+            flush=True,
+        )
+        await websocket.send_json(result)
+        return True
+
+    async def start_partial_if_due():
+        """Start at most one inference and always snapshot the newest audio."""
+        nonlocal partial_task, partial_snapshot, partial_sequence
+        nonlocal coalesced_snapshots, coalesced_due_count
+        nonlocal coalesced_base_total_bytes, partial_anchor_ms
+        if not started:
+            return
+        audio_ms = total_audio_bytes // (16 * 2)
+        new_audio_ms = (total_audio_bytes - last_inferred_total_bytes) // (16 * 2)
+        if audio_ms < min_audio_ms or new_audio_ms < partial_interval_ms:
+            return
+        if partial_task is not None:
+            # ``new_audio_ms`` is relative to the last *completed* inference;
+            # subtract the current snapshot as well, otherwise the interval that
+            # launched this task is counted as coalesced a second time.
+            in_flight_audio_ms = (
+                total_audio_bytes - coalesced_base_total_bytes
+            ) // (16 * 2)
+            due_count = max(0, in_flight_audio_ms // partial_interval_ms)
+            if due_count > coalesced_due_count:
+                coalesced_snapshots += due_count - coalesced_due_count
+                coalesced_due_count = due_count
+            return
+
+        partial_anchor_ms = next_window_start(audio_ms, len(audio) // 32,
+            partial_anchor_ms, last_inferred_total_bytes // 32, partial_window_ms)
+        partial_window_start_bytes = partial_anchor_ms * 32
+        window_bytes = min(len(audio), total_audio_bytes - partial_window_start_bytes)
+        if window_bytes <= 0:
+            return
+        window_ms = window_bytes // (16 * 2)
+        pcm = np.frombuffer(
+            bytes(audio[-window_bytes:]), dtype="<i2"
+        ).astype(np.float32) / 32768.0
+        partial_sequence += 1
+        snapshot = {
+            "sequence": partial_sequence,
+            "total_audio_bytes": total_audio_bytes,
+            "audio_ms": audio_ms,
+            "window_start_bytes": partial_window_start_bytes,
+            "window_ms": window_ms,
+            # Capture the session clock used for this snapshot.  A repeated
+            # start command must not retroactively change its lag measurement.
+            "started_at": stream_started_at,
+        }
+        partial_snapshot = snapshot
+        coalesced_due_count = 0
+        coalesced_base_total_bytes = total_audio_bytes
+        loop = asyncio.get_running_loop()
+
+        async def run_snapshot():
+            t0 = time.perf_counter()
+            result = await loop.run_in_executor(
+                None, recognize_stream_partial, pcm, language
+            )
+            infer_seconds = time.perf_counter() - t0
+            # Audio can arrive in a burst (for example after a short sender
+            # stall), which would otherwise make this wall-clock backlog
+            # negative.  A negative value is not meaningful as streaming lag.
+            lag_ms = max(
+                0.0,
+                (time.monotonic() - snapshot["started_at"]) * 1000.0
+                - snapshot["audio_ms"],
+            )
+            return {
+                "result": result,
+                "infer_seconds": infer_seconds,
+                "lag_ms": lag_ms,
+            }
+
+        partial_task = asyncio.create_task(run_snapshot())
 
     try:
         while True:
@@ -1049,15 +1430,33 @@ async def stream_asr(websocket: WebSocket):
                     min_audio_ms = max(
                         400, min(3000, int(command.get("min_audio_ms", 800)))
                     )
+                    partial_window_ms = max(
+                        3000, min(10000, int(command.get("partial_window_ms", 6000)))
+                    )
+                    stream_started_at = time.monotonic()
                     started = True
                     await websocket.send_json(
                         {
                             "event": "started",
                             "sample_rate": 16000,
                             "partial_interval_ms": partial_interval_ms,
+                            "partial_window_ms": partial_window_ms,
                         }
                     )
                 elif event in ("stop", "cancel"):
+                    # Tests and clients may send cancel immediately after their last
+                    # audio chunk.  Flush a short completed inference; a slow worker
+                    # is cancelled below and final /asr remains authoritative.
+                    if partial_task is not None and not partial_task.done():
+                        try:
+                            await asyncio.wait_for(
+                                asyncio.shield(partial_task), timeout=0.5
+                            )
+                        except asyncio.TimeoutError:
+                            partial_task.cancel()
+                        except asyncio.CancelledError:
+                            pass
+                    await finish_partial_if_ready()
                     await websocket.send_json({"event": "stopped"})
                     break
                 continue
@@ -1074,11 +1473,9 @@ async def stream_asr(websocket: WebSocket):
 
             max_bytes = max_audio_ms * 16 * 2
             overlap_bytes = overlap_audio_ms * 16 * 2
-            # Roll before adding the next frame.  last_text is the latest cumulative
-            # hypothesis, so it is safe to commit while the retained overlap gives
-            # the next window a chance to repair the boundary.
+            # Retention changes audio storage only. The transcript's current
+            # window remains replaceable until next_window_start changes its anchor.
             if len(audio) + len(chunk) > max_bytes:
-                committed_text = last_text or committed_text
                 keep = min(len(audio), overlap_bytes)
                 audio = bytearray(audio[-keep:]) if keep > 0 else bytearray()
                 window_start_bytes = max(0, total_audio_bytes - len(audio))
@@ -1086,43 +1483,18 @@ async def stream_asr(websocket: WebSocket):
                     f"[Stream/Roll] total={total_audio_bytes // (16 * 2)}ms "
                     f"window_start={window_start_bytes // (16 * 2)}ms "
                     f"overlap={len(audio) // (16 * 2)}ms "
-                    f"committed_chars={len(committed_text)}",
+                    f"partial_chars={len(transcript.text)}",
                     flush=True,
                 )
 
             audio.extend(chunk)
             total_audio_bytes += len(chunk)
 
-            audio_ms = total_audio_bytes // (16 * 2)
-            new_audio_ms = (total_audio_bytes - last_inferred_total_bytes) // (16 * 2)
-            if audio_ms < min_audio_ms or new_audio_ms < partial_interval_ms:
-                continue
-
-            # 在 worker 线程里跑模型，避免阻塞 FastAPI 的 websocket event loop。
-            pcm = np.frombuffer(bytes(audio), dtype="<i2").astype(np.float32) / 32768.0
-            loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(
-                None, recognize_stream_partial, pcm, language
-            )
-            last_inferred_total_bytes = total_audio_bytes
-
-            window_text = result.get("text", "") or ""
-            current = merge_streaming_transcripts(committed_text, window_text)
-            stable = common_prefix(last_text, current) if last_text else ""
-            revision = bool(last_text and not current.startswith(last_text))
-            last_text = current
-            result["text"] = current
-            result.update(
-                {
-                    "event": "partial",
-                    "stable_text": stable,
-                    "unstable_text": current[len(stable):],
-                    "revision": revision,
-                    "audio_ms": audio_ms,
-                    "window_start_ms": window_start_bytes // (16 * 2),
-                }
-            )
-            await websocket.send_json(result)
+            # Publish a completed result before scheduling the newest snapshot.  The
+            # receive loop never waits for model inference, so incoming audio cannot
+            # build an inference backlog.
+            await finish_partial_if_ready()
+            await start_partial_if_due()
     except WebSocketDisconnect:
         pass
     except Exception as exc:
@@ -1133,6 +1505,9 @@ async def stream_asr(websocket: WebSocket):
             await websocket.send_json({"event": "error", "error": str(exc)})
         except Exception:
             pass
+    finally:
+        if partial_task is not None and not partial_task.done():
+            partial_task.cancel()
 
 
 @app.get("/speakers")
@@ -1436,6 +1811,30 @@ async def vad(
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+def final_input_result(result: dict):
+    """The HTTP contract distinguishes acoustic rejection from processing error."""
+    result.setdefault("input_status", "no_speech" if result.get("no_speech") else "accepted")
+    result.setdefault("raw_vad_observed", "raw_vad_has_speech" in result)
+    result["input_error_code"] = ""
+    result["input_error_stage"] = ""
+    result["input_error_retryable"] = False
+    return result
+
+
+def failed_input_result(code: str, stage: str, error: str, status_code: int,
+                        retryable: bool = False):
+    # An empty text caused by a server/input error is not evidence of silence.
+    result = {
+        "text": "", "audio_event": "InputError", "no_speech": False,
+        "input_status": "error", "input_error_code": code,
+        "input_error_stage": stage, "input_error_retryable": bool(retryable),
+        "raw_vad_observed": False,
+        "error": str(error)[:512],
+    }
+    result.update(unknown_speaker_meta())
+    return JSONResponse(result, status_code=status_code)
+
+
 def empty_asr_result(reason: str, elapsed: float = 0.0):
     """Return a normal no-speech result for an audio boundary, not a server fault."""
     result = {
@@ -1450,7 +1849,7 @@ def empty_asr_result(reason: str, elapsed: float = 0.0):
         "no_speech_reason": reason,
     }
     result.update(unknown_speaker_meta())
-    return result
+    return final_input_result(result)
 
 
 def build_pitch_boundary_subsegments(
@@ -1758,7 +2157,7 @@ async def asr(
     speculative: bool = Form(False),
 ):
     if _model is None:
-        return JSONResponse({"error": "model not loaded"}, status_code=503)
+        return failed_input_result("asr_not_ready", "availability", "model not loaded", 503, True)
     data = await audio_file.read()
     submitted_at = time.perf_counter()
     # Direct Python callers (tests/tools) do not resolve FastAPI Form defaults.
@@ -1773,7 +2172,8 @@ async def asr(
 
 @app.post("/asr/cancel")
 async def cancel_asr(request_id: str = Form(...)):
-    return {"ok": True, "found": _final_asr_scheduler.cancel(request_id)}
+    boundary_found = _boundary_http_service.cancel(request_id)
+    return {"ok": True, "found": _final_asr_scheduler.cancel(request_id) or boundary_found}
 
 
 @app.post("/asr/promote")
@@ -1786,24 +2186,22 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
     """Authoritative complete analysis on the single final worker, not the event loop."""
     queue_wait = max(0.0, time.perf_counter() - submitted_at) if submitted_at is not None else 0.0
     timing = AsrTiming()
+    error_stage = "decode"
     try:
         if not data:
             return empty_asr_result("empty_upload")
         try:
             wav = decode_wav(data)
         except Exception as exc:
-            return JSONResponse(
-                {"error": f"invalid audio: {exc}"}, status_code=400
-            )
+            return failed_input_result("invalid_audio", "decode", f"invalid audio: {exc}", 400)
         if wav.size < 160:
             return empty_asr_result("empty_or_too_short_audio")
         if not np.isfinite(wav).all():
-            return JSONResponse(
-                {"error": "invalid audio: non-finite samples"}, status_code=400
-            )
+            return failed_input_result("invalid_audio", "decode", "invalid audio: non-finite samples", 400)
         raw_wav = wav
         timing.mark("decode")
 
+        error_stage = "vad"
         # 第二道保险：没有足够长的人声就不运行 SenseVoice，避免噪声幻听。
         # 纯哼唱可能被 speech-VAD 拒绝，所以并行的音高门可有条件放行。
         try:
@@ -1815,6 +2213,7 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
             raise
         timing.mark("vad")
         checkpoint()
+        error_stage = "quick_pitch"
         quick_singing = (
             _singing_analyzer.analyze(wav, thorough=False)
             if _singing_analyzer is not None
@@ -1852,7 +2251,7 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
             }
             result.update(singing_response_fields(quick_singing))
             result.update(unknown_speaker_meta())
-            return result
+            return final_input_result(result)
 
         # 像唱歌就给尾部留足余量。判据用 quick 探针的 tonal 或"本轮约好了跟唱"——
         # 两者都在 thorough 分析之前就有，而裁剪必须发生在分析之前。
@@ -1870,6 +2269,7 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
             print(f"[VAD] 歌声尾部余量 {singing_tail_margin}ms "
                   f"(tonal={is_tonal_vocal(quick_singing)} expect={expect_singing})")
 
+        error_stage = "speaker_identity"
         speaker_meta, speaker_dt, pending_embedding = identify_speaker(
             wav, speech_ms, learn=learn_speaker
         )
@@ -1895,11 +2295,18 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
                 "elapsed": round(vad_dt + speaker_dt, 3),
             }
             result.update(speaker_meta)
-            return result
+            return final_input_result(result)
 
+        error_stage = "recognizer"
         t0 = time.time()
         try:
-            res = generate_asr(wav, language)
+            res = generate_final_asr(
+                wav, language, quick_analysis=quick_singing,
+                raw_duration=raw_wav.size / 16000.0,
+                vad_has_speech=raw_vad_has_speech, vad_segments=segments,
+                content_start_seconds=audio_content_start_seconds,
+                expect_singing=expect_singing,
+                singing_vad_override=singing_vad_override)
         except RuntimeError as exc:
             if is_empty_tensor_list_error(exc):
                 print(f"[ASR] empty tensor boundary in recognizer: {exc}")
@@ -1924,6 +2331,7 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
         # 'Da.' 'The.' 这类哼唱残片全拦了，角色对哼曲子不再有反应)。
         # is_tonal_vocal 就是为"放行哼唱、挡住噪音"设计的。闸门本身在下面——必须等
         # thorough 分析出来才判，见那里的注释。
+        error_stage = "full_pitch"
         singing = (
             _singing_analyzer.analyze(
                 wav,
@@ -1956,6 +2364,39 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
         # thorough 的分离度很干净: 真人 med 125~154Hz / voiced 0.54~0.69；
         # 噪音 med 58~59Hz / voiced 0.05~0.24——voiced 一项就已低于 0.34 的门槛。
         tonal = is_tonal_vocal(singing)
+        if retain_tonal_evidence_only(text, emotion, speaker_meta, raw_vad_has_speech,
+                                      singing, expect_singing, singing_vad_override):
+            # Keep the complete audio and measured time base. No text/identity
+            # learning or segmented recognizer speculation may promote this
+            # candidate to a confirmed new user turn.
+            result = {
+                "text": "", "language": lang, "emotion": emotion,
+                "audio_event": audio_event, "no_speech": False,
+                "input_status": "evidence_only",
+                "input_evidence_reason": "weak-tonal-without-speech",
+                "input_evidence_text": text,
+                "raw_vad_has_speech": bool(raw_vad_has_speech),
+                "raw_vad_speech_ms": int(raw_vad_speech_ms), "speech_ms": speech_ms,
+                "vad_elapsed": round(vad_dt, 3), "speaker_elapsed": round(speaker_dt, 3),
+                "elapsed": round(vad_dt + speaker_dt + dt, 3),
+                "audio_content_start_seconds": round(audio_content_start_seconds, 3),
+                "singing_expected": bool(expect_singing), "singing_expected_override": False,
+            }
+            result.update(singing_response_fields(singing))
+            result.update(speaker_meta)
+            result["speaker_learning_allowed"] = False
+            try:
+                dump_mixed_sample(raw_wav, wav, result,
+                                  os.path.join(os.path.dirname(__file__), "mixed_dumps"))
+            except Exception as exc:
+                print(f"[ASR/MixedDump] evidence snapshot failed: {exc}", flush=True)
+            dump_band_sample(wav, singing, result, text, expect_singing)
+            result["timings"] = timing.finish()
+            result["timings"]["queue_wait"] = round(queue_wait, 4)
+            result["timing_schema"] = 1
+            print("[ASR] retained evidence only: weak-tonal-without-speech "
+                  f"characters={len(text)} strong_performance=False", flush=True)
+            return final_input_result(result)
         if (not expect_singing and not tonal
                 and _is_hallucinated_transcript(text, emotion, speaker_meta)):
             print(
@@ -1985,15 +2426,20 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
             # 声纹库。机器嗡鸣的"声纹"比真人还稳定，学进去反而比真人更快累积注册进度。
             result.update(singing_response_fields(singing))
             result.update(unknown_speaker_meta())
-            return result
+            if speaker_meta.get("speaker_status") == "error":
+                result.update(speaker_status="error", speaker_voiceprint_status="error",
+                              speaker_error_code=speaker_meta.get("speaker_error_code", ""))
+            return final_input_result(result)
 
         # 闸门放行了，这段音频才算真话，现在才写进声纹库。
+        error_stage = "speaker_learning"
         speaker_meta = commit_speaker_learning(pending_embedding, speech_ms, speaker_meta)
 
         # Keep the full-turn score even if armed sing-along recovery later
         # chooses a tail-only acoustic classifier. Unity crops scores in the
         # full post-VAD time base; a tail-relative score would otherwise lose
         # the opening notes a second time.
+        error_stage = "singing_analysis"
         full_turn_singing_score = (singing or {}).get("singing_score")
         full_turn_score_window_offset = float(
             (singing or {}).get("analysis_window_offset_seconds", 0.0) or 0.0
@@ -2089,6 +2535,8 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
             "emotion": emotion,
             "audio_event": audio_event,
             "no_speech": False,
+            "raw_vad_has_speech": bool(raw_vad_has_speech),
+            "raw_vad_speech_ms": int(raw_vad_speech_ms),
             "speech_ms": speech_ms,
             "vad_elapsed": round(vad_dt, 3),
             "speaker_elapsed": round(speaker_dt, 3),
@@ -2101,6 +2549,26 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
         acoustic_segment_candidate = bool(
             singing and is_expected_singing_performance(singing)
         )
+        # Ordinary speech should use the whole-turn ASR result directly.  The
+        # segmented path is expensive: for long audio it schedules several
+        # additional recognizer passes (core and boundary-overlap windows),
+        # even when the acoustic result is clearly speech.  Keep the complete
+        # path for explicit sing-along requests and for either confirmed or
+        # strong candidate singing evidence.
+        run_segmented_analysis = bool(
+            expect_singing or
+            acoustic_segment_candidate or
+            singing_vad_override or
+            bool((singing or {}).get("is_singing", False))
+        )
+        print(
+            f"[ASR/Segments] mode={'enabled' if run_segmented_analysis else 'skipped'} "
+            f"reason={'singing-evidence' if run_segmented_analysis else 'ordinary-speech'} "
+            f"expect_sing={expect_singing} acoustic_candidate={acoustic_segment_candidate} "
+            f"is_singing={bool((singing or {}).get('is_singing', False))} "
+            f"vad_override={singing_vad_override}",
+            flush=True,
+        )
         # The whole pass remains an acoustic-analysis hint and a fallback. Final
         # semantics are decoded independently per time span, including margins
         # outside expanded, even when the whole-turn acoustic label is speech.
@@ -2110,8 +2578,13 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
             parsed = parse_output(recognized[0]["text"] if recognized else "")
             return dict(text=parsed[0], language=parsed[1], audio_event=parsed[3])
 
-        mixed = transcribe_segments(wav, singing, recognize_piece, text)
+        error_stage = "segment_asr"
+        mixed = (
+            transcribe_segments(wav, singing, recognize_piece, text)
+            if run_segmented_analysis else {}
+        )
         result.update(mixed)
+        segment_lyrics = {"text": "", "language": ""}
         if mixed:
             island_parts = [s for s in mixed["turn_segments"] if (acoustic_segment_candidate or singing.get("is_singing")) and s["region"] == "island"
                             and s["start_seconds"] >= float(singing.get("singing_start_seconds", 0)) - .001
@@ -2129,7 +2602,7 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
                     wav, singing, text, language,
                     allow_acoustic_candidate=acoustic_segment_candidate)
             print("[ASR/Segments] " + json.dumps(mixed, ensure_ascii=False), flush=True)
-        else:
+        elif run_segmented_analysis:
             segment_lyrics = transcribe_singing_segment(
                 wav,
                 singing,
@@ -2150,9 +2623,10 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
         )
         result["singing_lyrics_mora"] = segment_lyrics.get("lyrics_mora", []) or []
         timing.mark("segment_asr")
+        error_stage = "boundary_asr"
         boundary_facts = analyze_singing_boundary_extras(
             wav,
-            singing,
+            singing if run_segmented_analysis else None,
             language,
             allow_acoustic_candidate=acoustic_segment_candidate,
         )
@@ -2170,12 +2644,15 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
         elif (boundary_facts.get("singing_tail_extra_asr_available") and
                 abs(tail_extra_end - wav.size / 16000.0) <= 0.05):
             result["singing_tail_text"] = boundary_facts["singing_tail_extra_text"]
-        else:
+        elif run_segmented_analysis:
             result["singing_tail_text"] = transcribe_singing_tail(
                 wav, singing, language
             )
+        else:
+            result["singing_tail_text"] = ""
         timing.mark("tail_asr")
         #分段歌词比整轮文本更贴近真正唱的内容，优先拿它去回忆
+        error_stage = "song_recall"
         result["song_recall"] = build_song_recall(
             singing, result.get("singing_text") or text
         )
@@ -2191,12 +2668,13 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
                               os.path.join(os.path.dirname(__file__), "mixed_dumps"))
         except Exception as exc:
             print(f"[ASR/MixedDump] snapshot failed: {exc}", flush=True)
+        error_stage = "diagnostic_dump"
         dump_band_sample(wav, singing, result, text, expect_singing)
         timing.mark("dump")
         result["timings"] = timing.finish()
         result["timings"]["queue_wait"] = round(queue_wait, 4)
         result["timing_schema"] = 1
-        return result
+        return final_input_result(result)
     except Exception as e:
         # FunASR/PyTorch occasionally reaches an empty internal segment after the
         # upload and VAD checks. Treat that known boundary as normal silence even
@@ -2208,11 +2686,23 @@ def recognize_final_audio(data: bytes, language="auto", learn_speaker=True,
         import traceback
 
         traceback.print_exc()
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return failed_input_result("asr_pipeline_failed", error_stage, str(e), 500,
+                                   isinstance(e, (RuntimeError, OSError, TimeoutError)))
     finally:
         phases = timing.finish()
         phases["queue_wait"] = round(queue_wait, 4)
         print("[ASR/Timing] " + json.dumps(phases, ensure_ascii=False), flush=True)
+
+
+def _recognize_boundary_piece(piece, language):
+    checkpoint()
+    recognized = generate_asr(piece, language)
+    parsed = parse_output(recognized[0]["text"] if recognized else "")
+    return dict(text=parsed[0], language=parsed[1], audio_event=parsed[3])
+
+
+_boundary_http_service = install_boundary_routes(
+    app, decode_wav, _recognize_boundary_piece, _final_asr_scheduler, lambda: _model is not None)
 
 
 # ------------------------------ 歌曲检索 ------------------------------
@@ -2639,6 +3129,10 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=9881)
     parser.add_argument(
+        "--require-cuda", action="store_true",
+        help="请求 ASR CUDA 时，CUDA 不可用或模型实际未使用 CUDA 则启动失败；显式 --device cpu 不受影响",
+    )
+    parser.add_argument(
         "--device",
         default="cuda:0",
         help="推理设备: cuda:0 / cuda:1 / cpu",
@@ -2701,6 +3195,7 @@ def main():
         pitch_device=args.pitch_device,
         enable_torchcrepe=not args.disable_torchcrepe,
         song_catalog_path=args.song_catalog_path,
+        require_cuda=args.require_cuda,
     )
     print(f"[SenseVoice] 监听 http://{args.host}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")

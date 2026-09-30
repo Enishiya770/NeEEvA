@@ -25,6 +25,7 @@ public static class NevaSceneAttentionRegression
         public bool smoothEntryObserved, smoothReturnObserved, animatorAdvanced, headPoseUnchangedAfterArdyYield;
         public float directedViewChangeDegrees;
         public bool retainedViewObserved, relativeViewAccepted;
+        public bool persistentHeldBeyondTwentySeconds, persistentYieldedToBody;
     }
     private sealed class Saved
     {
@@ -44,7 +45,7 @@ public static class NevaSceneAttentionRegression
     private static Vector3 rootPosition;
     private static Quaternion rootRotation;
     private static Vector3 firstPoint;
-    private static float phaseAt, returnFromAngle, animatorStart;
+    private static float phaseAt, returnFromAngle, animatorStart, nextPersistentRenewal;
     private static int phase, lastFrame;
 
     static NevaSceneAttentionRegression()
@@ -53,7 +54,7 @@ public static class NevaSceneAttentionRegression
         EditorApplication.playModeStateChanged += state => {
             if (!SessionState.GetBool(Key + "Active", false)) return;
             if (state == PlayModeStateChange.EnteredPlayMode)
-                try { Initialize(); } catch (Exception e) { Finish(e); }
+                InitializeFixture();
             if (state == PlayModeStateChange.EnteredEditMode && SessionState.GetBool(Key + "Finished", false)) Exit();
         };
         EditorApplication.delayCall += () => {
@@ -71,13 +72,39 @@ public static class NevaSceneAttentionRegression
             foreach (var setup in EditorSceneManager.GetSceneManagerSetup())
                 if (!string.IsNullOrEmpty(setup.path) && SceneManager.GetSceneByPath(setup.path).isDirty)
                     throw new InvalidOperationException("Refusing to replace a dirty saved scene.");
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            SessionState.SetBool(Key + "Active", true); SessionState.SetBool(Key + "Finished", false);
+            SessionState.SetFloat(Key + "Deadline", (float)EditorApplication.timeSinceStartup + 100);
+            EditorApplication.isPlaying = true;
+        }
+        catch (Exception e) { Finish(e); }
+    }
+
+    private static async void InitializeFixture()
+    {
+        try
+        {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Model/NeEEvA.vrm");
-            if (prefab == null) throw new InvalidOperationException("The actual imported NeEEvA VRM is missing.");
-            var actor = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene); actor.name = Actor;
+            GameObject actor;
+            if (prefab != null) actor = UnityEngine.Object.Instantiate(prefab);
+            else
+            {
+                // The isolated DLL fixture has runtime VRM importers but no editor
+                // asset importer. Load the exact source avatar in Play in that case.
+                string avatarPath = Path.GetFullPath(Path.Combine(Application.dataPath, "../../../../Assets/Model/NeEEvA.vrm"));
+                if (!File.Exists(avatarPath)) throw new InvalidOperationException("The actual source NeEEvA VRM is missing.");
+                var imported = await Vrm10.LoadPathAsync(avatarPath, controlRigGenerationOption: ControlRigGenerationOption.None, showMeshes: true);
+                if (imported == null) throw new InvalidOperationException("The actual VRM runtime importer returned no avatar.");
+                actor = imported.gameObject;
+            }
+            actor.name = Actor;
             actor.transform.SetPositionAndRotation(new Vector3(2, .3f, -1), Quaternion.Euler(0, 37, 0));
             foreach (var component in actor.GetComponentsInChildren<Behaviour>(true)) component.enabled = false;
             var vrm = actor.GetComponentInChildren<Vrm10Instance>(true);
+            // Runtime import registers secondary hair physics in a global job
+            // service even when the VRM component is disabled. This static-rig
+            // isolation check disables that independent writer in its own avatar.
+            vrm.Runtime.SpringBone.Dispose();
             var eyes = vrm.GetComponent<NevaEyeTracking>() ?? vrm.gameObject.AddComponent<NevaEyeTracking>();
             eyes.Configure(vrm); eyes.enabled = true;
             var source = vrm.GetComponent<NevaSceneVisionCapture>() ?? vrm.gameObject.AddComponent<NevaSceneVisionCapture>();
@@ -90,9 +117,11 @@ public static class NevaSceneAttentionRegression
             var idle = vrm.GetComponent<Animator>();
             idle.runtimeAnimatorController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/AIChatTookit/Animation/Animator Controller.controller");
             idle.applyRootMotion = false; idle.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-            SessionState.SetBool(Key + "Active", true); SessionState.SetBool(Key + "Finished", false);
-            SessionState.SetFloat(Key + "Deadline", (float)EditorApplication.timeSinceStartup + 50);
-            EditorApplication.isPlaying = true;
+            // Runtime import and assigning a controller can finish initialization
+            // at a player-loop boundary even with subsequent animation disabled.
+            await System.Threading.Tasks.Task.Yield();
+            await System.Threading.Tasks.Task.Yield();
+            Initialize();
         }
         catch (Exception e) { Finish(e); }
     }
@@ -132,7 +161,7 @@ public static class NevaSceneAttentionRegression
             if (!EditorApplication.isPlaying || attention == null || lastFrame == Time.frameCount) return;
             lastFrame = Time.frameCount;
             float elapsed = Time.realtimeSinceStartup - phaseAt;
-            if (elapsed > 7f) throw new TimeoutException("Attention phase " + phase + " did not complete: " + attention.State + " / " + attention.Status);
+            if (elapsed > (phase == 24 ? 24f : 7f)) throw new TimeoutException("Attention phase " + phase + " did not complete: " + attention.State + " / " + attention.Status);
             float angle = Quaternion.Angle(neutralHead, tracking.Head.localRotation);
             if (phase <= 2)
             {
@@ -187,8 +216,24 @@ public static class NevaSceneAttentionRegression
             {
                 report.retainedViewObserved = attention.IsSettled && attention.OwnerId == "explore-right-up" && Quaternion.Angle(rootRotation, tracking.HeadFrameRotation) > 20;
                 Require(report.retainedViewObserved, "Changed view remains physically held for the following decision.");
+                Require(attention.RetainPersistentView("explore-right-up") && !attention.RetainPersistentView("obsolete"),
+                    "Persistent retention requires the settled current owner and rejects a late old verifier.");
+                phase = 24; phaseAt = Time.realtimeSinceStartup; nextPersistentRenewal = phaseAt + 2f;
+            }
+            else if (phase == 24)
+            {
+                Require(attention.IsPersistent && attention.IsSettled && attention.OwnerId == "explore-right-up",
+                    "Persistent stationary pose remains physically held between bounded verification leases.");
+                if (Time.realtimeSinceStartup >= nextPersistentRenewal)
+                {
+                    Require(attention.RetainPersistentView("explore-right-up"), "Fresh-verifier lease can renew without restarting or snapping head.");
+                    nextPersistentRenewal = Time.realtimeSinceStartup + 2f;
+                }
+                if (elapsed < 21f) return;
+                report.persistentHeldBeyondTwentySeconds = attention.IsSettled && attention.IsPersistent && Quaternion.Angle(rootRotation, tracking.HeadFrameRotation) > 20;
+                Require(report.persistentHeldBeyondTwentySeconds, "Actual persistent head pose survives the former twenty-second expiry.");
                 report.relativeViewAccepted = attention.TryOrientView("explore-relative-left", -15, 0, out string reason);
-                Require(report.relativeViewAccepted && !attention.Release("explore-right-up"), "A relative new exploration replaces its exact predecessor, without stale cancellation: " + reason);
+                Require(report.relativeViewAccepted && !attention.IsPersistent && !attention.Release("explore-right-up"), "A relative new exploration replaces its exact predecessor, without stale cancellation: " + reason);
                 phase = 22; phaseAt = Time.realtimeSinceStartup;
             }
             else if (phase == 22 && attention.IsSettled)
@@ -215,13 +260,15 @@ public static class NevaSceneAttentionRegression
                 report.animatorAdvanced = animator.GetCurrentAnimatorStateInfo(0).normalizedTime > animatorStart;
                 report.animatorSettledErrorDegrees = attention.AngularErrorDegrees;
                 Require(report.animatorAdvanced && attention.AngularErrorDegrees <= 2.1f, "Idle keeps advancing while actual head settles; no accumulated offsets.");
+                Require(attention.RetainPersistentView("animated"), "Persistent pose may coexist with an advancing normal idle baseline.");
                 player = tracking.Target.gameObject.AddComponent<ArdyMotionPlayer>(); player.Bind(tracking.Target);
                 var nod = Resources.Load<TextAsset>("ARDY/nod"); Require(nod != null, "Actual cached ARDY nod exists.");
                 player.Play(nod, ArdyMotionMask.Head); player.Tick(.1f);
                 Quaternion ardyPose = tracking.Head.localRotation;
                 typeof(NevaSceneAttention).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(attention, null);
                 report.headPoseUnchangedAfterArdyYield = Quaternion.Angle(ardyPose, tracking.Head.localRotation) < .01f;
-                Require(attention.State == "yielded" && tracking.AttentionOwnerId == null && report.headPoseUnchangedAfterArdyYield,
+                report.persistentYieldedToBody = !attention.IsPersistent;
+                Require(attention.State == "yielded" && tracking.AttentionOwnerId == null && report.headPoseUnchangedAfterArdyYield && report.persistentYieldedToBody,
                     "Incoming actual ARDY head motion owns its applied pose; attention yields without overwriting it.");
                 Require(!attention.TryLookAt("blocked", Point(10, 0), out _), "New attention cannot acquire during actual ARDY playback.");
                 player.enabled = false;
@@ -253,14 +300,17 @@ public static class NevaSceneAttentionRegression
     private static void CheckUntouched()
     {
         bool valid = true;
+        var changed = new List<string>();
         foreach (var value in saved)
         {
             var bone = value.transform;
             if (bone == tracking.Head || bone == tracking.LeftEye || bone == tracking.RightEye) continue;
-            valid &= Vector3.Distance(bone.localPosition, value.position) < .00001f && Quaternion.Angle(bone.localRotation, value.rotation) < .05f &&
+            bool unchanged = Vector3.Distance(bone.localPosition, value.position) < .00001f && Quaternion.Angle(bone.localRotation, value.rotation) < .05f &&
                 Vector3.Distance(bone.localScale, value.scale) < .00001f;
+            valid &= unchanged;
+            if (!unchanged) changed.Add(bone.name + " position=" + Vector3.Distance(bone.localPosition, value.position) + " angle=" + Quaternion.Angle(bone.localRotation, value.rotation));
         }
-        Require(valid, "All non-head/eye local transforms unchanged during static attention.");
+        Require(valid, "All non-head/eye local transforms unchanged during static attention. " + string.Join("; ", changed));
         Require(Vector3.Distance(tracking.Target.transform.position, rootPosition) < .00001f && Quaternion.Angle(tracking.Target.transform.rotation, rootRotation) < .01f,
             "Attention never translates or rotates character root.");
     }

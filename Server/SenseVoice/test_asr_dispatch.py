@@ -59,6 +59,18 @@ class AsrDispatchTests(unittest.IsolatedAsyncioTestCase):
                 release.set()
                 self.assertEqual((await final)["text"], "final")
 
+    async def test_long_stream_survives_retained_audio_roll(self):
+        socket = Socket()
+        socket.messages = iter([{"text": '{"event":"start"}'}] +
+            [{"bytes": bytes(64000)} for _ in range(21)] +
+            [{"text": '{"event":"cancel"}'}])
+        with patch.object(server, "_model", object()), patch.object(server,
+                "recognize_stream_partial", return_value={"text": "窗口修订"}):
+            await asyncio.wait_for(server.stream_asr(socket), 2)
+        self.assertFalse(any(r.get("event") == "error" for r in socket.results), socket.results)
+        self.assertEqual(socket.results[-1]["event"], "stopped")
+        self.assertTrue(any(r.get("stream_assembly") == "anchored-window-v2" for r in socket.results))
+
     async def test_final_requests_remain_serialized_and_errors_do_not_lock_worker(self):
         active = 0
         peak = 0

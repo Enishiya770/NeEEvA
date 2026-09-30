@@ -162,7 +162,17 @@ class MixedTurnTests(unittest.TestCase):
 
     def test_final_api_promotes_segments_and_preserves_speech_verdict(self):
         import sensevoice_server as server
-        analysis = dict(self.analysis, singing_probability=.42, pitch_stability=.7)
+        analysis = dict(
+            self.analysis,
+            duration=20,
+            singing_probability=.42,
+            pitch_stability=.7,
+            periodicity_mean=.72,
+            voiced_ratio=.5,
+            sustained_ratio=.3,
+            pitch_timeline_midi=[60] * 40,
+            pitch_timeline_frame_seconds=.1,
+        )
         def generate(piece, language):
             if len(piece) == len(self.wav):
                 return [{"text": "<|zh|><|NEUTRAL|><|Speech|>我继续唱轮"}]
@@ -188,6 +198,41 @@ class MixedTurnTests(unittest.TestCase):
         self.assertEqual(result["audio_content_start_seconds"], .25)
         self.assertEqual(result["turn_segments_schema"], 1)
         self.assertIs(dump.call_args.args[0], self.wav)
+
+    def test_plain_speech_skips_segmented_asr_passes(self):
+        import sensevoice_server as server
+        analysis = dict(
+            self.analysis,
+            duration=20,
+            singing_probability=.22,
+            pitch_stability=.35,
+            periodicity_mean=.42,
+            voiced_ratio=.3,
+            sustained_ratio=.05,
+            pitch_timeline_midi=[],
+            pitch_timeline_frame_seconds=.1,
+        )
+        calls = []
+
+        def generate(piece, language):
+            calls.append((len(piece), language))
+            return [{"text": "<|zh|><|NEUTRAL|><|Speech|>这是一整轮普通语音"}]
+
+        with patch.object(server, "decode_wav", return_value=self.wav), \
+             patch.object(server, "run_vad", return_value=(True, 19000, [[0, 20000]], 0)), \
+             patch.object(server, "trim_to_speech_with_offset", return_value=(self.wav, .25)), \
+             patch.object(server, "identify_speaker", return_value=({}, 0, None)), \
+             patch.object(server, "commit_speaker_learning", return_value={}), \
+             patch.object(server, "_singing_analyzer", SimpleNamespace(analyze=lambda *a, **k: dict(analysis))), \
+             patch.object(server, "generate_asr", side_effect=generate), \
+             patch.object(server, "dump_band_sample"), \
+             patch.object(server, "dump_mixed_sample"):
+            result = server.recognize_final_audio(b"wav", language="zh", learn_speaker=False)
+
+        self.assertEqual(calls, [(len(self.wav), "zh")])
+        self.assertNotIn("turn_segments_schema", result)
+        self.assertEqual(result["singing_text"], "")
+        self.assertEqual(result["singing_tail_text"], "")
 
 
 if __name__ == "__main__":

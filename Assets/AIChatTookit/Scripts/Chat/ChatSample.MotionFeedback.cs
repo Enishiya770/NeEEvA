@@ -195,7 +195,7 @@ public partial class ChatSample
         if (record.intent.ResponseGeneration != m_FormalResponseGeneration || record.speechRound != m_CurrentSpeechRoundId) return;
         m_MotionRejectedGeneration = m_FormalResponseGeneration;
         m_MotionRejectedSpeechRound = record.speechRound;
-        DiscardPendingSpeechForRound(record.speechRound);
+        DiscardPendingSpeechForRound(record.speechRound, "motion_rejected");
         m_SentenceBuffer.Length = 0;
     }
 

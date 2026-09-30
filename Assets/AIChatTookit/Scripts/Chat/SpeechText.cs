@@ -17,7 +17,8 @@ public readonly struct SpeechText
         "只有汉字的短句也必须声明；‘只说某几个字’限制的是可见台词，内部标记仍需提供。" +
         "心里话和工具按原规则处理。\n" +
         "正文前声明一次发声阶段：<speech mode=\"independent\"/> 表示台词不依赖本轮待验证的演唱、素材动作或歌唱权限提案，普通闲聊选它并直接发声；" +
-        "本轮提交演唱、素材变更、singing_policy 提案或承诺其执行时，改用 <speech mode=\"after_action\"/>，台词等待真实动作校验。" +
+        "只有本条实际提交sing_goal、演唱、素材变更或singing_policy提案时才用 <speech mode=\"after_action\"/>，台词等待真实动作校验。" +
+        "仅song_search/song_catalog查询、澄清或等待结果时用independent；按实际查询状态说话，不承诺已经开始演唱。口头承诺本身不能代替动作或构成after_action。" +
         "after_action 用于演唱、素材及 singing_policy 独立校验；只有房间移动或上身 motion 时使用 independent，执行结果另读身体程序事实。" +
         "阶段在正文之前确定，不能中途切换；independent 本轮不能再提交演唱、素材变更或 singing_policy 标签。" +
         "阶段按整条回复实际提交的动作选择，不按say是否只是简短应答来选：只要本条含sing_goal或sing，必须从开头使用after_action；" +
@@ -27,14 +28,19 @@ public readonly struct SpeechText
     public readonly string LanguageCode;
     public readonly string LanguageSource;
     public readonly SpeechActionDependency ActionDependency;
+    // Internal role thought is a speech-shaped segment that is intentionally
+    // silent. It remains observable but must never enter a TTS request.
+    public readonly bool SuppressTts;
 
     public SpeechText(string text, string languageCode = null, string languageSource = null,
-        SpeechActionDependency actionDependency = SpeechActionDependency.Unspecified)
+        SpeechActionDependency actionDependency = SpeechActionDependency.Unspecified,
+        bool suppressTts = false)
     {
         Text = text ?? "";
         LanguageCode = NormalizeLanguage(languageCode);
         LanguageSource = languageSource ?? (LanguageCode == null ? "auto-fallback" : "declared");
         ActionDependency = actionDependency;
+        SuppressTts = suppressTts;
     }
 
     public static string NormalizeLanguage(string code)
@@ -59,6 +65,7 @@ public sealed class SpeechTextBuffer
     {
         public string Language;
         public SpeechActionDependency Dependency;
+        public bool SuppressTts;
         public int Length;
     }
 
@@ -86,9 +93,11 @@ public sealed class SpeechTextBuffer
         if (string.IsNullOrEmpty(value.Text)) return;
         text.Append(value.Text);
         if (runs.Count > 0 && runs[runs.Count - 1].Language == value.LanguageCode &&
-            runs[runs.Count - 1].Dependency == value.ActionDependency)
+            runs[runs.Count - 1].Dependency == value.ActionDependency &&
+            runs[runs.Count - 1].SuppressTts == value.SuppressTts)
             runs[runs.Count - 1].Length += value.Text.Length;
-        else runs.Add(new Run { Language = value.LanguageCode, Dependency = value.ActionDependency, Length = value.Text.Length });
+        else runs.Add(new Run { Language = value.LanguageCode, Dependency = value.ActionDependency,
+            SuppressTts = value.SuppressTts, Length = value.Text.Length });
     }
 
     public void Remove(int start, int count)
@@ -115,7 +124,7 @@ public sealed class SpeechTextBuffer
         foreach (Run run in runs)
         {
             result.Add(new SpeechText(text.ToString(at, run.Length), run.Language,
-                actionDependency: run.Dependency));
+                actionDependency: run.Dependency, suppressTts: run.SuppressTts));
             at += run.Length;
         }
         return result;

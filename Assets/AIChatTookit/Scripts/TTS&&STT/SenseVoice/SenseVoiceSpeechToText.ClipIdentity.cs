@@ -28,6 +28,8 @@ public partial class SenseVoiceSpeechToText
             prefixSeconds <= 0f || float.IsNaN(prefixSeconds) || float.IsInfinity(prefixSeconds)) return;
         m_CaptureOverlaps[m_LiveRecordingCandidateSessionSerial] = new CaptureOverlap {
             EarlierSession = earlierSession, PrefixSeconds = prefixSeconds };
+        m_RecordingPcmLineage.Bind(m_LiveRecordingCandidateSessionSerial, earlierSession, prefixSeconds);
+        m_ContinuationIsolation.Bind(m_LiveRecordingCandidateSessionSerial, earlierSession, prefixSeconds);
     }
 
     private void EnsureClipIdentity(PracticePhrase phrase)

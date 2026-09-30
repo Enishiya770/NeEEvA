@@ -713,6 +713,12 @@ public sealed class SubtitleOverlay : MonoBehaviour
         string code, string fallback, SubtitleLanguage language)
     {
         string key = (code ?? "").Trim().ToLowerInvariant();
+        if (key == "recording_decision_exhausted")
+            return language == SubtitleLanguage.Japanese
+                ? "歌い返しの提案を確認できず、音声変換も再生もまだ開始していません。もう一度お試しください。歌唱禁止や音声サービスの故障を示すものではありません。"
+                : language == SubtitleLanguage.English
+                    ? "The singing proposal could not be validated. Voice conversion and playback have not started. Please try again; this does not indicate a singing ban or a voice-service failure."
+                    : fallback;
         if (language == SubtitleLanguage.English)
         {
             if (key == "tool_correction_exhausted") return "The requested action could not be completed. Please try again.";

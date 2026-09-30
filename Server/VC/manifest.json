@@ -1,0 +1,375 @@
+{
+  "version": 1,
+  "release_sha256": "a27dc2a78d608a0ff66a4dd0e727bd1140add8f12e92316b8c7494d7000329c9",
+  "file_count": 73,
+  "total_bytes": 552938467,
+  "backend": "rvc-character-v2",
+  "source_policy": "Current local vendor and exact trained model; no upstream upgrade",
+  "files": [
+    {
+      "path": "RVC/hubert_compat.py",
+      "bytes": 3716,
+      "sha256": "1b3322f8664d2d5759308c80cd3cfa729c2cf14c66e89b41cde78103594c7e49"
+    },
+    {
+      "path": "RVC/models/neeeva_character.index",
+      "bytes": 125294539,
+      "sha256": "0c25921e295e023f3dc2728395ba46396ba0f12a6a8bbfc34f25094154f16767"
+    },
+    {
+      "path": "RVC/models/neeeva_character.json",
+      "bytes": 227,
+      "sha256": "66ca838afc2d56c2b0d965dbf7316216183d39c2988e18b1e713c885e16521a7"
+    },
+    {
+      "path": "RVC/models/neeeva_character.pth",
+      "bytes": 56274284,
+      "sha256": "1f00fd0a90bbd788f11bf514b845dc80061c191fd65c91b5202caf7dc4c83768"
+    },
+    {
+      "path": "RVC/rvc_convert.py",
+      "bytes": 16754,
+      "sha256": "311fa4be8629b3284d1d2e82e4664d71d64165f0dd3306df9129ad363bd8bd73"
+    },
+    {
+      "path": "RVC/vendor/rvc/assets/hubert_base/config.json",
+      "bytes": 1492,
+      "sha256": "0346950779dfb7f9316fa74ed846e2b8a22a08eedfdc5387b73f327cb1a4a7cf"
+    },
+    {
+      "path": "RVC/vendor/rvc/assets/hubert_base/preprocessor_config.json",
+      "bytes": 225,
+      "sha256": "7c1976a680fb7acc757cd36fb08eef878fa36c70b4c9d2d595df9c608bbbbf0e"
+    },
+    {
+      "path": "RVC/vendor/rvc/assets/hubert_base/pytorch_model.bin",
+      "bytes": 189206711,
+      "sha256": "cc8c20f4b90a520757260197a3ff2505705a7adbd20ad9eeaa4e1a9b38442ef5"
+    },
+    {
+      "path": "RVC/vendor/rvc/assets/rmvpe/rmvpe.pt",
+      "bytes": 181184272,
+      "sha256": "6d62215f4306e3ca278246188607209f09af3dc77ed4232efdd069798c4ec193"
+    },
+    {
+      "path": "RVC/vendor/rvc/configs/config.json",
+      "bytes": 420,
+      "sha256": "fb622a8ecb6415ccbe8f96604fd611d826640b7035bc20cc6cb4d75f24d6d9cb"
+    },
+    {
+      "path": "RVC/vendor/rvc/configs/config.py",
+      "bytes": 9008,
+      "sha256": "7a27b819ecb4491d117eb7c0a7037cd6ad832e9b615e9de554df7143d267cbc1"
+    },
+    {
+      "path": "RVC/vendor/rvc/configs/v1/32k.json",
+      "bytes": 1071,
+      "sha256": "5a862d2ad474a0ff5c218630cc1b61fd85479a8b3938e73dff94d8b2380749da"
+    },
+    {
+      "path": "RVC/vendor/rvc/configs/v1/40k.json",
+      "bytes": 1069,
+      "sha256": "ca4055cf8875b9f34d293e33179bd548b828eeac2b39376752b62deb2398f66d"
+    },
+    {
+      "path": "RVC/vendor/rvc/configs/v1/48k.json",
+      "bytes": 1072,
+      "sha256": "f8ea51151a5827f8e6206a11e1db44cb79a349f4bb5f64a2afcfce075adc4c69"
+    },
+    {
+      "path": "RVC/vendor/rvc/configs/v2/32k.json",
+      "bytes": 1067,
+      "sha256": "aeffdbc3e06a08f1af828cd910fdaf6c0c5f35808b14c2eea3edc732958829c3"
+    },
+    {
+      "path": "RVC/vendor/rvc/configs/v2/48k.json",
+      "bytes": 1069,
+      "sha256": "c9b8aebbc3306130a00c65c7184809482c25943018e59df15e442e3fd94c9e14"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/i18n.py",
+      "bytes": 780,
+      "sha256": "a3cbfadfe4a5ca30da83acf92fe94d42fbe5654a8f6e9329152d0626765e16c2"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/en_US.json",
+      "bytes": 23284,
+      "sha256": "3c6cb35a5db07c526b8fd5dfad5fb681f2d735621b89a2c1173e138e589ccdc4"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/es_ES.json",
+      "bytes": 25536,
+      "sha256": "af5e07eecdde780c0adb8c1351d318711069d498bca63f4494d0d31ecee6241a"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/fr_FR.json",
+      "bytes": 27024,
+      "sha256": "0da1f0b9ec7fa5d306cbb6538fd99ad76f037d6a6907d0705fa241cdd8e97cfc"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/it_IT.json",
+      "bytes": 23940,
+      "sha256": "a3a204a1c99a11f2187cd47619065b632f7003a8f0f33466c69471ab059deb5b"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/ja_JP.json",
+      "bytes": 26332,
+      "sha256": "84324aeffec0a5b86886581cb62a022bdcc821cac124750a67f0da7a2724ca4f"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/ko_KR.json",
+      "bytes": 24140,
+      "sha256": "60d9b9679139554acaa9326a29eb0a04b934c1a77c489c36554a2de526d91800"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/pt_BR.json",
+      "bytes": 25091,
+      "sha256": "ccdd682955c4c3f10c1223358a9f9cdbc34d54bd8055f0f3de755c53e9ba470b"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/ru_RU.json",
+      "bytes": 33341,
+      "sha256": "eaeb16a08bb5fd3d042dd02137cde198565bc9ac0b2eabeb916d5189d47352d6"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/tr_TR.json",
+      "bytes": 24882,
+      "sha256": "9430618f4b73cd55a5b2833cfdd7441424e1c040543daf2519b7c3faeb2a9b01"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/zh_CN.json",
+      "bytes": 21162,
+      "sha256": "92affd712e5baa3aab6d6b6e4354018ff53dc2d8905b17c5e021404de03cf487"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/zh_HK.json",
+      "bytes": 21304,
+      "sha256": "e39063511b6e10d841d997e6ae16b4bd3f3500dde351cc896819b77d442215f3"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/zh_SG.json",
+      "bytes": 21276,
+      "sha256": "80f27fe14b3fd2d3ea1d2eff46445a7e25593bb31fb85b40cab04bb81b95d5e0"
+    },
+    {
+      "path": "RVC/vendor/rvc/i18n/locale/zh_TW.json",
+      "bytes": 21301,
+      "sha256": "09d4be25f08420a1c2f7b4710ff474cc9ab54b087a94646274a7ed5654dfaf66"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/audio.py",
+      "bytes": 1540,
+      "sha256": "0297bb799aa9a12e297b905b7d34c800a7fa05ac3049a33a0f7b1536aaee6fe3"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/fcpe.py",
+      "bytes": 4134,
+      "sha256": "9f83369a23706c9dbaf1c51476e56a30cc8a97ca30227376c00818e23c57596d"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/hubert.py",
+      "bytes": 3050,
+      "sha256": "fa451dffe7950f1dc49bbda5966da10002b382fc5f35f8dbd664e9af638e4fbc"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/module/attentions.py",
+      "bytes": 15994,
+      "sha256": "8820e6047353d99344fc73fbb6c69d85e4f61066fc498982cc895e9577d4519f"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/module/commons.py",
+      "bytes": 5463,
+      "sha256": "132a907eff444907861e63684c04c88ae631d03707470858f7c53f857b0cc5c8"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/module/models.py",
+      "bytes": 37756,
+      "sha256": "4c214e78e21d5ecbafcb531483cad616035626d8ed21d5e7dfd56a9cb3c51029"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/module/modules.py",
+      "bytes": 17775,
+      "sha256": "b1aa77b0921468a61492fa89ed1f1212cd22fee3caa551befe44d8ab359fd2f1"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/module/transforms.py",
+      "bytes": 7458,
+      "sha256": "fb0d3320adf32ca0eaa44dd56e8922927f77ec3dd45c775e10c3da1704072c6a"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/rmvpe.py",
+      "bytes": 23465,
+      "sha256": "ebfe7149e167a4acc3d8a906a3baf6ecc5233d32a79d9273bf5d64381d6aeed5"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/rtrvc.py",
+      "bytes": 12840,
+      "sha256": "4a5d48f101fd93fa573b4a3725ddee79b1e2c1b9e9ff4556442a598aaaa9a514"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/vc/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/vc/modules.py",
+      "bytes": 12829,
+      "sha256": "bc5983c20fdbae528e9c505201a50469724d8069e2be3e8f3483bc450943350b"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/vc/pipeline.py",
+      "bytes": 13766,
+      "sha256": "5b696d5d107bd0ac1ed69c7d7467cd9f39a9eb14cb246bf1056e80d085674326"
+    },
+    {
+      "path": "RVC/vendor/rvc/infer/vc/utils.py",
+      "bytes": 1849,
+      "sha256": "13dd0c749d22f73fb1962c6328036e5fd8600023640d25d1b1445e1fe07d58d3"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/__init__.py",
+      "bytes": 71,
+      "sha256": "8e89459b7288508093717fadc634329a71dd4c0a895c712e2fcbe52ea0cb9464"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/file_io.py",
+      "bytes": 617,
+      "sha256": "67ac1c2a9f4f7beeff3277f383a6b2add2336c0ffc813e4e065addf92c472a96"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/progress.py",
+      "bytes": 1261,
+      "sha256": "2794b583a1838b2c77435b1e907f64d73e97f0f1ab91eccaa7c9e926a92ddc90"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/torchgate/__init__.py",
+      "bytes": 372,
+      "sha256": "05e2dcfd4c20a685cb87f07d6d494c889bc554db0927d2a1b0985870ecac90c7"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/torchgate/torchgate.py",
+      "bytes": 11271,
+      "sha256": "f2c4018950a6772f130d7b36c809efbe577ffa4384a1c45cfb50bf1fd87abf28"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/torchgate/utils.py",
+      "bytes": 2556,
+      "sha256": "0dbcca7d2945b657508e9b247b0c4ea98b0e3535be7abe968b6d49f2d6f0f3f9"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/bs_roformer/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/bs_roformer/attend.py",
+      "bytes": 2229,
+      "sha256": "3bdf339f4585f951d62bb0307ca24b4f1a8c428dfdcdc3b3e32aed4e08375833"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/bs_roformer/bs_roformer.py",
+      "bytes": 17435,
+      "sha256": "810f94e72fcc11ba9bd34fb386f1b3a259959f6c2a1c9ef0c36424ad5358ee60"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/bs_roformer/mel_band_roformer.py",
+      "bytes": 18192,
+      "sha256": "562ee0eba64c1b779835377b201c35ea2daa1589f600fc0209916ea07dc01f60"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/bsroformer.py",
+      "bytes": 15026,
+      "sha256": "b68ae134b692f918ad4d6239397bd1f6fda7ef4619c88b2fa74ccae45a170893"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/lib/lib_v5/layers_123821KB.py",
+      "bytes": 3672,
+      "sha256": "766f056d98f7032baf3c8f3e2a4f870bef2e3b9307bcae71caaae42a2a559576"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/lib/lib_v5/layers_new.py",
+      "bytes": 3951,
+      "sha256": "e70cb68c6ed1827a933be0c543515ddaf8e41de8c657256df5f0563dd39c0343"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/lib/lib_v5/model_param_init.py",
+      "bytes": 1724,
+      "sha256": "872c10682306ffd95121b69b9a2ef970e413f6936c8d1b80b85036c5aedac36f"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/lib/lib_v5/modelparams/4band_v2.json",
+      "bytes": 947,
+      "sha256": "2bb315e6a8fb9ff12a546f4361e095388e0e702dbb1ff364e809c6e915e0a94f"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/lib/lib_v5/modelparams/4band_v3.json",
+      "bytes": 944,
+      "sha256": "c0104bb7aab6a48b418b9a1e45c8970003d3a2459b2538c5f360a154e1c20484"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/lib/lib_v5/nets_61968KB.py",
+      "bytes": 3952,
+      "sha256": "f5c398f431a03f1a99b289885292cc95ac3c0673f2c5010cf856d289b3f71cb3"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/lib/lib_v5/nets_new.py",
+      "bytes": 4270,
+      "sha256": "d7630586f8812dbeebac5b67b2ea2a6d581be0f6257ebc4cb8b8e7d1ea35af62"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/lib/lib_v5/spec_utils.py",
+      "bytes": 21725,
+      "sha256": "6a1349f6149d41df6de48d45bb86cb52b1a306aad1861f2fa1802c3efc6e11b2"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/lib/utils.py",
+      "bytes": 2580,
+      "sha256": "1d74d53273114dc960cba86b79a6574e10e492338b0c3ab0268cac9733827013"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/mdxnet.py",
+      "bytes": 12112,
+      "sha256": "53cbd655f3955983e97360667c3b120942e449b4a8e24411c20d8ed700cad1c7"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/rotary_embedding_torch/__init__.py",
+      "bytes": 131,
+      "sha256": "1b3812ae937de03f38466cd3d12dc2fe5ed5e80ee70dc6d1b48375676589c207"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/rotary_embedding_torch/rotary_embedding_torch.py",
+      "bytes": 8757,
+      "sha256": "875fd451069c1c0c1097a5c12cf1694eea8fc64d1ab940d659c0345e7e536101"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/vr.py",
+      "bytes": 15137,
+      "sha256": "1e8d823ce092b14a54dbc1f4fff4d85d0ed1b444171181e5c0ff78054f16a724"
+    },
+    {
+      "path": "RVC/vendor/rvc/tools/uvr5/webui.py",
+      "bytes": 4992,
+      "sha256": "e73d6fdcd505bc4bd1fbca86c95ab9f1934d47c38a2820a6cc92018019cee564"
+    },
+    {
+      "path": "SeedVC/model_assets.py",
+      "bytes": 4807,
+      "sha256": "0de6baea89e9de0f1880927251aae4fd11156e70e13fc3a1f0733819f1e64030"
+    },
+    {
+      "path": "SeedVC/seedvc_runner.py",
+      "bytes": 2614,
+      "sha256": "8bcb552dbbfe9247c28cb0c8ab033ac16eb1c9ae50cba50319b94a5dd92d849e"
+    },
+    {
+      "path": "SeedVC/seedvc_server.py",
+      "bytes": 44638,
+      "sha256": "f56db33d3502ec618fdb6b7e1cbc1a2191167dcaefaf1aae3bf3c6901042fcd4"
+    },
+    {
+      "path": "refs/41041.wav",
+      "bytes": 258176,
+      "sha256": "45ec00862673fab17d290ec261fcdda3316f9b0f0d5d58e9bfa3a289aedb482c"
+    }
+  ]
+}

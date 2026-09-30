@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-09-26",
+  "release_sha256": "a27dc2a78d608a0ff66a4dd0e727bd1140add8f12e92316b8c7494d7000329c9",
+  "file_count": 73,
+  "total_bytes": 552938467,
+  "base_image_id": "sha256:3430d6614a8e2925f34d059af6caf05aff42387326db4d05639a60f10f2654d8",
+  "tested_image_id": "sha256:75c61e5a9af6410135ffd8b70e140d36fae8affa62b145036e0c01e7566da774",
+  "container_name": "neeeva-spark-vc",
+  "remote_root": "/home/spark_root_001/neeeva-voice/vc",
+  "url": "http://192.168.114.163:9882/convert",
+  "reference_path": "/home/spark_root_001/neeeva-voice/vc/release/refs/41041.wav",
+  "actual_models": {
+    "rvc": {
+      "device": "cuda:0",
+      "dtype": "torch.float16"
+    },
+    "hubert": {
+      "device": "cuda:0",
+      "dtype": "torch.float16"
+    },
+    "rmvpe": {
+      "device": "cuda:0",
+      "dtype": "torch.float16"
+    }
+  },
+  "torch": "2.11.0+cu130",
+  "cuda": "13.0",
+  "cpu_threads": 1,
+  "worker_idle_seconds": 90,
+  "faiss_opt_level": "generic",
+  "local_support_sha256": {
+    "manifest.json": "04348046811ed5f27330a361aa29c70c701dba72204d021b4d417c4a7d855a84",
+    "serve.py": "a98b1c4b51a3797779c843ae7e579422840ec556f51d2f622d02fbfb822b614c",
+    "manage.sh": "b77c2372435a2cea0c0a8f0949aec50d48b3186f4afa9d011bd5033726fdca0a",
+    "requirements-spark.txt": "ca365753999d5a1bf8a204ada9c1a87749e92436ca0bfe7361a4308358902c5e",
+    "requirements-lock.txt": "69463fc2c59600e5dac940622b75441a813a50c9f8d6d3de9544259f2c29789a",
+    "Dockerfile.spark": "8663e77df3d6b7b8446259270c028d89029ae0ee11c6386310bb06b39f332b17"
+  },
+  "dependency_lock_scope": "Actual pip freeze --local; inherited global packages identified by base image",
+  "dependency_rebuild_scope": "Current Dockerfile pins top-level requirements; prefer recorded image identity for exact recreation",
+  "smoke": "Server/VC/runtime/spark/report.json",
+  "local_baseline": "Server/VC/runtime/local/report.json",
+  "cancellation_regression": "Server/VC/runtime/cancel-regression.json",
+  "approval_note": "Combined upload/restart/smoke action denied as blocked by policy and not executed. Undeployed idle3600 proposal reverted; current tested runtime idle90.",
+  "unity_transport_report": "Logs/vc/unity-transport-spark.json",
+  "installation_tunnel_closed": true,
+  "installation_proxy_listener_verified_absent": "192.168.114.163:18880"
+}

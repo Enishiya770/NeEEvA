@@ -22,7 +22,10 @@ public sealed partial class ArdyRoomDialogueBridge
     public SceneTargetResult LastSceneTargetResult => CopySceneTargetResult(lastSceneTargetResult);
     public bool IsApproachingSceneTarget => sceneTargetActive;
     public string TargetKind => executionTargetKind;
-    public string SceneTargetMotionKind => string.IsNullOrEmpty(sceneViewDirection) ? "approach-object" : "reposition-view";
+    public string SceneTargetMotionKind => executionTargetKind == "visible-ground" ? "move-to-ground" :
+        string.IsNullOrEmpty(sceneViewDirection) ? "approach-object" : "reposition-view";
+    private bool HasSceneTargetPlan => (executionTargetKind == "scene-object" || executionTargetKind == "visible-ground") &&
+        sceneTargetPlan != null;
 
     private string executionTargetKind = "user";
     private bool sceneTargetActive;
@@ -47,6 +50,11 @@ public sealed partial class ArdyRoomDialogueBridge
         Func<string> validateTarget, out string failure, float standOff = .8f)
         => SubmitSceneTarget(id, captureId, targetId, visibleSurfacePoint, validateTarget, out failure, standOff, null, 0, null);
 
+    /// <summary>The measured floor itself is the destination; no object offset or hidden floor projection.</summary>
+    public bool MoveToVisibleGround(string id, string captureId, string targetId, Vector3 visibleFloorPoint,
+        Func<string> validateTarget, out string failure)
+        => SubmitSceneTarget(id, captureId, targetId, visibleFloorPoint, validateTarget, out failure, 0, null, 0, null, true);
+
     public bool RepositionSceneTarget(string id, string captureId, string targetId, Vector3 visibleSurfacePoint,
         string direction, float distance, string purpose, Func<string> validateTarget, out string failure)
     {
@@ -59,23 +67,24 @@ public sealed partial class ArdyRoomDialogueBridge
     }
 
     private bool SubmitSceneTarget(string id, string captureId, string targetId, Vector3 visibleSurfacePoint,
-        Func<string> validateTarget, out string failure, float standOff, string viewDirection, float viewDistance, string viewPurpose)
+        Func<string> validateTarget, out string failure, float standOff, string viewDirection, float viewDistance, string viewPurpose,
+        bool groundMovement = false)
     {
         if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(captureId) || string.IsNullOrEmpty(targetId) ||
             !Finite(visibleSurfacePoint) || validateTarget == null)
-            return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, "缺少有效视觉观测、已定位物体或当前目标有效性检查。", out failure, viewDirection, viewDistance, viewPurpose);
+            return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, "缺少有效视觉观测、已定位表面或当前目标有效性检查。", out failure, viewDirection, viewDistance, viewPurpose, groundMovement);
         if (!IsConnected || controller.Avatar != avatar || navigation.EnvironmentRoot != environmentRoot || chat != subscribedChat)
-            return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, "房间移动尚未连接或场景绑定已改变。", out failure, viewDirection, viewDistance, viewPurpose);
+            return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, "房间移动尚未连接或场景绑定已改变。", out failure, viewDirection, viewDistance, viewPurpose, groundMovement);
         if (activeAction || followActive || ReservesBody || controller.IsBusy || controller.IsMoving)
-            return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, "已有空间任务或身体姿态尚未释放；本次视觉目标没有替换它。", out failure, viewDirection, viewDistance, viewPurpose);
+            return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, "已有空间任务或身体姿态尚未释放；本次视觉目标没有替换它。", out failure, viewDirection, viewDistance, viewPurpose, groundMovement);
         string targetFailure = ValidateSceneTargetCallback(validateTarget);
         if (targetFailure != null)
-            return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, targetFailure, out failure, viewDirection, viewDistance, viewPurpose);
+            return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, targetFailure, out failure, viewDirection, viewDistance, viewPurpose, groundMovement);
         if (!ValidUser(out failure))
-            return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, failure, out failure, viewDirection, viewDistance, viewPurpose);
+            return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, failure, out failure, viewDirection, viewDistance, viewPurpose, groundMovement);
 
         ResetNavigationRecovery();
-        executionTargetKind = "scene-object";
+        executionTargetKind = groundMovement ? "visible-ground" : "scene-object";
         sceneTargetEpoch++;
         sceneTargetActive = true;
         sceneTargetActionId = actionId = id;
@@ -90,7 +99,9 @@ public sealed partial class ArdyRoomDialogueBridge
         boundUser = userHead;
         Vector3 ground = avatar.transform.position + Vector3.up * importedReference.groundY * avatar.transform.lossyScale.y;
         sceneStartGround = ground;
-        bool planned = viewDirection == null ? ArdyRoomObjectApproachPlanner.TryPlan(navigation, ground, visibleSurfacePoint, userHead, standOff,
+        bool planned = groundMovement ? ArdyRoomGroundMovementPlanner.TryPlan(navigation, ground, visibleSurfacePoint, userHead,
+            out sceneTargetPlan, out failure, out sceneTargetObservation) :
+            viewDirection == null ? ArdyRoomObjectApproachPlanner.TryPlan(navigation, ground, visibleSurfacePoint, userHead, standOff,
             out sceneTargetPlan, out failure, out sceneTargetObservation) :
             ArdyRoomViewPositionPlanner.TryPlan(navigation, ground, visibleSurfacePoint, userHead, viewDirection, viewDistance,
                 out sceneTargetPlan, out failure, out sceneTargetObservation);
@@ -113,12 +124,14 @@ public sealed partial class ArdyRoomDialogueBridge
         var live = avatar.GetComponent<ArdyLiveMotionController>();
         if (live != null) live.Cancel("scene-object-approach");
         activeAction = true;
-        SetFact("preparing", viewDirection == null ? "已接受视觉目标，正在生成走到其附近地面并面向目标的动作。" :
+        SetFact("preparing", groundMovement ? "已验证当前可见空地和完整路线，正在生成走到该地面的动作。" :
+            viewDirection == null ? "已接受视觉目标，正在生成走到其附近地面并面向目标的动作。" :
             "已接受明确方向的观察站位调整，正在生成沿路面向目标的小范围移动；视野是否改善仍需新图确认。");
         try
         {
             controller.WalkingSpeed = walkingSpeed;
-            if (viewDirection == null) controller.MoveTo(sceneTargetPlan.GroundTarget, sceneTargetPlan.FacePoint);
+            if (groundMovement) controller.MoveTo(sceneTargetPlan.GroundTarget);
+            else if (viewDirection == null) controller.MoveTo(sceneTargetPlan.GroundTarget, sceneTargetPlan.FacePoint);
             else controller.MoveToFacingTarget(sceneTargetPlan.GroundTarget, sceneTargetPlan.FacePoint);
             operationRevision = controller.OperationRevision;
             sceneTargetOperationRevision = operationRevision;
@@ -136,11 +149,12 @@ public sealed partial class ArdyRoomDialogueBridge
     }
 
     private bool RejectSceneTarget(string id, string captureId, string targetId, Vector3 point, string message, out string failure,
-        string viewDirection = null, float viewDistance = 0, string viewPurpose = null)
+        string viewDirection = null, float viewDistance = 0, string viewPurpose = null, bool groundMovement = false)
     {
         failure = message;
         var value = new SceneTargetResult { actionId = id ?? "", captureId = captureId ?? "", targetId = targetId ?? "",
-            motionKind = viewDirection == null ? "approach-object" : "reposition-view", requestedDirection = viewDirection ?? "",
+            targetKind = groundMovement ? "visible-ground" : "scene-object",
+            motionKind = groundMovement ? "move-to-ground" : viewDirection == null ? "approach-object" : "reposition-view", requestedDirection = viewDirection ?? "",
             requestedDistance = float.IsNaN(viewDistance) || float.IsInfinity(viewDistance) ? 0 : viewDistance, viewPurpose = viewPurpose ?? "",
             status = "rejected", reason = message, terminal = true, reached = false, visibleSurfacePoint = Finite(point) ? point : Vector3.zero,
             observedAtRealtime = Time.realtimeSinceStartup, actualRoot = avatar != null ? avatar.transform.position : Vector3.zero };
@@ -223,7 +237,8 @@ public sealed partial class ArdyRoomDialogueBridge
                 float tolerance = sceneViewDirection == null ? controller.ArrivalTolerance + .03f : ArdyRoomLocomotionController.ViewPositionArrivalTolerance + .005f;
                 bool reached = distance <= tolerance && facing >= 0 && facing <= 15f;
                 string arrivedPhase = reached ? "arrived" : "goal-not-reached";
-                string arrivedReason = reached ? (sceneViewDirection == null ? "已实际到达视觉目标附近的地面站位并面向目标；仍需新视野确认所见。" :
+                string arrivedReason = reached ? (executionTargetKind == "visible-ground" ? "已实际到达所选可见地面；正在以新视野确认当前位置所见。" :
+                    sceneViewDirection == null ? "已实际到达视觉目标附近的地面站位并面向目标；仍需新视野确认所见。" :
                     "已实际完成请求方向的站位调整并面向原目标；仍需新图确认是否看全、看清或避开遮挡。") :
                     "行走结束，但视觉目标站位或朝向误差尚未达到要求。";
                 SetFact(arrivedPhase, arrivedReason);
@@ -244,6 +259,8 @@ public sealed partial class ArdyRoomDialogueBridge
         if (avatar == null || sceneTargetPlan == null || importedReference == null) return;
         Vector3 ground = avatar.transform.position + Vector3.up * importedReference.groundY * avatar.transform.lossyScale.y;
         distance = Vector3.Distance(ground, sceneTargetPlan.GroundTarget);
+        // Free floor destinations promise arrival only, not facing a point now under the feet.
+        if (executionTargetKind == "visible-ground") { facing = 0; return; }
         Vector3 direction = sceneSurfacePoint - ground; direction.y = 0;
         Vector3 forward = avatar.transform.forward; forward.y = 0;
         if (direction.sqrMagnitude > .0001f && forward.sqrMagnitude > .0001f) facing = Vector3.Angle(forward, direction);
@@ -254,6 +271,7 @@ public sealed partial class ArdyRoomDialogueBridge
         if (!sceneTargetActive) return;
         MeasureSceneTarget(out float distance, out float facing);
         var value = new SceneTargetResult { actionId = sceneTargetActionId, captureId = sceneCaptureId, targetId = sceneSurfaceId,
+            targetKind = executionTargetKind,
             motionKind = SceneTargetMotionKind, requestedDirection = sceneViewDirection ?? "", requestedDistance = sceneViewDistance,
             viewPurpose = sceneViewPurpose ?? "", startGround = sceneStartGround,
             requestedGround = sceneTargetPlan != null ? sceneTargetPlan.GroundTarget : sceneStartGround,
@@ -263,6 +281,7 @@ public sealed partial class ArdyRoomDialogueBridge
             observedAtRealtime = Time.realtimeSinceStartup, actualStandpointError = distance, actualFacingErrorDegrees = facing,
             visibleSurfacePoint = sceneSurfacePoint, plannedGround = sceneTargetPlan != null ? sceneTargetPlan.GroundTarget : Vector3.zero,
             actualRoot = avatar != null ? avatar.transform.position : Vector3.zero };
+        if (executionTargetKind == "visible-ground") value.scope = "Actual arrival at the measured visible same-plane floor; no semantic object identity or promised facing. Arrival is not a fresh observation; the caller must capture the resulting view before choosing another leg.";
         sceneTargetActive = false; sceneTargetValidator = null; sceneTargetEpoch++;
         lastSceneTargetResult = value;
         Debug.Log("[Room/SceneTarget] " + JsonUtility.ToJson(value), this);

@@ -34,6 +34,11 @@ public partial class ChatSample
     private string m_PresentationCharacterDisplayName = "角色";
     [SerializeField, HideInInspector] private UniVRM10.VRM10Object m_PresentationNamedModel;
     [SerializeField, HideInInspector] private string m_PresentationModelFileName;
+    private Transform m_PresentationHeadSource;
+    private Transform m_PresentationHead;
+    private Avatar m_PresentationHeadAvatar;
+    private Renderer[] m_PresentationAvatarRenderers;
+    private float m_PresentationNextHeadLookup;
 
     /// <summary>
     /// The avatar attached to this conversation, not the language model or an ASR speaker.
@@ -84,6 +89,53 @@ public partial class ChatSample
         if (m_AudioSource == null) return null;
         Audio2LipScript lips = m_AudioSource.GetComponent<Audio2LipScript>();
         return lips != null && lips.meshRenderer != null ? lips.meshRenderer.transform : null;
+    }
+
+    /// <summary>Resolve the visible avatar's head without binding the UI to a particular VRM prefab.</summary>
+    public bool TryGetPresentationHeadPosition(out Vector3 position)
+    {
+        position = Vector3.zero;
+        Transform source = PresentationAvatarSource();
+        if (source == null || !source.gameObject.activeInHierarchy) return false;
+        Avatar animatorAvatar = m_Animator != null ? m_Animator.avatar : null;
+        if (m_PresentationHeadSource != source || m_PresentationHeadAvatar != animatorAvatar ||
+            (m_PresentationHead == null && Time.unscaledTime >= m_PresentationNextHeadLookup))
+        {
+            m_PresentationHeadSource = source;
+            m_PresentationHeadAvatar = animatorAvatar;
+            m_PresentationHead = null;
+            m_PresentationNextHeadLookup = Time.unscaledTime + 1f;
+            var vrm = source.GetComponentInParent<UniVRM10.Vrm10Instance>(true);
+            if (vrm != null) vrm.TryGetBoneTransform(HumanBodyBones.Head, out m_PresentationHead);
+            Animator animator = m_Animator != null ? m_Animator : source.GetComponentInParent<Animator>(true);
+            if (m_PresentationHead == null && animator != null && animator.avatar != null &&
+                animator.avatar.isValid && animator.isHuman)
+                m_PresentationHead = animator.GetBoneTransform(HumanBodyBones.Head);
+            Transform root = vrm != null ? vrm.transform : animator != null ? animator.transform : source;
+            m_PresentationAvatarRenderers = root.GetComponentsInChildren<Renderer>(true);
+        }
+        if (m_PresentationHead != null && m_PresentationHead.gameObject.activeInHierarchy)
+        {
+            position = m_PresentationHead.position;
+            return true;
+        }
+
+        // Non-humanoid avatars still have a useful upper-body anchor. Bounds follow
+        // their current pose and scale; never substitute the chat object's position.
+        bool hasBounds = false;
+        Bounds bounds = default;
+        if (m_PresentationAvatarRenderers != null)
+        {
+            foreach (Renderer renderer in m_PresentationAvatarRenderers)
+            {
+                if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
+                if (!hasBounds) { bounds = renderer.bounds; hasBounds = true; }
+                else bounds.Encapsulate(renderer.bounds);
+            }
+        }
+        if (!hasBounds) return false;
+        position = bounds.center + Vector3.up * bounds.extents.y * .8f;
+        return true;
     }
 
     private string ReadPresentationModelFileName(UniVRM10.Vrm10Instance avatar, bool allowEditorLookup)

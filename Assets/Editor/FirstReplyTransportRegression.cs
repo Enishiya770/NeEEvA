@@ -77,6 +77,20 @@ public static class FirstReplyTransportRegression
             CheckAcceptedUserOwnership(model);
             CheckListeningBudget(model);
 
+            model.m_Backend = ChatQW.BackendType.OpenAICompatible;
+            Check(!model.SupportsFirstReplyRouting,"Unconfigured OpenAI-compatible provider must not assume vLLM regex support");
+            typeof(ChatQW).GetField("m_OpenAICompatibleFirstReplyStructuredOutputs",Flags).SetValue(model,true);
+            var compatible = JObject.Parse(CaptureWire(model, user, context, image));
+            Check(model.SupportsFirstReplyRouting && compatible["grammar"] == null && compatible["id_slot"] == null &&
+                (string)compatible["structured_outputs"]?["regex"] == FirstReplyProtocol.StructuredRegex &&
+                (bool)compatible["stream"] && (int)compatible["max_tokens"] == 768,
+                "Configured vLLM first reply lost its structural regex or received llama.cpp-only fields");
+            Check(compatible.ToString().Contains(FirstReplyProtocol.RecordingSingingHead) &&
+                compatible.ToString().Contains("最后一句不能删") && compatible.ToString().Contains("未执行合并") &&
+                compatible.ToString().Contains("待完成") && compatible.ToString().Contains(image),
+                "OpenAI-compatible route lost recording handoff, current words/image or unfinished action facts");
+            model.m_Backend = ChatQW.BackendType.Local;
+
             // Start the actual production coroutine, then cancel from its diagnostic
             // callback before SendWebRequest. This checks lifecycle without any HTTP.
             int completions = 0, deltas = 0, diagnostics = 0;
@@ -250,6 +264,7 @@ public static class FirstReplyTransportRegression
                 "Ordinary completion duplicated the current user or assistant");
 
             foreach (var completion in new[] { new FirstReplyCompletion { Disposition = FirstReplyDisposition.Tools },
+                new FirstReplyCompletion { Disposition = FirstReplyDisposition.RecordingSinging },
                 FirstReplyCompletion.Failed("network-before-public") })
             {
                 model.CancelActiveResponse();
@@ -312,10 +327,13 @@ public static class FirstReplyTransportRegression
         int prior = model.m_EphemeralMaxTokens;
         var savedHistory = new System.Collections.Generic.List<LLM.SendData>(model.m_DataList);
         string savedSkill = model.ActiveSkillContext, savedTrailing = model.TrailingContext;
+        var promptField = typeof(LLM).GetField("m_Prompt", Flags);
+        object savedPrompt = promptField.GetValue(model);
         model.m_EphemeralMaxTokens = 128;
         try
         {
             var persona = new LLM.SendData("system", "Stable listening fixture persona");
+            promptField.SetValue(model, persona.content);
             var obsolete = new LLM.SendData("user", "obsolete fixture tool instruction");
             var recentAnswer = new LLM.SendData("assistant", "recent fixture reference answer");
             var recentQuestion = new LLM.SendData("user", "recent fixture reference question");
@@ -328,7 +346,9 @@ public static class FirstReplyTransportRegression
             var original = JObject.Parse((string)Method("BuildEphemeralRequestJsonWithImage").Invoke(model,
                 new object[] { prompt, null, 1, false }));
             var listening = JObject.Parse((string)Method("BuildListeningPreparationRequestJson").Invoke(model, new object[] { prompt }));
-            Check((int)original["max_tokens"] == 128 && (int)listening["max_tokens"] == 256 &&
+            // One request now includes evidenced intent/semantic-span preparation.
+            // Its 512-token budget remains local to this existing auxiliary lane.
+            Check((int)original["max_tokens"] == 128 && (int)listening["max_tokens"] == 512 &&
                 (int)listening["id_slot"] == 1 && model.m_EphemeralMaxTokens == 128,
                 "Listening budget changed other auxiliary requests or added a new slot");
             var messages = (JArray)listening["messages"];
@@ -336,7 +356,7 @@ public static class FirstReplyTransportRegression
             Check((string)messages[messages.Count - 1]["role"] == "user" &&
                 (string)messages[messages.Count - 1]["content"] == prompt && payload.Contains(exact),
                 "Conditional listening changed or truncated the complete latest correction");
-            Check((string)messages[0]["content"] == persona.content &&
+            Check(((string)messages[0]["content"]).Contains(persona.content) &&
                 payload.Contains(recentAnswer.content) && payload.Contains(recentQuestion.content),
                 "Compact preparation lost the stable persona or recent reference background");
             Check(!payload.Contains(obsolete.content) && !payload.Contains(model.ActiveSkillContext) &&
@@ -357,13 +377,14 @@ public static class FirstReplyTransportRegression
             model.CancelEphemeralMsg();
             var stale = (IEnumerator)Method("RequestEphemeralPayloadWithDiagnostics").Invoke(model, new object[] {
                 listening.ToString(Newtonsoft.Json.Formatting.None), generation, new Action<string>(_ => calls++),
-                "listening-preparation", "fixture-cancelled-listening" });
+                "listening-preparation", "fixture-cancelled-listening", null });
             try { Check(!stale.MoveNext() && calls == 0, "A cancelled listening request sent HTTP or delivered a draft"); }
             finally { (stale as IDisposable)?.Dispose(); }
         }
         finally
         {
             model.m_EphemeralMaxTokens = prior;
+            promptField.SetValue(model, savedPrompt);
             model.m_DataList.Clear(); model.m_DataList.AddRange(savedHistory);
             model.ActiveSkillContext = savedSkill; model.TrailingContext = savedTrailing;
         }

@@ -13,6 +13,7 @@ public partial class ChatSample
         public ArdyRoomDialogueBridge bridge;
         public int controllerOperation, targetRevision, sceneEpoch, visionEpoch;
         public string actionId, phase;
+        public string activeTaskId, taskMode;
         public JObject sceneAction;
         public SceneVisionObservation observation;
     }
@@ -70,6 +71,10 @@ public partial class ChatSample
             "needsCloserObservation", "groundArrived", "objectReobserved", "postArrivalObservationStatus", "observationGoalId",
             "viewDirection", "viewPurpose", "viewPurposeStatus", "requestedViewDistance", "actualViewOffset", "viewBefore", "viewAfter");
         result["objectStateDependency"] = SceneObjectSpeechStamp();
+        // Verification captures renew in the background; only actual task/pose
+        // changes invalidate a statement that the gaze is still being held.
+        result["persistentGaze"] = PickRoomFields(BuildPersistentSceneAttentionFacts(),
+            "active", "physicallyHeld", "actionId", "entityId", "state", "reason");
         return result;
     }
 
@@ -78,9 +83,29 @@ public partial class ChatSample
             bridge = bridge, controllerOperation = bridge?.Controller != null ? bridge.Controller.OperationRevision : -1,
             targetRevision = bridge != null ? bridge.ReadCurrentTargetEvidence().currentTargetRevision : -1,
             actionId = bridge != null ? bridge.ActionId : "", phase = bridge != null ? bridge.Phase : "disconnected",
+            activeTaskId = bridge != null ? bridge.ActiveTaskId : "", taskMode = bridge != null ? bridge.TaskMode : "none",
             sceneEpoch = m_SceneActionEpoch, visionEpoch = m_SceneVisionEpoch,
             sceneAction = RoomSpeechSceneStamp(), observation = observation
         };
+
+    private bool HasCurrentRoomRequestReceipt(RoomSpeechSnapshot snapshot)
+    {
+        var bridge = GetComponent<ArdyRoomDialogueBridge>();
+        if (snapshot == null || bridge == null || bridge != snapshot.bridge || !bridge.IsConnected ||
+            string.IsNullOrEmpty(m_RoomTaskActionId) || snapshot.actionId != m_RoomTaskActionId ||
+            snapshot.activeTaskId != m_RoomTaskActionId || bridge.ActionId != m_RoomTaskActionId ||
+            bridge.ActiveTaskId != m_RoomTaskActionId || snapshot.taskMode != m_RoomTaskIntent ||
+            bridge.TaskMode != m_RoomTaskIntent) return false;
+        if (m_RoomTaskIntent == "follow" && m_RoomTaskDispatch != "follow-submitted" ||
+            m_RoomTaskIntent == "approach" && m_RoomTaskDispatch != "attempt-submitted" ||
+            m_RoomTaskIntent != "follow" && m_RoomTaskIntent != "approach") return false;
+        // A receipt survives ordinary target revisions and newly generated steps,
+        // but not a stopped, paused, failed, replaced or completed execution. This
+        // never proves current motion, arrival, route feasibility or visual facts.
+        bool Healthy(string phase) => phase == "preparing" || phase == "generating" ||
+            phase == "moving" || m_RoomTaskIntent == "follow" && phase == "follow-waiting";
+        return Healthy(snapshot.phase) && Healthy(bridge.Phase);
+    }
 
     private List<string> ChangedRoomSpeechFacts(RoomSpeechSnapshot before, RoomSpeechDependencies scope)
     {

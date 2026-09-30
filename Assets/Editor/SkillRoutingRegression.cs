@@ -1009,7 +1009,7 @@ public static partial class SkillRoutingRegression
             object evidence = clone.Invoke(type.GetField("RecordingEvidence").GetValue(phrase), null);
             type.GetField("RecordingEvidence").SetValue(phrase, evidence);
             type.GetField("LatestRecordingEvidence").SetValue(phrase, evidence);
-            byte[] clean = (byte[])type.GetField("SourceCleanWavBytes").GetValue(phrase);
+            byte[] clean = (byte[])type.GetProperty("SourceCleanWavBytes").GetValue(phrase);
             // Non-silent, high-amplitude PCM catches decode/re-encode rounding;
             // silence alone would incorrectly pass a byte-only identity check.
             object[] decoded = { clean, null, 0 };
@@ -1019,7 +1019,7 @@ public static partial class SkillRoutingRegression
             for (int i = 0; i < samples.Length; i++) samples[i] = .9f * Mathf.Sin(2f * Mathf.PI * 220f * i / sampleRate);
             clean = (byte[])typeof(SenseVoiceSpeechToText).GetMethod("EncodeMonoPcm16Wav", BindingFlags.NonPublic | BindingFlags.Static)
                 .Invoke(null, new object[] { samples, sampleRate });
-            type.GetField("SourceCleanWavBytes").SetValue(phrase, clean);
+            type.GetProperty("SourceCleanWavBytes").SetValue(phrase, clean);
             float[] timeline = (float[])type.GetField("SourceCleanMidiTimeline").GetValue(phrase);
             float duration = (float)typeof(SenseVoiceSpeechToText).GetMethod("GetWavDurationSeconds", BindingFlags.NonPublic | BindingFlags.Static)
                 .Invoke(null, new object[] { clean });
@@ -1027,8 +1027,9 @@ public static partial class SkillRoutingRegression
             foreach (string field in new[] { "CleanEndSeconds", "RecoveryEndSeconds" }) evidence.GetType().GetField(field).SetValue(evidence, duration);
             foreach (object item in new[] { phrase, other })
                 foreach (string field in new[] { "SourceExpandedWavBytes", "SourceExpandedMidiTimeline", "RecoveryWavBytes", "RecoveryMidiTimeline" })
-                    type.GetField(field).SetValue(item, null);
-            type.GetField("WavBytes").SetValue(phrase, clean);
+                    if (field.EndsWith("WavBytes", StringComparison.Ordinal)) type.GetProperty(field).SetValue(item, null);
+                    else type.GetField(field).SetValue(item, null);
+            type.GetProperty("WavBytes").SetValue(phrase, clean);
             type.GetField("MidiTimeline").SetValue(phrase, timeline);
             type.GetField("ActiveCapture").SetValue(phrase, "clean");
             type.GetField("ActiveTrimHeadSeconds").SetValue(phrase, 0f);
@@ -1045,7 +1046,7 @@ public static partial class SkillRoutingRegression
             for (int repeat = 0; repeat < 2; repeat++)
                 if (!(bool)Resolve("refs=\"" + firstRef + "\" range=\"expanded\"")[0] ||
                     !ReferenceEquals(states[stable], pitch) || (int)type.GetField("Revision").GetValue(phrase) != revision ||
-                    !ReferenceEquals(type.GetField("WavBytes").GetValue(phrase), clean))
+                    !ReferenceEquals(type.GetProperty("WavBytes").GetValue(phrase), clean))
                     throw new Exception("Equivalent clean/expanded selection regenerated audio or erased measured pitch.");
             // A later clip lacks recovery audio and has genuinely different coordinates.
             object otherEvidence = clone.Invoke(type.GetField("RecordingEvidence").GetValue(other), null);
@@ -1393,7 +1394,7 @@ public static partial class SkillRoutingRegression
                 phraseType.GetField("RecordingSequence").SetValue(phrase, id - 6);
                 phraseType.GetField("Lyrics").SetValue(phrase, lyrics);
                 phraseType.GetField("Seconds").SetValue(phrase, 8f + id);
-                phraseType.GetField("WavBytes").SetValue(phrase, new byte[45]);
+                phraseType.GetProperty("WavBytes").SetValue(phrase, new byte[45]);
                 phraseType.GetField("MidiTimeline").SetValue(
                     phrase, new float[] { 60f, 60f, 60f, 60f });
                 object value = Activator.CreateInstance(candidateType);
@@ -1494,7 +1495,7 @@ public static partial class SkillRoutingRegression
                 throw new InvalidOperationException(
                     "Expanded margin duration can still be silently reused as a clean-local trim, " +
                     "or an unrelated clean-local crop is incorrectly blocked.");
-            phraseType.GetField("RecoveryWavBytes").SetValue(
+            phraseType.GetProperty("RecoveryWavBytes").SetValue(
                 newerCandidatePhrase, new byte[45]);
             phraseType.GetField("RecoveryMidiTimeline").SetValue(
                 newerCandidatePhrase, null);
@@ -1514,7 +1515,7 @@ public static partial class SkillRoutingRegression
                 "SingingEvidenceSnapshot", BindingFlags.NonPublic);
             object evidence = Activator.CreateInstance(evidenceType);
             evidenceType.GetField("CaptureSessionSerial").SetValue(evidence, 101);
-            evidenceType.GetField("RawWavBytes").SetValue(evidence, new byte[45]);
+            evidenceType.GetProperty("RawWavBytes").SetValue(evidence, new byte[45]);
             evidenceType.GetField("PitchTimelineMidi").SetValue(
                 evidence, new float[] { 60f, 61f });
             evidenceType.GetField("FrameSeconds").SetValue(evidence, 0.10f);
@@ -1555,7 +1556,7 @@ public static partial class SkillRoutingRegression
                     "A quarantined recording could not be explicitly rejected.");
             //同一真实录音的迟到分析可能多出采样、改变 raw/clean 字节；身份仍应由
             //录音会话而不是 WAV 签名锚定。
-            evidenceType.GetField("RawWavBytes").SetValue(evidence, new byte[57]);
+            evidenceType.GetProperty("RawWavBytes").SetValue(evidence, new byte[57]);
             if (sense.QuarantineRecentSingingCandidate(
                     out int repeatedRejectedId, out float _))
                 throw new InvalidOperationException(
@@ -1590,7 +1591,7 @@ public static partial class SkillRoutingRegression
             senseType.GetField("m_RollbackSingingPerformanceMidi", flags).SetValue(
                 sense, previousMidi);
             evidenceType.GetField("CaptureSessionSerial").SetValue(evidence, 102);
-            evidenceType.GetField("RawWavBytes").SetValue(evidence, pendingWav);
+            evidenceType.GetProperty("RawWavBytes").SetValue(evidence, pendingWav);
             evidenceType.GetField("PitchTimelineMidi").SetValue(evidence, pendingMidi);
             evidenceType.GetField("RawSeconds").SetValue(evidence, 4f);
             evidenceType.GetField("HeadExtraText").SetValue(
@@ -1601,7 +1602,7 @@ public static partial class SkillRoutingRegression
                 .SetValue(sense, 102);
             object finalEvidence = Activator.CreateInstance(evidenceType);
             evidenceType.GetField("CaptureSessionSerial").SetValue(finalEvidence, 102);
-            evidenceType.GetField("RawWavBytes").SetValue(finalEvidence, new byte[61]);
+            evidenceType.GetProperty("RawWavBytes").SetValue(finalEvidence, new byte[61]);
             evidenceType.GetField("PitchTimelineMidi").SetValue(finalEvidence, pendingMidi);
             evidenceType.GetField("FrameSeconds").SetValue(finalEvidence, 0.10f);
             evidenceType.GetField("AtRealtime").SetValue(
@@ -1694,10 +1695,9 @@ public static partial class SkillRoutingRegression
             "呃那我继续唱喽，你能把我刚才唱的包括现在唱的这几段连起来吗";
         object[] extensionArgs = { truncatedFinal, stableComplete, true, null };
         string promoted = (string)resolve.Invoke(null, extensionArgs);
-        if (promoted != stableComplete ||
-            !(extensionArgs[3] as string).StartsWith("stable-stream-mixed-extension"))
+        if (promoted != truncatedFinal || (string)extensionArgs[3] != "final-asr")
             throw new InvalidOperationException(
-                "A stable mixed-turn tail request is overwritten by truncated final ASR.");
+                "A longer partial must remain private and cannot replace final ASR.");
 
         object[] conflictArgs = {
             "今天我们讨论天气", "请把刚才唱的全部连起来", true, null };
@@ -1761,7 +1761,8 @@ public static partial class SkillRoutingRegression
                 throw new InvalidOperationException("Test fixture did not reproduce a continuing vowel with no new onset.");
             Set("m_IsRecording", true);
             Set("m_LatestStreamPartial", "啦");
-            Set("m_StalledReviewActivityRevision", revision);
+            Set("m_StalledReviewActivityRevision", activity.ActivityRevision);
+            Set("m_StalledReviewTextRevision", activity.Revision - activity.ActivityRevision);
             Set("m_StalledReviewSoundAt", reviewedSound);
             var receive = rt.GetMethod("HandleStalledUserTurnDecision", flags);
             receive.Invoke(handler, new object[] { "take_turn", .9f, "singing", .9f, "user", "啦", 1000 });
@@ -2026,7 +2027,8 @@ public static partial class SkillRoutingRegression
             SetRt("m_PendingSemanticEouStatus", "take_turn");
             SetRt("m_PendingSemanticEouConfidence", .9f);
             SetRt("m_PendingSemanticEouTextKey", "旧音频的新修订");
-            SetRt("m_StalledReviewActivityRevision", activity.Revision);
+            SetRt("m_StalledReviewActivityRevision", activity.ActivityRevision);
+            SetRt("m_StalledReviewTextRevision", activity.Revision - activity.ActivityRevision);
             SetRt("m_LastMeaningfulStreamTextTime", Time.realtimeSinceStartup - 2f);
             SetRt("m_StalledRequiredUnchangedSeconds", .65f);
             SetRt("m_StreamSubmittedSeconds", 4f); // one delayed coverage packet
@@ -2349,29 +2351,17 @@ public static partial class SkillRoutingRegression
             throw new MissingMemberException(
                 "Main-role practice confirmation/revision or atomic memory grounding contract is missing.");
 
-        TextAsset behavior = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/AIChatTookit/Prompts/behavior.txt");
-        TextAsset singing = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/AIChatTookit/Prompts/Skills/singing.txt");
-        if (behavior == null ||
-            !behavior.text.Contains("不能因此记成“用户喜欢/最爱/偏好这首歌”") ||
-            !behavior.text.Contains("长期事实写入前系统会"))
-            throw new InvalidOperationException(
-                "Memory prompt no longer distinguishes singing/mentioning from preference evidence.");
-        if (singing == null ||
-            !singing.text.Contains("<sing refs=") ||
-            !singing.text.Contains("<clip_confirm ref=") ||
-            !singing.text.Contains("<clip_revise ref=") ||
-            !singing.text.Contains("<clip_drop ref=") ||
-            !singing.text.Contains("以该份原录音开始为 0 秒") ||
-            !singing.text.Contains("来源确认成功但 playback 仍非 ready") ||
-            !singing.text.Contains("原始录音仍保留") ||
-            !singing.text.Contains("不确定时，你始终可以先询问") ||
-            !singing.text.Contains("删除具有破坏性") ||
-            !singing.text.Contains("说话→唱歌→说话") ||
-            !singing.text.Contains("不能只看单个标签判定没唱"))
-            throw new InvalidOperationException(
-                "Singing Skill lost main-role confirmation, non-destructive revision, stable identity, or direct routing guidance.");
+        TextAsset behavior = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/AIChatTookit/Prompts/behavior.txt");
+        TextAsset singing = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/AIChatTookit/Prompts/Skills/singing.txt");
+        string generalTools = PromptProtocolAssets.GeneralTools(), singingTools = PromptProtocolAssets.SingingTools();
+        if (behavior == null || !behavior.text.Contains("可独立核验") || !generalTools.Contains("用户唱过不等于喜欢"))
+            throw new InvalidOperationException("Memory principles lost independent factual grounding.");
+        if (singing == null || singing.text.Contains("<") || !singing.text.Contains("原录音开始为零秒") ||
+            !singingTools.Contains("<sing refs=") || !singingTools.Contains("<clip_confirm ref=") ||
+            !singingTools.Contains("<clip_revise ref=") || !singingTools.Contains("<clip_drop ref=") ||
+            !singingTools.Contains("原始录音仍保留") || !singingTools.Contains("删除具有破坏性") ||
+            !singingTools.Contains("不能只看单个标签判定没唱"))
+            throw new InvalidOperationException("Singing principles/tool contract lost stable identity, range evidence or supported edits.");
     }
 
     private static void RunSingingModeFusionRegression(Type chatType)
@@ -2887,33 +2877,15 @@ public static partial class SkillRoutingRegression
 
     private static void RunEvidenceGroundingPromptRegression()
     {
-        TextAsset behavior = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/AIChatTookit/Prompts/behavior.txt");
-        TextAsset singing = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/AIChatTookit/Prompts/Skills/singing.txt");
-        if (behavior == null ||
-            !behavior.text.Contains("不确定性、自主判断与询问权（最高原则") ||
-            !behavior.text.Contains("向用户询问始终必须保留为一个可选行动") ||
-            !behavior.text.Contains("不等于每次都必须询问") ||
-            !behavior.text.Contains("相信自己的主观判断") ||
-            !behavior.text.Contains("前提本身有歧义时，本节优先") ||
-            !behavior.text.Contains("事实与记忆的依据（上述最高原则") ||
-            !behavior.text.Contains("自己先前没有依据地说过的话") ||
-            !behavior.text.Contains("没有依据不等于事实不存在") ||
-            !behavior.text.Contains("可以选择马上查工具，也可以暂时不查") ||
-            !behavior.text.Contains("生成正文前，静默检查每一句"))
-            throw new InvalidOperationException(
-                "Behavior prompt is missing the general evidence-grounding principle.");
-
-        if (singing == null ||
-            !singing.text.Contains("不确定性、自主判断与询问权") ||
-            !singing.text.Contains("你始终可以先询问") ||
-            !singing.text.Contains("用户提过歌名") ||
-            !singing.text.Contains("不能证明本机曲库里有它") ||
-            !singing.text.Contains("不能凭聊天印象列歌名") ||
-            !singing.text.Contains("承认刚才没有根据"))
-            throw new InvalidOperationException(
-                "Singing Skill is missing its domain-specific memory evidence boundary.");
+        TextAsset behavior = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/AIChatTookit/Prompts/behavior.txt");
+        TextAsset singing = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/AIChatTookit/Prompts/Skills/singing.txt");
+        if (behavior == null || behavior.text.Contains("<") || !behavior.text.Contains("询问不是每轮必做") ||
+            !behavior.text.Contains("采用") && !behavior.text.Contains("按有把握") ||
+            !behavior.text.Contains("用户最新纠正优先") || !behavior.text.Contains("错误不会因重复而成为事实"))
+            throw new InvalidOperationException("Behavior principles lost autonomous judgment or evidence grounding.");
+        if (singing == null || !singing.text.Contains("不确定时可询问") ||
+            !singing.text.Contains("不证明本机已有对应音频") || !singing.text.Contains("不按歌词编造"))
+            throw new InvalidOperationException("Singing principles lost uncertainty or the library-evidence boundary.");
     }
 
     private static void RunToolCorrectionRegression(Type chatType)
@@ -2944,13 +2916,10 @@ public static partial class SkillRoutingRegression
             throw new InvalidOperationException(
                 "Structured tool correction feedback lost facts or failed to neutralize tag-like text.");
 
-        TextAsset behavior = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/AIChatTookit/Prompts/behavior.txt");
-        if (behavior == null || !behavior.text.Contains("工具纠错事实") ||
-            !behavior.text.Contains("内部纠错可用") || behavior.text.Contains("纠错轮禁止 `<silent/>`") ||
-            !behavior.text.Contains("真实用户刚说完的回复中禁止"))
-            throw new InvalidOperationException(
-                "Behavior prompt is missing the user-turn tool correction protocol.");
+        string generalTools = PromptProtocolAssets.GeneralTools();
+        if (!generalTools.Contains("程序纠错事实") || !generalTools.Contains("可以只提交修正工具") ||
+            !generalTools.Contains("真实用户刚说完的回复禁止 skill_request"))
+            throw new InvalidOperationException("General compatibility contract lost tool correction or user-turn skill routing.");
     }
 
     private static void RunSongCatalogInspectionRegression(Type chatType)
@@ -3024,14 +2993,9 @@ public static partial class SkillRoutingRegression
             summary.Contains("audio_dir"))
             throw new InvalidOperationException("Song catalog summary lost counts, pagination, or privacy constraints.");
 
-        TextAsset prompt = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/AIChatTookit/Prompts/Skills/singing.txt");
-        TextAsset behavior = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/AIChatTookit/Prompts/behavior.txt");
-        if (prompt == null || !prompt.text.Contains("<song_catalog") ||
-            !prompt.text.Contains("只有、全部、一共") ||
-            behavior == null || !behavior.text.Contains("<song_catalog"))
-            throw new InvalidOperationException("Song catalog self-inspection protocol is missing from prompts.");
+        string tools = PromptProtocolAssets.SingingTools();
+        if (!tools.Contains("<song_catalog") || !tools.Contains("只有、全部、一共"))
+            throw new InvalidOperationException("Song catalog self-inspection contract is missing.");
     }
 
     private static void RunSingingPolicyRegression(Type chatType)
@@ -3164,8 +3128,7 @@ public static partial class SkillRoutingRegression
                     "A supported or migration singing tag is missing from the known tag registry: " + tag);
         }
 
-        TextAsset prompt = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/AIChatTookit/Prompts/Skills/singing.txt");
+        TextAsset prompt = Resources.Load<TextAsset>(PromptProtocolAssets.SingingPath);
         TextAsset behavior = AssetDatabase.LoadAssetAtPath<TextAsset>(
             "Assets/AIChatTookit/Prompts/behavior.txt");
         if (prompt == null || behavior == null ||
@@ -3627,8 +3590,7 @@ public static partial class SkillRoutingRegression
             throw new InvalidOperationException(
                 "Canonical and legacy pitch goals can conflict silently.");
 
-        TextAsset singingPrompt = AssetDatabase.LoadAssetAtPath<TextAsset>(
-            "Assets/AIChatTookit/Prompts/Skills/singing.txt");
+        TextAsset singingPrompt = Resources.Load<TextAsset>(PromptProtocolAssets.SingingPath);
         if (singingPrompt == null ||
             !singingPrompt.text.Contains("pitch_plan=\"keep,keep,+half_step\"") ||
             !singingPrompt.text.Contains("pitch_plan=\"keep,keep,+whole_step\"") ||
@@ -3639,7 +3601,6 @@ public static partial class SkillRoutingRegression
             !singingPrompt.text.Contains("局部重唱只更新对应段") ||
             !singingPrompt.text.Contains("片段的中心音高不是歌曲调性") ||
             !singingPrompt.text.Contains("ready") ||
-            !singingPrompt.text.Contains("不要再组合 source、mode、order") ||
             !singingPrompt.text.Contains("不原样重复同一无效请求"))
             throw new InvalidOperationException(
                 "Singing Skill no longer explains action consistency, current-material routing, or pitch rejection semantics.");

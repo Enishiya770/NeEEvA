@@ -30,6 +30,7 @@ public partial class ChatSample
         public readonly Vector3 rootPosition, rootScale, pointAtCapture, pointInRenderer;
         public readonly Quaternion rootRotation;
         public Vector3 focusRegion;
+        public Func<bool> ownerCurrent;
         private readonly NeEEvA.Motion.ArdyRoomLocomotionController controller;
         private readonly NeEEvA.Motion.ArdyRoomNavigation navigation;
 
@@ -50,6 +51,7 @@ public partial class ChatSample
 
         public string Validate()
         {
+            if (ownerCurrent != null && !ownerCurrent()) return "object-approach-plan-owner-invalidated";
             if (source == null || !source.IsObservationBindingCurrent(observed.observation) || source.Target != avatar ||
                 bridge == null || !bridge.IsConnected || bridge.avatar != avatar || bridge.environmentRoot != environment ||
                 bridge.Controller != controller || bridge.Navigation != navigation || controller == null || controller.Avatar != avatar ||
@@ -223,9 +225,10 @@ public partial class ChatSample
         ArdyRoomDialogueBridge bridge, int generation, int epoch, Action completed)
     {
         int workEpoch = m_WorkEpoch, userTurn = m_ActionConstraints.CurrentUserTurn;
+        var planCurrent = CaptureSceneActorPlanLease(decision, generation);
         bool Current() => epoch == m_SceneActionEpoch && generation == m_FormalResponseGeneration &&
             workEpoch == m_WorkEpoch && userTurn == m_ActionConstraints.CurrentUserTurn &&
-            isActiveAndEnabled && SceneEyesOpen && !m_UserSpeechActiveForAutonomy && ReferenceEquals(m_SceneActionFact, fact);
+            isActiveAndEnabled && SceneEyesOpen && !m_UserSpeechActiveForAutonomy && ReferenceEquals(m_SceneActionFact, fact) && planCurrent();
         void FinishPreparation(string dispatch)
         {
             if (!Current()) return;
@@ -247,7 +250,7 @@ public partial class ChatSample
         if (bridge == null || !bridge.IsConnected || bridge.ReservesBody || bridge.IsFollowing)
         { Reject("existing-body-task-has-priority"); yield break; }
         string revisitKind = decision.IsViewPosition ? "reposition-view:" + decision.viewPosition.direction : "approach-object";
-        if (decision.origin == "autonomous" && m_SceneTargetRevisitAt.TryGetValue(revisitKind + ":" + selected.EntityId, out float next) &&
+        if (decision.IsSelfInitiated && m_SceneTargetRevisitAt.TryGetValue(revisitKind + ":" + selected.EntityId, out float next) &&
             Time.realtimeSinceStartup < next)
         { Reject("same-visible-entity-autonomous-revisit-suppressed"); yield break; }
         float standOff = 0;
@@ -259,6 +262,7 @@ public partial class ChatSample
             selected = observationReference;
         }
         var anchor = new SceneObjectApproachAnchor(selected, bridge);
+        anchor.ownerCurrent = planCurrent;
         anchor.focusRegion = fact.hasIntentFocus ? fact.intentFocusWorldPoint : anchor.pointAtCapture;
         string failure = anchor.Validate();
         if (failure != null) { Reject(failure); yield break; }
@@ -366,7 +370,7 @@ public partial class ChatSample
     private IEnumerator ObserveSceneObjectApproachResult(SceneActionFact fact, SceneObjectApproachAnchor anchor, int epoch, int submittedOperation)
     {
         bool Current() => epoch == m_SceneActionEpoch && isActiveAndEnabled && m_SceneActionActive &&
-            ReferenceEquals(m_SceneActionFact, fact);
+            ReferenceEquals(m_SceneActionFact, fact) && (anchor.ownerCurrent == null || anchor.ownerCurrent());
         void Finish(string phase, string reason)
         {
             if (!Current()) return;
@@ -383,6 +387,8 @@ public partial class ChatSample
             m_SceneAttention?.Release(fact.actionId, reason);
             Finish("arrived-object-unconfirmed", reason);
         }
+        try
+        {
         float deadline = Time.realtimeSinceStartup + 120f;
         var focus = new SceneObjectApproachFocus { point = anchor.pointAtCapture, lastSeen = anchor.observed.observation.CapturedAtRealtime };
         ArdyRoomDialogueBridge.SceneTargetResult result = null;
@@ -443,7 +449,9 @@ public partial class ChatSample
         {
             bool received = false;
             float requestedAt = Time.realtimeSinceStartup;
-            RequestSceneObservation("scene-object-arrival-confirm", value => { observation = value; received = true; });
+            // This result must describe the arrived pose, not the rolling frame that
+            // happened to finish before the request (even when that frame is fresh).
+            RequestFreshSceneObservation("scene-object-arrival-confirm", value => { observation = value; received = true; });
             deadline = Time.realtimeSinceStartup + 4.5f;
             while (Current() && SameCompletedOperation() && !received && Time.realtimeSinceStartup < deadline) yield return null;
             if (!Current()) yield break;
@@ -479,6 +487,35 @@ public partial class ChatSample
         if (seen == null)
         { Unconfirmed("same-entity-not-visible", "actual floor arrival retained; same object could not be confirmed after the bounded arrival observation: " + failure); yield break; }
         if (anchor.Validate() != null) { Unconfirmed("target-invalidated", "object reference changed during arrival reobservation"); yield break; }
+        if (fact.gazeHold == "until-cancel")
+        {
+            // Locomotion released its pose lease above. Establish a stationary
+            // owner from this actual arrived image before promising to hold it.
+            if (m_SceneAttention == null || m_SceneAttention.OwnerId != fact.actionId || !m_SceneAttention.IsSettled)
+            {
+                if (m_SceneAttention == null || !m_SceneAttention.TryLookAt(fact.actionId, seen.WorldPoint, out failure, 4f))
+                { Unconfirmed("gaze-hold-not-established", "floor arrival retained; stationary gaze could not be acquired: " + failure); yield break; }
+                deadline = Time.realtimeSinceStartup + 4.5f;
+                while (Current() && SameCompletedOperation() && !m_SceneAttention.IsSettled && Time.realtimeSinceStartup < deadline) yield return null;
+                if (!Current()) yield break;
+                if (!SameCompletedOperation() || !m_SceneAttention.IsSettled)
+                { Unconfirmed("gaze-hold-not-established", "floor arrival retained; stationary gaze did not settle under the same body owner"); yield break; }
+                bool received = false;
+                float requestedAt = Time.realtimeSinceStartup;
+                RequestFreshSceneObservation("scene-object-arrival-gaze-confirm", value => { observation = value; received = true; });
+                deadline = Time.realtimeSinceStartup + 4.5f;
+                while (Current() && SameCompletedOperation() && !received && Time.realtimeSinceStartup < deadline) yield return null;
+                if (!Current()) yield break;
+                if (!SameCompletedOperation() || anchor.Validate() != null || !received || observation?.HasImage != true ||
+                    observation.CapturedAtRealtime < requestedAt || !IsFreshSceneObservation(observation) ||
+                    !anchor.source.TryFindObservedObject(observation, fact.entityId, out seen, out failure) ||
+                    !seen.VisibleConfirmed || seen.Root != anchor.root || !seen.TryValidate(out failure))
+                { Unconfirmed("gaze-hold-not-established", "floor arrival retained; the held head view did not reconfirm the same entity: " + failure); yield break; }
+                fact.resultCaptureId = observation.CaptureId;
+            }
+            if (!RetainSceneAttention(fact))
+            { Unconfirmed("gaze-hold-not-established", "floor arrival retained; stationary gaze ownership was lost before retention"); yield break; }
+        }
         fact.objectReobserved = true; fact.postArrivalObservationStatus = "same-entity-in-new-image";
         if (fact.intent == "reposition-view")
         {
@@ -488,10 +525,28 @@ public partial class ChatSample
         var device = seen.Root.GetComponent<SceneObjectLightSwitch>();
         if (device != null && device.EntityId != seen.EntityId) device = null;
         RememberSceneObject(seen, device);
-        m_SceneAttention?.RetainView(fact.actionId, 20f);
+        if (fact.gazeHold != "until-cancel") m_SceneAttention?.RetainView(fact.actionId, 20f);
         Finish("arrived", fact.intent == "reposition-view"
             ? "requested relative floor station and target facing reached; the same entity is visible in a new image. Compare the current RGB against viewPurpose; readability, whole-object visibility and occlusion improvement are not established by arrival alone"
             : "actual nearby floor station and facing reached; the same entity is visible in a new arrival image; no touching or device operation");
+        }
+        finally
+        {
+            // Revoking an adopted goal stops only its own physical operation.
+            // Do not cancel a new controller owner or publish a late result.
+            if (anchor.ownerCurrent != null && !anchor.ownerCurrent() && epoch == m_SceneActionEpoch &&
+                ReferenceEquals(m_SceneActionFact, fact) && m_SceneActionActive)
+            {
+                m_SceneAttention?.ReleaseLocomotionFocus(fact.actionId, "object-plan-owner-invalidated");
+                m_SceneAttention?.Release(fact.actionId, "object-plan-owner-invalidated");
+                EndSceneResultWatch(fact.actionId);
+                if (anchor.bridge != null && anchor.bridge.ActionId == fact.actionId &&
+                    anchor.bridge.Controller?.OperationRevision == submittedOperation)
+                    anchor.bridge.StopMovement("cancelled", "object-plan-owner-invalidated");
+                m_SceneActionActive = false;
+                RecordSceneAction(fact, "cancelled", "object-plan-owner-invalidated");
+            }
+        }
     }
 
     private void TickSceneObjectApproachFocus(SceneActionFact fact, SceneObjectApproachAnchor anchor, int operation,
@@ -516,7 +571,7 @@ public partial class ChatSample
             state.pending = true;
             state.nextCapture = now + Mathf.Clamp(m_SceneObjectApproachObservationInterval, .4f, 1f);
             float requestedAt = now;
-            RequestSceneObservation("scene-object-moving-focus", observation => {
+            RequestFreshSceneObservation("scene-object-moving-focus", observation => {
                 state.pending = false;
                 if (!current()) return;
                 string failure = null; SceneObservedObject seen = null;

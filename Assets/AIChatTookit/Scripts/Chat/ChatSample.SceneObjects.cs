@@ -40,6 +40,11 @@ public partial class ChatSample
             m_RecentSceneObjects.Clear(); m_SceneDeviceChangedAt.Clear(); m_KnownSceneObjects.Clear();
         }
         if (m_SceneObjectCatalogAttempted) return;
+        // The first continuous-vision setup can run from OnEnable while the
+        // scene is still loading. Do not consume the one profile scan then.
+        // A later formal observation calls this again before capturing pixels;
+        // only ready environments reach the potentially expensive structure scan.
+        if (!SceneObjectLampCatalog.IsEnvironmentReady(environment, out _)) return;
         m_SceneObjectCatalogAttempted = true;
         if (SceneObjectLampCatalog.EnsureRegistered(environment, out _, out string failure))
             Debug.Log("[Vision/Object] registered audited runtime lamp profile; local facts exposed only after visible selection", this);
@@ -66,6 +71,17 @@ public partial class ChatSample
             ["scope"] = "Only previously selected visible entities, observed timestamps and explicit device results. These are snapshots, not continuous perception or a room inventory. Scene-authored labels are annotations, not visual recognition. Hierarchy does not prove support/contact. No arbitrary Inspector edits or physical hand interaction. On/off controls the registered emitter and Light flag; baked lighting may remain.",
             ["deviceDistanceLimitMeters"] = Mathf.Clamp(m_SceneDeviceDistance, .5f, 3f)
         };
+    }
+
+    private JObject BuildSpatialObjectMemory()
+    {
+        var bridge = GetComponent<ArdyRoomDialogueBridge>();
+        bool same = m_EnableSceneObjectAwareness && bridge != null && bridge.environmentRoot != null &&
+            bridge.environmentRoot == m_SceneObjectEnvironment;
+        // KnownSceneObjectHistory validates scene/avatar/identity ownership, but does not read
+        // current transforms or claim that a historical entity is visible in the current frame.
+        return SpatialObjectMemory.Project(same ? KnownSceneObjectHistory() : new JArray(),
+            same && SceneResultBindingValid() ? m_SceneObjectStateResult : null, DateTime.UtcNow);
     }
 
     private bool KnownSceneObjectBinding(string entityId, out KnownSceneObject value)
@@ -107,6 +123,7 @@ public partial class ChatSample
                 ["captureId"]=observation.CaptureId, ["entityId"]=item.Key,
                 ["sceneLabel"]=current.SceneLabel, ["identitySource"]=current.IdentitySource,
                 ["imagePoint"]=new JObject { ["x"]=current.ImagePoint.x, ["y"]=current.ImagePoint.y },
+                ["deviceOperationPrerequisite"]=BuildSceneDeviceOperationPrerequisite(current),
                 ["scope"]="Same previously identified entity confirmed visible in this captured frame. Copy entityTarget for reference; execution still requires a new physical-view confirmation. No new device-state read or capability grant."
             });
         }
@@ -123,6 +140,10 @@ public partial class ChatSample
             ["identitySource"] = value.IdentitySource, ["captureId"] = value.CaptureId,
             ["observedUtc"] = value.CapturedAtUtc, ["visibleInCapturedFrame"] = true,
             ["pointAtCapture"] = JObject.FromObject(new { x=value.WorldPoint.x, y=value.WorldPoint.y, z=value.WorldPoint.z }),
+            ["imagePointAtCapture"] = new JObject { ["x"] = value.ImagePoint.x, ["y"] = value.ImagePoint.y },
+            ["observerPoseAtCapture"] = new JObject {
+                ["position"] = JObject.FromObject(new { x=value.observation.CameraPosition.x, y=value.observation.CameraPosition.y, z=value.observation.CameraPosition.z }),
+                ["rotation"] = JObject.FromObject(new { x=value.observation.CameraRotation.x, y=value.observation.CameraRotation.y, z=value.observation.CameraRotation.z, w=value.observation.CameraRotation.w }) },
             ["scope"] = value.MeasurementScope, ["capabilities"] = capabilities,
             ["runtimeDeviceStateReadAfterObservation"] = device == null ? null : JObject.Parse(JsonUtility.ToJson(device.ReadState())),
             ["stateReadAtUtc"] = device == null ? null : DateTime.UtcNow.ToString("o"),
@@ -142,7 +163,8 @@ public partial class ChatSample
         }
         m_KnownSceneObjects[value.EntityId] = new KnownSceneObject {
             root=value.Root, avatar=GetComponent<ArdyRoomDialogueBridge>()?.avatar, lastSeen=Time.realtimeSinceStartup,
-            facts=PickRoomFields(m_SelectedSceneObject, "entityId", "sceneLabel", "identitySource", "captureId", "observedUtc", "capabilities")
+            facts=PickRoomFields(m_SelectedSceneObject, "entityId", "sceneLabel", "identitySource", "captureId", "observedUtc", "capabilities",
+                "pointAtCapture", "imagePointAtCapture", "observerPoseAtCapture", "runtimeDeviceStateReadAfterObservation", "stateReadAtUtc")
         };
         m_RecentSceneObjects.Enqueue(PickRoomFields(m_SelectedSceneObject,
             "entityId", "sceneLabel", "identitySource", "captureId", "observedUtc"));
@@ -207,6 +229,13 @@ public partial class ChatSample
         // A wrong/unknown referent can be repaired against candidates in THIS current picture.
         // Source freshness, body ownership and output gates above are never bypassed.
         if (canReviewSelection && m_EnableSceneObjectTargetMatching) reject = null;
+        // An already bound entity cannot acquire power control from another matcher
+        // response. Explicit reselection may propose a different visible referent;
+        // it still passes the same capability check after matching, before looking.
+        if (reject == null && decision.IsObjectState && decision.entityTarget != null &&
+            !decision.RequestsTargetReselection && selected?.VisibleConfirmed == true &&
+            !TryGetSceneObjectPowerCapability(selected, bridge?.environmentRoot, out _, out string capabilityFailure))
+            reject = capabilityFailure;
         if (reject != null)
         {
             m_RoomTaskDispatch = "not-submitted: " + reject;
@@ -220,6 +249,7 @@ public partial class ChatSample
         var motion = new DialogueMotionIntent(decision.intent, "", generation, ++m_MotionSequence);
         RegisterMotionAction(ref motion); m_RoomTaskActionId = motion.ActionId;
         var fact = new SceneActionFact { actionId=motion.ActionId, intent=decision.intent, origin=decision.origin,
+            gazeHold=decision.gazeHold,
             captureId=observation.CaptureId, visualLabel=decision.visualTarget?.label ?? selected?.SceneLabel,
             viewDirection=decision.viewPosition?.direction, viewPurpose=decision.viewPosition?.purpose,
             requestedViewDistance=decision.viewPosition?.distance ?? 0,
@@ -230,6 +260,8 @@ public partial class ChatSample
             entityId=selected?.EntityId, objectConfirmed=selected?.VisibleConfirmed == true,
             focusKind=selected == null ? "image-region-bearing" : "visible-object",
             scope="Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation." };
+        if (!TryHandOffSceneViewToObjectPreparation(fact, generation))
+            CancelPersistentSceneAttention("new-scene-target");
         m_SceneActionActive = true; int epoch = ++m_SceneActionEpoch;
         m_PendingSceneFormalCaptureGeneration = generation;
         RecordSceneAction(fact, "preparing", "preparing selected-object observation or image-region focus");
@@ -244,6 +276,7 @@ public partial class ChatSample
         var environment = bridge.environmentRoot;
         var controller = bridge.Controller;
         int workEpoch = m_WorkEpoch, userTurn = m_ActionConstraints.CurrentUserTurn;
+        var planCurrent = CaptureSceneActorPlanLease(decision, generation);
         bool handedToNavigation = false;
         bool BindingCurrent() => source != null && source == m_SceneVisionCapture && source.Target == avatar &&
             avatar != null && environment != null && bridge.avatar == avatar && bridge.environmentRoot == environment &&
@@ -252,7 +285,7 @@ public partial class ChatSample
             environment.gameObject.scene == gameObject.scene;
         bool Current() => epoch == m_SceneActionEpoch && generation == m_FormalResponseGeneration && isActiveAndEnabled &&
             SceneEyesOpen && !m_UserSpeechActiveForAutonomy && bridge != null && bridge.IsConnected &&
-            workEpoch == m_WorkEpoch && userTurn == m_ActionConstraints.CurrentUserTurn;
+            workEpoch == m_WorkEpoch && userTurn == m_ActionConstraints.CurrentUserTurn && planCurrent();
         void Finish(string phase, string reason)
         {
             if (!Current()) return;
@@ -284,6 +317,9 @@ public partial class ChatSample
                 else if (matched == null) { Reject(matchFailure ?? "object-target-match-interrupted"); yield break; }
                 selected = matched;
             }
+            if (decision.IsObjectState &&
+                !TryGetSceneObjectPowerCapability(selected, environment, out _, out string capabilityFailure))
+            { Reject(capabilityFailure); yield break; }
             var eyes = m_SceneVisionCapture.Target.GetComponent<NevaEyeTracking>();
             if (eyes == null || !eyes.IsInitialized || !eyes.isActiveAndEnabled) { Reject("calibrated-attention-rig-unavailable"); yield break; }
             float deadline = Time.realtimeSinceStartup + 2f;
@@ -303,7 +339,7 @@ public partial class ChatSample
             if (!Current()) yield break;
             if (!m_SceneAttention.IsSettled) { Reject("attention-did-not-settle"); yield break; }
             SceneVisionObservation refreshed = null; bool captured = false;
-            RequestSceneObservation("scene-object-confirm", value => { refreshed=value; captured=true; });
+            RequestFreshSceneObservation("scene-object-confirm", value => { refreshed=value; captured=true; });
             deadline = Time.realtimeSinceStartup + 4.5f;
             while (Current() && !captured && Time.realtimeSinceStartup < deadline) yield return null;
             if (!Current()) yield break;
@@ -315,7 +351,7 @@ public partial class ChatSample
             if (selected == null)
             {
                 fact.resultCaptureId = refreshed.CaptureId;
-                if (!m_SceneAttention.RetainView(fact.actionId, 20f)) { Reject("attention-retention-lost"); yield break; }
+                if (!RetainSceneAttention(fact)) { Reject("attention-retention-lost"); yield break; }
                 Finish("observed", "actual head focused toward the image region and captured a new view; object identity and depth remain unconfirmed"); yield break;
             }
             if (!m_SceneVisionCapture.TryConfirmObject(refreshed, selected, out var confirmed, out failure) || !confirmed.VisibleConfirmed)
@@ -334,17 +370,18 @@ public partial class ChatSample
             if (!decision.IsObjectState)
             {
                 fact.resultCaptureId=refreshed.CaptureId;
-                if (!m_SceneAttention.RetainView(fact.actionId, 20f)) { Reject("attention-retention-lost"); yield break; }
+                if (!RetainSceneAttention(fact)) { Reject("attention-retention-lost"); yield break; }
                 Finish("observed", "selected visible entity confirmed in a new view; local authored facts and registered capabilities recorded"); yield break;
             }
-            if (device == null || !device.IsBound) { Reject("selected-object-has-no-registered-power-capability"); yield break; }
+            if (!TryGetSceneObjectPowerCapability(selected, environment, out device, out failure))
+            { Reject(failure); yield break; }
             if (device.Root != m_SceneObjectEnvironment && !device.Root.IsChildOf(m_SceneObjectEnvironment))
             { Reject("device-outside-bound-environment"); yield break; }
             if (Vector3.Distance(bridge.avatar.transform.position, device.Root.position) > Mathf.Clamp(m_SceneDeviceDistance, .5f, 3f))
             { Reject("device-outside-nearby-operation-distance"); yield break; }
             bool on = decision.objectState == "on";
             if (decision.objectState != "on" && decision.objectState != "off") { Reject("unsupported-object-state"); yield break; }
-            if (decision.origin == "autonomous" && device.ReadState().on != on &&
+            if (decision.IsSelfInitiated && device.ReadState().on != on &&
                 m_SceneDeviceChangedAt.TryGetValue(selected.EntityId, out float changedAt) && Time.realtimeSinceStartup - changedAt < 30f)
             { Reject("autonomous-device-change-cooldown"); yield break; }
             if (!Current()) yield break;
@@ -374,7 +411,7 @@ public partial class ChatSample
             float appliedRealtime = Time.realtimeSinceStartup;
             RecordSceneAction(fact, "state-applied", "registered device state applied; awaiting a fresh image, not a physical switch press");
             refreshed=null; captured=false;
-            RequestSceneObservation("scene-object-state-result", value => { refreshed=value; captured=true; });
+            RequestFreshSceneObservation("scene-object-state-result", value => { refreshed=value; captured=true; });
             deadline=Time.realtimeSinceStartup+4.5f;
             while (Current() && !captured && Time.realtimeSinceStartup < deadline) yield return null;
             if (!Current()) yield break;
@@ -410,5 +447,20 @@ public partial class ChatSample
             if (epoch == m_SceneActionEpoch && m_SceneActionActive && !handedToNavigation)
             { m_SceneAttention?.Release(fact.actionId, "object-preparation-ended"); m_SceneActionActive=false; m_PendingSceneFormalCaptureGeneration=-1; }
         }
+    }
+
+    private static bool TryGetSceneObjectPowerCapability(SceneObservedObject selected, Transform environment,
+        out SceneObjectLightSwitch device, out string reason)
+    {
+        device = null; reason = "selected-object-has-no-registered-power-capability";
+        if (selected?.VisibleConfirmed != true || selected.Root == null || !selected.TryValidate(out _)) return false;
+        var candidate = selected.Root.GetComponent<SceneObjectLightSwitch>();
+        if (candidate == null || candidate.Root != selected.Root || candidate.EntityId != selected.EntityId || !candidate.IsBound)
+            return false;
+        if (environment == null || (candidate.Root != environment && !candidate.Root.IsChildOf(environment)))
+        { reason = "device-outside-bound-environment"; return false; }
+        if (!candidate.TryValidate(out var invalid))
+        { reason = "registered-power-capability-invalid: " + invalid; return false; }
+        device = candidate; reason = null; return true;
     }
 }

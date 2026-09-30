@@ -35,7 +35,11 @@ public sealed class RoleOutputChannels
     private int thoughtDepth;
     private char quote;
     private readonly Action<SpeechText> onSpeech;
+    private readonly Action<SpeechText> onSilentSpeech;
+    private readonly Action<string> onDiagnostic;
+    private void Observe(string name) { try { onDiagnostic?.Invoke(name); } catch { } }
     private readonly StringBuilder pendingSpeech = new StringBuilder();
+    private readonly StringBuilder pendingSilentSpeech = new StringBuilder();
     private string languageCode;
     public bool HasInvalidLanguage { get; private set; }
     public bool HasUndeclaredSpeech { get; private set; }
@@ -53,7 +57,8 @@ public sealed class RoleOutputChannels
         (SpeechDependency == SpeechActionDependency.AfterAction && !HasSingingValidationActions
             ? "本轮没有提交演唱、素材变更或歌唱权限提案，不能使用 after_action。"
             : "发声阶段必须在正文前声明一次；本轮不能中途切换。") +
-        "普通聊天及房间/上身 motion 使用 independent；只有本轮确实提交演唱、素材变更或歌唱权限提案才用 after_action。" +
+        "普通聊天、song_search/song_catalog只读查询及房间/上身 motion 使用 independent；只有本轮确实提交演唱目标、演唱、素材变更或歌唱权限提案才用 after_action。" +
+        "查询尚未返回时不得声称已查明；口头承诺不构成依赖动作。" +
         "先读当前房间/身体执行事实，再自然说明意图或实际结果；不要为了纠正发声阶段重复已受理的 motion，" +
         "也不要把格式错误说成房间移动失败或已完成。";
     private bool phaseDeclared, phaseSpeechSuppressed;
@@ -63,9 +68,13 @@ public sealed class RoleOutputChannels
         "song_remember", "song_rename", "song_forget", "singing_policy" };
 
     public RoleOutputChannels(Action<SpeechText> onSpeech = null,
-        RoleOutputBoundaryPolicy boundaryPolicy = RoleOutputBoundaryPolicy.LegacyCompatible)
+        RoleOutputBoundaryPolicy boundaryPolicy = RoleOutputBoundaryPolicy.LegacyCompatible,
+        Action<string> onDiagnostic = null,
+        Action<SpeechText> onSilentSpeech = null)
     {
         this.onSpeech = onSpeech;
+        this.onDiagnostic = onDiagnostic;
+        this.onSilentSpeech = onSilentSpeech;
         this.boundaryPolicy = boundaryPolicy;
     }
     public int PrivateCharacters { get; private set; }
@@ -194,7 +203,11 @@ public sealed class RoleOutputChannels
             else if (!char.IsWhiteSpace(c)) atSpeechBlockStart = false;
             if (languageCode == null && char.IsLetterOrDigit(c)) HasUndeclaredSpeech = true;
         }
-        else if (!char.IsWhiteSpace(c)) PrivateCharacters++;
+        else
+        {
+            if (thoughtDepth > 0) pendingSilentSpeech.Append(c);
+            if (!char.IsWhiteSpace(c)) PrivateCharacters++;
+        }
     }
 
     private void FlushSpeech()
@@ -203,6 +216,15 @@ public sealed class RoleOutputChannels
         var part = new SpeechText(pendingSpeech.ToString(), languageCode, actionDependency: SpeechDependency);
         pendingSpeech.Length = 0;
         onSpeech?.Invoke(part);
+    }
+
+    private void FlushSilentSpeech()
+    {
+        if (pendingSilentSpeech.Length == 0) return;
+        var part = new SpeechText(pendingSilentSpeech.ToString(), languageCode, "thought",
+            SpeechActionDependency.Unspecified, suppressTts: true);
+        pendingSilentSpeech.Length = 0;
+        try { onSilentSpeech?.Invoke(part); } catch { }
     }
 
     public string Finish()
@@ -228,6 +250,7 @@ public sealed class RoleOutputChannels
         if (phaseDeclared && SpeechDependency == SpeechActionDependency.AfterAction && HasSpeech &&
             !HasSingingValidationActions)
             RejectSpeechPhase("声明台词等待动作校验，但没有提交对应演唱、素材动作或歌唱权限提案；空承诺未受理。 ");
+        FlushSilentSpeech();
         FlushSpeech();
         return emitted.ToString();
     }
@@ -250,8 +273,21 @@ public sealed class RoleOutputChannels
         }
         if (name == "thought" || name == "think")
         {
-            if (closing) thoughtDepth = Math.Max(0, thoughtDepth - 1);
-            else if (!token.EndsWith("/>", StringComparison.Ordinal)) thoughtDepth++;
+            if (closing)
+            {
+                bool wasInside = thoughtDepth > 0;
+                thoughtDepth = Math.Max(0, thoughtDepth - 1);
+                if (wasInside && thoughtDepth == 0)
+                {
+                    Observe("role.thought_closed");
+                    FlushSilentSpeech();
+                }
+            }
+            else if (!token.EndsWith("/>", StringComparison.Ordinal))
+            {
+                if (thoughtDepth == 0) Observe("role.thought_opened");
+                thoughtDepth++;
+            }
             return;
         }
         if (thoughtDepth > 0) return;
@@ -381,6 +417,7 @@ public sealed class RoleOutputChannels
                     return;
                 }
             }
+            Observe("role.action_candidate");
             actions.Append(token);
             actionTokens.Add(token);
         }
@@ -425,7 +462,13 @@ public sealed class RoleOutputChannels
         }
         bool discardedDependentSpeech = HasInvalidSpeechPhase && SpeechDependency != SpeechActionDependency.Independent;
         string prefix = "";
-        if (includeSpeechPhase && (phaseDeclared || HasInvalidSpeechPhase) && HasSpeech)
+        // Silent structured singing proposals still own an action dependency.
+        // Dropping it because no public words were generated makes the completion
+        // callback lose the declaration that the independent goal review requires.
+        // Preserve rejected declarations too; projection cannot turn an invalid
+        // dependent proposal into an unqualified executable action.
+        if (includeSpeechPhase && (phaseDeclared || HasInvalidSpeechPhase) &&
+            (HasSpeech || HasSingingValidationActions))
             prefix = "<speech mode=\"" + (SpeechDependency == SpeechActionDependency.Independent ? "independent" : "after_action") +
                 (HasInvalidSpeechPhase ? "\" rejected=\"true" : "") + "\"/>";
         return prefix + (!discardedDependentSpeech && HasSpeech ? speech.ToString().TrimEnd() : "<silent/>") + executableActions;

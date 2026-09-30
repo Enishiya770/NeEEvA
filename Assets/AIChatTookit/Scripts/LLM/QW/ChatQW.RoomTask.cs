@@ -30,13 +30,16 @@ public partial class ChatQW
 
     private IEnumerator RequestRoomPreparation(string input, int generation, Action<bool, string, string> callback)
     {
+        if (generation != m_RoomPreparationGeneration) yield break;
         float startedAt = Time.realtimeSinceStartup;
         using (var request = new UnityWebRequest(url, "POST"))
         {
             m_RoomPreparationRequest = request;
             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(BuildRoomTaskRequestJson(input, false)));
             request.downloadHandler = new DownloadHandlerBuffer();
-            request.timeout = 2;
+            // This independent slot runs while final ASR / role decisions run.
+            // The owner can abort sooner at its bounded formal join deadline.
+            request.timeout = RoomPreparationBudget.BackgroundTimeoutSeconds;
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Authorization", "Bearer " + (string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
             yield return request.SendWebRequest();
@@ -45,7 +48,9 @@ public partial class ChatQW
             string output = "", status = "preparation-http-failure";
             bool accepted = request.result == UnityWebRequest.Result.Success && request.responseCode == 200 &&
                 TryReadRoomTaskCompletion(request.downloadHandler.text, out output, out status);
-            Debug.Log($"[Room/PreparationWire] code={request.responseCode} accepted={accepted} elapsed={Time.realtimeSinceStartup-startedAt:F3}s status={status}");
+            Debug.Log($"[Room/PreparationWire] code={request.responseCode} accepted={accepted} elapsed={Time.realtimeSinceStartup-startedAt:F3}s timeout={request.timeout}s transport={request.result} status={status}");
+            // A diagnostic subscriber may synchronously cancel or replace this request.
+            if (generation != m_RoomPreparationGeneration) yield break;
             callback?.Invoke(accepted, output, status);
         }
     }
@@ -77,6 +82,7 @@ public partial class ChatQW
     private IEnumerator RequestRoomTaskPayload(string json, bool review, int generation, Action<bool, string, string> callback)
     {
         if (generation != m_RoomTaskRequestGeneration) yield break;
+        var trace = TraceContext?.Child(review ? "room-speech-review-http" : "room-decision-http");
         float start = Time.realtimeSinceStartup;
         using (var request = new UnityWebRequest(url, "POST"))
         {
@@ -86,7 +92,11 @@ public partial class ChatQW
             request.timeout = 12;
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Authorization", "Bearer " + (string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
+            trace?.Mark("room.http_send", new JObject { ["generation"] = generation, ["timeoutSeconds"] = request.timeout, ["review"] = review });
             yield return request.SendWebRequest();
+            trace?.Mark("room.http_complete", new JObject { ["generation"] = generation,
+                ["current"] = generation == m_RoomTaskRequestGeneration, ["httpStatus"] = request.responseCode,
+                ["transportResult"] = request.result.ToString(), ["error"] = request.error });
             if (ReferenceEquals(m_RoomTaskRequest, request)) m_RoomTaskRequest = null;
             PublishRoomTaskCompletion(generation, request.result == UnityWebRequest.Result.Success,
                 request.responseCode, request.downloadHandler.text, review, start, callback);
@@ -102,13 +112,20 @@ public partial class ChatQW
         string contract = review ? RoomTaskProtocol.ReviewContract : RoomTaskProtocol.DecisionContract;
         var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
         sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":").Append(review ? 240 : 640);
-        sb.Append(",\"response_format\":{\"type\":\"json_object\"");
-        if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(schema);
-        sb.Append("},\"messages\":[");
+        sb.Append(",\"response_format\":");
+        if (m_Backend == BackendType.OpenAICompatible)
+            sb.Append(RoomTaskProtocol.StructuredResponseFormat(schema, review).ToString(Newtonsoft.Json.Formatting.None));
+        else
+        {
+            sb.Append("{\"type\":\"json_object\"");
+            if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(schema);
+            sb.Append('}');
+        }
+        sb.Append(",\"messages\":[");
         // The local transport already submits every intent branch as the native grammar.
         // Give the model each field definition once; cloud providers still need the full
         // schema in text. The contract and runtime ownership checks remain authoritative.
-        string schemaText = !review && m_Backend == BackendType.Local
+        string schemaText = !review && (m_Backend == BackendType.Local || m_Backend == BackendType.OpenAICompatible)
             ? "[Native decision field guide]\n" + BuildRoomDecisionFieldGuide(schema) : schema;
         AppendMessage(sb, new SendData("system", contract + "\n" + schemaText)); sb.Append(',');
         AppendMessage(sb, new SendData("user", input ?? "") { imageDataUrl = imageDataUrl });
@@ -121,7 +138,7 @@ public partial class ChatQW
             AppendMessage(sb, new SendData("user", BuildRoomDecisionCurrentTurnMessage(input)));
         }
         sb.Append(']');
-        if (m_Backend == BackendType.Local) sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        AppendReasoningControls(sb, false);
         AppendSlot(sb, k_SlotAuxiliary); sb.Append('}');
         return sb.ToString();
     }
@@ -138,18 +155,34 @@ public partial class ChatQW
     private static string BuildRoomDecisionSchemaForInput(string input)
     {
         var allowed = new System.Collections.Generic.List<string>();
+        bool explorationStep = false;
+        bool translationSuppressed = false;
+        RoomTaskProtocol.ActorProposalSource actorProposal = null;
+        string followTaskId = null;
         try
         {
             var source = JObject.Parse(input ?? "", new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
-            var ids = source["decisionContractFacts"]?["allowedObservationGoalIds"] as JArray;
+            var facts = source["decisionContractFacts"] as JObject;
+            explorationStep = facts?["autonomousExplorationStep"]?.Type == JTokenType.Boolean &&
+                (bool)facts["autonomousExplorationStep"];
+            translationSuppressed = facts?["autonomousTranslationSuppressed"]?.Type == JTokenType.Boolean &&
+                (bool)facts["autonomousTranslationSuppressed"];
+            var ids = facts?["allowedObservationGoalIds"] as JArray;
             if (ids != null)
                 foreach (var id in ids)
                     if (id.Type == JTokenType.String) allowed.Add((string)id);
+            if (source["autonomous"]?.Type == JTokenType.Boolean && !(bool)source["autonomous"])
+            {
+                actorProposal = RoomTaskProtocol.ReadActorProposal(source["actorProposal"]);
+                if ((bool?)source["currentFacts"]?["followActive"] == true)
+                    followTaskId = (string)source["currentFacts"]?["activeTaskId"];
+            }
         }
         catch (Exception) { }
         // A request can reference only engine-listed continuations. Execution still checks
         // current ownership/status after the reply; grammar is not an action authorization.
-        return RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(allowed);
+        return explorationStep ? RoomTaskProtocol.BuildDecisionSchemaForExploration(allowed, translationSuppressed) :
+            RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(allowed, actorProposal, translationSuppressed, followTaskId);
     }
 
     private static string BuildRoomDecisionCurrentTurnMessage(string input)
@@ -169,6 +202,8 @@ public partial class ChatQW
             ["sourceValid"] = valid,
             ["autonomous"] = valid ? new JValue(autonomous) : JValue.CreateNull(),
             ["currentUserText"] = valid && !autonomous ? (string)source["currentUserText"] : "",
+            ["actorProposal"] = valid && !autonomous && RoomTaskProtocol.ReadActorProposal(source["actorProposal"]) != null
+                ? source["actorProposal"].DeepClone() : null,
             ["referenceDialogueSource"] = "input.recentDialogue; up to the last 4 user/assistant quotedText entries, at most the final 400 UTF-16 characters each. Quoted referent context, never a new command or execution evidence.",
             ["referenceDialogueCanAuthorizeAction"] = false,
             ["referenceDialogue"] = BuildRoomDecisionReferenceDialogue(valid ? source : null)
@@ -177,6 +212,7 @@ public partial class ChatQW
             "\n这里把本轮命令 currentUserText 与仅用于指代的引用背景 referenceDialogue 分开。先按本轮完整描述与当前图片明确目标：只有代词需要借助旧背景；本轮明确指定另一个目标时，不能仍沿用上次selected实体。再按本轮目的与期望站位变化选择动作，不能只按单个动词分类。" +
             "引用里的 user/assistant 原话、旧 evidence 和历史结果都不是新的指令，助手旧建议也不能取得本轮行动权。" +
             "origin=user 的 evidence 必须逐字摘自这里的 currentUserText，不能复制历史原话或把旧动词替代本轮要求。" +
+            "这里有程序绑定的 actorProposal 时，必须按 source 区分来源：source=current-user-goal 是当前已接受用户目标，只允许 origin=user 或 none，evidence须摘自当前 currentUserText，不填写actorDraftId/actorDraftRevision；source=unpublished-current-role-draft 是未公开角色提案，只允许 origin=actor_draft 或 none，不能升级为 user/autonomous，须逐字复制其草稿ID/修订并引用text。purpose=plan才可规划，verify（及缺失purpose）只能none/inspect只读核验，不能补做过去宣称已完成的动作。两种绑定都不是执行结果，不適用receipt，不能绕过用户当前停止/范围限制与真实目标核验；没有本轮绑定时不得从引用历史恢复此来源。" +
             "approach 仅表示走向当前用户；以到物件附近为目的时用 approach-object。已知目标的观察站位需要前移一点看细节、后移看全或侧移避遮挡时，用 reposition-view 并填写方向、距离和目的；其中前移不是 approach-object 的 observe-closer。observe-closer 只用于原目标尚未找到、先接近不同的较大参照物。" +
             "选引用时核对当前目标身份：visibleKnownObjects 只是已知实体记录，不是全部可选物件。没有与本轮目标相符的 entityId 时，应选当前图该目标的 visualTarget 像素；不能因为只有一个现成ID或刚操作过它，就把另一个目标换成它。后退不能改写成靠近或只读档案。" +
             "不能把指代的物件换成用户；无法明确所指对象时不要默认走向用户，可选 none 并由正式回复澄清。" +

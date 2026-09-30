@@ -1,0 +1,9 @@
+FROM ghcr.io/anemll/dspark-vllm-gx10:0.1.1
+USER root
+RUN test -x /usr/bin/ffmpeg
+RUN python3 -m venv --system-site-packages /opt/neeeva-vc-venv
+COPY requirements-spark.txt /tmp/neeeva-vc-requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip /opt/neeeva-vc-venv/bin/python -m pip install -r /tmp/neeeva-vc-requirements.txt
+ENV OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONUNBUFFERED=1
+ENV PATH=/opt/neeeva-vc-venv/bin:$PATH
+ENTRYPOINT ["/opt/neeeva-vc-venv/bin/python"]

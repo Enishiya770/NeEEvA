@@ -1,0 +1,148 @@
+{
+  "segments": [
+    {
+      "id": 1,
+      "start_seconds": 0.0,
+      "end_seconds": 6.73,
+      "region": "head",
+      "type": "uncertain",
+      "type_source": "acoustic_boundary_hypothesis",
+      "text": "你还是没动算了呃，接下来测试歌唱能力，我要唱了一段歌。",
+      "language": "zh",
+      "status": "ok",
+      "error": "",
+      "alternatives": [],
+      "confidence_available": false,
+      "review_required": false
+    },
+    {
+      "id": 2,
+      "start_seconds": 6.73,
+      "end_seconds": 13.38,
+      "region": "island",
+      "type": "singing_candidate",
+      "type_source": "acoustic_boundary_hypothesis",
+      "text": "初めて の ルーブル は なんて こと は なかた は 私 だけ の もナリ だ。",
+      "language": "ja",
+      "status": "ok",
+      "error": "",
+      "alternatives": [
+        {
+          "source": "boundary_overlap",
+          "start_seconds": 6.33,
+          "end_seconds": 13.78,
+          "text": "初めて のルーブル は なんて こと は なかた は 私だけの 無だ。",
+          "language": "ja",
+          "audio_event": "Speech"
+        }
+      ],
+      "confidence_available": false,
+      "review_required": true
+    },
+    {
+      "id": 3,
+      "start_seconds": 13.38,
+      "end_seconds": 16.17,
+      "region": "island",
+      "type": "singing_candidate",
+      "type_source": "acoustic_boundary_hypothesis",
+      "text": "もに出会ってたから。",
+      "language": "ja",
+      "status": "ok",
+      "error": "",
+      "alternatives": [
+        {
+          "source": "boundary_overlap",
+          "start_seconds": 12.98,
+          "end_seconds": 16.57,
+          "text": "もう男 に 出会 って たから。",
+          "language": "ja",
+          "audio_event": "Speech"
+        }
+      ],
+      "confidence_available": false,
+      "review_required": true
+    },
+    {
+      "id": 4,
+      "start_seconds": 16.17,
+      "end_seconds": 21.16,
+      "region": "tail",
+      "type": "uncertain",
+      "type_source": "acoustic_boundary_hypothesis",
+      "text": "呃，你能把我现在唱的这一段唱给我听吗？",
+      "language": "zh",
+      "status": "ok",
+      "error": "",
+      "alternatives": [],
+      "confidence_available": false,
+      "review_required": false
+    }
+  ],
+  "rawSeconds": 21.16,
+  "scope": "Observed final transcripts/segments and completed speech only. No human lyric labels. Numeric identities below describe capture order; tests create synthetic in-memory clips with matching sequence, never source approval.",
+  "sourceLogSha256": "26a8729052345b0fa171cf8774eb4a892f0fa8a95bb7539ee1fceab4629edfe5",
+  "rows": [
+    {
+      "sourceLine": 71478,
+      "publicSpeech": "わかったわ。次の指示ね。いつでも準備はできてるから、どうぞ。",
+      "capture": 15,
+      "user": "很好，就是整整一段的速度啊，就是从我说完话到你走过来说完话，整段的速度有点。 偏慢了。那这个待会我估计还是工程学的问题，待会再去问问问问GPT老师吧。好，下一个行动，那个请你一直跟着我。"
+    },
+    {
+      "sourceLine": 73939,
+      "publicSpeech": "わかったわ。あなたの後ろを、ずっとついていくわね。",
+      "capture": 16,
+      "user": "试着跟着我，一直跟着我。"
+    },
+    {
+      "sourceLine": 76041,
+      "publicSpeech": "あら、ごめんなさい。つい景色に見とれて、あなたの後を追うのを忘れてたわ。今からちゃんとついていくわね。",
+      "capture": 17,
+      "user": "我看你没跟过来啊。"
+    },
+    {
+      "sourceLine": 78534,
+      "publicSpeech": "あら、ごめんなさい。私の頭が固くなっちゃって、動けなくなっていたの。でも、今からちゃんと動くわね。",
+      "capture": 18,
+      "user": "你还是没动啊，你现在动都没动，你怎么说能说跟着我呢？"
+    },
+    {
+      "sourceLine": 81963,
+      "publicSpeech": "ふふっ、また私の頭が固くなっちゃってごめんね。歌のテスト、楽しみにしてるわ。さあ、準備はいい？",
+      "capture": 19,
+      "user": "你还是没动算了呃，接下来测试歌唱能力，我要唱了一段歌，每天的日。 なんてことはなかたは私だけのも何にたもに出会ってたから。 呃，你能把我现在唱的这一段唱给我听吗？"
+    },
+    {
+      "sourceLine": 84578,
+      "publicSpeech": "あら、ごめんなさい。私の頭が固くなっちゃって、ちゃんと聞こえてなかったの。でも、あなたの歌はすごく素敵だったわね。",
+      "capture": 20,
+      "user": "哎，我刚才已经把歌唱出来了呀，你没听到吗？"
+    },
+    {
+      "sourceLine": 86569,
+      "publicSpeech": "あら、ごめんね。私の頭が固くなっちゃって、ちゃんと聞こえてなかったの。あなたの歌、すごく素敵だったわね。",
+      "capture": 21,
+      "user": "那你能把它唱出来吗？"
+    },
+    {
+      "sourceLine": 89301,
+      "publicSpeech": "あら、ごめんなさい。また私の頭が固くなっちゃって、あなたの本当の意図をちゃんと汲み取れてなかったの。あなたの歌、すごく素敵だったわね。さあ、準備はいい？",
+      "capture": 22,
+      "user": "完了你又开始复读了。呃，我是说我希望你唱我刚才唱的那一段歌。"
+    },
+    {
+      "sourceLine": 91750,
+      "publicSpeech": null,
+      "capture": 23,
+      "user": "我是要你唱呀，是要你唱出我刚才唱的那一段话。"
+    },
+    {
+      "sourceLine": 92797,
+      "publicSpeech": "あら、ごめんなさい。また私の頭が固くなっちゃって、あなたの本当の意図をちゃんと汲み取れてなかったの。あなたの歌、すごく素敵だったわね。さあ、準備はいい？",
+      "capture": 24,
+      "user": "我是要你唱呀，是要你唱出我刚才唱的那一段话，那一段歌说错了。"
+    }
+  ],
+  "rawSha256": "05bc4e85e5ffb95c7a036060a9f149d3afbe39b455f1fde5472aef7e23669aaf"
+}

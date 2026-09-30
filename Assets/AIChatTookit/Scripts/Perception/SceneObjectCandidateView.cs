@@ -22,7 +22,8 @@ namespace NeEEvA.Perception
             public PixelBox pixelBounds, markerPixelBounds;
             public int visiblePixelCount;
             public LocalHierarchy localHierarchy;
-            public string scope = "Opaque pixels in the source captured frame. Scene labels are authored annotations, not image interpretation. No inferred identity match, capability, current world position or reachability.";
+            public string[] registeredCapabilities;
+            public string scope = "Opaque pixels in the source captured frame. Scene labels are authored annotations, not image interpretation. registeredCapabilities records validated local interfaces at snapshot time, not permission to execute; absence cannot be repaired by a visual label. No inferred identity match, current world position or reachability.";
             [NonSerialized] internal SceneObservedObject selected;
         }
         [Serializable] public sealed class LocalPart
@@ -74,6 +75,31 @@ namespace NeEEvA.Perception
                     selected=item.selected; return true;
                 }
             reason="candidateId is not one of this exact candidate view's short IDs."; return false;
+        }
+
+        // Historical identity only, never a current-view permit. Used after an asynchronous
+        // interpretation to request a NEW image of exactly this entity, not to reuse old pixels.
+        internal bool TryGetHistoricalCandidateForReobservation(string candidateId, out SceneObservedObject selected, out string reason)
+        {
+            selected = null; reason = "Candidate is not a confirmed visible identity.";
+            if (source == null || !source.isActiveAndEnabled || !source.IsObservationBindingCurrent(observation) ||
+                !SceneVisionGrounding.Fresh(observation))
+            { reason = "Candidate source identity or age no longer permits same-entity reobservation."; return false; }
+            foreach (var item in candidates)
+                if (string.Equals(item.candidateId, candidateId, StringComparison.Ordinal))
+                {
+                    if (!item.selected.VisibleConfirmed || !item.selected.TryValidate(out reason)) return false;
+                    selected = item.selected; return true;
+                }
+            reason = "candidateId is not one of this exact candidate view's short IDs."; return false;
+        }
+
+        internal static string[] RegisteredCapabilities(SceneObservedObject selected)
+        {
+            var device = selected?.Root != null ? selected.Root.GetComponent<SceneObjectLightSwitch>() : null;
+            bool power = selected?.VisibleConfirmed == true && selected.TryValidate(out _) && device != null &&
+                device.Root == selected.Root && device.EntityId == selected.EntityId && device.IsBound && device.TryValidate(out _);
+            return power ? new[] { "inspect-object", "look-at", "set-object-state:on|off" } : new[] { "inspect-object", "look-at" };
         }
 
         private sealed class Mask
@@ -159,7 +185,7 @@ namespace NeEEvA.Perception
                     sceneLabel=item.observed.SceneLabel,identitySource=item.observed.IdentitySource,
                     imagePoint=item.sample,visiblePixelCount=item.count,
                     pixelBounds=new PixelBox(item.minX,item.minY,item.maxX-item.minX+1,item.maxY-item.minY+1),
-                    localHierarchy=Hierarchy(item.observed),selected=item.observed };
+                    localHierarchy=Hierarchy(item.observed),registeredCapabilities=RegisteredCapabilities(item.observed),selected=item.observed };
             }
             Texture2D original=null,composite=null;
             try

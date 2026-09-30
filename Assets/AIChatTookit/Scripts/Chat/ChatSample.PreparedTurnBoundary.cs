@@ -61,6 +61,7 @@ public partial class ChatSample
         int requestVersion = ++m_SpeculativeRequestVersion;
         m_SpeculativeRequestInFlight = true;
         int inputRevision = m_InputAudioRevision, audioMs = m_StreamingLatestAudioMs;
+        int thoughtEpoch = m_ListeningThoughtEpoch;
         var trace = new PreparedListeningTrace
         {
             Id = "listening-" + source.CaptureSerial + "-" + inputRevision + "-" + requestVersion,
@@ -78,6 +79,7 @@ public partial class ChatSample
             if (!currentRequest) return;
             m_SpeculativeRequestInFlight = false;
             StagePreparedTurnBoundary(response, transcript, source, inputRevision, requestedAt);
+            StageIncrementalListeningPreparation(response, source, inputRevision, requestVersion, requestedAt, thoughtEpoch);
             if (TranscriptContinuity(transcript, m_StreamingTranscript) < 0.55f)
             { ScheduleSpeculativeRefreshIfNeeded(); return; }
             SpeculativeDraft parsed = ParseSpeculativeDraft(response);
@@ -88,14 +90,9 @@ public partial class ChatSample
                 StoreStreamingObservedMode(parsed, transcript);
                 if (IsStrongSpeculativeSpeechVeto(parsed) && OnStableUserSpeechObserved != null)
                     OnStableUserSpeechObserved(m_LastObservedModeConfidence, m_StreamingLatestAudioMs);
-                if (!string.IsNullOrWhiteSpace(parsed.draft))
-                {
-                    parsed.draft = StripAgentTagsForTTS(parsed.draft).Trim();
-                    m_SpeculativeDraft = parsed;
-                    if (m_LogSpeculativeListening)
-                        Debug.Log($"[流式倾听] 临时草稿就绪 confidence={parsed.confidence:F2} mode={parsed.observed_mode}/{parsed.mode_confidence:F2}: \"{parsed.draft}\"");
-                    if (!m_StreamingTurnIsSinging) PrepareSingingBridge(parsed);
-                }
+                // Even a backend that returns a legacy nonempty draft cannot enqueue
+                // TTS or inject that prose into the formal reply. Only evidenced
+                // preparation is carried into the formal decision as bounded data.
             }
             ScheduleSpeculativeRefreshIfNeeded();
         });
@@ -134,6 +131,12 @@ public partial class ChatSample
     {
         PreparedTurnBoundaryEvidence previous = m_PreparedBoundaryEvidence;
         m_PreparedBoundaryEvidence = evidence;
+        if (m_IncrementalListeningCandidate != null &&
+            (evidence.CaptureSerial != m_IncrementalListeningCandidate.Source.CaptureSerial ||
+             m_InputAudioRevision != m_IncrementalListeningCandidate.InputRevision))
+            ClearIncrementalListeningPreparation();
+        MaintainListeningThought();
+        ReconcileListeningThought(evidence.Transcript);
         // ASR can still repeat the same words when the user resumes after a pause.
         // Only a real recorder activity revision schedules this refresh; coverage-only
         // updates do not. Normal update handling owns changed transcript scheduling.

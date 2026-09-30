@@ -28,6 +28,7 @@ public static class ChatLatencyTransportRegression
         CheckStagedObservations();
         CheckSceneFactRequestSharing();
         CheckFormalResponseStages();
+        CheckOpenAICompatibleBackend();
         checks += SceneFactCompactionRegression.RunChecks();
         Debug.Log("[ChatLatencyTransportRegression] passed checks=" + checks);
     }
@@ -346,6 +347,51 @@ public static class ChatLatencyTransportRegression
 
     private static JObject Request(ChatQW model, string context) => JObject.Parse((string)typeof(ChatQW)
         .GetMethod("BuildRequestJsonForMessages", Flags).Invoke(model, new object[] { model.m_DataList, true, context }));
+
+    private static void CheckOpenAICompatibleBackend()
+    {
+        const string urlName = "NEEEVA_OPENAI_BASE_URL";
+        const string modelName = "NEEEVA_OPENAI_MODEL";
+        const string keyName = "NEEEVA_OPENAI_API_KEY";
+        string oldUrl = Environment.GetEnvironmentVariable(urlName);
+        string oldModel = Environment.GetEnvironmentVariable(modelName);
+        string oldKey = Environment.GetEnvironmentVariable(keyName);
+        var host = new GameObject("InactiveOpenAICompatibleWireFixture"); host.SetActive(false);
+        try
+        {
+            Environment.SetEnvironmentVariable(urlName, "https://fixture.invalid/v1/chat/completions");
+            Environment.SetEnvironmentVariable(modelName, "fixture-vision-model");
+            Environment.SetEnvironmentVariable(keyName, "synthetic-secret-never-serialized");
+            var provider = host.AddComponent<ChatQW>();
+            provider.m_Backend = ChatQW.BackendType.OpenAICompatible;
+            provider.m_OpenAICompatibleUrl = "https://inspector.invalid/v1/chat/completions";
+            provider.m_OpenAICompatibleModelName = "inspector-model";
+            provider.m_OpenAICompatibleUseChatTemplateKwargs = true;
+            provider.api_key = "";
+            typeof(ChatQW).GetMethod("Awake", Flags).Invoke(provider, null);
+            string actualUrl = (string)typeof(LLM).GetField("url", Flags).GetValue(provider);
+            Check(actualUrl == "https://fixture.invalid/v1/chat/completions" &&
+                provider.m_OpenAICompatibleModelName == "fixture-vision-model" &&
+                provider.api_key == "synthetic-secret-never-serialized",
+                "OpenAI-compatible environment configuration did not override the non-secret scene defaults");
+            provider.m_DataList.Add(new LLM.SendData("user", "只回一个字：好"));
+            JObject wire = Request(provider, null);
+            Check((string)wire["model"] == "fixture-vision-model" && (bool)wire["enable_thinking"] == false &&
+                (string)wire["reasoning_effort"] == "none" &&
+                (bool)wire["chat_template_kwargs"]["enable_thinking"] == false &&
+                (string)wire["chat_template_kwargs"]["reasoning_effort"] == "none",
+                "OpenAI-compatible wire did not select the configured model or suppress template reasoning");
+            Check(wire["id_slot"] == null && !wire.ToString().Contains("synthetic-secret-never-serialized"),
+                "OpenAI-compatible wire leaked local llama slot fields or authorization material into JSON");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(urlName, oldUrl);
+            Environment.SetEnvironmentVariable(modelName, oldModel);
+            Environment.SetEnvironmentVariable(keyName, oldKey);
+            UnityEngine.Object.DestroyImmediate(host);
+        }
+    }
 
     private static void CheckStableDialoguePrefix()
     {

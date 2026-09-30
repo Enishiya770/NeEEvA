@@ -26,7 +26,9 @@ Run from the repository root with the existing ARDY environment:
 & Server/ARDY/start_motion_service.ps1
 ```
 
-The service binds only `127.0.0.1:8093`. The default feature URL, `http://127.0.0.1:8080`, is the same local tunnel used for chat and reaches the single shared Qwen process. Without an active preview release, it loads the evaluated `mlp-seed1.pt`; a valid active release selects its bound adapter. Both modes load pinned ARDY Core 20 FPS / Horizon 40 with `text_encoder=False`. Weights must already exist in the local HF cache. It does not download or load a language model.
+The default service binds `127.0.0.1:8093`. The default feature URL, `http://127.0.0.1:8080`, is the same local tunnel used for chat and reaches the single shared Qwen process. Without an active preview release, it loads the evaluated `mlp-seed1.pt`; a valid active release selects its bound adapter. Both modes load pinned ARDY Core 20 FPS / Horizon 40 with `text_encoder=False`. Weights must already exist in the local HF cache. It does not download or load a language model.
+
+For a DGX Spark on the private switch, pass `--host 0.0.0.0 --port 8093` and keep the process behind that switch. If the Qwen feature worker is a separate process and its response truthfully declares `shared_model:false`, add `--allow-independent-feature-model`; the service still requires the pinned Qwen SHA256, contract, template, raw-last pooling, dimension and request binding. The Windows project launcher and the Spark SSH wrapper use these options explicitly.
 
 The wire contract is documented in `docs/ardy-live-protocol.md`. `POST /v1/motion/generate` accepts the character/turn/revision, request ID, chunk index, description, `UpperBody` mask and optional initial projected history. Every response contains exactly 40 new frames in the existing Unity schema 1. Chunks 0, 1 and 2 cover six seconds. `final` is true on chunk 2. The application mask affects Unity playback; it is not an ARDY inpainting constraint. Generated lower-body/root motion is not applied by this stationary upper-body client.
 

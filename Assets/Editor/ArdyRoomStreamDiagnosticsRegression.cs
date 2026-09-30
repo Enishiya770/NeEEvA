@@ -47,6 +47,8 @@ public static class ArdyRoomStreamDiagnosticsRegression
             typeof(ArdyRoomLocomotionController).GetProperty("OperationRevision").SetValue(controller, 7);
             StorageChecks(controller);
             HistoryChecks(controller);
+            SlowIdleHistoryChecks(controller);
+            PreparedHistoryChecks(controller);
             WarmRootSpeedChecks(controller);
             CommittedTurnSpeedChecks(controller);
             return checks;
@@ -290,6 +292,73 @@ public static class ArdyRoomStreamDiagnosticsRegression
             Set(pose, "root", Vector3.zero); Set(pose, "rotation", Quaternion.identity); Set(pose, "scale", 1f);
             Set(pose, "worldRotations", Enumerable.Repeat(Quaternion.identity, 27).ToArray()); poses.Add(pose);
         }
+    }
+    private static void FillSlowIdleHistory(ArdyRoomLocomotionController controller)
+    {
+        FillWarmHistory(controller);
+        var poses = (IList)Get(controller, "warmStreamPoses");
+        while (poses.Count > 5) poses.RemoveAt(0);
+        float last = Time.realtimeSinceStartup;
+        for (int i = 0; i < poses.Count; i++)
+        {
+            Set(poses[i], "time", last - (poses.Count - 1 - i) * .27f);
+            Set(poses[i], "unityFrame", 100 + i);
+            Set(poses[i], "hips", Vector3.up + Vector3.right * (i * .001f));
+        }
+    }
+    private static void SlowIdleHistoryChecks(ArdyRoomLocomotionController controller)
+    {
+        FillSlowIdleHistory(controller);
+        Check(TryHistory(controller, out var history) && history.Length == 16,
+            "Consecutive actual 270 ms idle frames could not seed the regular 20 Hz wire history.");
+        foreach (string scenario in new[] { "skipped-frame", "long-stall", "root-motion", "turning", "pelvis-motion", "joint-motion", "stale", "parent", "scale" })
+        {
+            FillSlowIdleHistory(controller);
+            var poses = (IList)Get(controller, "warmStreamPoses");
+            if (scenario == "skipped-frame") Set(poses[2], "unityFrame", 999);
+            if (scenario == "long-stall") Set(poses[2], "time", (float)Get(poses[2], "time") - .1f);
+            if (scenario == "root-motion") Set(poses[2], "root", Vector3.right * .01f);
+            if (scenario == "turning") Set(poses[2], "rotation", Quaternion.Euler(0, 1, 0));
+            if (scenario == "pelvis-motion") Set(poses[2], "hips", Vector3.up + Vector3.right * .05f);
+            if (scenario == "joint-motion") ((Quaternion[])Get(poses[2], "worldRotations"))[6] = Quaternion.Euler(25, 0, 0);
+            if (scenario == "stale") foreach (var pose in poses) Set(pose, "time", (float)Get(pose, "time") - .2f);
+            if (scenario == "parent") Set(poses[2], "parent", controller.transform);
+            if (scenario == "scale") Set(poses[2], "scale", 1.1f);
+            string expected = scenario == "stale" ? "latest-sample-stale" : scenario == "parent" ? "parent-changed" :
+                scenario == "scale" ? "scale-changed" : "sample-gap";
+            Check(!TryHistory(controller) && controller.StreamHistoryObservation.code == expected,
+                "Slow-render idle exception admitted unsafe or missing actual pose evidence: " + scenario);
+        }
+    }
+    private static void PreparedHistoryChecks(ArdyRoomLocomotionController controller)
+    {
+        FillWarmHistory(controller); Check(TryHistory(controller, out var accepted), "Fresh baseline history missing.");
+        void Seed()
+        {
+            Set(controller, "preparedWarmStreamHistory", accepted);
+            Set(controller, "preparedWarmStreamOperation", 17);
+            Set(controller, "preparedWarmStreamFrame", Time.frameCount);
+            Set(controller, "preparedWarmStreamAt", Time.realtimeSinceStartup);
+        }
+        bool Take(int operation)
+        {
+            var args = new object[] { operation, null };
+            return (bool)typeof(ArdyRoomLocomotionController).GetMethod("TryTakePreparedWarmStreamHistory", Private).Invoke(controller, args);
+        }
+        Seed(); Check(Take(17) && !Take(17), "Fresh rendered snapshot was not consumed exactly once.");
+        Seed(); Set(controller, "preparedWarmStreamFrame", Time.frameCount - 1);
+        Set(controller, "preparedWarmStreamAt", Time.realtimeSinceStartup - .27f);
+        Check(Take(17), "Next coroutine frame rejected the immediately preceding measured 270 ms idle snapshot.");
+        Seed(); Check(!Take(18), "Another operation consumed the prepared pose history.");
+        Seed(); Set(controller, "preparedWarmStreamFrame", Time.frameCount - 2);
+        Check(!Take(17), "Prepared history survived a skipped rendered frame.");
+        Seed(); Set(controller, "preparedWarmStreamAt", Time.realtimeSinceStartup - .5f);
+        Check(!Take(17), "A long main-thread stall admitted an old prepared pose snapshot.");
+        Seed();
+        // Storage-only identities are not actual native sessions; never issue HTTP for them.
+        Set(controller, "streamSessionId", null);
+        Call(controller, "CancelContinuousStream");
+        Check(!Take(17), "Cancellation retained prepared pose history.");
     }
     private static void CommittedTurnSpeedChecks(ArdyRoomLocomotionController controller)
     {

@@ -127,11 +127,20 @@ public partial class ChatSample
         bool deferredPolicy = IsSingingPolicyActionDeferredThisRound();
         if (!held || (!missingAction && !waitingGoal && !waitingPolicy && !deferredPolicy && m_SingingRejectedSpeechRound != m_CurrentSpeechRoundId))
         { m_SingingSpeechWithheld = false; return; }
-        // Nothing has been synthesized yet. Do not count discarded promises as heard speech.
+        // An independent prefix can already be playing when later tags invalidate
+        // the decision. Revoke this round's queue and in-flight prefetch, retain
+        // observed playback, and let its player drain/cancel through the normal path.
+        bool alreadyStarted = HasRoundSpeechStarted(m_FormalResponseGeneration, m_CurrentSpeechRoundId);
+        DiscardPendingSpeechForRound(m_CurrentSpeechRoundId, "singing_validation");
         m_SentenceBuffer.Length = 0;
         spoken = "";
         m_SingingSpeechWithheld = true;
-        m_WorkProgressFact += "\n[外放事实] 上一决策的待验证台词未外放：" +
+        TraceSpeechGate("discarded", waitingPolicy ? "policy_review" : deferredPolicy ? "policy_result"
+            : waitingGoal ? "goal_review" : missingAction ? "missing_action" : "rejected");
+        m_WorkProgressFact += alreadyStarted
+            ? "\n[外放事实] 本轮已有普通台词开始播放；当前及后续待播内容已撤销。已播声音不可撤回，开始播放不代表整句或演唱完成。"
+                + "完整播完的句子=" + CompletedRoleSpeechForRound(m_FormalResponseGeneration, m_CurrentSpeechRoundId) + "。\n"
+            : "\n[外放事实] 上一决策的待验证台词未外放：" +
             (waitingPolicy ? "策略提案待独立审核；尚未改变歌唱策略，不是执行失败。" :
              deferredPolicy ? "策略提案已经单独处理，旧回复不能作为结果确认；以本次策略结果事实为准。" :
              waitingGoal ? "演唱目标待独立审核；尚未提交音频执行，不是执行失败。" :
@@ -141,7 +150,7 @@ public partial class ChatSample
             ? "[Work/Speech] status=waiting_policy_review；依赖策略审核的台词未外放；未改变策略"
             : deferredPolicy ? "[Work/Speech] status=policy_response_withheld；策略另有独立结果事实，本轮旧台词未外放"
             : waitingGoal ? "[Work/Speech] status=waiting_goal_review；依赖目标审核的台词未外放；未提交音频"
-            : "[Work/Speech] 发声阶段或演唱校验未通过，撤回本轮待验证台词；独立身体动作结果不受此项判定影响");
+            : $"[Work/Speech] validationRejected=true playbackStarted={alreadyStarted} pendingSpeechRevoked=true; already played audio cannot be retracted");
     }
 
     private void NormalizeSingingGoalReview(AutonomyIntentDecision decision)
@@ -188,6 +197,14 @@ public partial class ChatSample
             decision.proceed = true;
             if (m_LogAgentLoop) Debug.LogWarning("[Sing/GoalReview] 口头批准与结构化目标不一致；" + mismatch);
         }
+        if (string.Equals(decision.singing_goal_status, "approved", StringComparison.OrdinalIgnoreCase) &&
+            !MatchRecordingBoundaryGoal(m_SingingGoal, decision.singing_goal_expected, true, out string boundaryMismatch))
+        {
+            decision.singing_goal_status = "revise";
+            decision.singing_goal_evidence = boundaryMismatch;
+            decision.work_status = "continue"; decision.proceed = true;
+            decision.response_route = "recording_singing";
+        }
     }
 
     private string SingingMaterialVersionKey()
@@ -206,7 +223,7 @@ public partial class ChatSample
 
     private string SingingProposalKey() => m_SingingGoal == null ? "none" : JsonConvert.SerializeObject(new {
         m_SingingGoal.refs, m_SingingGoal.range, m_SingingGoal.revisions, m_SingingGoal.start, m_SingingGoal.end,
-        m_SingingGoal.intent, m_SingingGoal.repairScope, m_SingingGoal.completion
+        m_SingingGoal.intent, m_SingingGoal.repairScope, m_SingingGoal.completion, m_SingingGoal.music
     });
 
     private string SingingRequestKey(AgentHumBackRequest request)
@@ -241,6 +258,7 @@ public partial class ChatSample
         HandleSystemNotice(new SystemNotice("singing_no_progress", SystemNoticeSeverity.Error,
             "演唱未执行：同一方案再次校验失败，已停止自动重试。", reason, "Agent", false));
         if (m_LogAgentLoop) Debug.LogWarning("[Work/NoProgress] 停止相同方案的自动重试：" + reason);
+        ScheduleRecordingFailureReceipt(reason);
     }
 
     private bool ConsumeWorkChainBudget()

@@ -34,15 +34,23 @@ public static class SpeechLanguageRegression
 
     private static void RunOrThrow()
     {
+        RunLanguageRouting();
+        // Preserve existing plain-speech, private channel, quoted-tool and malformed-tool behavior.
+        foreach (string test in new[] { "RunRoleOutputChannelsRegression", "RunPlainSpeechPromptRegression" })
+            typeof(SkillRoutingRegression).GetMethod(test, Static).Invoke(null, null);
+    }
+
+    // Isolates language routing from the broader LLM SSE/prompt regression suite.
+    public static void RunLanguageRouting()
+    {
         checks = 0;
         RunParser();
         RunQueue();
         RunCollectedReply();
         RunTts();
+        RunSanitizedLanguageRetention();
         RunCacheIdentity();
-        // Preserve existing plain-speech, private channel, quoted-tool and malformed-tool behavior.
-        foreach (string test in new[] { "RunRoleOutputChannelsRegression", "RunPlainSpeechPromptRegression" })
-            typeof(SkillRoutingRegression).GetMethod(test, Static).Invoke(null, null);
+        Debug.Log($"[SpeechLanguageRouting] passed {checks} checks");
     }
 
     private static string Signature(List<SpeechText> parts)
@@ -63,6 +71,7 @@ public static class SpeechLanguageRegression
             { "<lang code='ja'/>了解。<lang code='zh'/>了解。", "ja:了解。|zh:了解。|" },
             { "<lang code=\"en\"/>Understood.<lang code=\"ja\"/>はい。", "en:Understood.|ja:はい。|" },
             { "<lang code=\"ja\"/>これは<lang code=\"en\"/>soundstage<lang code=\"ja\"/>の話ね。", "ja:これは|en:soundstage|ja:の話ね。|" },
+            { "<lang code=\"ja\"/>もう一度、<lang code=\"zh\"/>「黑化肥，灰发会发黑」<lang code=\"ja\"/>よ。", "ja:もう一度、|zh:「黑化肥，灰发会发黑」|ja:よ。|" },
             { "<lang code=\"ja\"/>はい。<thought><lang code=\"zh\"/>秘密。</thought>了解。<silent/><lang code=\"en\"/>secret", "ja:はい。了解。|" },
             { "<lang code=\"ja\"/><say>了解。</say><next in=\"5s\"/>", "ja:了解。\n|" },
             { "<lang code=\"ja\"/>はい。<lang code=\"bad\"/>听到哦。", "ja:はい。|auto:听到哦。|" },
@@ -104,10 +113,18 @@ public static class SpeechLanguageRegression
 
     private static void RunQueue()
     {
-        const string raw = "<lang code=\"zh\"/>听到哦。<lang code=\"ja\"/>了解。アントネーワです。<lang code=\"en\"/>Thank you.";
-        foreach (bool held in new[] { false, true })
-        foreach (int packet in new[] { 1, 2, 7, 19, raw.Length })
+        var cases = new Dictionary<string, string>
         {
+            { "<lang code=\"zh\"/>听到哦。<lang code=\"ja\"/>了解。アントネーワです。<lang code=\"en\"/>Thank you.",
+                "zh:听到哦。|ja:了解。アントネーワです。|en:Thank you.|" },
+            { "<lang code=\"ja\"/>もう一度、<lang code=\"zh\"/>「黑化肥，灰发会发黑」<lang code=\"ja\"/>よ。",
+                "ja:もう一度、|zh:「黑化肥，灰发会发黑」|ja:よ。|" },
+        };
+        foreach (var test in cases)
+        foreach (bool held in new[] { false, true })
+        foreach (int packet in new[] { 1, 2, 7, 19, test.Key.Length })
+        {
+            string raw = test.Key;
             var host = new GameObject("SpeechLanguageQueueRegression");
             host.SetActive(false);
             try
@@ -127,7 +144,7 @@ public static class SpeechLanguageRegression
                 var parts = new List<SpeechText>();
                 foreach (object entry in queue)
                     parts.Add(new SpeechText((string)Get(entry, "Text"), (string)Get(entry, "LanguageCode")));
-                Check(Signature(parts) == "zh:听到哦。|ja:了解。アントネーワです。|en:Thank you.|",
+                Check(Signature(parts) == test.Value,
                     "Chat queue merged languages or lost text, held=" + held + " packet=" + packet);
             }
             finally { UnityEngine.Object.DestroyImmediate(host); }
@@ -158,6 +175,31 @@ public static class SpeechLanguageRegression
                 }
             }
             Check(tts.ResolveSpeech(new SpeechText("听到哦。")).LanguageCode == "zh", "Chinese fallback regressed");
+            SpeechText kanaConflict = tts.ResolveSpeech(new SpeechText("わかりました。", "zh"));
+            Check(kanaConflict.LanguageCode == "ja" && kanaConflict.LanguageSource == "declared-conflict-auto",
+                "Explicit Chinese language was allowed to synthesize kana as Chinese");
+            SpeechText simplifiedConflict = tts.ResolveSpeech(new SpeechText("我们现在开始。", "ja"));
+            Check(simplifiedConflict.LanguageCode == "zh" && simplifiedConflict.LanguageSource == "declared-conflict-auto",
+                "Explicit Japanese language was allowed to synthesize simplified Chinese text");
+            // Captured production failure: a one-kana suffix overrode the entire zh
+            // quotation. Prefetch and playback must produce identical request languages.
+            CheckStableTtsLanguage(tts, "「黑化肥，灰发会发黑」よ。", "zh", "zh", "declared");
+            CheckStableTtsLanguage(tts, "黑化肥，灰发会发黑よ。", "zh", "zh", "declared");
+            CheckStableTtsLanguage(tts, "「黑化肥，灰发会发黑」です。", "zh", "zh", "declared");
+            foreach (string quote in new[] { "「了解」", "『了解』", "“了解”", "\"了解\"" })
+                CheckStableTtsLanguage(tts, quote + "です。", "zh", "zh", "declared");
+            CheckStableTtsLanguage(tts, "我们现在开始吧。ね。", "zh", "zh", "declared");
+            foreach (string code in new[] { "zh", "ja" })
+                CheckStableTtsLanguage(tts, "「识时务者为俊杰（识时务なる者は俊杰なり", code, code, "declared");
+            CheckStableTtsLanguage(tts, "わかりました。", "zh", "ja", "declared-conflict-auto");
+            CheckStableTtsLanguage(tts, "今日はいい天気ですね。", "zh", "ja", "declared-conflict-auto");
+            CheckStableTtsLanguage(tts, "了解です。", "zh", "ja", "declared-conflict-auto");
+            CheckStableTtsLanguage(tts, "え？", "zh", "ja", "declared-conflict-auto");
+            CheckStableTtsLanguage(tts, "我们现在开始。", "ja", "zh", "declared-conflict-auto");
+            CheckStableTtsLanguage(tts, "了解。", "ja", "ja", "declared");
+            CheckStableTtsLanguage(tts, "「了解」です。", "ja", "ja", "declared");
+            CheckStableTtsLanguage(tts, "「黒い肥料」です。", "ja", "ja", "declared");
+            CheckStableTtsLanguage(tts, "我们现在は。", null, "ja", "auto-fallback");
             SpeechText fallback = tts.ResolveSpeech(new SpeechText("听到哦。"));
             Check(fallback.LanguageSource == "auto-fallback" &&
                 tts.ResolveSpeech(fallback).LanguageSource == "auto-fallback", "Resolved fallback was mislabeled as a model declaration");
@@ -169,6 +211,61 @@ public static class SpeechLanguageRegression
             Check(tts.ResolveSpeech(queued).LanguageCode == "ja", "Another request changed queued language");
             tts.TrySetTargetLanguage("en");
             Check(tts.ResolveSpeech(new SpeechText("了解。", "ja")).LanguageCode == "en", "Explicit fixed mode lost priority");
+        }
+        finally { UnityEngine.Object.DestroyImmediate(host); }
+    }
+
+    private static void CheckStableTtsLanguage(GPTSoVITSFASTAPI tts, string text, string declared,
+        string expected, string expectedSource)
+    {
+        var speech = new SpeechText(text, declared, actionDependency: SpeechActionDependency.AfterAction,
+            suppressTts: true);
+        for (int pass = 0; pass < 3; pass++)
+        {
+            speech = tts.ResolveSpeech(speech);
+            Check(speech.Text == text && speech.LanguageCode == expected && speech.LanguageSource == expectedSource,
+                "TTS language changed on resolution " + pass + ": " + declared + " / " + text);
+            Check(speech.ActionDependency == SpeechActionDependency.AfterAction && speech.SuppressTts,
+                "Language resolution discarded the speech segment's metadata");
+            foreach (int mode in new[] { 0, 3 })
+            {
+                object data = typeof(GPTSoVITSFASTAPI).GetMethod("CreateSpeechRequest", Instance)
+                    .Invoke(tts, new object[] { speech.Text, speech.LanguageCode, mode });
+                var json = Newtonsoft.Json.Linq.JObject.Parse(JsonUtility.ToJson(data));
+                Check((string)json["text"] == text && (string)json["text_lang"] == expected &&
+                    (int)json["streaming_mode"] == mode, "Repeated resolution changed the synthesis payload");
+            }
+        }
+    }
+
+    private static void RunSanitizedLanguageRetention()
+    {
+        var source = new List<SpeechText> {
+            new SpeechText("嗯，我在听哦。", "ja", "declared")
+        };
+        MethodInfo rebind = typeof(ChatSample).GetMethod(
+            "RebindSanitizedSpeechLanguages", Static);
+        var result = (List<SpeechText>)rebind.Invoke(null, new object[] {
+            source, "嗯，我在听哦。"
+        });
+        Check(result.Count == 1 && result[0].LanguageCode == "ja" &&
+            result[0].Text == "嗯，我在听哦。",
+            "Non-streaming cleanup discarded the declared language");
+
+        var host = new GameObject("SpeechLanguageFallbackIsolationRegression");
+        host.SetActive(false);
+        try
+        {
+            var tts = host.AddComponent<GPTSoVITSFASTAPI>();
+            Set(tts, "m_LogLanguageChanges", false);
+            Set(tts, "m_TargetTextLan", GPTSoVITSFASTAPI.Language.中文);
+            tts.EnableAutoTargetLanguage();
+            Check(tts.ResolveSpeech(new SpeechText("了解。")).LanguageCode == "zh",
+                "Configured Han-only fallback was not used");
+            Check(tts.ResolveSpeech(new SpeechText("わかりました。")).LanguageCode == "ja",
+                "Kana fallback detection regressed");
+            Check(tts.ResolveSpeech(new SpeechText("了解。")).LanguageCode == "zh",
+                "Auto fallback leaked the previous request language");
         }
         finally { UnityEngine.Object.DestroyImmediate(host); }
     }

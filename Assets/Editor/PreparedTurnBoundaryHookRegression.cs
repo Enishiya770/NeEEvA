@@ -36,6 +36,9 @@ public static class PreparedTurnBoundaryHookRegression
             Check(!applied && shadowArgs[1] == null && delivered == 0,
                 "shadow validation never returns a prepared decision or invokes a callback");
             Call(chat, "StagePreparedTurnBoundary", Wire(), Text, evidence, 7, evidence.SampledAt);
+            Check(!Request(chat, false) && model.BoundaryCalls == 0 && delivered == 0,
+                "remote admission denial preserves shadow-only policy without requesting another model decision");
+            Call(chat, "StagePreparedTurnBoundary", Wire(), Text, evidence, 7, evidence.SampledAt);
             Check(Request(chat) && model.BoundaryCalls == 1 && delivered == 0 &&
                 Get(chat, "m_PreparedBoundary") == null && Get(chat, "m_SpeculativeDraft") == null,
                 "default shadow hit consumes candidate but cannot close or speak; independent review proceeds");
@@ -60,10 +63,21 @@ public static class PreparedTurnBoundaryHookRegression
             Check(Get(chat, "m_PreparedBoundary") != null && Get(chat, "m_SpeculativeDraft") == null,
                 "a valid boundary can be prepared without an audible draft");
             evidence = Mature(evidence); chat.ObservePreparedTurnBoundaryEvidence(evidence);
-            Check(Request(chat), "prepared review accepted");
+            Check(Request(chat, false), "valid prepared review is accepted even when new remote requests are denied");
             Check(model.BoundaryCalls == 0 && delivered == 1 && lastAction == "complete",
                 "ready lease hits actual callback with zero fresh boundary requests");
             Check(Get(chat, "m_PreparedBoundary") == null, "lease consumed once");
+
+            Set(chat, "m_SpeculativeRequestInFlight", true);
+            int preservedVersion = (int)Get(chat, "m_SpeculativeRequestVersion");
+            int preservedCancels = model.EphemeralCancels;
+            Check(!Request(chat, false) && model.BoundaryCalls == 0 && delivered == 1,
+                "no prepared lease plus denied budget cannot dispatch a fresh review or callback");
+            Check((bool)Get(chat, "m_SpeculativeRequestInFlight") &&
+                  (int)Get(chat, "m_SpeculativeRequestVersion") == preservedVersion &&
+                  model.EphemeralCancels == preservedCancels,
+                "budget denial does not cancel unrelated in-flight preparation or invalidate its callback generation");
+            Set(chat, "m_SpeculativeRequestInFlight", false);
 
             Check(Request(chat), "consumed lease falls back");
             Check(model.BoundaryCalls == 1 && delivered == 1, "fallback issues one request and waits for its callback");
@@ -137,9 +151,9 @@ public static class PreparedTurnBoundaryHookRegression
         ["quiet_boundary"] = new JObject { ["action"] = action, ["confidence"] = 0.95f,
             ["mode"] = "speech", ["source"] = "user", ["turn_state"] = state, ["reason"] = "完整请求" },
     }.ToString();
-    private static bool Request(ChatSample chat) => chat.RequestStalledTurnReview(Text,
+    private static bool Request(ChatSample chat, bool allowRemoteRequest = true) => chat.RequestStalledTurnReview(Text,
         1f, 2000, 0.001f, 0.01f, 0.004f, true, 0f, 0f, 0f, 0f, 0f,
-        0, "", 0f, 15f, 0.6f, 0.1f, 1000, "quiet", 0);
+        0, "", 0f, 15f, 0.6f, 0.1f, 1000, "quiet", 0, null, allowRemoteRequest);
     private static object Get(object value, string field) => value.GetType().GetField(field, Flags).GetValue(value);
     private static void Set(object value, string field, object data) => value.GetType().GetField(field, Flags).SetValue(value, data);
     private static object Call(object value, string method, params object[] args) => value.GetType().GetMethod(method, Flags).Invoke(value, args);
@@ -150,6 +164,7 @@ public static class PreparedTurnBoundaryHookRegression
 public sealed class PreparedTurnBoundaryFixtureModel : LLM
 {
     public int ListeningCalls, LegacyEphemeralCalls, BoundaryCalls;
+    public int EphemeralCancels;
     public string Prompt;
     public Action<string> Prepared, Boundary;
     public override bool SupportsTurnBoundaryMessages => true;
@@ -158,6 +173,6 @@ public sealed class PreparedTurnBoundaryFixtureModel : LLM
     public override void PostEphemeralMsg(string prompt, Action<string> callback) => LegacyEphemeralCalls++;
     public override void PostTurnBoundaryMsg(string prompt, Action<string> callback)
     { BoundaryCalls++; Boundary = callback; }
-    public override void CancelEphemeralMsg() { }
+    public override void CancelEphemeralMsg() { EphemeralCancels++; }
     public override void CancelTurnBoundaryMsg() { }
 }

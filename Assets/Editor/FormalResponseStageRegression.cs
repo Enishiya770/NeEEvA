@@ -23,11 +23,14 @@ public static class FormalResponseStageRegression
             "Committed reply still includes non-executable singing grammar");
         Check(FormalResponseContextPolicy.SkillContext(FormalResponseStage.General, active, catalog) == active,
             "A prior committed request leaked its projection into General");
-        const string custom = "Unknown provider's semantic skill context; preserve exactly.";
-        Check(FormalResponseContextPolicy.SkillContext(FormalResponseStage.CommittedSpatialReply, custom, catalog) == custom,
-            "Unstructured custom context was silently dropped");
-        Check(FormalResponseContextPolicy.SkillContext(FormalResponseStage.CommittedSpatialReply, "[已加载技能: broken", catalog) == "[已加载技能: broken",
-            "Malformed skill metadata should fail open unchanged");
+        const string custom = "Custom capability preference. <sing refs=\"old-example\"/>";
+        string customProjected = FormalResponseContextPolicy.SkillContext(FormalResponseStage.CommittedSpatialReply, custom, catalog);
+        Check(customProjected.Contains("Custom capability preference.") && !customProjected.Contains("<sing") &&
+            customProjected.Contains(FormalPromptProfile.PreferenceAuthority),
+            "Custom capability prose was lost or switched the structured stage to old tool syntax");
+        string malformed = FormalResponseContextPolicy.SkillContext(FormalResponseStage.CommittedSpatialReply, "[已加载技能: broken", catalog);
+        Check(malformed.Contains("[已加载技能: broken") && malformed.Contains(FormalPromptProfile.PreferenceAuthority),
+            "Malformed skill metadata must remain data, not a protocol fallback");
         Check(FormalResponseContextPolicy.SkillContext(FormalResponseStage.CommittedSpatialReply, catalog, catalog).Contains(catalog),
             "The capability catalog must remain available without an active skill");
         Check(FormalResponseContextPolicy.SkillContext(FormalResponseStage.General, null, catalog) == null,

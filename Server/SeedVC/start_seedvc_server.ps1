@@ -8,6 +8,16 @@ $ErrorActionPreference = "Stop"
 $seedVcRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent (Split-Path -Parent $seedVcRoot)
 $localPackageRoot = Join-Path $seedVcRoot "python_packages"
+$startupLog = Join-Path $seedVcRoot "runtime\seedvc_startup.log"
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $startupLog) | Out-Null
+function Write-StartupLog([string]$Message) {
+    Add-Content -LiteralPath $startupLog -Encoding UTF8 -Value ("[{0:O}] {1}" -f (Get-Date), $Message)
+}
+trap {
+    Write-StartupLog ("Startup failed: " + $_.Exception.Message)
+    throw $_
+}
+Write-StartupLog "Selecting bridge and character-conversion Python runtimes."
 
 # Reuse the already running GPT-SoVITS runtime when possible.  That environment
 # commonly contains the fairseq/faiss stack required by the character RVC
@@ -58,8 +68,9 @@ $pythonCandidates = @(
     $(if ($env:NEEEVA_GPT_SOVITS_ROOT) {
         Join-Path $env:NEEEVA_GPT_SOVITS_ROOT "runtime\python.exe"
     }),
-    (Join-Path $projectRoot "GPT-SoVITS\runtime\python.exe")
-) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    (Join-Path $projectRoot "GPT-SoVITS\runtime\python.exe"),
+    $ttsRuntimePython
+) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 
 function Test-SeedVcPython {
     param(
@@ -99,6 +110,7 @@ if (-not $pythonExe) {
 
 Set-Location -LiteralPath $seedVcRoot
 $env:PYTHONUTF8 = "1"
+Write-StartupLog "Selected bridge=$pythonExe; character RVC=$env:NEEEVA_RVC_PYTHON"
 
 if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
     $resolvedLogPath = [System.IO.Path]::GetFullPath($LogPath)
@@ -117,6 +129,7 @@ if ($pythonExe -eq "py") {
     & $pythonExe -u seedvc_server.py --port 9882
 }
 $serverExitCode = $LASTEXITCODE
+Write-StartupLog "Server exited with code $serverExitCode."
 if ($serverExitCode -ne 0) {
     exit $serverExitCode
 }

@@ -369,15 +369,27 @@ public partial class SenseVoiceSpeechToText : STT
         public PracticePhrase CopyForRevision() => (PracticePhrase)MemberwiseClone();
         //会话内稳定身份。清单段号会在删除旧段后前移，不能拿段号给跨轮音高状态做键。
         public int StableId;
-        public byte[] WavBytes;
-        public byte[] RecoveryWavBytes;
+        private RetainedRecordingPcm storedWavBytes;
+        public byte[] WavBytes { get => storedWavBytes?.Read(); set => storedWavBytes = RetainPcm(value); }
+        public long WavBytesStoredLength => storedWavBytes != null && storedWavBytes.Available ? storedWavBytes.ByteCount : 0;
+        public float WavBytesStoredSeconds => (float)(storedWavBytes?.DurationSeconds ?? 0);
+        private RetainedRecordingPcm storedRecoveryWavBytes;
+        public byte[] RecoveryWavBytes { get => storedRecoveryWavBytes?.Read(); set => storedRecoveryWavBytes = RetainPcm(value); }
+        public long RecoveryWavBytesStoredLength => storedRecoveryWavBytes != null && storedRecoveryWavBytes.Available ? storedRecoveryWavBytes.ByteCount : 0;
+        public float RecoveryWavBytesStoredSeconds => (float)(storedRecoveryWavBytes?.DurationSeconds ?? 0);
         public float[] MidiTimeline;
         public float[] RecoveryMidiTimeline;
         //不可变的录音源。WavBytes/MidiTimeline 是当前可播放版本，修边后会更新；
         //下面四项始终保留首次提交的 clean/expanded，因此“重新处理”永远可撤销，
         //也不会像 practice_drop 那样把唯一的原录音永久删掉。
-        public byte[] SourceCleanWavBytes;
-        public byte[] SourceExpandedWavBytes;
+        private RetainedRecordingPcm storedSourceCleanWavBytes;
+        public byte[] SourceCleanWavBytes { get => storedSourceCleanWavBytes?.Read(); set => storedSourceCleanWavBytes = RetainPcm(value); }
+        public long SourceCleanWavBytesStoredLength => storedSourceCleanWavBytes != null && storedSourceCleanWavBytes.Available ? storedSourceCleanWavBytes.ByteCount : 0;
+        public float SourceCleanWavBytesStoredSeconds => (float)(storedSourceCleanWavBytes?.DurationSeconds ?? 0);
+        private RetainedRecordingPcm storedSourceExpandedWavBytes;
+        public byte[] SourceExpandedWavBytes { get => storedSourceExpandedWavBytes?.Read(); set => storedSourceExpandedWavBytes = RetainPcm(value); }
+        public long SourceExpandedWavBytesStoredLength => storedSourceExpandedWavBytes != null && storedSourceExpandedWavBytes.Available ? storedSourceExpandedWavBytes.ByteCount : 0;
+        public float SourceExpandedWavBytesStoredSeconds => (float)(storedSourceExpandedWavBytes?.DurationSeconds ?? 0);
         public float[] SourceCleanMidiTimeline;
         public float[] SourceExpandedMidiTimeline;
         public int Revision;
@@ -607,7 +619,9 @@ public partial class SenseVoiceSpeechToText : STT
         public string PlaybackStatus = "ready";
         public string WholeTurnText = "";
         public string SingingSegmentText = "";
-        public byte[] RawWavBytes;
+        private RetainedRecordingPcm storedRawWavBytes;
+        public byte[] RawWavBytes { get => storedRawWavBytes?.Read(); set => storedRawWavBytes = RetainPcm(value); }
+        public long RawWavBytesStoredLength => storedRawWavBytes != null && storedRawWavBytes.Available ? storedRawWavBytes.ByteCount : 0;
         public float SingingProbability;
         public float PitchStability;
         public float MelodicIslandSeconds;
@@ -636,7 +650,6 @@ public partial class SenseVoiceSpeechToText : STT
     private float m_LastPracticeCommitTime = -999f;
     //一首完整歌曲很容易超过 16 个自然句。这里是会话内的素材保留量，不是一次推理
     //要吃下的块数；实际转换会在 ChatSample 里按块排队并及时释放，所以可以适度放宽。
-    private const int MaxPracticePhraseCount = 64;
     //旋律相似度分不开不同的歌——实测**跨歌**中位 0.654、同一首歌不同段落中位 0.618，
     //错误合并的那些反而更高。所以这里没有"判对"的阈值可用，只有"判它没意义"的下界：
     //0.654 就是随机拿两首不相干的歌配对能拿到的分。低于它的候选携带的信息量是零，
@@ -679,11 +692,14 @@ public partial class SenseVoiceSpeechToText : STT
     private sealed class SingingEvidenceSnapshot
     {
         public string RecordingId = Guid.NewGuid().ToString("N");
+        public Newtonsoft.Json.Linq.JObject BoundaryTranscriptEvidence;
         public string AcousticMode = "unavailable";
         public string AudioEvent = "";
         public float TimelineOriginSeconds;
         public int CaptureSessionSerial;
-        public byte[] RawWavBytes;
+        private RetainedRecordingPcm storedRawWavBytes;
+        public byte[] RawWavBytes { get => storedRawWavBytes?.Read(); set => storedRawWavBytes = RetainPcm(value); }
+        public long RawWavBytesStoredLength => storedRawWavBytes != null && storedRawWavBytes.Available ? storedRawWavBytes.ByteCount : 0;
         public float[] PitchTimelineMidi;
         public float FrameSeconds;
         public float AtRealtime;
@@ -731,6 +747,8 @@ public partial class SenseVoiceSpeechToText : STT
         {
             CaptureSessionSerial = source.CaptureSessionSerial,
             RecordingId = source.RecordingId,
+            BoundaryTranscriptEvidence = source.BoundaryTranscriptEvidence == null ? null :
+                (Newtonsoft.Json.Linq.JObject)source.BoundaryTranscriptEvidence.DeepClone(),
             AcousticMode = source.AcousticMode,
             AudioEvent = source.AudioEvent,
             TimelineOriginSeconds = source.TimelineOriginSeconds,
@@ -887,6 +905,35 @@ public partial class SenseVoiceSpeechToText : STT
     private int m_StreamGeneration = 0;
     private int m_StreamQueuedAudioBytes = 0;
     private bool m_StreamStopQueued = false;
+
+    // Transport lifecycle is observable by the recording owner.  The owner still
+    // keeps the original PCM and decides when to close a capture; this callback
+    // only reports that the preview transport can no longer provide coverage.
+    public event Action<int, string, string> OnStreamingTransportChanged;
+
+    public int StreamingGeneration
+    {
+        get { return m_StreamGeneration; }
+    }
+
+    private void QueueStreamingTransport(int generation, string state, string reason)
+    {
+        QueueStreamMainThread(() =>
+        {
+            // Late terminal notifications from an older socket must never affect
+            // a newer capture session.
+            if (generation != m_StreamGeneration && state != "cancelled") return;
+            try
+            {
+                if (OnStreamingTransportChanged != null)
+                    OnStreamingTransportChanged(generation, state ?? "", reason ?? "");
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        });
+    }
 
     public bool StreamingPreviewEnabled
     {
@@ -1121,6 +1168,8 @@ public partial class SenseVoiceSpeechToText : STT
             CleanLeadInEvidenceType = m_LastCleanLeadInEvidenceType ?? "none",
             CleanLeadInEvidenceProbability = m_LastCleanLeadInEvidenceProbability,
         };
+        CaptureBoundaryTranscriptEvidence(snapshot);
+        TraceSingingEvidence(snapshot);
         m_LastSingingEvidence = snapshot;
         UpdateRetainedRecordingEvidence(snapshot);
         Debug.Log($"[SenseVoice/Evidence] 原始歌唱证据已保存 raw={snapshot.RawSeconds:F2}s " +
@@ -1167,6 +1216,7 @@ public partial class SenseVoiceSpeechToText : STT
         m_StreamSocket = new ClientWebSocket();
         m_StreamQueuedAudioBytes = 0;
         m_StreamStopQueued = false;
+        QueueStreamingTransport(generation, "started", "local-start");
 
         string endpoint = BuildStreamingPreviewURL();
         RunStreamingPreviewAsync(
@@ -1183,25 +1233,31 @@ public partial class SenseVoiceSpeechToText : STT
     /// 推送 microphone ring buffer 中“新增加”的交错 float samples。
     /// 服务端固定接收 16kHz mono PCM16；这里负责降混和必要的线性重采样。
     /// </summary>
-    public void PushStreamingSamples(float[] interleaved, int channels, int sampleRate)
+    public bool TryPushStreamingSamples(float[] interleaved, int channels, int sampleRate)
     {
-        if (interleaved == null || interleaved.Length == 0) return;
-        if (m_StreamOutgoing == null || m_StreamOutgoingSignal == null || m_StreamStopQueued) return;
+        if (interleaved == null || interleaved.Length == 0) return false;
+        if (m_StreamOutgoing == null || m_StreamOutgoingSignal == null || m_StreamStopQueued) return false;
 
         byte[] pcm = FloatToPcm16Mono(interleaved, Mathf.Max(1, channels), Mathf.Max(1, sampleRate));
-        if (pcm.Length == 0) return;
+        if (pcm.Length == 0) return false;
 
         // 连接尚未建立时也允许短暂排队；超过约 8 秒音频说明服务不可用，停止继续堆内存。
         int queued = Interlocked.Add(ref m_StreamQueuedAudioBytes, pcm.Length);
         if (queued > 16000 * 2 * 8)
         {
             Interlocked.Add(ref m_StreamQueuedAudioBytes, -pcm.Length);
-            return;
+            return false;
         }
 
         m_StreamOutgoing.Enqueue(new StreamOutgoing { data = pcm });
         try { m_StreamOutgoingSignal.Release(); }
         catch (ObjectDisposedException) { }
+        return true;
+    }
+
+    public void PushStreamingSamples(float[] interleaved, int channels, int sampleRate)
+    {
+        TryPushStreamingSamples(interleaved, channels, sampleRate);
     }
 
     /// <summary>
@@ -1218,6 +1274,14 @@ public partial class SenseVoiceSpeechToText : STT
 
     public void CancelStreamingPreview()
     {
+        int cancelledGeneration = m_StreamGeneration;
+        bool hadTransport = m_StreamSocket != null || m_StreamOutgoing != null ||
+            m_StreamCancellation != null;
+        if (hadTransport && OnStreamingTransportChanged != null)
+        {
+            try { OnStreamingTransportChanged(cancelledGeneration, "cancelled", "local-cancel"); }
+            catch (Exception e) { Debug.LogException(e); }
+        }
         m_StreamGeneration++;
         m_StreamPartialCallback = null;
         m_StreamStopQueued = true;
@@ -1262,6 +1326,7 @@ public partial class SenseVoiceSpeechToText : STT
                 Mathf.Clamp(m_StreamPartialIntervalMs, 400, 2500) +
                 ",\"min_audio_ms\":" + Mathf.Clamp(m_StreamMinAudioMs, 400, 3000) + "}";
             await SendTextAsync(socket, start, cancellation);
+            QueueStreamingTransport(generation, "open", "connected");
 
             using (CancellationTokenSource sessionCancellation =
                 CancellationTokenSource.CreateLinkedTokenSource(cancellation))
@@ -1283,12 +1348,16 @@ public partial class SenseVoiceSpeechToText : STT
         {
             if (generation == m_StreamGeneration)
             {
+                QueueStreamingTransport(generation, "error", e.GetType().Name);
                 QueueStreamMainThread(() =>
                     Debug.LogWarning("[SenseVoice/stream] 连接中断: " + e.Message));
             }
         }
         finally
         {
+            if (generation == m_StreamGeneration && !cancellation.IsCancellationRequested &&
+                !m_StreamStopQueued)
+                QueueStreamingTransport(generation, "closed", "worker-ended");
             try { socket.Dispose(); } catch (Exception) { }
             try { signal.Dispose(); } catch (Exception) { }
         }
@@ -1339,7 +1408,11 @@ public partial class SenseVoiceSpeechToText : STT
         {
             WebSocketReceiveResult result = await socket.ReceiveAsync(
                 new ArraySegment<byte>(buffer), cancellation);
-            if (result.MessageType == WebSocketMessageType.Close) return;
+            if (result.MessageType == WebSocketMessageType.Close)
+            {
+                QueueStreamingTransport(generation, "closed", "remote-close");
+                return;
+            }
             if (result.MessageType != WebSocketMessageType.Text) continue;
 
             message.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
@@ -1355,10 +1428,15 @@ public partial class SenseVoiceSpeechToText : STT
                     QueueStreamMainThread(() => Debug.LogWarning("[SenseVoice/stream] JSON: " + e.Message));
             }
             if (response == null) continue;
-            if (response.@event == "stopped") return;
+            if (response.@event == "stopped")
+            {
+                QueueStreamingTransport(generation, "closed", "server-stopped");
+                return;
+            }
             if (response.@event == "error")
             {
                 string error = response.error;
+                QueueStreamingTransport(generation, "error", "server-error");
                 QueueStreamMainThread(() => Debug.LogWarning("[SenseVoice/stream] " + error));
                 return;
             }
@@ -1654,32 +1732,51 @@ public partial class SenseVoiceSpeechToText : STT
                 yield break;
             }
 
-            VadResponse response = JsonUtility.FromJson<VadResponse>(www.downloadHandler.text);
-            VoiceActivityResult result = new VoiceActivityResult();
-            if (response != null)
-            {
-                result.IsSpeech = response.is_speech;
-                result.SpeechMs = response.speech_ms;
-                result.SpeakerId = response.speaker_id ?? "";
-                result.SpeakerName = response.speaker_name ?? "";
-                result.SpeakerKind = response.speaker_kind ?? "";
-                result.SpeakerStatus = response.speaker_status ?? "";
-                result.SpeakerVoiceprintId = response.speaker_voiceprint_id ?? "";
-                result.SpeakerVoiceprintStatus = response.speaker_voiceprint_status ?? "";
-                result.SpeakerConfidence = response.speaker_confidence;
-                result.SelfConfidence = response.speaker_self_confidence;
-                result.IsSinging = response.is_singing;
-                result.SingingProbability = response.singing_probability;
-            }
-            if (m_VerboseLog && response != null)
+            VoiceActivityResult result = ParseVoiceActivityResult(www.downloadHandler.text);
+            if (m_VerboseLog && result.Available)
             {
                 Debug.Log($"[SenseVoice/VAD] speech={result.IsSpeech} voiced={result.SpeechMs}ms " +
                           $"speaker={result.SpeakerId}/{result.SpeakerKind} " +
                           $"score={result.SpeakerConfidence:F3} self={result.SelfConfidence:F3} " +
-                          $"dt={response.elapsed:F3}s");
+                          $"dt={result.ElapsedSeconds:F3}s");
             }
             if (callback != null) callback(result);
         }
+    }
+
+    private static VoiceActivityResult ParseVoiceActivityResult(string json)
+    {
+        var result = new VoiceActivityResult();
+        if (string.IsNullOrWhiteSpace(json)) return result;
+        try
+        {
+            var wire = Newtonsoft.Json.Linq.JObject.Parse(json);
+            // Missing protocol/error responses are not measured negative VAD.
+            // Older responses can still supply speech; only complete evidence
+            // may defer a candidate at the unheard-continuation boundary.
+            bool available = wire["is_speech"]?.Type == Newtonsoft.Json.Linq.JTokenType.Boolean &&
+                wire["speech_ms"]?.Type == Newtonsoft.Json.Linq.JTokenType.Integer &&
+                wire["is_singing"]?.Type == Newtonsoft.Json.Linq.JTokenType.Boolean;
+            var response = JsonUtility.FromJson<VadResponse>(json);
+            if (response == null) return result;
+            result.Available = available && response.speech_ms >= 0;
+            result.IsSpeech = response.is_speech;
+            result.SpeechMs = response.speech_ms;
+            result.SpeakerId = response.speaker_id ?? "";
+            result.SpeakerName = response.speaker_name ?? "";
+            result.SpeakerKind = response.speaker_kind ?? "";
+            result.SpeakerStatus = response.speaker_status ?? "";
+            result.SpeakerVoiceprintId = response.speaker_voiceprint_id ?? "";
+            result.SpeakerVoiceprintStatus = response.speaker_voiceprint_status ?? "";
+            result.SpeakerConfidence = response.speaker_confidence;
+            result.SelfConfidence = response.speaker_self_confidence;
+            result.IsSinging = response.is_singing;
+            result.SingingProbability = response.singing_probability;
+            result.ElapsedSeconds = response.elapsed;
+        }
+        catch (Newtonsoft.Json.JsonException) { }
+        catch (ArgumentException) { }
+        return result;
     }
 
     private IEnumerator SendAudioData(
@@ -1691,8 +1788,39 @@ public partial class SenseVoiceSpeechToText : STT
         float streamingObservedSeconds,
         bool streamingSpokenExitDetected,
         bool semanticSpokenLeadIn,
-        bool speculative = false)
+        bool speculative = false,
+        int isolatedCaptureSerial = 0,
+        float excludedPrefixSeconds = 0f,
+        float originalCapturedAt = -1f)
     {
+        int captureSessionSerial = isolatedCaptureSerial > 0
+            ? isolatedCaptureSerial : m_LiveRecordingCandidateSessionSerial;
+        float sourceCapturedAt = originalCapturedAt >= 0f ? originalCapturedAt :
+            (m_InputCaptureAt >= 0f ? m_InputCaptureAt : Time.realtimeSinceStartup);
+        if (captureSessionSerial != m_LiveRecordingCandidateSessionSerial)
+        {
+            _callback?.Invoke("");
+            yield break;
+        }
+        if (isolatedCaptureSerial <= 0) RegisterRecordingPcmLineage(audioBytes, captureSessionSerial);
+        if (!IsolateContinuationAudio(captureSessionSerial, ref audioBytes, ref excludedPrefixSeconds))
+        {
+            if (!speculative)
+                PublishFinalTranscriptOutcome(captureSessionSerial, "rejected", "continuation-self-speech", "");
+            _callback?.Invoke("");
+            yield break;
+        }
+        if (excludedPrefixSeconds > 0f)
+        {
+            // Old cumulative partials describe the removed waveform. Only the
+            // reanalysed suffix may establish final text or melodic boundaries.
+            m_ClosedSpeechEvidence = null;
+            m_EarlierCaptureTranscripts.Clear();
+            m_CurrentCaptureTranscript = "";
+            streamingSingingOnsetSeconds = -1f;
+            streamingObservedSeconds = 0f;
+            streamingSpokenExitDetected = semanticSpokenLeadIn = false;
+        }
         if (!HasUsableWavPayload(audioBytes))
         {
             if (_callback != null) _callback("");
@@ -1700,7 +1828,7 @@ public partial class SenseVoiceSpeechToText : STT
         }
         int requestSerial = ++m_AsrRequestSerial;
         var ticket = new AnalysisTicket { CompletedCapture = !speculative };
-        int captureSessionSerial = m_LiveRecordingCandidateSessionSerial;
+        var trace = CaptureTrace(captureSessionSerial)?.Child(speculative ? "asr-preview-http" : "asr-final-http");
         string finalSource = "rejected", finalRejection = "request-no-result", finalRawText = "";
         bool delivered = false;
         Action<string> originalCallback = _callback;
@@ -1709,13 +1837,16 @@ public partial class SenseVoiceSpeechToText : STT
             if (delivered) return;
             delivered = true;
             if (ticket.CompletedCapture)
-                PublishFinalTranscriptOutcome(captureSessionSerial, finalSource, finalRejection, finalRawText);
+                PublishFinalTranscriptOutcome(captureSessionSerial, finalSource, finalRejection, finalRawText, text);
+            trace?.Mark("asr.result", new Newtonsoft.Json.Linq.JObject { ["requestSerial"] = requestSerial,
+                ["captureSerial"] = captureSessionSerial, ["speculative"] = speculative,
+                ["source"] = finalSource, ["rejection"] = finalRejection, ["characters"] = (text ?? "").Length });
             originalCallback?.Invoke(text);
         };
         if (speculative) CancelPreviewAnalysis();
         m_AnalysisTickets.Add(ticket);
         if (speculative) m_PreviewAnalysis = ticket;
-        float capturedAt = m_InputCaptureAt >= 0f ? m_InputCaptureAt : Time.realtimeSinceStartup;
+        float capturedAt = sourceCapturedAt + excludedPrefixSeconds;
         stopwatch.Restart();
 
         WWWForm form = new WWWForm();
@@ -1735,7 +1866,13 @@ public partial class SenseVoiceSpeechToText : STT
             float requestStarted = Time.realtimeSinceStartup;
             www.SetRequestHeader("accept", "application/json");
 
+            trace?.Mark("asr.send", new Newtonsoft.Json.Linq.JObject { ["requestSerial"] = requestSerial,
+                ["captureSerial"] = captureSessionSerial, ["speculative"] = speculative,
+                ["language"] = m_Language, ["learnSpeaker"] = learnSpeaker, ["expectSinging"] = expectSinging,
+                ["inputAudio"] = WaveformTrace.Describe(audioBytes, ticket.Id) });
             yield return www.SendWebRequest();
+            trace?.Mark("asr.transport_complete", new Newtonsoft.Json.Linq.JObject { ["httpStatus"] = www.responseCode,
+                ["transportResult"] = www.result.ToString(), ["cancelled"] = ticket.Cancelled, ["detached"] = ticket.Detached });
 
             m_AnalysisTickets.Remove(ticket);
             if (ReferenceEquals(m_PreviewAnalysis, ticket)) m_PreviewAnalysis = null;
@@ -1757,6 +1894,7 @@ public partial class SenseVoiceSpeechToText : STT
             {
                 string _responseText = www.downloadHandler.text;
                 Response _response = JsonUtility.FromJson<Response>(_responseText);
+                TraceAnalysisResponse(trace, _response, captureSessionSerial, requestSerial);
 
                 if (_response == null)
                 {
@@ -1766,11 +1904,43 @@ public partial class SenseVoiceSpeechToText : STT
                 }
                 else
                 {
+                    // Terminal rejection belongs to sealed PCM even when its
+                    // reply was superseded. Preserve that fact before detaching.
+                    ObserveCaptureIsolation(captureSessionSerial, ticket.CompletedCapture,
+                        FinalRejectionReason(_response), GetWavDurationSeconds(audioBytes) + excludedPrefixSeconds);
+                    if (m_ContinuationIsolation.InheritedRejectedSeconds(captureSessionSerial) >
+                        excludedPrefixSeconds + 0.0001f)
+                    {
+                        if (ticket.Detached || captureSessionSerial != InputCaptureSessionSerial)
+                        {
+                            finalRejection = "continuation-self-speech";
+                            _callback?.Invoke("");
+                            yield break;
+                        }
+                        trace?.Mark("asr.continuation_reanalysis", new Newtonsoft.Json.Linq.JObject {
+                            ["captureSerial"] = captureSessionSerial,
+                            ["rejectedPrefixSeconds"] = m_ContinuationIsolation.InheritedRejectedSeconds(captureSessionSerial),
+                            ["scope"] = "late ancestor rejection; old mixed transcript is not published; reanalyse fresh suffix" });
+                        // A late rejection may race the descendant upload. Keep
+                        // real new speech by reanalysing its PCM, never by deleting
+                        // a matching phrase from a mixed transcript.
+                        yield return SendAudioData(audioBytes, originalCallback, learnSpeaker, expectSinging,
+                            streamingSingingOnsetSeconds, streamingObservedSeconds, streamingSpokenExitDetected,
+                            semanticSpokenLeadIn, !ticket.CompletedCapture, captureSessionSerial, excludedPrefixSeconds, sourceCapturedAt);
+                        yield break;
+                    }
                     if (ticket.Detached)
                     {
                         finalRejection = "detached";
                         ArchiveCompletedCapture(_response, audioBytes, capturedAt, captureSessionSerial);
                         // Never publish the old transcript or awaken its cancelled reply.
+                        _callback?.Invoke("");
+                        yield break;
+                    }
+                    if (_response.input_status == "error")
+                    {
+                        finalRejection = "input-error";
+                        Debug.LogError($"[SenseVoice/InputError] code={_response.input_error_code} stage={_response.input_error_stage}");
                         _callback?.Invoke("");
                         yield break;
                     }
@@ -1793,6 +1963,8 @@ public partial class SenseVoiceSpeechToText : STT
                     LastText = _response.text ?? "";
                     m_LastTurnSegments = _response.turn_segments_schema == 1
                         ? _response.turn_segments : null;
+                    m_LastTurnSegmentsCaptureSessionSerial = captureSessionSerial;
+                    m_BoundaryTranscriptOriginSeconds = _response.audio_content_start_seconds;
                     m_LastWholeTurnText = _response.whole_text ?? "";
                     m_LastSegmentedPrimaryText = LastText;
                     if (HasTimeOrderedTranscript)
@@ -2322,6 +2494,16 @@ public partial class SenseVoiceSpeechToText : STT
                                   "本轮整段不自动回唱，但干净歌唱岛已缓存为最近素材");
                     }
 
+                    if (_response.input_status == "evidence_only")
+                    {
+                        finalSource = "evidence-only";
+                        finalRejection = _response.input_evidence_reason ?? "weak-audio-evidence";
+                        QuarantineRecentSingingCandidate(out int evidenceCandidate, out float evidenceSeconds);
+                        Debug.Log($"[ASR/EvidenceOnly] capture={captureSessionSerial} candidate={evidenceCandidate} " +
+                            $"seconds={evidenceSeconds:F2} reason={finalRejection}; 音频保留，不产生新的文字话轮");
+                        _callback?.Invoke("");
+                        yield break;
+                    }
                     if (LastNoSpeech || (string.IsNullOrWhiteSpace(LastText) && !LastIsSinging))
                     {
                         Debug.Log($"[ASR/Rejected] request={requestSerial} capture={captureSessionSerial} " +
@@ -3056,13 +3238,15 @@ public partial class SenseVoiceSpeechToText : STT
     /// quarantine 可以复制这份音频作为隔离证据，但来源确认前绝不能让普通回唱工具
     /// 从 recent_turn 绕过隔离区直接播放它。
     /// </summary>
-    private bool RevokeCurrentSingingPlaybackAlias(string reason)
+    private bool RevokeCurrentSingingPlaybackAlias(string reason) => RevokeSingingPlaybackAlias(reason, 0);
+
+    private bool RevokeSingingPlaybackAlias(string reason, int rejectedCapture)
     {
         bool sameAnalysis = m_LastSingingCacheSerial == m_LastCompletedAsrSerial;
         bool sameCapture = m_LastSingingCacheCaptureSessionSerial > 0 &&
             m_LastSingingCacheCaptureSessionSerial ==
                 m_LiveRecordingCandidateSessionSerial;
-        if (!sameAnalysis && !sameCapture) return false;
+        if (rejectedCapture > 0 ? m_LastSingingCacheCaptureSessionSerial != rejectedCapture : !sameAnalysis && !sameCapture) return false;
         m_LastSingingAudioBytes = m_RollbackSingingAudioBytes;
         m_LastSingingRecoveryAudioBytes = m_RollbackSingingRecoveryAudioBytes;
         m_LastSingingLyrics = m_RollbackSingingLyrics;
@@ -3579,6 +3763,7 @@ public partial class SenseVoiceSpeechToText : STT
         Array.Copy(BitConverter.GetBytes(remaining), 0, trimmed, dataHeaderOffset + 4, 4);
         Array.Copy(BitConverter.GetBytes(trimmed.Length - 8), 0, trimmed, 4, 4);
         actualStartSeconds = skipBytes / (float)byteRate;
+        WaveformTrace.Transform(wavBytes, trimmed, actualStartSeconds, (skipBytes + remaining) / (double)byteRate);
         return trimmed;
     }
 
@@ -3984,19 +4169,17 @@ public partial class SenseVoiceSpeechToText : STT
                 ActiveTrimTailSeconds = m_PracticePhrases[i].ActiveTrimTailSeconds,
                 Lyrics = m_PracticePhrases[i].Lyrics ?? "",
                 Seconds = m_PracticePhrases[i].Seconds,
-                RecoverySeconds = m_PracticePhrases[i].RecoveryWavBytes != null
-                    ? GetWavDurationSeconds(m_PracticePhrases[i].RecoveryWavBytes)
+                RecoverySeconds = m_PracticePhrases[i].RecoveryWavBytesStoredLength > 0
+                    ? m_PracticePhrases[i].RecoveryWavBytesStoredSeconds
                     : m_PracticePhrases[i].Seconds,
                 OriginalCleanSeconds = m_PracticePhrases[i].OriginalCleanSeconds > 0f
                     ? m_PracticePhrases[i].OriginalCleanSeconds
-                    : GetWavDurationSeconds(m_PracticePhrases[i].SourceCleanWavBytes ??
-                                            m_PracticePhrases[i].WavBytes),
+                    : (m_PracticePhrases[i].SourceCleanWavBytesStoredLength > 0 ? m_PracticePhrases[i].SourceCleanWavBytesStoredSeconds : m_PracticePhrases[i].WavBytesStoredSeconds),
                 OriginalExpandedSeconds = m_PracticePhrases[i].OriginalExpandedSeconds > 0f
                     ? m_PracticePhrases[i].OriginalExpandedSeconds
-                    : GetWavDurationSeconds(m_PracticePhrases[i].SourceExpandedWavBytes ??
-                                            m_PracticePhrases[i].RecoveryWavBytes ??
-                                            m_PracticePhrases[i].SourceCleanWavBytes ??
-                                            m_PracticePhrases[i].WavBytes),
+                    : (m_PracticePhrases[i].SourceExpandedWavBytesStoredLength > 0 ? m_PracticePhrases[i].SourceExpandedWavBytesStoredSeconds :
+                       m_PracticePhrases[i].RecoveryWavBytesStoredLength > 0 ? m_PracticePhrases[i].RecoveryWavBytesStoredSeconds :
+                       m_PracticePhrases[i].SourceCleanWavBytesStoredLength > 0 ? m_PracticePhrases[i].SourceCleanWavBytesStoredSeconds : m_PracticePhrases[i].WavBytesStoredSeconds),
                 Language = m_PracticePhrases[i].Language ?? "",
                 SongId = m_PracticePhrases[i].SongId ?? "",
                 SongName = m_PracticePhrases[i].SongName ?? "",
@@ -4004,8 +4187,7 @@ public partial class SenseVoiceSpeechToText : STT
                     0f, Time.realtimeSinceStartup - m_PracticePhrases[i].AtRealtime),
                 ConfirmedAgoSeconds = Mathf.Max(
                     0f, Time.realtimeSinceStartup - m_PracticePhrases[i].ConfirmedAtRealtime),
-                HasExpandedCapture = m_PracticePhrases[i].RecoveryWavBytes != null &&
-                    m_PracticePhrases[i].RecoveryWavBytes.Length > 44 &&
+                HasExpandedCapture = m_PracticePhrases[i].RecoveryWavBytesStoredLength > 44 &&
                     HasPlayablePitchTimeline(
                         m_PracticePhrases[i].RecoveryMidiTimeline),
                 PitchCenterMidi = MedianVoicedPitch(m_PracticePhrases[i].MidiTimeline),
@@ -4691,8 +4873,8 @@ public partial class SenseVoiceSpeechToText : STT
             Debug.Log($"[SenseVoice/Practice] 同身份版本更新 ref={phrase.ClipRef} practice={i + 1} stable_id={phrase.StableId}");
             return i + 1;
         }
-        if (m_PracticePhrases.Count >= MaxPracticePhraseCount)
-            m_PracticePhrases.RemoveAt(0);
+        // Session metadata and stable identities remain retained. PCM is backed
+        // by the bounded resident disk archive, so old songs are not FIFO-evicted.
         phrase.StableId = ++m_NextPracticePhraseStableId;
         m_PracticePhrases.Add(phrase);
         return m_PracticePhrases.Count;
@@ -4968,18 +5150,8 @@ public partial class SenseVoiceSpeechToText : STT
         RetainRecordingEvidence(phrase, m_LastSingingEvidence);
         candidateId = ++m_NextQuarantinedSingingCandidateId;
         phrase.OriginCandidateId = candidateId;
-        if (m_QuarantinedSingingCandidates.Count >= MaxPracticePhraseCount)
-        {
-            QuarantinedSingingCandidate oldest = m_QuarantinedSingingCandidates[0];
-            for (int i = 1; i < m_QuarantinedSingingCandidates.Count; i++)
-            {
-                if (m_QuarantinedSingingCandidates[i].Phrase.AtRealtime < oldest.Phrase.AtRealtime)
-                    oldest = m_QuarantinedSingingCandidates[i];
-            }
-            m_QuarantinedSingingCandidates.Remove(oldest);
-            Debug.LogWarning($"[SenseVoice/Quarantine] 会话候选达到 {MaxPracticePhraseCount} 个；" +
-                             $"为限制内存仅清理最老 candidate={oldest.CandidateId}");
-        }
+        // Do not drop the oldest source/introductory recording to bound RAM.
+        // RetainPcm supplies disk backing with a bounded resident cache.
         m_QuarantinedSingingCandidates.Add(new QuarantinedSingingCandidate
         {
             Evidence = phrase.RecordingEvidence,
@@ -5234,6 +5406,8 @@ public partial class SenseVoiceSpeechToText : STT
     public bool TrySelectSingingClipWindow(string clipRef, bool confirmUser,
         float startSeconds, float endSeconds, bool excludeSpeech, out int stableId, out string failure)
     {
+        bool refined = TryApplyVerifiedBoundary(clipRef, startSeconds, endSeconds, confirmUser, excludeSpeech, out bool handled, out stableId, out failure);
+        if (handled) return refined;
         failure = "";
         if (!TryResolveSingingClip(clipRef, out stableId, out int candidateId))
         { failure = "指定 clip 不存在。"; return false; }
@@ -5676,6 +5850,7 @@ public partial class SenseVoiceSpeechToText : STT
             return false;
         }
         byte[] revisedWav = EncodeMonoPcm16Wav(croppedSamples, sampleRate);
+        WaveformTrace.Transform(sourceWav, revisedWav, sampleStart / (double)sampleRate, sampleEnd / (double)sampleRate);
         if (revisedWav == null || revisedWav.Length <= 44)
         {
             failure = "修订版本编码失败；当前版本保持不变";
@@ -5750,6 +5925,7 @@ public partial class SenseVoiceSpeechToText : STT
         samples = ResampleForPace(samples, pace);
         ApplyPerformanceEnvelope(samples, sampleRate, gainStart, gainEnd);
         wavBytes = EncodeMonoPcm16Wav(samples, sampleRate);
+        WaveformTrace.Transform(source, wavBytes, 0, WaveformTrace.Duration(source));
         diagnostic = $"seed={performanceSeed}, pace={pace:F3}, dynamics={gainStart:F2}->{gainEnd:F2}";
         return wavBytes != null && wavBytes.Length > 44;
     }
@@ -5947,6 +6123,9 @@ public partial class SenseVoiceSpeechToText : STT
 
         var decoded = new List<float[]>(sequence.Count);
         var selectedTimelines = new List<float[]>(sequence.Count);
+        var traceSources = new List<byte[]>();
+        var traceStarts = new List<double>();
+        var traceEnds = new List<double>();
         int outputRate = 0;
         for (int k = 0; k < sequence.Count; k++)
         {
@@ -5973,6 +6152,8 @@ public partial class SenseVoiceSpeechToText : STT
                 failure = $"第 {i + 1} 段不是可组合的 PCM WAV";
                 return false;
             }
+            TracePracticeSource(stored, selectedWav, expandedAvailable);
+            double traceStart = 0, traceEnd = phraseSamples.Length / (double)Mathf.Max(1, phraseRate);
             if (hasExplicitTrim)
             {
                 float selectedDuration = phraseSamples.Length / (float)Mathf.Max(1, phraseRate);
@@ -5989,6 +6170,7 @@ public partial class SenseVoiceSpeechToText : STT
                     Mathf.RoundToInt(start * phraseRate), 0, phraseSamples.Length);
                 int sampleEnd = Mathf.Clamp(
                     Mathf.RoundToInt(end * phraseRate), sampleStart, phraseSamples.Length);
+                traceStart = sampleStart / (double)phraseRate; traceEnd = sampleEnd / (double)phraseRate;
                 var croppedSamples = new float[sampleEnd - sampleStart];
                 Array.Copy(phraseSamples, sampleStart, croppedSamples, 0, croppedSamples.Length);
                 phraseSamples = croppedSamples;
@@ -6010,9 +6192,21 @@ public partial class SenseVoiceSpeechToText : STT
             if (outputRate <= 0) outputRate = phraseRate;
             if (phraseRate != outputRate)
                 phraseSamples = ResampleToRate(phraseSamples, phraseRate, outputRate);
+            traceSources.Add(selectedWav); traceStarts.Add(traceStart); traceEnds.Add(traceEnd);
             decoded.Add(phraseSamples);
             selectedTimelines.Add(selectedTimeline);
         }
+
+        for (int i = 0; i < sequence.Count; i++)
+            for (int j = 0; j < i; j++)
+                if (sequence[i] != sequence[j] && WaveformTrace.SharesCopiedPcm(
+                    traceSources[i], traceStarts[i], traceEnds[i], traceSources[j], traceStarts[j], traceEnds[j]))
+                {
+                    failure = "recording-overlapping-continuation-selection: 所选不同片段共享实际录音区间，" +
+                        "它们是续接版本，不能当不同乐句拼接；请选择所需完整版本或不重叠范围。" +
+                        "若用户明确要求重复同一片段，请重复同一稳定音源并保留请求审核。未修改或播放录音。";
+                    return false;
+                }
 
         System.Random random = new System.Random(performanceSeed);
         const float outputFrameSeconds = 0.10f;
@@ -6052,6 +6246,7 @@ public partial class SenseVoiceSpeechToText : STT
             }
             else gaps.Add(0f);
             segmentWavs.Add(EncodeMonoPcm16Wav(phrase, outputRate));
+            WaveformTrace.Transform(traceSources[i], segmentWavs[i], traceStarts[i], traceEnds[i]);
             segmentMedians.Add(MedianVoicedPitch(selectedTimelines[i]));
             segmentSources.Add(sequence[i] + 1);
 
@@ -6101,6 +6296,7 @@ public partial class SenseVoiceSpeechToText : STT
             SegmentSourceIndices = segmentSources,
             MedianMidi = MedianVoicedPitch(midi.ToArray()),
         };
+        WaveformTrace.Concatenate(composition.WavBytes, segmentWavs, gaps);
         return composition.WavBytes != null && composition.WavBytes.Length > 44 &&
             HasPlayablePitchTimeline(composition.MidiTimeline);
     }
@@ -6158,6 +6354,7 @@ public partial class SenseVoiceSpeechToText : STT
             //只有真正位于连续有声区的硬切才需要极短淡入淡出；静音切点上的处理不可闻。
             ApplyShortEdgeFade(chunkSamples, sampleRate, 0.006f);
             chunks.Add(EncodeMonoPcm16Wav(chunkSamples, sampleRate));
+            WaveformTrace.Transform(wavBytes, chunks[chunks.Count - 1], startSample / (double)sampleRate, endSample / (double)sampleRate);
             gaps.Add(0f);
             sources.Add(chunks.Count);
 
@@ -7010,6 +7207,9 @@ public partial class SenseVoiceSpeechToText : STT
     [Serializable]
     private class Response
     {
+        public string input_status, input_error_code, input_error_stage, input_evidence_reason;
+        public bool input_error_retryable;
+        public bool raw_vad_observed;
         public int turn_segments_schema;
         public TurnTranscriptSegment[] turn_segments;
         public string whole_text, segmented_text, transcript_source;
@@ -7153,6 +7353,8 @@ public partial class SenseVoiceSpeechToText : STT
 
     public class VoiceActivityResult
     {
+        public bool Available = false;
+        public float ElapsedSeconds = 0f;
         public bool IsSpeech = false;
         public int SpeechMs = 0;
         public string SpeakerId = "";

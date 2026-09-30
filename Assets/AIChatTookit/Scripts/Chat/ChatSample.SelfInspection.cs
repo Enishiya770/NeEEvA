@@ -101,7 +101,7 @@ public partial class ChatSample
         m_SongMemoryInFlight || m_SpeakerManageInFlight || IsSingingRuntimeActivityActive() || HasPendingSingingPolicyReview() ||
         m_PendingMotionRepair != null || m_ActiveMotionRepair != null;
 
-    private bool ShouldReviewUserWork() => !m_UserSpeechActiveForAutonomy &&
+    private bool ShouldReviewUserWork() => !SingingReviewRetryExhausted && !m_UserSpeechActiveForAutonomy &&
         ((m_WorkReviewOpen && (m_WorkResponses.Count > 0 || HasPendingSingingGoalReview())) ||
             (HasAutonomousSingingGoal() && HasPendingSingingGoalReview()) ||
             (HasReviewedRecoveredUserSingingGoal() && m_WorkContinuations + m_AutonomousGoalContinuations < MaxWorkContinuations));
@@ -112,7 +112,11 @@ public partial class ChatSample
         return status == "continue" || status == "waiting_tool" || status == "waiting_user" || status == "closed" || status == "none";
     }
 
-    private string BuildDedicatedWorkReviewPrompt(string frame) =>
+    private string BuildDedicatedWorkReviewPrompt(string frame)
+    {
+        if (m_SingingGoal != null && m_SingingGoal.review == "pending" && m_ChatSettings?.m_SpeechToText is SenseVoiceSpeechToText)
+            return BuildSourceAwareRecordingReviewPrompt();
+        return
         "[内部事项进度判定；不生成角色台词，不调用工具]\n" +
         (m_WorkReviewOpen ? "这次只判断上一用户请求有没有必要的未完成步骤，不讨论主动闲聊或新意。\n" :
             "当前没有打开的用户事项续接；program_work_status=" + m_WorkStatus + "。这次独立审核当前歌唱草案。" +
@@ -127,7 +131,9 @@ public partial class ChatSample
         "proceed只在continue时为true。intent写必要下一步，不给原请求增加新目标。" +
         "\n独立核验歌唱目标：sing_goal 是角色提出的草案，不是用户要求的权威来源。" +
         "首先从完整时序区分用户已经唱过什么、用户是否要求角色唱。singing_goal_expected.origin=user_request/autonomous/none/uncertain；" +
-        "user_request须用request_quote逐字引用用户要求角色演唱的原话；用户说自己试唱、实际歌词和角色自己的承诺不能充当该请求。" +
+        "若goal有sourceRelation，必须对照current_recording_input的capture/clip及完整当轮顺序独立填写source_relation=current_recording/retained_recording/mixed_recordings，再与所选refs核对；其它旧协议目标填写none。" +
+        "先判断这次是新唱后的请求、重唱旧曲、还是普通追问，不要照抄goal的选择。相同的‘这一段’引文可以指不同录音，sourceUserTurn只说明请求来源，不证明音频来源；旧goal和上次成功播放不能覆盖本次新唱/最新纠正。明确要求第一段仍可用retained，不能机械改成最新录音。" +
+        "user_request须用request_quote逐字引用用户要求角色演唱的原话；source-aware repeat必须引用current_user_complete本次重唱请求，不能引用历史授权；用户说自己试唱、实际歌词和角色自己的承诺不能充当该请求。" +
         "request_quote是你这次独立审核填写的输出；goal.requestQuote/sourceUserTurn是审核通过后程序保存的结果，不是角色提案必填项。待审草案未有这些结果属于正常，不能据此revise或让角色自行补写引文。" +
         "对于transition=create的初始草案，若唯一问题是origin误写autonomous，而你从真实用户输入核对出的完整目标与草案一致，本次用approved并在expected填写user_request和真实引文；程序随后核对引文及完整目标才保存来源纠正，无需角色重提相同目标。已有任务来源改变、目标不一致或后来取消不适用此规则。" +
         "active_goal是程序持久保存的完整原任务，goal是当前轮提案。最新用户输入可能只是追问，不能拿它替换原目标或按最近录音重新推断。" +
@@ -144,6 +150,9 @@ public partial class ChatSample
         "两项判定分别完成：用户没有欠办事项可work_status=closed，同时符合允许边界的origin=autonomous草案仍应singing_goal_status=approved；不需要把自主选择改称用户命令。" +
         "你当前正在执行这次独立审核；结构化goal已经提交给你，review=pending仅表示等待你的本次判定，不是草案错误。" +
         "若目标内容符合用户要求，请在本次直接给approved；不要仅因pending、尚未执行或回复未重写sing_goal而要求另一次审核。" +
+        "本次审核的是用户要求与目标的素材、顺序、范围和版本；来源确认与音频准备是分别验证的步骤。source=pending只表示声音来源未确认，本身不禁止演唱，也不表示用户请求来源uncertain。" +
+        "目标通过不会把source改为confirmed_user；显式选择真实clean/expanded/window后，执行器仍须验证原音频、音高和讲话边界，现有pending条目的来源确认仍须走明确的来源确认操作。" +
+        "仍须结合完整输入独立判断是否要求演唱、哪份录音和范围；若有具体指代冲突、来源否认或内容疑点可revise或waiting_user，不能仅把source=pending当作必须再次询问的硬门槛。" +
         "range=current/clean/expanded引用素材清单已有的范围，均不需要另填起止秒数；只有window必须指定坐标。" +
         "选择第一段/第二段是在选refs，不是要求重新裁切；用户要求现有/相同范围时range=current、起止为null，不要把清单展示的坐标改写为新的window。" +
         "用户任务先依据最新完整请求和实际素材清单，独立填写singing_goal_expected中的有序refs和range，再与草案逐项比较，二者不一致必须revise。" +
@@ -161,7 +170,9 @@ public partial class ChatSample
         "\n只输出紧凑JSON：{\"work_evidence\":\"简短对照\",\"work_status\":\"continue|waiting_tool|waiting_user|closed\"," +
         "\"proceed\":false,\"intent\":\"必要下一步；没有则留空\",\"wait_seconds\":45," +
         "\"singing_goal_status\":\"none|approved|revise|waiting_user|cancelled\",\"singing_goal_evidence\":\"目标与用户要求的核验依据\"," +
-        "\"singing_goal_expected\":{\"origin\":\"none\",\"request_quote\":\"\",\"refs\":\"\",\"range\":\"none\",\"start_seconds\":null,\"end_seconds\":null}}";
+        "\"singing_goal_expected\":{\"origin\":\"none\",\"source_relation\":\"none\",\"request_quote\":\"\",\"refs\":\"\",\"range\":\"none\",\"start_seconds\":null,\"end_seconds\":null}}" +
+        BuildRecordingInputReviewContext();
+    }
 
     // Meaning is judged by the existing LLM probe; ownership, liveness and budgets are local.
     private bool ApplyWorkReviewDecision(AutonomyIntentDecision decision)
@@ -328,9 +339,18 @@ public partial class ChatSample
 
     private void DispatchWorkFeedback(string feedback, string imageUrl, int generation)
     {
+        if (TryConsumeSettledActorWorkFeedback(generation)) return;
         imageUrl = ResolveFormalSceneImage(generation);
         bool guardSceneFeedback = ShouldGuardWorkSceneFeedback(generation);
+        bool recording = ConsumeReviewedRecordingFeedback(generation, guardSceneFeedback);
+        BindRecordingDecisionContext(recording, generation);
+        m_ResponseTrace?.Sample("work.feedback_route", new JObject {
+            ["generation"] = generation, ["speechRound"] = m_CurrentSpeechRoundId,
+            ["route"] = recording ? "recording_singing" : "general",
+            ["scope"] = "validated work-review route; no additional model request or execution authority" });
         string latest = BuildFormalObservationContext(feedback) + (guardSceneFeedback ? BuildWorkSceneFeedbackContext() : "");
+        if (!recording && !guardSceneFeedback && TryDispatchActorGeneralDraft(m_LastUserMsg, imageUrl,
+                generation, true, latest, true)) return;
         ObservationReceipt observations = CaptureObservationReceipt();
         bool consumed = false;
         var sceneSpeech = guardSceneFeedback ? new SpeechTextBuffer() : null;

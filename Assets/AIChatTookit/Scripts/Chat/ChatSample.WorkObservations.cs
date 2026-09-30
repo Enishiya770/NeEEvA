@@ -155,7 +155,23 @@ public partial class ChatSample
             "等待用户回复或工具返回时不要重复承诺，已结束事项不要重开。";
     }
 
-    private bool? m_ObservedSvcReachable, m_ObservedSvcWorkerReady;
+    private bool? m_ObservedSvcReachable, m_ObservedSvcWorkerReady, m_ObservedSvcHealthy;
+    private string m_ObservedSvcDetail = "";
+
+    private bool RecordSvcHealthObservation(bool reachable, bool httpSuccess, string body)
+    {
+        m_ObservedSvcReachable = reachable;
+        m_ObservedSvcHealthAt = Time.realtimeSinceStartup;
+        m_ObservedSvcHealthy = null;
+        m_ObservedSvcDetail = TruncateForFrame(body ?? "", 600);
+        try {
+            var result = JObject.Parse(body ?? "{}");
+            if (result["ok"]?.Type == JTokenType.Boolean)
+                m_ObservedSvcHealthy = httpSuccess && (bool)result["ok"];
+        } catch (Exception) { /* Reachable does not establish readiness. */ }
+        if (m_ObservedSvcHealthy != true) m_ObservedSvcWorkerReady = null;
+        return httpSuccess && m_ObservedSvcHealthy == true;
+    }
     private float m_ObservedSvcHealthAt = -1f, m_ObservedSvcWarmupAt = -1f;
 
     private JObject BuildVoiceCapabilityObservation()
@@ -174,7 +190,8 @@ public partial class ChatSample
                 workActive = IsSingingRuntimeActivityActive(), lastOutcome = m_LatestSingingOutcome,
                 lastCompletedPlayback = m_LastCompletedPracticePlaybackFacts,
                 serviceObservation = new {
-                    reachable = m_ObservedSvcReachable,
+                    reachable = m_ObservedSvcReachable, healthy = m_ObservedSvcHealthy,
+                    detail = m_ObservedSvcDetail,
                     healthAgeSeconds = m_ObservedSvcHealthAt < 0f ? (float?)null : now - m_ObservedSvcHealthAt,
                     workerReady = m_ObservedSvcWorkerReady,
                     warmupAgeSeconds = m_ObservedSvcWarmupAt < 0f ? (float?)null : now - m_ObservedSvcWarmupAt,
@@ -192,11 +209,13 @@ public partial class ChatSample
     {
         m_ObservedSvcWarmupAt = Time.realtimeSinceStartup;
         m_ObservedSvcWorkerReady = null;
-        if (!succeeded) return;
+        if (!succeeded) m_ObservedSvcDetail = TruncateForFrame(body ?? "", 600);
         try {
             var result = JObject.Parse(body ?? "{}");
             if (result["ready"]?.Type == JTokenType.Boolean)
-                m_ObservedSvcWorkerReady = (bool)result["ready"];
-        } catch (Exception) { /* An HTTP success with an unknown payload proves no worker state. */ }
+                m_ObservedSvcWorkerReady = succeeded && (bool)result["ready"];
+            else if (result["ok"]?.Type == JTokenType.Boolean && !(bool)result["ok"])
+                m_ObservedSvcWorkerReady = false;
+        } catch (Exception) { /* Unknown payload proves no worker state. */ }
     }
 }

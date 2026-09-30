@@ -167,7 +167,8 @@ public sealed class TurnActivityEvidence
     private readonly List<Level> levels = new List<Level>();
     private float nextSample, highSince = -1f, quietSince = -1f;
     private float melodyReceivedAt = -999f, melodyRms;
-    private bool melodySupported;
+    private bool melodySupported, lastTailVadAvailable;
+    private int lastTailSpeechMs;
     private float textActivityAt = -999f;
     private string acceptedText = "", candidateText = "";
     private int candidateAudioMs = -1, lastAsrAudioMs = -1;
@@ -198,7 +199,7 @@ public sealed class TurnActivityEvidence
     public void Reset(float now)
     {
         levels.Clear(); nextSample = now; highSince = -1f; quietSince = now;
-        melodyReceivedAt = -999f; melodyRms = 0f; melodySupported = false;
+        melodyReceivedAt = -999f; melodyRms = 0f; melodySupported = lastTailVadAvailable = false; lastTailSpeechMs = 0;
         acceptedText = candidateText = ""; candidateAudioMs = lastAsrAudioMs = -1;
         lastAsrAudioEndTime = -1f;
         Revision = ActivityRevision = 0; textActivityAt = -999f;
@@ -246,6 +247,7 @@ public sealed class TurnActivityEvidence
         lastAsrAudioMs = audioMs; LastAsrAt = now;
         lastAsrAudioEndTime = audioEndTime >= 0f && audioEndTime <= now ? audioEndTime : -1f;
         TailAvailable = tailAvailable;
+        lastTailVadAvailable = tailVadAvailable; lastTailSpeechMs = tailSpeechMs;
         melodyReceivedAt = now; melodyRms = tailRms;
         // Periodicity is not speaker identity. Require energy above measured noise too.
         melodySupported = tailAvailable && tailRms >= Mathf.Max(0.001f, noiseUpper * 1.35f) &&
@@ -282,6 +284,18 @@ public sealed class TurnActivityEvidence
         // Text changes only invalidate semantics. Soft speech is supported by the
         // independent tail VAD above, including when ASR has not produced new words.
         return true;
+    }
+
+    // A revision of old words must not keep a physically quiet turn open forever.
+    // This only permits closing capture and requesting full final ASR; the text
+    // remains unconfirmed and cannot itself authorize a reply or an action.
+    public bool CanClosePendingTextOnQuietTail(float now, float requiredQuiet)
+    {
+        float quiet = Mathf.Max(1.5f, requiredQuiet);
+        return PendingText && !LevelActive && !MelodyActive && !TextActivityActive &&
+            AsrHealthy(now) && TailAvailable && TailAge(now) <= 1.25f &&
+            lastTailVadAvailable && lastTailSpeechMs == 0 && CoversQuietTail &&
+            QuietSeconds(now) >= quiet && lastAsrAudioEndTime >= quietSince + quiet - .25f;
     }
 
     // A full-clip result may corroborate a tentative partial without waiting for a

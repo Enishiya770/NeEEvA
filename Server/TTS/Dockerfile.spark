@@ -1,0 +1,15 @@
+FROM ghcr.io/anemll/dspark-vllm-gx10:0.1.1
+USER root
+# The pinned cached image already supplies ARM ffmpeg, libsndfile and GCC.
+RUN test -x /usr/bin/ffmpeg && command -v gcc
+RUN python3 -m venv --system-site-packages /opt/neeeva-tts-venv
+COPY requirements-spark.txt /tmp/neeeva-tts-requirements.txt
+COPY requirements-lock.txt /tmp/neeeva-tts-requirements.lock.txt
+RUN /opt/neeeva-tts-venv/bin/python -m pip install -r /tmp/neeeva-tts-requirements.txt -c /tmp/neeeva-tts-requirements.lock.txt
+# Imported by the frozen upstream AR scheduler, even in inference-only mode.
+RUN /opt/neeeva-tts-venv/bin/python -m pip install numpy==1.26.4 matplotlib==3.10.3 -c /tmp/neeeva-tts-requirements.lock.txt
+# Match the packaged, hashed English tagger data from the active local runtime.
+RUN /opt/neeeva-tts-venv/bin/python -m pip install nltk==3.8.1 -c /tmp/neeeva-tts-requirements.lock.txt
+ENV PATH=/opt/neeeva-tts-venv/bin:$PATH
+ENV OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONUNBUFFERED=1
+ENTRYPOINT ["/opt/neeeva-tts-venv/bin/python"]

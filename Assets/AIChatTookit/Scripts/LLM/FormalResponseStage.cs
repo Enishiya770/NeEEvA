@@ -7,7 +7,8 @@ public enum FormalResponseStage
 {
     General,
     CommittedSpatialReply,
-    FirstReplyRouting
+    FirstReplyRouting,
+    RecordingSingingDecision
 }
 
 /// <summary>Only executable skill instructions are projected. User/audio evidence,
@@ -22,6 +23,8 @@ public static class FormalResponseContextPolicy
 
     public static string SkillContext(FormalResponseStage stage, string active, string catalog)
     {
+        if (stage == FormalResponseStage.RecordingSingingDecision)
+            return "本次按现有录音语义表选择；其他能力仍可通过handoff交回完整工具链，不表示能力被禁用。";
         if (stage != FormalResponseStage.CommittedSpatialReply && stage != FormalResponseStage.FirstReplyRouting) return active;
         var result = new StringBuilder(stage == FormalResponseStage.FirstReplyRouting
             ? FirstReplySkillScope : SpatialSkillScope);
@@ -32,16 +35,19 @@ public static class FormalResponseContextPolicy
         while (!string.IsNullOrEmpty(active) && (cursor = active.IndexOf(marker, cursor, StringComparison.Ordinal)) >= 0)
         {
             // These headers are authored by LLM.SetActiveSkills, not inferred from
-            // user/audio content. Malformed or unknown free-form context stays intact.
+            // user/audio content. Unknown custom prose remains preference data;
+            // it cannot switch a structured request back to a tool protocol.
             int end = active.IndexOf(']', cursor + marker.Length);
-            if (end < 0) return active;
+            if (end < 0) return result + "\n" + FormalPromptProfile.RolePreferences(active);
             string name = active.Substring(cursor + marker.Length, end - cursor - marker.Length);
-            if (name.Length == 0 || name.Length > 120 || name.IndexOfAny(new[] {'\r', '\n'}) >= 0) return active;
+            if (name.Length == 0 || name.Length > 120 || name.IndexOfAny(new[] {'\r', '\n'}) >= 0)
+                return result + "\n" + FormalPromptProfile.RolePreferences(active);
             if (!names.Contains(name)) names.Add(name);
             cursor = end + 1;
         }
         if (names.Count == 0 && !string.IsNullOrWhiteSpace(active) &&
-            !string.Equals(active.Trim(), (catalog ?? "").Trim(), StringComparison.Ordinal)) return active;
+            !string.Equals(active.Trim(), (catalog ?? "").Trim(), StringComparison.Ordinal))
+            return result + "\n" + FormalPromptProfile.RolePreferences(active);
         if (names.Count > 0) result.Append("\n已加载并仍可用于后续适当阶段的技能：").Append(string.Join("、", names));
         return result.ToString();
     }
@@ -50,6 +56,7 @@ public static class FormalResponseContextPolicy
         "[本次首答的能力范围]\n你仍能使用全部已有能力：对话、观察/转头、场景移动/跟随/停止、" +
         "自由身体动作、物件检查及已登记设备操作、演唱/回唱、录音素材处理、歌曲与长期记忆。" +
         "本请求只决定普通对话或交回完整工具与审核流程，不执行这些能力，所以只列概览而不重复工具语法。" +
-        "省略语法不表示不支持、已执行或取消了该能力。需要任何工具、动作或新的事实核验时选择 tools。" +
+        "省略语法不表示不支持、已执行或取消了该能力。需要工具、动作或新的事实核验时选择 tools；" +
+        "唯有明确以已有录音为来源的回唱按首答通道规则选择 recording_singing，其他演唱仍选择 tools。" +
         "完整原话、声学证据、当前结果与未知、未完成事项仍以附带事实为准；不能把用户唱过误解为要求回唱。";
 }

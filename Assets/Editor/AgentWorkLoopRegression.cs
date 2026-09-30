@@ -11,7 +11,7 @@ using UnityEngine;
 // Regression of the observable request boundary, rather than copies of prompt/ack logic.
 // Only ASR capture and model/audio transport are fixtures. Chat orchestration, clip parsing,
 // result recording, completion/cancellation callbacks and ChatQW JSON assembly are production.
-public static class AgentWorkLoopRegression
+public static partial class AgentWorkLoopRegression
 {
     private const string SessionKey = "NeEEvA.AgentWorkLoop.PlayMode";
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
@@ -67,13 +67,24 @@ public static class AgentWorkLoopRegression
             ["incompleteScenario"] = incomplete,
             ["scenarios"] = scenarios
         };
-        string path = Path.GetFullPath("Tools/MotionAdapter/reports/agent-work-loop-regression.json");
+        string path = Path.GetFullPath(SessionState.GetBool("NeEEvA.ToolCorrection.Only", false)
+            ? "Tools/MotionAdapter/reports/tool-correction-regression.json"
+            : "Tools/MotionAdapter/reports/agent-work-loop-regression.json");
+        SessionState.EraseBool("NeEEvA.ToolCorrection.Only");
         Directory.CreateDirectory(Path.GetDirectoryName(path)); File.WriteAllText(path, report.ToString() + "\n");
         EditorApplication.Exit(failure == null ? 0 : 1);
     }
 
     private static IEnumerator Run()
     {
+        if (SessionState.GetBool("NeEEvA.ToolCorrection.Only", false))
+        {
+            IEnumerator correction = ToolCorrectionScenarios();
+            while (correction.MoveNext()) yield return correction.Current;
+            yield break;
+        }
+        IEnumerator correctionCases = ToolCorrectionScenarios();
+        while (correctionCases.MoveNext()) yield return correctionCases.Current;
         foreach (IEnumerator scenario in new[] { CompleteMixedHearing(), PendingAndRepeatedSinging(), RequestOriginAndMaterials(), ConfirmationAndContinue(), PlaybackObservation(), CancellationAndSupersession(), BoundedRecovery(), VoiceEvidence(), ReviewWireContract(), ReviewedGoalMustMatchStructuredExpectation(), ReadUserTextIsNotRoleAction(), EmptyInspectionDeliveryIsBounded(), WorkEpochFencesStreamCallbacks(), ConditionalObservationReceipt(), MemoryAcknowledgementOwnership(), MemoryAcknowledgementSupersession(), NonAgentMemoryDelivery() })
             while (scenario.MoveNext()) yield return scenario.Current;
     }
@@ -340,6 +351,73 @@ public static class AgentWorkLoopRegression
         Check((string)Get(f.chat, "m_WorkStatus") == "blocked" && !(bool)Get(f.chat, "m_WorkReviewOpen"), "Recovery exhaustion was declared completed or left unbounded.");
         Check(f.model.reviewRequests == 4 && f.model.ephemeralRequests == 0, "Pending-work progress reused the idle ephemeral request route.");
         SaveScenario(f); f.Dispose(); fixture = null;
+    }
+
+    public static IEnumerator RunSingingReviewUnavailableChecks()
+    {
+        int before = checks;
+        fixture = new Fixture("singing_review_unavailable_callback_is_bounded");
+        var f = fixture;
+        try
+        {
+            yield return null;
+            void Propose()
+            {
+                int revision = f.sense.DescribePracticePhrases().Single(p => p.ClipRef == f.first).Revision;
+                object[] args = { $"<sing_goal origin=\"user_request\" refs=\"{f.first}\" range=\"current\" revisions=\"{revision}\" expected=\"本轮指定的第一段\"/>", true };
+                Call(f.chat, "ExtractSingingGoalTags", args);
+                Check((bool)Call(f.chat, "HasPendingSingingGoalReview"), "Runtime recovery fixture did not register a real pending goal");
+            }
+            f.BeginUser("请回唱第一段。"); f.Confirm(f.first); Propose();
+            Call(f.chat, "FireTick", "singing-goal-review");
+            Check(f.model.reviewRequests == 1, "Pending singing did not reach real PostWorkReviewMsg");
+            var firstCallback = f.model.SnapshotReview();
+            f.model.Decide("");
+            var overlay = (SubtitleOverlay)Get(f.chat, "m_SubtitleOverlay");
+            Check((int)Get(f.chat, "m_SingingUnavailableAttempts") == 1 &&
+                overlay.NoticeHistory.Count(n => n.Code == "singing_review_retrying") == 1,
+                "Actual provider failure did not schedule one retry and show its stage");
+            firstCallback("");
+            Check((int)Get(f.chat, "m_SingingUnavailableAttempts") == 1,
+                "Duplicated actual provider callback consumed the second attempt");
+            Call(f.chat, "FireTick", "singing-goal-review-retry");
+            Check(f.model.reviewRequests == 2, "Permitted singing review retry did not reach its provider");
+            var oldCallback = f.model.SnapshotReview();
+            f.model.Decide("{broken");
+            Check((int)Get(f.chat, "m_SingingUnavailableAttempts") == 2 &&
+                overlay.NoticeHistory.Count(n => n.Code == "singing_review_unavailable") == 1 &&
+                f.model.Requests.Count == 0 && !(bool)Get(f.chat, "m_SingingRequestSubmittedSinceUserTurn"),
+                "Second unavailable review invented formal/audio execution or lacked terminal notice");
+            Call(f.chat, "FireTick", "default");
+            Call(f.chat, "BeginAutonomyIntentProbeCore", "default", false);
+            Check(f.model.reviewRequests == 2 && !(bool)Call(f.chat, "ShouldReviewUserWork"),
+                "Default work/probe path bypassed the exhausted pending-goal latch");
+
+            f.BeginUser("现在再试第一段。"); Propose();
+            Call(f.chat, "FireTick", "singing-goal-review");
+            Check(f.model.reviewRequests == 3, "New user input could not retry a previously unavailable review");
+            int notices = overlay.NoticeHistory.Count;
+            oldCallback("");
+            Check(overlay.NoticeHistory.Count == notices && (bool)Get(f.chat, "m_AutonomyProbeInFlight"),
+                "Old callback consumed or cleared the newer request");
+            f.model.Decide("");
+            Check((int)Get(f.chat, "m_SingingUnavailableAttempts") == 1,
+                "New request inherited the old goal's spent retry budget");
+
+            Call(f.chat, "FireTick", "singing-goal-review-retry");
+            var response = JObject.Parse(Continue("等待用户确认目标，不执行"));
+            response["work_status"] = "waiting_user"; response["proceed"] = false;
+            response["singing_goal_status"] = "waiting_user";
+            response["singing_goal_evidence"] = "当前素材和用户要求尚需确认，未批准执行。";
+            response["singing_goal_expected"] = ExpectedSinging(f.first, "current");
+            f.model.Decide(response.ToString());
+            Check((int)Get(f.chat, "m_SingingUnavailableAttempts") == 0 && f.model.Requests.Count == 0,
+                "Valid semantic review did not clear transport retry state or launched audio unexpectedly");
+            Check(!(bool)Get(f.chat, "m_SingingRequestSubmittedSinceUserTurn"),
+                "Review recovery submitted audio without semantic approval");
+            Debug.Log("[SingingReviewUnavailableRegression] passed checks=" + (checks - before));
+        }
+        finally { f.Dispose(); fixture = null; }
     }
 
     private static IEnumerator VoiceEvidence()
@@ -703,7 +781,7 @@ public static class AgentWorkLoopRegression
         ["singing_goal_expected"] = ExpectedSinging("", "none"), ["wait_seconds"] = 45 }.ToString();
 
     private static JObject ExpectedSinging(string refs, string range) => new JObject {
-        ["origin"] = refs.Length == 0 ? "none" : "user_request", ["request_quote"] = refs.Length == 0 ? "" : fixture.user,
+        ["origin"] = refs.Length == 0 ? "none" : "user_request", ["source_relation"] = "none", ["request_quote"] = refs.Length == 0 ? "" : fixture.user,
         ["refs"] = refs, ["range"] = range, ["start_seconds"] = null, ["end_seconds"] = null };
 
     private static string LastSystem(JObject request)

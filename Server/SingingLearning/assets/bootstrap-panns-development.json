@@ -1,0 +1,163 @@
+{
+  "schema": "neeeva.frozen-score-adapter.v1",
+  "model": "weighted_standardized_l2_logistic",
+  "execution_authorized": false,
+  "output_name": "uncalibrated_score",
+  "feature_metadata": {
+    "names": [
+      "speech_direct_logit",
+      "singing_direct_logit",
+      "speech_family_max_logit",
+      "singing_family_max_logit",
+      "music_logit",
+      "humming_logit",
+      "rapping_logit",
+      "singing_family_minus_speech_family",
+      "singing_direct_minus_speech_direct"
+    ],
+    "definitions": [
+      "logit(clip(Speech, 1e-5, 1-1e-5))",
+      "logit(clip(Singing, 1e-5, 1-1e-5))",
+      "logit(clip(max(actual_speech_family_members), 1e-5, 1-1e-5))",
+      "logit(clip(max(actual_singing_family_members), 1e-5, 1-1e-5))",
+      "logit(clip(Music, 1e-5, 1-1e-5))",
+      "logit(clip(Humming, 1e-5, 1-1e-5))",
+      "logit(clip(Rapping, 1e-5, 1-1e-5))",
+      "max(actual_singing_family_members) - max(actual_speech_family_members)",
+      "Singing - Speech"
+    ],
+    "logit_clip": 1e-05,
+    "input_label_order": [
+      "Speech",
+      "Singing",
+      "Male speech, man speaking",
+      "Female speech, woman speaking",
+      "Child speech, kid speaking",
+      "Conversation",
+      "Narration, monologue",
+      "Male singing",
+      "Female singing",
+      "Child singing",
+      "Humming",
+      "Rapping",
+      "Music"
+    ],
+    "family_member_order": "canonical_parent_male_female_optional_child",
+    "actual_speech_family_members": [
+      "Speech",
+      "Male speech, man speaking",
+      "Female speech, woman speaking",
+      "Child speech, kid speaking"
+    ],
+    "actual_singing_family_members": [
+      "Singing",
+      "Male singing",
+      "Female singing",
+      "Child singing"
+    ],
+    "family_aggregation": "maximum_raw_score_not_probability_union"
+  },
+  "standardizer": {
+    "mean": [
+      -1.1753320329164894,
+      -8.497218515286088,
+      -1.1753320329164894,
+      -8.375078034079525,
+      -5.88316484999946,
+      -9.706228192524069,
+      -11.124599251444762,
+      -0.40211714538557736,
+      -0.4027289331988996
+    ],
+    "std": [
+      2.6077553082712064,
+      2.0364030872378294,
+      2.6077553082712064,
+      2.1541589484853176,
+      1.5231245486386782,
+      1.987830146760616,
+      0.620535195246508,
+      0.2970298682044619,
+      0.29646892836912125
+    ],
+    "raw_std": [
+      2.6077553082712064,
+      2.0364030872378294,
+      2.6077553082712064,
+      2.1541589484853176,
+      1.5231245486386782,
+      1.987830146760616,
+      0.620535195246508,
+      0.2970298682044619,
+      0.29646892836912125
+    ],
+    "std_floor": 1e-06,
+    "fit_scope": "provided_training_rows_only",
+    "weighting": "same_normalized_sample_weights_as_objective"
+  },
+  "weights": [
+    -0.014232003967007252,
+    0.5954774694915338,
+    -0.014232003967007252,
+    0.6184700063905907,
+    0.26078223252623256,
+    0.785892997574458,
+    0.40210701229670887,
+    0.319535537459445,
+    0.31967585797482717
+  ],
+  "bias": -0.019039322255682677,
+  "lambda": 0.1,
+  "objective_definition": "sum(normalized_weight * BCE(soft_target,sigmoid(Xw+b))) + lambda/2 * sum(w^2)",
+  "bias_penalized": false,
+  "optimization": {
+    "method": "deterministic_newton_armijo",
+    "armijo_c": 0.0001,
+    "backtrack_factor": 0.5,
+    "max_backtracks_per_iteration": 50
+  },
+  "convergence": {
+    "converged": true,
+    "iterations": 5,
+    "objective": 0.24261125768914965,
+    "gradient_norm_inf": 1.6033677580074013e-09,
+    "max_iterations": 200,
+    "gradient_tolerance": 1e-08,
+    "total_backtracks": 0,
+    "objective_history": [
+      0.6859067750401272,
+      0.2919176159675412,
+      0.2465352583773523,
+      0.2426472126542442,
+      0.2426112614720666,
+      0.24261125768914965
+    ],
+    "fit_wall_seconds": 0.0019081999780610204,
+    "reason": "gradient_tolerance_met"
+  },
+  "training_summary": {
+    "rows": 259,
+    "positive_weight_rows": 259,
+    "normalized_positive_mass": 0.439904600482402,
+    "normalized_negative_mass": 0.5600953995175982,
+    "input_weight_scale": 0.0570409982174688,
+    "scaled_weight_sum": 105.18749999999999,
+    "input_weight_sum": 5.999999999999999
+  },
+  "scope": "Offline exploratory score adapter. No posterior calibration claim, split construction, threshold tuning, smoothing, gap filling, segment filtering or execution authority.",
+  "experiment_provenance": {
+    "protocol_sha256": "29a950daeb7804c99c54469d6f61a8fcefd0de81f981e6d81ba0f37cf5703b9a",
+    "model": "panns",
+    "training_ids": [
+      "c10",
+      "c14",
+      "c15",
+      "c6",
+      "c8",
+      "c9",
+      "previous-c13"
+    ],
+    "status": "fitted_on_all_development_data_for_offline_experiments_only",
+    "held_out_acceptance": false
+  }
+}

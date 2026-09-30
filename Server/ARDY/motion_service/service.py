@@ -17,12 +17,15 @@ from .protocol import FEATURE_CONTRACT, FEATURE_TEMPLATE, QWEN_MODEL_SHA256, Gen
 class LiveFeatureProvider:
     source = "live-qwen"
 
-    def __init__(self, base_url="http://127.0.0.1:8080", expected_model_sha256=None):
+    def __init__(self, base_url="http://127.0.0.1:8080", expected_model_sha256=None,
+                 allow_independent_model=False):
         self.base_url = base_url.rstrip("/")
         self.expected_model_sha256 = (expected_model_sha256 or QWEN_MODEL_SHA256).lower()
         if self.expected_model_sha256 != QWEN_MODEL_SHA256:
             raise ValueError("The selected adapter requires its original Qwen model SHA256")
-        self.info = {"source": self.source, "verified": False, "baseUrl": self.base_url}
+        self.allow_independent_model = bool(allow_independent_model)
+        self.info = {"source": self.source, "verified": False, "baseUrl": self.base_url,
+                     "sharedModelRequired": not self.allow_independent_model}
 
     async def fetch(self, request, remaining):
         payload = {"text": request.description, "request_id": request.requestId,
@@ -47,7 +50,9 @@ class LiveFeatureProvider:
                 value["feature_source"] == "live-qwen", value["protocol"] == "qwen-motion-raw-last-v1",
                 value["request_id"] == request.requestId, value["text"] == request.description,
                 value["pooling"] == "last_input_token_raw", value["template"] == FEATURE_TEMPLATE,
-                value["shared_model"] is True, value["context_tokens"] == 512,
+                isinstance(value["shared_model"], bool),
+                (value["shared_model"] is True or self.allow_independent_model),
+                value["context_tokens"] == 512,
                 isinstance(actual_hash, str) and len(actual_hash) == 64 and all(c in "0123456789abcdef" for c in actual_hash),
                 actual_hash == self.expected_model_sha256,
             )
@@ -56,6 +61,8 @@ class LiveFeatureProvider:
         except (KeyError, ValueError, TypeError, OverflowError, AttributeError) as error:
             raise ServiceError(502, "feature_contract_mismatch", str(error)) from error
         self.info = {"source": self.source, "verified": True, "baseUrl": self.base_url,
+                     "sharedModel": bool(value["shared_model"]),
+                     "sharedModelRequired": not self.allow_independent_model,
                      "featureContract": FEATURE_CONTRACT, "modelSha256": actual_hash}
         return {"embedding": embedding, "source": self.source, "modelSha256": actual_hash,
                 "featureRequestId": request.requestId, "featureContract": FEATURE_CONTRACT}

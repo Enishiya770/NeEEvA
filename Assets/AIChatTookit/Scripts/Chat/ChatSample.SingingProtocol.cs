@@ -350,6 +350,8 @@ public partial class ChatSample
         }
         if (!preparationOnly && !BindPreparedSingingGoalMaterials(sense, out failure))
             return RejectSingingResolution(out detail, "prepared_goal_mismatch", "range", failure, "准备后的素材已改变；重新核对完整目标，未开始播放。");
+        m_ResponseTrace?.Child("singing-material").Mark("singing.material_resolved",
+            sense.TraceSelectedMaterials(request.ClipRefs, request.Order, request.Range));
         Debug.Log($"[Sing/Resolve] refs={request.ClipRefs} -> order={request.Order} range={request.Range}; prepared_not_played");
         return true;
     }

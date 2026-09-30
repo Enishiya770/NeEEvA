@@ -752,6 +752,7 @@ namespace NeEEvA.Motion
         private void LateUpdate()
         {
             ObserveWarmStreamPose();
+            PrepareWarmStreamHistoryAfterPose();
             if (IsBusy || ownedClip != null)
             {
                 string avatarReason = AvatarUnavailableReason();
@@ -934,6 +935,9 @@ namespace NeEEvA.Motion
                 if (request.result != UnityWebRequest.Result.Success)
                 {
                     LastErrorResponseJson = request.downloadHandler?.text;
+                    lastServiceError = ReadServiceErrorObservation(LastErrorResponseJson, request.responseCode,
+                        requestId, OperationRevision);
+                    Debug.LogWarning("[ARDY room/service-error] " + JsonUtility.ToJson(lastServiceError), this);
                     throw new ServiceRequestException("ARDY 服务请求失败（" + request.responseCode + "）：" + request.error, LastErrorResponseJson);
                 }
                 if (request.downloadedBytes > 8 * 1024 * 1024) throw new InvalidOperationException("ARDY 响应超出本阶段大小限制。");

@@ -71,6 +71,12 @@ class AnalysisScheduler:
             self._condition.notify()
             return job is not None
 
+    def was_cancelled(self, request_id):
+        """Read a recent cancellation for a multi-step request between short jobs."""
+        with self._condition:
+            cancelled_at = self._cancelled.get(request_id)
+            return cancelled_at is not None and time.monotonic() - cancelled_at < 60
+
     def promote(self, request_id):
         if not request_id:
             return False

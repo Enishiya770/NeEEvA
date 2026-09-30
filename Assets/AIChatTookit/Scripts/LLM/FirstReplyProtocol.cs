@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 
-public enum FirstReplyDisposition { Ordinary, Tools, Failed }
+public enum FirstReplyDisposition { Ordinary, Tools, Failed, RecordingSinging }
 
 /// <summary>Completion never contains executable tool output. A tool decision hands
 /// the untouched turn to the existing planner. A preparation is not a spoken turn.</summary>
@@ -26,12 +26,13 @@ public static class FirstReplyProtocol
 {
     public const string OrdinaryHead = "<route>ordinary</route>";
     public const string ToolsHead = "<route>tools</route>";
+    public const string RecordingSingingHead = "<route>recording_singing</route>";
     public const int MaximumResponseCharacters = 16384;
     public const int MaximumSpeechSegments = 3;
     public const int MaximumTrailingWhitespace = 4;
     public const string RouteContract =
         "[本轮首答通道]\n你仍是原来的角色，保留人设、语言、记忆和全部能力。先理解完整本轮原话及上下文，由你选择通道。" +
-        "第一项只能输出 <route>ordinary</route> 或 <route>tools</route>，不能在前面输出思考、解释或其它标签。\n" +
+        "第一项只能输出 <route>ordinary</route>、<route>tools</route> 或 <route>recording_singing</route>，不能在前面输出思考、解释或其它标签。\n" +
         "ordinary：本轮仅需直接对话，能基于现有可靠资料回答，既不执行也不承诺新的动作、工具、演唱、素材/记忆修改；" +
         "随后输出语言、independent 阶段和显式 say 正文。正文用可朗读的自然文字，不用反引号或代码块。直接回答问题，遵守用户语言要求；不要为了快而只说称呼、复述或空泛应声。" +
         "第一句就给具体回答、理由或相关感受；称呼、笑声和礼貌应声不要单独占第一句，可自然放到实质内容之后。" +
@@ -42,6 +43,20 @@ public static class FirstReplyProtocol
         "tools：本轮需要身体/房间动作、视向/观察操作、演唱/录音/素材处理、记忆修改、其它已有工具，" +
         "或需要进一步核验当前视觉、执行结果才能如实回答。只输出 <route>tools</route> 后结束；" +
         "程序会把完整本轮交回原执行和审核链，所有低频能力仍可使用，不在这里生成候选台词或工具标签。" +
+        "用户委托你自己选择目的地、在房间随便逛逛或四处走走探索，仍是实际空间行动，选择tools；不因没有指定物件或坐标就用ordinary只描述想法或要求用户逐步指挥。走向当前画面中的地面、停止正在进行的探索也选tools，交给空间规划器核对与执行。" +
+        "仅讨论探索、解释引用的‘随便逛逛’或明确现在不要开始走动时，按完整语义选择ordinary；不能因出现动作词就执行，当前纠正和尾句否定优先。" +
+        "区分不开始新任务与停止现有任务：已有探索/跟随/移动仍进行时，‘别再四处逛了，停在这里’要求真正停止，必须tools；ordinary不能只说‘我已经停下’来代替停止操作。只解释停止这句话且要求别执行，才仍是ordinary。" +
+        "recording_singing 是 tools 的狭窄特例：本轮明确把已存在的录音片段作为回唱来源，例如刚录下的旋律，或承接你刚才针对该录音提出的回唱邀请。" +
+        "必须同时有回唱意图和指向已有录音的依据；这不是所有演唱请求的通用通道。来源不明确时选 tools。" +
+        "已有录音也包括本轮刚采集并留存的用户发声，不要求用户说出‘录音’二字。输入含用户刚唱的歌词转写，" +
+        "随后询问你能否把‘这一段’唱给他听，且voice列有本轮录音候选时，属于recording_singing；按本轮语义判断指代，不因歌词识别不准或语言混合而改成指定曲查询。" +
+        "只输出 <route>recording_singing</route> 后结束；程序会用本轮素材快照进入录音回唱决策及原有审核，不在这里说会唱、不能唱或已经唱过。" +
+        "当前用户明确没有录过所请求歌曲时，不能把这首歌当作已有录音；选择 tools，不选择 recording_singing。" +
+        "只给曲名或没有现成录音的演唱请求也选择 tools，让原工具链确认歌曲与可用素材；即使存在其他录音也不能当作这首歌的来源。" +
+        "素材数量不决定能否歌唱，不能在 ordinary 里凭 materialCount=0 宣布不能唱。" +
+        "举例：‘唱《两只老虎》，我没录过’→tools；‘照刚才录音再唱’→recording_singing；‘解释“走到我身边来”，不要真的移动’→ordinary。" +
+        "已附新鲜视野图像允许ordinary基于图片直接回答，但新的视向/移动操作仍必须tools。" +
+        "若hasUnreadExecutionDetails为true，完整工具结果仍待处理，不能用旧成功/失败状态替代最新事实；需要这些结果才能回答时选tools。" +
         "只讨论唱歌、动作等话题并不等于要求执行；反之用户追加的否定、指代、尾句限制不可忽略。" +
         "问候、情绪回应、个人偏好或一般生活建议通常能直接交流；仅提及房间、休息、唱歌等话题无需查询或操作。" +
         "不要仅因存在旧任务或已加载技能而选 tools；只有你本轮真正需要新工具/动作或核验时才选它。" +
@@ -52,12 +67,20 @@ public static class FirstReplyProtocol
     // Local llama.cpp grammar constrains the complete response, including late tags.
     // A bounded client parser remains mandatory; grammar is not semantic validation.
     public const string Grammar =
-        "root ::= tools | ordinary\n" +
+        "root ::= tools | recording | ordinary\n" +
         "tools ::= \"<route>tools</route>\" trailing\n" +
+        "recording ::= \"<route>recording_singing</route>\" trailing\n" +
         "ordinary ::= \"<route>ordinary</route>\\n\" lang \"<speech mode=\\\"independent\\\"/>\" say (\"\\n\" lang say (\"\\n\" lang say)?)? trailing\n" +
         "lang ::= \"<lang code=\\\"\" (\"ja\" | \"zh\" | \"en\") \"\\\"/>\"\n" +
         "say ::= \"<say>\" [^<>`]+ \"</say>\"\n" +
         "trailing ::= [ \\t\\r\\n]{0,4}\n";
+
+    // Same language as the native grammar. Only explicitly configured vLLM
+    // endpoints receive this field; client validation remains authoritative.
+    public const string StructuredRegex =
+        "(?:<route>tools</route>|<route>recording_singing</route>|<route>ordinary</route>\\n" +
+        "<lang code=\"(?:ja|zh|en)\"/><speech mode=\"independent\"/><say>[^<>`]+</say>" +
+        "(?:\\n<lang code=\"(?:ja|zh|en)\"/><say>[^<>`]+</say>){0,2})[ \\t\\r\\n]{0,4}";
 }
 
 /// <summary>Bounded request-local prefix decoder. Public deltas require an exact
@@ -107,11 +130,13 @@ public sealed class FirstReplyStreamParser
                 string prefix = head.ToString();
                 if (prefix == FirstReplyProtocol.OrdinaryHead) route = FirstReplyDisposition.Ordinary;
                 else if (prefix == FirstReplyProtocol.ToolsHead) route = FirstReplyDisposition.Tools;
+                else if (prefix == FirstReplyProtocol.RecordingSingingHead) route = FirstReplyDisposition.RecordingSinging;
                 else if (prefix.Length > 64 || (!FirstReplyProtocol.OrdinaryHead.StartsWith(prefix, StringComparison.Ordinal) &&
-                    !FirstReplyProtocol.ToolsHead.StartsWith(prefix, StringComparison.Ordinal))) failure = "first-reply-invalid-route-head";
+                    !FirstReplyProtocol.ToolsHead.StartsWith(prefix, StringComparison.Ordinal) &&
+                    !FirstReplyProtocol.RecordingSingingHead.StartsWith(prefix, StringComparison.Ordinal))) failure = "first-reply-invalid-route-head";
                 continue;
             }
-            if (route == FirstReplyDisposition.Tools)
+            if (route == FirstReplyDisposition.Tools || route == FirstReplyDisposition.RecordingSinging)
             {
                 if (!IsProtocolWhitespace(c)) failure = "first-reply-tools-has-body";
                 else if (++toolsWhitespace > FirstReplyProtocol.MaximumTrailingWhitespace)
@@ -187,7 +212,8 @@ public sealed class FirstReplyStreamParser
             incomplete.Speech = delivered.Snapshot();
             return incomplete;
         }
-        if (route == FirstReplyDisposition.Tools) return new FirstReplyCompletion { Disposition = FirstReplyDisposition.Tools };
+        if (route == FirstReplyDisposition.Tools || route == FirstReplyDisposition.RecordingSinging)
+            return new FirstReplyCompletion { Disposition = route.Value };
         // Do not forward raw model output: completion consumers can execute tags.
         // Construct only the already validated public language runs, no private text.
         var safe = new StringBuilder();

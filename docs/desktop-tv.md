@@ -15,19 +15,20 @@ SailingMoon Day Chat 场景中的 `tv_frame` 使用新增的 `Desktop Screen` �
 | Monitor Index | `0` 主显示器；`1` 起为其他显示器，按桌面位置排序 |
 | Frames Per Second | `12`，可设为 1–30；看视频时可提高，但会增加采集与上传开销 |
 | Max Width / Max Height | `1280 × 720`，保持比例缩小，不强行拉伸 |
-| Exclude Unity Windows | 默认开启；仅在这台电视的采集中排除 Unity，其他截图/录屏不受此开关影响。Game 视图有焦点时按 `F8` 可统一切换所有正在采集的电视 |
+| Exclude Unity Windows | 默认开启；优先仅在这台电视的采集中排除 Unity，其他截图/录屏不受影响。若本机驱动不支持局部过滤，会自动切换到兼容回退并临时使用 Windows 全局捕获排除。Game 视图有焦点时按 `F8` 可统一切换所有正在采集的电视 |
+| Filter Fallback Behavior | `Hide Unity Globally` 会让电视继续排除 Unity，但 OBS Display/Window Capture 和系统截图也看不到 Unity；`Keep Unity Visible` 会让 OBS/截图看到 Unity，但电视的普通采集可能出现镜中镜 |
 | Flip X / Flip Y | 默认关闭，用于手动调整画面方向 |
 | Brightness | `1`；电视使用独立自发光式显示材质 |
 
 运行中可以修改上述设置；Status 显示采集状态和画面尺寸，Displayed Frames 显示已上传帧数。取消勾选该组件或退出 Play Mode 会停止采集。
 
-`Exclude Unity Windows` 开启后，本进程的 Unity 编辑器主窗口、浮动窗口或 Windows 游戏窗口仅从电视自己的采集画面中排除，现实显示器上的 Unity 仍照常显示和接收输入，普通截图和 OBS 可以继续采集它。此版本已改为每个电视采集实例的局部过滤，不再用窗口全局截图排除实现开关。
+`Exclude Unity Windows` 开启后，本进程的 Unity 编辑器主窗口、浮动窗口或 Windows 游戏窗口优先仅从电视自己的采集画面中排除，现实显示器上的 Unity 仍照常显示和接收输入，普通截图和 OBS 可以继续采集它。若 Magnification 过滤回调报错或连续返回全黑帧，组件会自动启用兼容回退。`Hide Unity Globally` 会用普通 GDI 桌面采集并临时给 Unity 窗口设置 `WDA_EXCLUDEFROMCAPTURE`；`Keep Unity Visible` 则不设置全局排除，让 OBS/截图继续看到 Unity，但电视可能出现镜中镜。回退状态会显示在 `Exclusion Status` 中，退出 Play、禁用组件或重新关闭开关时恢复窗口原来的捕获设置。
 
-本机已验证局部过滤能取得被排除窗口后面的背景，同时普通 GDI 采集仍能看到该窗口，窗口的 display affinity 保持不变。此路径目前限定 **Windows 64 位、系统只有一个显示器**；使用旧版 Magnification 图像回调，显卡/Windows 组合仍有兼容性限制。检测到多显示器（包括运行中接入）或无有效回调时，会停止这台电视的过滤采集并显示原因，不会改用全局排除。关闭开关可恢复普通 GDI 整屏采集，后者支持选择多个显示器。
+本机已验证局部过滤能取得被排除窗口后面的背景，同时普通 GDI 采集仍能看到该窗口，窗口的 display affinity 保持不变。此路径目前限定 **Windows 64 位、系统只有一个显示器**；使用旧版 Magnification 图像回调，显卡/Windows 组合仍有兼容性限制。检测到多显示器、无有效回调或连续黑帧时，会自动切换到兼容回退并显示原因；关闭开关可恢复普通 GDI 整屏采集，后者支持选择多个显示器。
 
 每台电视的开关相互独立；F8 只是同时切换所有正在采集的电视的快捷方式。运行时设置接口 `DesktopTvScreen.SetUnityCaptureExclusion(bool)` 可供 UI Toggle 或未来 VR 设置面板调用。更换采集模式时短暂清空旧帧，避免新模式启动失败后继续显示旧画面。
 
-升级后等待 Unity 编译完成，退出并重新进入 Play Mode，让旧版全局排除状态得到清理。今后录制 Unity 无需关闭电视过滤。该开关只排除当前 Unity 进程的窗口；OBS 预览或 SteamVR 等其他进程的镜像画面仍可能造成另一条反馈循环，应另行避免把预览放在电视正在采集的桌面上。
+升级后等待 Unity 编译完成，退出并重新进入 Play Mode，让旧版全局排除状态得到清理。专用过滤正常时，录制 Unity 无需关闭电视过滤；如果使用 `Hide Unity Globally` 回退，OBS/截图会暂时看不到 Unity 窗口，切换为 `Keep Unity Visible` 或关闭 `Exclude Unity Windows` 后即可恢复。该开关只排除当前 Unity 进程的窗口；OBS 预览或 SteamVR 等其他进程的镜像画面仍可能造成另一条反馈循环，应另行避免把预览放在电视正在采集的桌面上。
 
 关闭排除后，如果 Unity 的 Game 窗口仍在被采集的显示器上，电视会再次形成镜中镜。另一种办法是使用扩展显示：把 Unity 和 VR 镜像窗口移到未被采集的显示器，让电视采集另一台显示器。仅戴上 PC VR 头显不会自动排除电脑上的 Unity 窗口。
 
@@ -55,7 +56,7 @@ SailingMoon Day Chat 场景中的 `tv_frame` 使用新增的 `Desktop Screen` �
 
 `WindowsDesktopFrameSource` 在后台线程采集，关闭过滤时使用 GDI，开启时使用 `WindowsFilteredDesktopCapture`；复用图像缓冲并只保留最新一帧。`DesktopTvScreen` 在 Unity 主线程上传 BGRA32 纹理；材质属性按屏幕实例设置。`DesktopScreen.shader` 支持普通渲染和 XR 立体渲染宏。窗口焦点变化不改变默认的主显示器来源，显示器布局会定期刷新。
 
-`WindowsFilteredDesktopCapture` 为采集创建隐藏的 magnifier 窗口，用 `MagSetWindowFilterList` 仅过滤自己的采集结果，再把回调图像转换为电视需要的 BGRA32 缓冲。不会修改 Unity 窗口的 display affinity，也不会临时隐藏真实窗口、切换焦点或改变全屏放大设置。旧版 `WindowsCaptureExclusion` 仅保留生命周期恢复入口，电视不再创建它的全局排除租约。
+`WindowsFilteredDesktopCapture` 为采集创建位于屏幕外、不可激活的 magnifier 窗口，用 `MagSetWindowFilterList` 仅过滤自己的采集结果，再把回调图像转换为电视需要的 BGRA32 缓冲。承载窗口保持真实尺寸，兼容部分 WDDM/DX11 组合对隐藏或零尺寸 magnifier 返回全黑回调的情况。若该路径在本机驱动上失败，`DesktopTvScreen` 会切换到普通 GDI 采集，并由 `WindowsCaptureExclusion` 临时设置全局窗口捕获排除；采集停止、禁用组件或关闭开关时恢复原始 affinity。
 
 所有局部过滤实例的原生操作由同一个专用线程执行，以满足此接口的线程限制；每台电视仍拥有独立的过滤窗口、采集尺寸和纹理。最后一个实例退出后释放放大采集运行时。生命周期清理会停止并等待后台采集线程结束。
 

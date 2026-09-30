@@ -990,9 +990,12 @@ MonoBehaviour:
   m_RmsSpikeThreshold: 0.012
   m_EnvSpikeMinGapSec: 2
   m_EnableStreamingRecognition: 1
+  m_EnableStablePartialPromotion: 1
   m_StreamAudioFrameSeconds: 0.1
   m_StreamPartialMaxAgeSeconds: 1.25
-  m_StreamPartialMaxLagMs: 1000
+  m_StreamPartialMaxLagMs: 1800
+  m_DegradedAsrCloseSilence: 1.8
+  m_DegradedCoverageGraceSeconds: 0.8
   m_StreamHumBackPrefixSeconds: 20
   m_ChatSample: {fileID: 1435085656}
   m_VoiceAWake: {fileID: 0}
@@ -1630,7 +1633,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_SpeechRecognizeURL: 
-  m_ServerSetting: http://127.0.0.1:9881
+  m_ServerSetting: http://192.168.114.163:9881
   m_EnableStreamingPreview: 1
   m_StreamingPreviewURL: 
   m_StreamPartialIntervalMs: 850
@@ -2988,7 +2991,7 @@ MonoBehaviour:
   - {fileID: 4900000, guid: 0c78d1db2ef151f4c8c147d9ada5082a, type: 3}
   m_SkillFiles:
   - {fileID: 4900000, guid: f0f8b0b5b7504a7ca01f7b430cedec21, type: 3}
-  m_Backend: 1
+  m_Backend: 2
   m_LocalUrl: http://127.0.0.1:8080/v1/chat/completions
   m_LocalModelName: antoneva
   m_SystemSetting: 
@@ -4373,9 +4376,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 20745b356ef75fe45a45c9cbecd25ba6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_PostURL: http://127.0.0.1:9880/tts
-  m_ReferWavPath: Model/41041.wav
-  m_VoiceConversionReferencePath: Model/41041.wav
+  m_PostURL: http://192.168.114.163:9880/tts
+  m_ReferWavPath: /home/spark_root_001/neeeva-voice/tts/release/refs/41041.wav
+  m_VoiceConversionReferencePath: /home/spark_root_001/neeeva-voice/vc/release/refs/41041.wav
   m_ReferenceText: "\u591C\u304C\u660E\u3051\u305F\u3089\u3001\u79C1\u3068\u4E00\u7DD2\u306B\u3001\u3053\u306E\u8FBA\u308A\u3092\u6563\u6B69\u3057\u307E\u3057\u3087\u3046\u3002"
   m_ReferenceTextLan: 2
   m_TargetLanguageMode: 0
@@ -5187,8 +5190,8 @@ MonoBehaviour:
   m_EnableSVSRVCPostPolish: 1
   m_AllowSVCFallbackFromSVS: 1
   m_EnableNeuralHumSVC: 1
-  m_HumSVCURL: http://127.0.0.1:9882/convert
-  m_AutoStartHumSVC: 1
+  m_HumSVCURL: http://192.168.114.163:9882/convert
+  m_AutoStartHumSVC: 0
   m_HumSVCStartupTimeoutSeconds: 45
   m_HumSVCStartScriptRelativePath: Server/SeedVC/start_seedvc_server.ps1
   m_HumSVCDiffusionSteps: 20

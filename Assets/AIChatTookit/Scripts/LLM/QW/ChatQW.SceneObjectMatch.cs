@@ -44,7 +44,7 @@ public partial class ChatQW
         sb.Append(',');
         AppendMessage(sb, new SendData("user", input ?? "") { imageDataUrl = imageDataUrl });
         sb.Append(']');
-        if (m_Backend == BackendType.Local) sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        AppendReasoningControls(sb, false);
         AppendSlot(sb, k_SlotAuxiliary); sb.Append('}');
         return sb.ToString();
     }
