@@ -76,6 +76,7 @@ public static class SceneObjectMatchingRegression
     {
         Vector3 root=bridge.avatar.transform.position;Quaternion rotation=bridge.avatar.transform.rotation;
         int operation=bridge.Controller.OperationRevision;var power=JObject.Parse(JsonUtility.ToJson(lamp.ReadState()));
+        int deviceWrites=((IDictionary)Get(lamp,"appliedActions")).Count;
         SceneVisionObservation source=null;Pending pending=null;
         yield return Prepare(chat);yield return Capture(chat,"wrong-pixel-source",value=>source=value);
         Check(chat.SceneVisionCapture.TryFindObservedObject(source,lamp.EntityId,out var lampPixel,out string reason),"Actual small lamp initially has current opaque pixels: "+reason);
@@ -130,7 +131,7 @@ public static class SceneObjectMatchingRegression
         Check((string)Fact(chat)["phase"]=="observed"&&(string)Fact(chat)["entityId"]==repaired.entityId,
             "Unknown long identifier can be repaired only via an offered current candidate and a new real view.");
 
-        foreach(var mode in new[]{"uncertain","different-target","invalid-candidate","cancel-late"})
+        foreach(var mode in new[]{"uncertain","different-target","landmark-as-device","invalid-candidate","cancel-late"})
         {
             yield return Prepare(chat);yield return Capture(chat,mode+"-source",value=>source=value);
             Check(chat.SceneVisionCapture.TryFindObservedObject(source,lamp.EntityId,out lampPixel,out reason),"Negative case uses actual current lamp pixels: "+reason);
@@ -142,8 +143,19 @@ public static class SceneObjectMatchingRegression
             {
                 pending.request.Complete(true,Reply("uncertain","none","The intended small object cannot be identified confidently from this view."),"controlled-match");
                 yield return Complete(chat,pending,mode);
-                Check((string)Fact(chat)["phase"]=="rejected"&&(bool?)Fact(chat)["semanticTargetConfirmed"]!=true&&
-                    (bool?)Fact(chat)["needsCloserObservation"]==true,"Uncertain recognition requests better observation and cannot execute the device operation.");
+                var fact=Fact(chat);var review=(JObject)Call(chat,"SceneObjectTargetContext");
+                Check((string)fact["intent"]=="inspect-object"&&(string)fact["phase"]=="observed"&&
+                    (string)fact["focusKind"]=="image-region-bearing"&&string.IsNullOrEmpty((string)fact["entityId"])&&
+                    (bool?)fact["objectConfirmed"]==false&&(bool?)fact["semanticTargetConfirmed"]==false&&
+                    (bool?)fact["needsCloserObservation"]==true&&(string)fact["targetMatchVerdict"]=="uncertain"&&
+                    !string.IsNullOrEmpty((string)fact["resultCaptureId"])&&(string)fact["resultCaptureId"]!=source.CaptureId&&
+                    chat.SceneVisionCapture.LatestObservation.CaptureId==(string)fact["resultCaptureId"]&&
+                    (bool)Call(chat,"IsFreshSceneObservation",chat.SceneVisionCapture.LatestObservation),
+                    "Uncertain read-only inspection observes the actual image-region bearing in a new current capture, without confirming an object identity.");
+                Check((bool?)review["associationCurrent"]==false&&(bool?)review["needsCloserObservation"]==true&&
+                    (bool?)review["needsTargetReselection"]==false&&string.IsNullOrEmpty((string)review["matchedEntityId"])&&
+                    string.IsNullOrEmpty((string)review["proposedEntityId"]),
+                    "Uncertainty asks for better observation; it neither proposes a different identified target nor binds the region as an object.");
             }
             else if(mode=="different-target")
             {
@@ -151,9 +163,25 @@ public static class SceneObjectMatchingRegression
                 pending.request.Complete(true,Reply("different-target",actualLamp.candidateId,"A visible alternative needs a separate fresh target decision; do not execute it now."),"controlled-match");
                 yield return Complete(chat,pending,mode);
                 var review=(JObject)Call(chat,"SceneObjectTargetContext");
-                Check((string)Fact(chat)["phase"]=="rejected"&&(bool?)Fact(chat)["semanticTargetConfirmed"]!=true&&
-                    (bool?)review["needsTargetReselection"]==true&&(string)review["proposedEntityId"]==lamp.EntityId,
-                    "A different-target proposal is retained only as a fresh-decision cue, never executed as a match.");
+                Check((string)Fact(chat)["intent"]=="inspect-object"&&(string)Fact(chat)["phase"]=="rejected"&&
+                    (bool?)Fact(chat)["semanticTargetConfirmed"]==false&&(string)Fact(chat)["targetMatchVerdict"]=="different-target"&&
+                    (bool?)Fact(chat)["needsCloserObservation"]==false&&(bool?)review["associationCurrent"]==false&&
+                    (bool?)review["needsTargetReselection"]==true&&(string)review["proposedEntityId"]==lamp.EntityId&&
+                    string.IsNullOrEmpty((string)review["matchedEntityId"])&&string.IsNullOrEmpty((string)Fact(chat)["resultCaptureId"])&&
+                    chat.SceneVisionCapture.LatestObservation.CaptureId==source.CaptureId,
+                    "A different-target inspection is rejected before focusing or recapturing; its alternative remains only a new-decision reselection cue.");
+            }
+            else if(mode=="landmark-as-device")
+            {
+                ordinary=chat.LastSceneObjectCandidateView.Candidates.First(value=>value.entityId!=lamp.EntityId);
+                pending.request.Complete(true,Reply("matched",ordinary.candidateId,
+                    "This furniture is the requested object's location landmark.","landmark"),"controlled-landmark-false-positive");
+                yield return Complete(chat,pending,mode);
+                var review=(JObject)Call(chat,"SceneObjectTargetContext");
+                Check((string)Fact(chat)["phase"]=="rejected" && (bool?)Fact(chat)["semanticTargetConfirmed"]!=true &&
+                    (string)review["candidateRole"]=="landmark" && (string)review["matchedEntityId"]==null &&
+                    JToken.DeepEquals(power,JObject.Parse(JsonUtility.ToJson(lamp.ReadState()))),
+                    "A model matched verdict on a landmark cannot become device-target identity or change the actual lamp.");
             }
             else if(mode=="invalid-candidate")
             {
@@ -173,7 +201,12 @@ public static class SceneObjectMatchingRegression
                     "Cancelling during matching revokes late callbacks without replacing the cancellation fact.");
                 AddCase(chat,mode,pending.decision);
             }
-            Check(JToken.DeepEquals(power,JObject.Parse(JsonUtility.ToJson(lamp.ReadState()))),"Negative matching case leaves the actual lamp state unchanged: "+mode);
+            Check(JToken.DeepEquals(power,JObject.Parse(JsonUtility.ToJson(lamp.ReadState())))&&
+                ((IDictionary)Get(lamp,"appliedActions")).Count==deviceWrites&&bridge.Controller.OperationRevision==operation&&!bridge.ReservesBody,
+                "Negative matching case makes no device write or native body operation and leaves actual lamp state unchanged: "+mode);
+            if(!inspection)Check(string.IsNullOrEmpty((string)Fact(chat)["resultCaptureId"])&&
+                chat.SceneVisionCapture.LatestObservation.CaptureId==source.CaptureId,
+                "Rejected device landmark/invalid-candidate or cancelled match cannot obtain a new action-result capture: "+mode);
         }
 
         // Exercise the production semantic-review coroutine directly. This is intentionally
@@ -194,11 +227,17 @@ public static class SceneObjectMatchingRegression
         ordinary=chat.LastSceneObjectCandidateView.Candidates.First(value=>value.entityId==wrong.EntityId);
         Check((string)referenceInput["targetPurpose"]=="observe-closer"&&((string)referenceInput["originalGoal"]).Contains("小灯")&&
             ((string)referenceInput["instructionScope"]).Contains("REFERENCE"),"Matching distinguishes the larger observation reference from the still-unconfirmed original small target.");
-        referenceRequest.Complete(true,Reply("matched",ordinary.candidateId,"The furniture is the larger reference for obtaining a better view, not identification of the small lamp."),"controlled-match");
+        referenceRequest.Complete(true,Reply("matched",ordinary.candidateId,"The furniture is the larger reference for obtaining a better view, not identification of the small lamp.","landmark"),"controlled-match");
         yield return Wait(()=>reviewDone,3,"Observe-closer semantic completion");allow=false;
         var semantic=JObject.Parse(JsonUtility.ToJson(semanticFact));
         Check(reference!=null&&reference.EntityId==wrong.EntityId&&(string)semantic["targetPurpose"]=="observe-closer"&&
-            (bool?)semantic["stateChanged"]!=true,"Matched observation reference retains its limited purpose and creates no device receipt.");
+            (bool?)semantic["stateChanged"]!=true && (bool?)semantic["semanticTargetConfirmed"]!=true,
+            "Matched observation reference retains its limited purpose and creates neither original-target proof nor a device receipt.");
+        var referenceReview=(JObject)Call(chat,"SceneObjectTargetContext");
+        Check((string)referenceReview["candidateRole"]=="landmark"&&(bool?)referenceReview["observationLandmarkConfirmed"]==true&&
+            (string)referenceReview["matchedEntityId"]==wrong.EntityId&&(bool?)referenceReview["semanticTargetConfirmed"]==false&&
+            ((IDictionary)Get(lamp,"appliedActions")).Count==deviceWrites&&bridge.Controller.OperationRevision==operation,
+            "Observe-closer explicitly accepts the landmark only as an observation reference; it neither proves the small target nor submits motion or power control.");
         LastReport["observationReferenceReview"]=new JObject { ["scope"]="Direct production matcher only; no navigation or final-target identification claim.",
             ["input"]=referenceInput,["semanticFact"]=semantic };
 
@@ -321,7 +360,7 @@ public static class SceneObjectMatchingRegression
     private static JObject PixelWire(SceneVisionObservation source,Vector2 point,string command,string intent="inspect-object")=>new JObject {
         ["intent"]=intent,["origin"]="user",["evidence"]=command,
         ["visualTarget"]=new JObject { ["captureId"]=source.CaptureId,["x"]=point.x,["y"]=point.y,["label"]=command } };
-    private static string Reply(string verdict,string id,string reason)=>new JObject { ["verdict"]=verdict,["candidateId"]=id,["reason"]=reason }.ToString();
+    private static string Reply(string verdict,string id,string reason,string role=null)=>new JObject { ["verdict"]=verdict, ["candidateRole"]=role??(verdict=="matched"?"target":verdict=="uncertain"?"uncertain":"other"),["candidateId"]=id,["reason"]=reason }.ToString();
     private static SceneObservedObject FindNeighbor(NevaSceneVisionCapture capture,SceneVisionObservation source,SceneObservedObject target)
     {
         foreach(float radius in new[]{.025f,.045f,.065f,.09f})foreach(var direction in new[]{Vector2.left,Vector2.right,Vector2.down,Vector2.up})

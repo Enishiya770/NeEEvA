@@ -16,10 +16,20 @@ param(
     [switch]$DecisionRepair,
     [switch]$DecisionRepairNative,
     [switch]$HalfTurnNative,
+    [switch]$SpatialMemory,
+    [switch]$SceneSearch,
+    [switch]$SceneSearchNative,
+    [switch]$SceneSearchLive,
+    [switch]$SpatialResult,
+    [switch]$SpatialGoalRunner,
+    [switch]$SpatialGoalRunnerNative,
+    [switch]$UnifiedDevice,
+    [switch]$UnifiedDeviceNative,
     [switch]$ViewPosition,
     [switch]$ViewPositionNative,
     [switch]$ResponseLatency,
     [switch]$FirstAudioRegression,
+    [switch]$FirstReplyRegression,
     [ValidateRange(-1,6)][int]$RecordedFurnitureIndex = -1,
     [ValidateRange(-60,60)][float]$SceneProbeYaw = 0,
     [string]$Project = '',
@@ -43,6 +53,43 @@ $methods = @{ integration='NevaSceneVisionIntegrationRegression.RunBatch'; camer
 # while hiding only the launched validation window. This never opens or saves the user's scene.
 $arguments = @('-batchmode','-projectPath',$projectPath,'-executeMethod',$methods[$Action],
     '-logFile',(Join-Path $destination 'unity.log'),'-nevaSceneVisionOutput',$destination)
+if ($UnifiedDevice -or $UnifiedDeviceNative) {
+    if ($Action -ne 'integration' -or ($UnifiedDevice -and $UnifiedDeviceNative) -or $SceneSearch -or $SceneSearchNative -or $SceneSearchLive -or
+        $SpatialMemory -or $SpatialResult -or $SpatialGoalRunner -or $SpatialGoalRunnerNative -or $NativeSceneActions -or $LiveSceneQwen -or
+        $ProductionSceneAction -or $ActiveSceneView -or $SceneObjects -or $LiveObjectReopen -or $ObjectMatching -or $ObjectApproachNative -or
+        $LiveObjectMatching -or $MotionReadiness -or $DecisionRepair -or $DecisionRepairNative -or $HalfTurnNative -or $ViewPosition -or
+        $ViewPositionNative -or $ResponseLatency -or $FirstAudioRegression -or $FirstReplyRegression -or $RecordedFurnitureIndex -ge 0 -or $SceneProbeYaw -ne 0) {
+        throw 'Unified device requires its own graphics-enabled integration focus.'
+    }
+    $arguments += @('-nevaUnifiedDevice','1')
+    if ($UnifiedDeviceNative) { $arguments += @('-nevaUnifiedDeviceNative','1') }
+}
+if ($SceneSearchLive) {
+    if ($Action -ne 'integration' -or $SceneSearch -or $SceneSearchNative -or $SpatialMemory -or $SpatialResult -or $SpatialGoalRunner -or $SpatialGoalRunnerNative -or $NativeSceneActions -or $LiveSceneQwen -or $ProductionSceneAction -or $ActiveSceneView -or $SceneObjects -or $LiveObjectReopen -or $ObjectMatching -or $ObjectApproachNative -or $LiveObjectMatching -or $MotionReadiness -or $DecisionRepair -or $DecisionRepairNative -or $HalfTurnNative -or $ViewPosition -or $ViewPositionNative -or $ResponseLatency -or $FirstAudioRegression -or $FirstReplyRegression -or $RecordedFurnitureIndex -ge 0 -or $SceneProbeYaw -ne 0) { throw 'Live search requires its own integration run without native motion or another focus.' }
+    $arguments += @('-nevaSceneSearchLive','1')
+}
+if ($SceneSearch -or $SceneSearchNative) {
+    if ($Action -ne 'integration' -or ($SceneSearch -and $SceneSearchNative) -or $SpatialMemory -or $SpatialResult -or $SpatialGoalRunner -or $SpatialGoalRunnerNative -or $NativeSceneActions -or $LiveSceneQwen -or $FirstAudioRegression -or $FirstReplyRegression) { throw 'Run scene search as a separate graphics-enabled integration focus.' }
+    $arguments += @('-nevaSceneSearch','1')
+    if ($SceneSearchNative) { $arguments += @('-nevaSceneSearchNative','1') }
+}
+if ($SpatialMemory) {
+    if ($Action -ne 'integration' -or $HalfTurnNative -or $NativeSceneActions -or $LiveSceneQwen -or $ProductionSceneAction -or $SpatialResult -or $SpatialGoalRunner -or $SpatialGoalRunnerNative) {
+        throw 'Spatial memory is a separate graphics-enabled integration focus.'
+    }
+    $arguments += @('-nevaSpatialMemory','1')
+}
+if ($SpatialResult -or $SpatialGoalRunner -or $SpatialGoalRunnerNative) {
+    if ($Action -ne 'integration' -or (@($SpatialResult,$SpatialGoalRunner,$SpatialGoalRunnerNative) | Where-Object { $_ }).Count -gt 1 -or $SpatialMemory -or $HalfTurnNative -or
+        $NativeSceneActions -or $LiveSceneQwen -or $ProductionSceneAction -or $SceneObjects -or $ActiveSceneView -or
+        $ObjectApproachNative -or $ObjectMatching -or $DecisionRepair -or $DecisionRepairNative -or $ViewPosition -or
+        $ViewPositionNative -or $ResponseLatency -or $MotionReadiness -or $FirstAudioRegression -or $FirstReplyRegression) {
+        throw 'Run each spatial-result / spatial-goal-runner focus as its own graphics-enabled integration run.'
+    }
+    if ($SpatialResult) { $arguments += @('-nevaSpatialResult','1') }
+    if ($SpatialGoalRunner) { $arguments += @('-nevaSpatialGoalRunner','1') }
+    if ($SpatialGoalRunnerNative) { $arguments += @('-nevaSpatialGoalRunner','1','-nevaSpatialGoalRunnerNative','1') }
+}
 if ($NativeSceneActions) { if ($Action -ne 'integration' -or $ProductionSceneAction) { throw 'Native scene actions require a separate integration run.' }; $arguments += @('-nevaSceneActionNative','1') }
 if ($LiveSceneQwen) {
     if ($Action -ne 'integration' -or $NativeSceneActions -or $ProductionSceneAction) { throw 'Live Qwen requires a separate integration run.' }
@@ -98,8 +145,14 @@ if ($ResponseLatency) {
     $arguments += @('-nevaResponseLatency','1')
 }
 if ($FirstAudioRegression) {
-    if ($Action -ne 'integration' -or $ResponseLatency) { throw 'First-audio controlled regressions require a separate integration run.' }
+    if ($Action -ne 'integration' -or $ResponseLatency -or $FirstReplyRegression) { throw 'First-audio controlled regressions require a separate integration run.' }
     $arguments += @('-nevaFirstAudioRegression','1')
+}
+if ($FirstReplyRegression) {
+    if ($Action -ne 'integration' -or $ResponseLatency -or $SpatialMemory -or $SceneObjects -or $NativeSceneActions -or $LiveSceneQwen) {
+        throw 'First-reply controlled regressions require a separate integration run.'
+    }
+    $arguments += @('-nevaFirstReplyRegression','1')
 }
 if ($SceneProbeYaw -ne 0) {
     if (-not $LiveSceneQwen) { throw 'A separate native observation orientation requires the explicit live Qwen run.' }

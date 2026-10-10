@@ -1,0 +1,41 @@
+Artifairy 头发与裙摆物理模型
+
+后续通用配置版
+
+已新增 E:\Artifairy\VRM\模型加贴图_通用配置版.vrm 和 E:\Artifairy\VRM\blender简单渲染_通用配置版.vrm，均有 43 个真实面部形态键及左右眼睛骨骼蒙皮，保留头发与裙摆物理。
+主模型 Prefab 为本目录 Artifairy_Compatible.prefab，对应新场景 Assets/Private/Artifairy/Scenes/Artifairy_Chat.unity。
+描边模型 Prefab 为本目录 Artifairy_RenderCompatible.prefab，对应新场景 Assets/Private/Artifairy/Scenes/Artifairy_RenderChat.unity。
+两份通用配置版均已通过 Unity 编辑器原生导入、绑定与保存重开检查；新场景和 Prefab 的只读 YAML 检查确认无重复子节点、多父级、父子指针冲突或循环。
+原房间 room_main/階段壁 已有 MeshFilter.m_Mesh 和 MeshCollider.m_Mesh 两处缺失，衍生场景原样继承；新角色没有新增缺失引用。
+完整使用方法与实际验证范围见 E:\Artifairy\VRM\通用配置版使用说明.txt，汇总报告为 E:\Artifairy\VRM\Unity通用配置验证.json。
+这些检查没有进入 Play Mode；运行时网络服务、账号连接、麦克风输入及连续聊天语音尚未进行端到端验证。
+完整房间、聊天界面和语音绑定在新场景中；单独拖入 Prefab 只提供模型及本地驱动。
+下方说明与已完成的验证针对此前 Artifairy_Physics.prefab；没有面部 BlendShape 的限制只适用于早期物理版。
+
+此前物理版使用
+
+将本目录 Artifairy_Physics.prefab 拖入场景，进入 Play Mode 后运行物理。
+Prefab 已绑定 ArtifairySpringBoneDriver，并采用与现有聊天场景兼容的独立物理更新。
+请保留其 Vrm10Instance 禁用、UpdateType=None 的配置，以免重复更新同一组弹簧骨骼。
+
+包含 7 条头发链、5 条裙摆链、39 根参与蒙皮的动态骨骼和 18 个身体碰撞球。
+已在此项目 Unity 2022.3.22f1 中通过 VRM 迁移、原生求解器、动作响应、蒙皮变形与独立驱动生命周期验证。
+实际 Built-in 材质、UV 和贴图绑定检查通过；在原模型的内存副本中确认驱动保持全部 57 个表情权重及独立尾巴骨骼。
+此验证为编辑器固定 60 Hz 批处理模拟，实时场景光照和聊天语音效果未测试。
+
+原角色与原场景没有替换。
+此前 Artifairy_Physics.vrm 的网格没有面部 BlendShape；当时的眨眼/口型脚本需要新形态键与重新绑定，不能复制旧索引。后续通用配置版已补充这些形态键。
+Spring Bone 不能保证所有宽裙片在极端动作中无穿插，也不包含地面碰撞。
+
+可编辑 Blender 模型、另一描边版本、骨骼预览及完整说明位于 E:\Artifairy\VRM。
+表情配置检查：E:\Artifairy\VRM\项目表情配置检查.txt
+物理验证报告：E:\Artifairy\VRM\Unity物理验证.json
+
+飘带显示修复（2026-10-08）
+
+两侧青色环形飘带原有的立体几何已完整保留。此前 Unity 透明渲染排序让部分环饰被裙布错误遮住，造成扁平观感。
+已仅将两侧环饰拆到 Artifairy_RibbonLoops_Opaque 材质，使用不透明渲染及深度写入；保留原颜色、贴图与发光。袖口蕾丝和裙片继续使用原透明材质。
+两份通用配置版 blend、VRM、项目导入文件和现有 Prefab 均已同步。仍打开原来的 Artifairy_Chat.unity 或 Artifairy_RenderChat.unity 即可查看，无需进入 Play Mode 才显示修复。
+骨骼、蒙皮、UV、法线、43 个表情、眼动及头发裙摆物理配置经检查保持一致；两个保存后的聊天场景重新打开及通用功能原生验证通过。
+修复前后原生 Unity 渲染对照：E:\Artifairy\VRM\飘带修复对照.png。
+修复前备份：E:\Artifairy\.vrm_work\ribbon_fix\before_material_fix。

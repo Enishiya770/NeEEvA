@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 #if UNITY_EDITOR
 using System.Reflection;
@@ -13,16 +14,74 @@ public static class RoomTaskProtocolRegression
     public static int RunChecks()
     {
         checks = 0;
-        DecisionSchemaCases(); VisualSchemaCases(); DecisionDiagnosticCases(); ReviewSchemaCases(); SpeechGateCases();
+        GoalUpdateResponseModeCases(); DecisionSchemaCases(); VisualSchemaCases(); DecisionDiagnosticCases(); ReviewSchemaCases(); SpeechGateCases(); SpatialAnswerCases();
 #if UNITY_EDITOR
         ProviderCases();
 #endif
         return checks;
     }
 
+    private static void GoalUpdateResponseModeCases()
+    {
+        foreach (string relation in new[] { "continue", "clarify", "unrelated", "new", "cancel" })
+        foreach (string kind in new[] { "answer-only", "action", "control", "mixed", "uncertain" })
+        {
+            var review=new RoomTaskProtocol.DeviceGoalReview { relation=relation, responseMode="answer",
+                verdict="approved", referentGoalId="original-goal", referentEntityId="" };
+            string expected=kind == "uncertain" || kind == "answer-only" ? "answer" : "act";
+            Check(RoomTaskProtocol.ResolveGoalUpdateResponseMode(review,new JObject { ["requestKind"]=kind }) == expected,
+                "Current request and old-goal relation stay independent: "+relation+"/"+kind);
+            Check(review.relation == relation && review.referentGoalId == "original-goal" &&
+                review.verdict == "approved", "Response routing never grants/replaces a goal or entity.");
+        }
+        var legacy=new RoomTaskProtocol.DeviceGoalReview { relation="continue", responseMode="answer-then-resume" };
+        Check(RoomTaskProtocol.ResolveGoalUpdateResponseMode(legacy,null) == "answer-then-resume",
+            "Missing/stale current semantics cannot override the existing authorization review.");
+        Check(RoomTaskProtocol.ResolveGoalUpdateResponseMode(legacy,new JObject { ["requestKind"]="mixed" }) == "answer-then-resume",
+            "Explicitly reviewed answer-before-continuation ordering survives mixed normalization.");
+        legacy.responseMode="answer";
+        Check(RoomTaskProtocol.ResolveGoalUpdateResponseMode(legacy,new JObject { ["requestKind"]="mixed" }) == "act",
+            "Questions plus action do not automatically require another answer-only round first.");
+    }
+
     private static string Decision(string intent, string origin, string evidence) => new JObject {
         ["intent"] = intent, ["origin"] = origin, ["evidence"] = evidence
     }.ToString(Newtonsoft.Json.Formatting.None);
+
+    private static void SpatialAnswerCases()
+    {
+        Check(RoomTaskProtocol.TryDecision(Decision("none", "none", ""), "Where did you see the clock?", false, out var omitted) &&
+            omitted.replyScope == "spatial" && !omitted.IsSpatial, "Missing scope retains zero action but requires a guarded spatial answer.");
+        var ordinary = JObject.Parse(Decision("none", "none", "")); ordinary["replyScope"]="ordinary";
+        Check(RoomTaskProtocol.TryDecision(ordinary.ToString(), "How was your day?", false, out var parsed) && parsed.replyScope=="ordinary",
+            "An explicit ordinary no-action decision preserves ordinary conversation.");
+        ordinary["replyScope"]="spatial";
+        Check(RoomTaskProtocol.TryDecision(ordinary.ToString(), "なぜそちらを向いたの？", false, out parsed) && parsed.replyScope=="spatial",
+            "A spatial question carries a speech obligation without introducing movement authority.");
+        ordinary["intent"]="approach"; ordinary["origin"]="user"; ordinary["evidence"]="Come here";
+        Check(!RoomTaskProtocol.TryDecision(ordinary.ToString(), "Come here", false, out _), "A reply scope cannot be attached to an action.");
+        var schema=JObject.Parse(RoomTaskProtocol.DecisionSchema);
+        var none=((JArray)schema["oneOf"]).OfType<JObject>().Single(x=>((JArray)x["properties"]["intent"]["enum"]).Values<string>().Contains("none"));
+        Check(((JArray)none["required"]).Values<string>().Contains("replyScope"), "The actual model grammar requires an explicit none reply classification.");
+        foreach(string status in new[]{"found","completed","incomplete","blocked","cancelled"})
+        {
+            var report=new JObject { ["taskId"]="search-fixture",["generation"]=42,["ownerCurrent"]=true,["status"]=status,
+                ["searchAttempted"]=true,["steps"]=0,["decisions"]=2,["foundEntityId"]="fixture-clock",["foundCaptureId"]="fresh-proof" };
+            var requirement=RoomTaskProtocol.SceneSearchReportRequirement(report,42);
+            Check((bool)requirement["required"]&&(bool)requirement["searchAttempted"],"Page-only search still requires its overall result: "+status);
+            string expected=(string)requirement["expectedReport"];
+            var review=new JObject { ["verdict"]="consistent",["reason"]="Controlled result coverage",["factScope"]="scene-action",["resultReport"]=expected };
+            Check(RoomTaskProtocol.ReviewReportsSceneSearch(review.ToString(),requirement),"The actual overall search outcome may be reported: "+status);
+            review["resultReport"]="not-applicable";
+            Check(!RoomTaskProtocol.ReviewReportsSceneSearch(review.ToString(),requirement),"A consistent last-turn-only sentence is insufficient for the search result: "+status);
+            review["resultReport"]=expected;review["factScope"]="none";
+            Check(!RoomTaskProtocol.ReviewReportsSceneSearch(review.ToString(),requirement),"A search result cannot evade mandatory execution dependencies: "+status);
+            report["ownerCurrent"]=false;
+            Check((bool)RoomTaskProtocol.SceneSearchReportRequirement(report,42)["required"]==false,"A revoked report cannot become the current result.");
+            report["ownerCurrent"]=true;
+            Check((bool)RoomTaskProtocol.SceneSearchReportRequirement(report,43)["required"]==false,"A previous generation's report cannot satisfy a new question.");
+        }
+    }
 
     private static void DecisionDiagnosticCases()
     {
@@ -234,9 +293,18 @@ public static class RoomTaskProtocolRegression
                 string schema = review ? RoomTaskProtocol.ReviewSchema :
                     RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(new string[0]);
                 string contract = review ? RoomTaskProtocol.ReviewContract : RoomTaskProtocol.DecisionContract;
-                var guide = JObject.Parse(schema); guide.Remove("oneOf");
-                string system = contract + "\n" + (!review && backend == ChatQW.BackendType.Local
-                    ? "[Native decision field guide]\n" + guide.ToString(Newtonsoft.Json.Formatting.None) : schema);
+                string system = contract + "\n" + schema;
+                if (!review && backend == ChatQW.BackendType.Local)
+                {
+                    string actualSystem = (string)messages[0]["content"];
+                    string prefix = contract + "\n[Native decision field guide]\n";
+                    Check(actualSystem != null && actualSystem.StartsWith(prefix, StringComparison.Ordinal),
+                        "Local field guide changed the exact production task contract or its delimiter.");
+                    var guide = JObject.Parse(actualSystem.Substring(prefix.Length),
+                        new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+                    CheckDecisionFieldGuide(JObject.Parse(schema), guide);
+                    system = prefix + guide.ToString(Newtonsoft.Json.Formatting.None);
+                }
                 Check((string)request["model"] == (backend == ChatQW.BackendType.Local ? "public-local-model" : "public-cloud-model") &&
                     (bool)request["stream"] == false && (bool)request["enable_thinking"] == false && (int)request["max_tokens"] == (review ? 240 : 640) &&
                     (double)request["temperature"] == 0, "Actual provider changed room-task model/output bounds.");
@@ -312,6 +380,50 @@ public static class RoomTaskProtocolRegression
                 "Auxiliary request serialization/completion/cancellation wrote accepted chat history.");
         }
         finally { UnityEngine.Object.DestroyImmediate(host); }
+    }
+
+    private static void CheckDecisionFieldGuide(JObject schema, JObject guide)
+    {
+        Check(guide.Property("oneOf") == null && JToken.DeepEquals(guide["properties"], schema["properties"]),
+            "Local field guide omits repeated oneOf arms while retaining every exact field definition.");
+        var expectedBase = (JObject)schema.DeepClone(); expectedBase.Remove("oneOf");
+        var actualBase = (JObject)guide.DeepClone(); actualBase.Remove("intentConstraints"); actualBase.Remove("directionConvention"); actualBase.Remove("noActionReply");
+        Check(((string)guide["noActionReply"] ?? "").Contains("replyScope=spatial"), "The guide teaches the no-action spatial answer classification.");
+        Check(JToken.DeepEquals(actualBase, expectedBase), "Field-guide compaction changes no other schema root constraints or fields.");
+        var branches = (JArray)schema["oneOf"]; var constraints = guide["intentConstraints"] as JArray;
+        Check(branches != null && constraints != null && constraints.Count == branches.Count,
+            "Every original intent/target alternative retains its own field constraint record.");
+        var common = new[] { "intent", "origin", "evidence" };
+        for (int index = 0; index < branches.Count; index++)
+        {
+            var branch = (JObject)branches[index]; var properties = (JObject)branch["properties"];
+            var constraint = constraints[index] as JObject;
+            Check(constraint != null && constraint.Properties().All(item =>
+                new[] { "intents", "required", "allowedAdditionalFields", "fieldOverrides" }.Contains(item.Name)) &&
+                JToken.DeepEquals(constraint["intents"], properties["intent"]["enum"]),
+                "Compacted intent constraint preserves the exact branch intent set without unrelated fields.");
+            var required = constraint["required"] as JArray; var allowed = constraint["allowedAdditionalFields"] as JArray;
+            Check(required != null && allowed != null &&
+                required.Values<string>().OrderBy(value => value).SequenceEqual(((JArray)branch["required"]).Values<string>()
+                    .Where(value => !common.Contains(value)).OrderBy(value => value)) &&
+                allowed.Values<string>().OrderBy(value => value).SequenceEqual(properties.Properties().Select(item => item.Name)
+                    .Where(value => !common.Contains(value)).OrderBy(value => value)),
+                "Compacted required and allowed fields exactly retain the branch, including target alternatives and search mode.");
+            var overrides = constraint["fieldOverrides"] as JObject;
+            int differingFields = 0;
+            foreach (var property in properties.Properties().Where(item => !common.Contains(item.Name)))
+            {
+                bool differs = !JToken.DeepEquals(property.Value, schema["properties"][property.Name]);
+                if (differs) differingFields++;
+                Check(differs ? overrides != null && JToken.DeepEquals(overrides[property.Name], property.Value) : overrides?[property.Name] == null,
+                    "Branch-specific bounds and enums survive compaction exactly: " + property.Name);
+            }
+            Check(differingFields == 0 ? constraint.Property("fieldOverrides") == null : overrides != null && overrides.Count == differingFields,
+                "Only necessary branch field overrides are emitted; no added permissions or discarded bounds.");
+        }
+        const string directions = "Actor-relative yaw: left negative, right positive. Pitch: up positive, down negative. orient-view is head/gaze yaw [-50,50], pitch [-25,25]; turn-in-place is body yaw [-180,180], pitch 0. A larger required yaw needs a body-turn decision; never clamp, wrap, reverse, or silently replace the requested angle.";
+        Check((string)guide["directionConvention"] == directions,
+            "Field guide preserves signed actor-relative axes, separate head/body limits and the prohibition on silently changing a requested angle.");
     }
 #endif
 

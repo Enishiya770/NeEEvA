@@ -1,0 +1,26 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "把它关掉。",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "把它关掉。",
+    "targetDescription": "电视柜上的装饰灯",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [
+    {
+      "role": "user",
+      "quotedText": "电视柜上是什么？"
+    },
+    {
+      "role": "assistant",
+      "quotedText": "电视柜上有一盏装饰灯。"
+    }
+  ],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

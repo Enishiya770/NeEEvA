@@ -44,8 +44,9 @@ public static class RoleOutputPublicBoundaryRegression
         VerifySpeechEverySplit("<thought>私人的检查，不发声。<sing refs=\"private\"/></thought>" +
             Header + "<say>確認しているよ。</say><lang code=\"zh\"/><say>正在确认。</say>",
             RoleOutputBoundaryPolicy.ExplicitPublicSay, "確認しているよ。正在确认。");
+        VerifyAbsorbedPreambleEverySplit("无标记内部说明。", Header + "<say>你好。</say><motion name=\"approach\"/>",
+            RoleOutputBoundaryPolicy.ExplicitPublicSay, "你好。", null);
         foreach (string raw in new[] {
-            "无标记内部说明。" + Header + "<say>你好。</say><motion name=\"approach\"/>",
             "<say>没有语言和阶段。</say>", "<lang code=\"ja\"/><say>阶段缺失。</say>",
             "<speech mode=\"independent\"/><say>语言缺失。</say>",
             Header + "<say extra=\"unexpected\">你好。</say>",
@@ -108,10 +109,10 @@ public static class RoleOutputPublicBoundaryRegression
     private static void RunToolPublicBoundaryCases()
     {
         const RoleOutputBoundaryPolicy policy = RoleOutputBoundaryPolicy.ExplicitPublicSayWithActions;
+        VerifyAbsorbedPreambleEverySplit("ユーザーは二つの音声を求めている。まず内部の手順を検討する。",
+            Header + "<say>確認しているよ。</say><motion name=\"nod\"/>", policy, "確認しているよ。", "<motion name=\"nod\"/>");
         foreach (string raw in new[] {
             "lang code=ja\n\nspeech mode=after_action\n\n聞いてね。<sing refs=\"clip:example\"/>",
-            "ユーザーは二つの音声を求めている。まず内部の手順を検討する。" + Header +
-                "<say>確認しているよ。</say><motion name=\"nod\"/>",
             Header + "無標記の正文。<motion name=\"follow\"/>",
             Header + "<say><motion name=\"follow\"/>ついていくね。</say>",
             Header + "<say><lang code=\"zh\"/>你好。</say>",
@@ -214,6 +215,35 @@ public static class RoleOutputPublicBoundaryRegression
     }
 
     private const string Header = "<lang code=\"ja\"/><speech mode=\"independent\"/>";
+
+    private static void VerifyAbsorbedPreambleEverySplit(string preamble, string publicTail,
+        RoleOutputBoundaryPolicy policy, string expectedSpeech, string expectedAction)
+    {
+        string raw = preamble + publicTail;
+        void CheckPrivacy(RoleOutputChannels parser, List<SpeechText> parts, string delivery)
+        {
+            Check(parser.HasAbsorbedBarePreamble && parser.PrivateCharacters >= preamble.Length &&
+                Join(parts) == expectedSpeech && parser.Speech == expectedSpeech &&
+                !parser.ToExecutableText().Contains(preamble),
+                "Absorbed private preamble reached speech or executable projection at " + delivery);
+            if (expectedAction == null)
+                Check(parser.HasInvalidPublicBoundary && !parser.HasActions && parser.ToExecutableText() == "<silent/>",
+                    "A rescued public prefix bypassed the forbidden late-action gate at " + delivery);
+            else
+                Check(!parser.HasInvalidPublicBoundary && !parser.HasInvalidSpeechPhase && parser.HasActions &&
+                    parser.ToExecutableText() == expectedSpeech + expectedAction,
+                    "Absorbing private reasoning changed valid public speech/action separation at " + delivery);
+        }
+        for (int split = 0; split <= raw.Length; ++split)
+        {
+            var parts = new List<SpeechText>(); var parser = new RoleOutputChannels(parts.Add, policy);
+            parser.Push(raw.Substring(0, split)); parser.Push(raw.Substring(split)); parser.Finish();
+            CheckPrivacy(parser, parts, "split " + split);
+        }
+        var characters = new List<SpeechText>(); var characterParser = new RoleOutputChannels(characters.Add, policy);
+        foreach (char character in raw) characterParser.Push(character.ToString()); characterParser.Finish();
+        CheckPrivacy(characterParser, characters, "character stream");
+    }
 
     public static void VerifyRecordedOffender(string raw)
     {

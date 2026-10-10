@@ -152,11 +152,27 @@ public static class SceneObjectCandidateViewRegression
         // Use a stale copy with the original valid binding rather than sleep or a negative
         // timestamp sentinel. This exercises production freshness without advancing Unity.
         var ctor=typeof(SceneVisionObservation).GetConstructors(BindingFlags.Instance|BindingFlags.NonPublic).Single();
-        var grounding=typeof(SceneVisionObservation).GetProperty("Grounding",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(observation);
-        var stale=(SceneVisionObservation)ctor.Invoke(new object[]{observation.CaptureId,"ready","",observation.CapturedAtUtc,
-            Time.realtimeSinceStartup-SceneVisionGrounding.MaximumObservationAge-1,observation.Frame,
+        var groundingProperty=typeof(SceneVisionObservation).GetProperty("Grounding",BindingFlags.Instance|BindingFlags.NonPublic);
+        var catalogProperty=typeof(SceneVisionObservation).GetProperty("VisibleCatalogSnapshot",BindingFlags.Instance|BindingFlags.NonPublic);
+        var grounding=groundingProperty.GetValue(observation);var catalog=catalogProperty.GetValue(observation);
+        float staleTime=Time.realtimeSinceStartup-SceneVisionGrounding.MaximumObservationAge-1;
+        Check(ctor.GetParameters().Length==17&&ctor.GetParameters()[16].ParameterType==typeof(Pose?),
+            "The stale-copy fixture explicitly follows the current observation constructor, including nullable captured body pose.");
+        var stale=(SceneVisionObservation)ctor.Invoke(new object[]{observation.CaptureId,observation.State,observation.Reason,observation.CapturedAtUtc,
+            staleTime,observation.Frame,
             new Pose(observation.CameraPosition,observation.CameraRotation),observation.VerticalFov,observation.Width,observation.Height,
-            observation.ImageDataUrl,observation.SceneHandle,observation.SceneName,observation.ScenePath,observation.LoadedSceneFingerprint,grounding});
+            observation.ImageDataUrl,observation.SceneHandle,observation.SceneName,observation.ScenePath,observation.LoadedSceneFingerprint,grounding,
+            observation.HasBodyPose?(object)new Pose(observation.BodyPosition,observation.BodyRotation):null});
+        catalogProperty.SetValue(stale,catalog);
+        var staleMetadata=JsonConvert.DeserializeObject<JObject>(stale.MetadataJson,new JsonSerializerSettings {DateParseHandling=DateParseHandling.None});
+        var retainedMetadata=JsonConvert.DeserializeObject<JObject>(observation.MetadataJson,new JsonSerializerSettings {DateParseHandling=DateParseHandling.None});
+        retainedMetadata.Remove("capturedAtRealtime");staleMetadata.Remove("capturedAtRealtime");
+        Check(stale.CapturedAtRealtime==staleTime&&stale.CapturedAtRealtime<observation.CapturedAtRealtime&&
+            JToken.DeepEquals(retainedMetadata,staleMetadata)&&stale.ImageDataUrl==originalPixels&&
+            stale.HasBodyPose==observation.HasBodyPose&&stale.BodyPosition.Equals(observation.BodyPosition)&&
+            stale.BodyRotation.Equals(observation.BodyRotation)&&ReferenceEquals(groundingProperty.GetValue(stale),grounding)&&
+            ReferenceEquals(catalogProperty.GetValue(stale),catalog),
+            "The stale copy changes only realtime age; exact identity/UTC/frame/scene/camera/body metadata, RGB and frozen grounding/catalog owners remain intact.");
         Check(!capture.TryBuildObjectCandidateView(stale,focus,null,out _,out _),"Expired frame cannot be re-labelled as a new crop observation.");
         // New real front surface hides the entire previous small entity. A preferred old ID
         // cannot bypass this frame's actual foreground pixels.

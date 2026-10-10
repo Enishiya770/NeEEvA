@@ -1,0 +1,26 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "Turn off the reading lamp in the kitchen.",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "Turn off the reading lamp in the kitchen.",
+    "targetDescription": "the reading lamp in the kitchen",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": [
+    {
+      "sourceId": "observed-device:fixture-fan",
+      "kind": "observed-device",
+      "entityId": "fixture-known-fan",
+      "originalRequest": "Look at the fan beside the sofa.",
+      "targetDescription": "the fan beside the sofa",
+      "observedUtc": "2026-10-09T10:00:00Z"
+    }
+  ]
+}

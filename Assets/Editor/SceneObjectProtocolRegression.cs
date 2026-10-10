@@ -77,9 +77,9 @@ public static class SceneObjectProtocolRegression
             !schema["required"].Values<string>().Contains("observationGoalId"),
             "Observation continuation advertises a bounded optional goal reference, not an implicit inherited goal.");
         JObject matcher = JObject.Parse(RoomTaskProtocol.ObjectMatchSchema);
-        Require((bool)matcher["additionalProperties"] == false && ((JObject)matcher["properties"]).Count == 3 &&
-            matcher["required"].Values<string>().OrderBy(x => x).SequenceEqual(new[] { "candidateId", "reason", "verdict" }),
-            "Object semantic matching has its own closed three-field schema.");
+        Require((bool)matcher["additionalProperties"] == false && ((JObject)matcher["properties"]).Count == 4 &&
+            matcher["required"].Values<string>().OrderBy(x => x).SequenceEqual(new[] { "candidateId", "candidateRole", "reason", "verdict" }),
+            "Object semantic matching has its own closed four-field schema.");
         Require(matcher["properties"]["verdict"]["enum"].Values<string>().SequenceEqual(new[] { "matched", "different-target", "uncertain" }) &&
             matcher["properties"]["candidateId"]["enum"].Values<string>().SequenceEqual(new[] { "none", "c1", "c2", "c3", "c4", "c5", "c6" }) &&
             (int)matcher["properties"]["reason"]["maxLength"] == 160,
@@ -91,7 +91,7 @@ public static class SceneObjectProtocolRegression
         int start = checks;
         JObject schema = JObject.Parse(RoomTaskProtocol.DecisionSchema);
         var branches = (JArray)schema["oneOf"];
-        Require(branches != null && branches.Count == 12, "Decision grammar advertises twelve explicit intent/target shapes.");
+        Require(branches != null && branches.Count == 14, "Decision grammar advertises fourteen explicit intent/target shapes, including a separately classified no-action reply and bounded search.");
         Require(branches.OfType<JObject>().All(branch => (bool)branch["additionalProperties"] == false &&
             branch["required"].Values<string>().Contains("intent") && branch["required"].Values<string>().Contains("origin") &&
             branch["required"].Values<string>().Contains("evidence")), "Every intent branch independently closes its fields.");
@@ -110,11 +110,69 @@ public static class SceneObjectProtocolRegression
             Require(RoomTaskProtocol.TryDecision(text, "", true, out _) == expected,
                 "Production parser: " + reason + " :: " + text);
         }
+        var searchBranch = branches.OfType<JObject>().Single(branch =>
+            branch["properties"]["intent"]["enum"].Values<string>().Contains("search-scene"));
+        var searchShape = (JObject)searchBranch["properties"]["searchTask"];
+        Require(searchBranch["required"].Values<string>().Contains("searchTask") &&
+            (bool)searchShape["additionalProperties"] == false &&
+            searchShape["required"].Values<string>().SequenceEqual(new[] { "mode" }) &&
+            ((JObject)searchShape["properties"]).Count == 1 &&
+            searchShape["properties"]["mode"]["enum"].Values<string>().SequenceEqual(new[] { "survey", "find" }),
+            "Search has one required closed survey/find mode, not free coordinates, an identity or device operation.");
+        foreach (string mode in new[] { "survey", "find" })
+        {
+            var search = Basic("search-scene"); search["searchTask"] = new JObject { ["mode"] = mode };
+            Expect(search, true, "An explicit bounded " + mode + " search has its own grammar branch.");
+            Require(RoomTaskProtocol.TryDecision(search.ToString(), "", true, out var decision) &&
+                decision.IsSceneSearch && decision.searchTask.mode == mode && !decision.IsObjectState && !decision.IsViewChange &&
+                decision.visualTarget == null && decision.entityTarget == null && decision.deviceGoal == null,
+                "Parsed search retains its mode without manufacturing an immediate object action or write authorization.");
+            foreach (var extra in new JObject { ["visualTarget"] = Target(), ["entityTarget"] = EntityTarget(),
+                ["viewChange"] = View(), ["objectState"] = "on", ["targetSelection"] = "reselect",
+                ["targetPurpose"] = "observe-closer", ["observationGoalId"] = "old-goal" }.Properties())
+            {
+                var wrong = (JObject)search.DeepClone(); wrong[extra.Name] = extra.Value.DeepClone();
+                Expect(wrong, false, "Search cannot carry executable target or old observation-goal field: " + extra.Name);
+                wrong[extra.Name] = JValue.CreateNull(); Expect(wrong, false, "A forbidden search field is not made absent by JSON null.");
+            }
+            var unknown = (JObject)search.DeepClone(); unknown["searchTask"]["worldPosition"] = new JArray(1, 2, 3);
+            Expect(unknown, false, "Search mode cannot carry model-invented world coordinates.");
+        }
+        foreach (JToken invalid in new JToken[] { JValue.CreateNull(), new JObject(), new JObject { ["mode"] = "wander" },
+            new JObject { ["mode"] = "Find" }, new JObject { ["mode"] = true }, new JValue("find") })
+        {
+            var search = Basic("search-scene"); search["searchTask"] = invalid;
+            Expect(search, false, "Search rejects missing, coercive or unknown task modes.");
+        }
+        Expect(Basic("search-scene"), false, "Search cannot omit its required task.");
+        var legacyNone = Basic("none");
+        Require(!MatchesSchemaShape(schema, legacyNone), "New model output must classify a no-action reply explicitly.");
+        Require(RoomTaskProtocol.TryDecision(legacyNone.ToString(), "", true, out var legacyDecision) &&
+            legacyDecision.replyScope == "spatial" && !legacyDecision.IsSpatial,
+            "Legacy three-field none stays parser-compatible, grants no action, and defaults to guarded spatial speech.");
+        foreach (string scope in new[] { "ordinary", "spatial" })
+        {
+            var reply = Basic("none"); reply["replyScope"] = scope;
+            Expect(reply, true, "A new no-action decision explicitly classifies the reply as " + scope + ".");
+        }
+        foreach (JToken scope in new JToken[] { JValue.CreateNull(), "unknown", true, 1 })
+        {
+            var reply = Basic("none"); reply["replyScope"] = scope;
+            Expect(reply, false, "No-action reply scope rejects null, unknown or coercive values.");
+        }
         foreach (string intent in new[] { "none", "approach", "follow", "stop-moving", "inspect" })
         {
-            var value = Basic(intent); Expect(value, true, "Plain intent retains its three-field form.");
+            var value = Basic(intent);
+            if (intent == "none") value["replyScope"] = "spatial";
+            Expect(value, true, intent == "none" ? "No-action reply requires its explicit semantic scope." : "Plain action intent retains its three-field form.");
+            if (intent != "none")
+            {
+                var replyOnAction = (JObject)value.DeepClone(); replyOnAction["replyScope"] = "spatial";
+                Expect(replyOnAction, false, "A no-action reply scope cannot be attached to " + intent + ".");
+            }
             var extras = new JObject { ["visualTarget"] = Target(), ["entityTarget"] = EntityTarget(), ["viewChange"] = View(),
-                ["objectState"] = "on", ["targetSelection"] = "reselect", ["targetPurpose"] = "observe-closer", ["observationGoalId"] = "goal-17" };
+                ["objectState"] = "on", ["targetSelection"] = "reselect", ["targetPurpose"] = "observe-closer", ["observationGoalId"] = "goal-17",
+                ["searchTask"] = new JObject { ["mode"] = "find" } };
             foreach (var extra in extras.Properties())
             {
                 var wrong = (JObject)value.DeepClone(); wrong[extra.Name] = extra.Value.DeepClone();
@@ -183,7 +241,7 @@ public static class SceneObjectProtocolRegression
             value.Remove("viewChange"); Expect(value, false, "A directional intent cannot omit its direction.");
         }
         LastReport["intentShapeSchemaChecks"] = checks - start;
-        LastReport["intentShapeSchemaScope"] = "Twelve production schema branches; existing shapes retain their structural examples. Reposition-view and request-local goal narrowing have a separate protocol regression. This bounded schema-keyword evaluator is not a provider grammar test; parser-only source authority, whitespace and nonzero/minimum-turn guards remain stricter than the schema.";
+        LastReport["intentShapeSchemaScope"] = "Fourteen production schema branches; explicit ordinary/spatial no-action replies, bounded survey/find search, forbidden immediate target/write fields, and existing shapes retain structural examples. Legacy three-field none is accepted only by the compatibility parser and defaults to guarded spatial speech. Reposition-view and request-local goal narrowing have a separate protocol regression. This bounded schema-keyword evaluator is not a provider grammar test; parser-only source authority, whitespace and nonzero/minimum-turn guards remain stricter than the schema.";
     }
 
     // Independent structural evaluation of precisely the JSON Schema keywords used
@@ -482,9 +540,17 @@ public static class SceneObjectProtocolRegression
     private static void ObjectMatchCases()
     {
         string[] offered = { "c1", "c3", "c6" };
-        JObject Result(string verdict, string id) => new JObject { ["verdict"]=verdict, ["candidateId"]=id, ["reason"]="当前图中可核对的描述关系" };
+        JObject Result(string verdict, string id) => new JObject { ["verdict"]=verdict, ["candidateRole"]="target", ["candidateId"]=id, ["reason"]="当前图中可核对的描述关系" };
         bool ParseMatch(JObject value, out RoomTaskProtocol.ObjectMatch match) =>
             RoomTaskProtocol.TryObjectMatch(value.ToString(Newtonsoft.Json.Formatting.None), offered, out match);
+        var landmark = Result("matched", "c1"); landmark["candidateRole"]="landmark";
+        Require(ParseMatch(landmark, out var landmarkMatch) && !landmarkMatch.IsMatched,
+            "A matched support/landmark never counts as the requested object itself.");
+        foreach (string role in new[] { "other", "uncertain", "TARGET", "" })
+        {
+            var wrongRole=Result("matched", "c1"); wrongRole["candidateRole"]=role;
+            Require(!ParseMatch(wrongRole, out _), "A positive match requires an explicit supported role.");
+        }
         foreach (string id in offered)
         {
             Require(ParseMatch(Result("matched", id), out var match) && match.IsMatched && match.candidateId == id,
@@ -513,7 +579,7 @@ public static class SceneObjectProtocolRegression
             "Offered-candidate membership uses exact ordinal equality, not case folding.");
         Require(!RoomTaskProtocol.TryObjectMatch(Result("matched", "7d9de4e777ed41bd9e48caa8d67f331a").ToString(),
             new[] { "7d9de4e777ed41bd9e48caa8d67f331a" }, out _), "Even a malformed offered list cannot make a session UUID a valid candidate number.");
-        foreach (string key in new[] { "verdict", "candidateId", "reason" })
+        foreach (string key in new[] { "verdict", "candidateId", "candidateRole", "reason" })
         {
             var missing = Result("matched", "c1"); missing.Remove(key);
             Require(!ParseMatch(missing, out _), "Object matcher requires every advertised field: " + key);

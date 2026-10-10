@@ -1,0 +1,17 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "さっきテレビ台の上に見えた扇風機を止めて。",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "さっきテレビ台の上に見えた扇風機を止めて。",
+    "targetDescription": "さっきテレビ台の上に見えた扇風機",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

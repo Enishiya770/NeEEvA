@@ -276,7 +276,7 @@ public static class SceneDecisionRepairRegression
     {
         var candidate = c.chat.LastSceneObjectCandidateView.Candidates.FirstOrDefault(x => x.entityId == c.lamp.EntityId);
         c.Check(candidate != null, "Actual candidate image contains this same lamp.");
-        request.Complete(true, new JObject { ["verdict"] = "matched", ["candidateId"] = candidate.candidateId,
+        request.Complete(true, new JObject { ["verdict"] = "matched", ["candidateRole"]="target", ["candidateId"] = candidate.candidateId,
             ["reason"] = "Controlled test reply: the current opaque lamp candidate matches the previously observed lamp and the present request." }.ToString(), "controlled-match");
     }
     private static IEnumerator BeginPlanner(Context c, string text)

@@ -153,8 +153,16 @@ public static class SceneViewPositionProtocolRegression
         foreach (string intent in JObject.Parse(RoomTaskProtocol.DecisionSchema)["properties"]["intent"]["enum"].Values<string>().Where(x => x != "reposition-view"))
         {
             var other = new JObject { ["intent"] = intent, ["origin"] = "user", ["evidence"] = UserText };
+            if (intent == "none")
+            {
+                Require(!SceneObjectProtocolRegression.MatchesSchemaShape(JObject.Parse(RoomTaskProtocol.DecisionSchema), other) &&
+                    Parse(other, out var legacy, out _) && legacy.replyScope == "spatial" && !legacy.IsSpatial,
+                    "Legacy none remains a guarded parser-only compatibility form; new model output must classify its reply scope.");
+                other["replyScope"] = "spatial";
+            }
             if (new[] { "look-at", "approach-object", "inspect-object", "set-object-state" }.Contains(intent)) other["visualTarget"] = Pixel();
             if (intent == "set-object-state") other["objectState"] = "on";
+            if (intent == "search-scene") other["searchTask"] = new JObject { ["mode"] = "survey" };
             if (intent == "orient-view" || intent == "turn-in-place") other["viewChange"] = new JObject { ["captureId"] = "current-view-37", ["yaw"] = 15, ["pitch"] = 0 };
             ExpectShape(other, true, "Existing intent without viewPosition remains valid: " + intent);
             other["viewPosition"] = Position(); ExpectShape(other, false, "Other intent cannot add position side effect: " + intent);

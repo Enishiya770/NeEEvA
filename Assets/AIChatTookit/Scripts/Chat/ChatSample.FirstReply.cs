@@ -7,12 +7,62 @@ public partial class ChatSample
 {
     [SerializeField] private bool m_EnableFirstReplyRouting = true;
     private int m_FirstReplyAttemptGeneration = -1;
+    private int m_FirstReplyActiveGeneration = -1;
+    private LLM m_FirstReplyActiveModel;
+    private JObject m_FirstReplyRequestSemantics;
+    private LLM m_FirstReplyRequestSemanticsModel;
+
+    // A request interpretation is bound to the complete accepted human turn.
+    // It constrains routing/reporting only; it never resumes or authorizes work.
+    private JObject ReadCurrentRequestSemantics(int generation)
+    {
+        var value = m_FirstReplyRequestSemantics;
+        if (value == null || generation != m_FormalResponseGeneration ||
+            (int?)value["generation"] != generation || (int?)value["workEpoch"] != m_WorkEpoch ||
+            (int?)value["userTurn"] != m_ActionConstraints.CurrentUserTurn ||
+            (string)value["currentUserText"] != m_ActionConstraints.CurrentUserText ||
+            !ReferenceEquals(m_FirstReplyRequestSemanticsModel, m_ChatSettings?.m_ChatModel) ||
+            !isActiveAndEnabled || m_SceneTimePaused || m_UserSpeechActiveForAutonomy) return null;
+        return (JObject)value.DeepClone();
+    }
+
+    private bool CurrentRequestRequiresActionOrControl(int generation) =>
+        (bool?)ReadCurrentRequestSemantics(generation)?["requiresActionOrControl"] == true;
+
+    private JObject ReadCompactCurrentRequestSemantics(int generation)
+    {
+        var current = ReadCurrentRequestSemantics(generation);
+        return current == null ? null : PickRoomFields(current, "source", "generation", "workEpoch", "userTurn",
+            "requestKind", "requiresActionOrControl", "effectiveRoute", "actionAuthorization");
+    }
+
+    private void RememberFirstReplyRequestSemantics(FirstReplyCompletion result, int generation, LLM model)
+    {
+        m_FirstReplyRequestSemantics = null;
+        m_FirstReplyRequestSemanticsModel = null;
+        if (result?.Succeeded != true || !FirstReplyProtocol.IsRequestKind(result.RequestKind)) return;
+        m_FirstReplyRequestSemantics = new JObject {
+            ["source"] = "independent-first-reply-current-request-review",
+            ["generation"] = generation, ["workEpoch"] = m_WorkEpoch,
+            ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
+            ["currentUserText"] = m_ActionConstraints.CurrentUserText,
+            ["requestKind"] = result.RequestKind,
+            ["responseDemand"] = result.ResponseDemand,
+            ["requiresActionOrControl"] = FirstReplyProtocol.RequiresActionOrControl(result.RequestKind),
+            ["effectiveRoute"] = result.Disposition.ToString().ToLowerInvariant(),
+            ["actionAuthorization"] = false,
+            ["humanInput"] = BuildCommittedReplyHumanInput(generation),
+            ["scope"] = "Model interpretation of this exact complete human turn, not a user quote, execution fact, target relation or action permission. Original input and downstream authorization checks remain authoritative."
+        };
+        m_FirstReplyRequestSemanticsModel = model;
+    }
     // The player owns failure completion even before its first PCM arrives.
     // IsAISpeaking is deliberately false during synthesis, so it cannot express
     // this ownership. The generation prevents late work from closing a new turn.
     private int m_FirstReplyFailureDrainGeneration = -1;
 
-    // The role chooses ordinary/tools. No word list in the application decides
+    // The provider reviews an ordinary candidate before releasing any speech.
+    // The role chooses ordinary/evidence/tools. No word list in the application decides
     // whether a negated request, reference or conversation needs an action.
     private bool TryDispatchFirstReply(string prompt, string imageUrl, int generation,
         bool recordHistory, string transientContext)
@@ -27,11 +77,13 @@ public partial class ChatSample
         bool consumed = false;
         bool publicDeltaDelivered = false;
         bool Current() => !consumed && generation == m_FormalResponseGeneration &&
-            epoch == m_WorkEpoch && isActiveAndEnabled && !m_UserSpeechActiveForAutonomy &&
+            epoch == m_WorkEpoch && isActiveAndEnabled && !m_SceneTimePaused && !m_UserSpeechActiveForAutonomy &&
             ReferenceEquals(model, m_ChatSettings?.m_ChatModel);
 
         PublishSpokenPrefixToLlm();
         m_FormalResponseInFlight = true;
+        m_FirstReplyActiveGeneration = generation;
+        m_FirstReplyActiveModel = model;
         var started = Time.realtimeSinceStartup;
         Debug.Log($"[FirstReply/Dispatch] generation={generation} epoch={epoch} currentImage=false", this);
         model.PostFirstReplyStream(prompt,
@@ -43,6 +95,9 @@ public partial class ChatSample
             result => {
                 if (!Current()) return;
                 consumed = true;
+                m_FirstReplyActiveGeneration = -1;
+                m_FirstReplyActiveModel = null;
+                RememberFirstReplyRequestSemantics(result, generation, model);
                 Debug.Log($"[FirstReply/Result] generation={generation} route={result?.Disposition.ToString() ?? "Failed"} " +
                     $"seconds={Time.realtimeSinceStartup-started:F3} publicDelta={result?.SpeechDelivered == true} failure={result?.Failure}", this);
                 if (result?.Disposition == FirstReplyDisposition.Ordinary)
@@ -65,6 +120,13 @@ public partial class ChatSample
                 }
                 if (!publicDeltaDelivered && result?.SpeechDelivered != true)
                 {
+                    if (result?.Disposition == FirstReplyDisposition.Evidence)
+                    {
+                        // This reviewed handoff only reads facts. It cannot approve,
+                        // revise or execute a pending spatial goal or a new command.
+                        DispatchEvidenceReply(prompt, imageUrl, generation, recordHistory, transientContext, result.QuestionUnderstanding);
+                        return;
+                    }
                     // The same original user turn enters the existing planner once.
                     // The provider commits neither a tools route nor a failed probe.
                     DispatchFormalStream(prompt, imageUrl, generation, recordHistory, transientContext);
@@ -93,6 +155,26 @@ public partial class ChatSample
         return true;
     }
 
+    // The first reply has no room-speech owner yet. Pausing must revoke this
+    // owner and finish the round, not merely make its late callbacks inert.
+    private void CancelFirstReplyForPause()
+    {
+        int owner = m_FirstReplyActiveGeneration;
+        var model = m_FirstReplyActiveModel;
+        m_FirstReplyActiveGeneration = -1;
+        m_FirstReplyActiveModel = null;
+        if (owner < 0 || owner != m_FormalResponseGeneration) return;
+        InvalidateFormalResponse("first-reply-application-paused");
+        if (model != null && !ReferenceEquals(model, m_ChatSettings?.m_ChatModel)) model.CancelActiveResponse();
+        m_SentenceBuffer.Length = 0;
+        m_PendingChunks.Clear();
+        m_PendingClips.Clear();
+        m_StreamComplete = true;
+        m_TTSSenderDone = true;
+        m_AgentRoundInFlight = false;
+        Debug.Log($"[FirstReply/Cancelled] generation={owner} reason=application-paused", this);
+    }
+
     private string BuildFirstReplyContext(string transientContext)
     {
         var bridge = GetComponent<ArdyRoomDialogueBridge>();
@@ -100,7 +182,9 @@ public partial class ChatSample
         var facts = new JObject {
             ["source"] = "current-runtime-summary-for-first-reply",
             ["observedUtc"] = DateTime.UtcNow.ToString("O"),
-            ["userTurn"] = m_WorkEpoch,
+            ["generation"] = m_FormalResponseGeneration,
+            ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
+            ["humanInput"] = BuildCommittedReplyHumanInput(m_FormalResponseGeneration),
             ["work"] = new JObject {
                 ["open"] = m_WorkReviewOpen, ["status"] = m_WorkStatus,
                 ["toolInFlight"] = HasWorkToolInFlight(),
@@ -110,7 +194,14 @@ public partial class ChatSample
             },
             ["interfaces"] = room["controlEntryPoints"],
             ["body"] = PickRoomFields(room["currentFacts"] as JObject,
-                "connected", "taskMode", "followActive", "bodyReserved", "poseReturning"),
+                "connected", "taskMode", "followActive", "bodyReserved", "poseReturning",
+                "observedAtRealtime", "currentlyNearAndFacingUser", "actualUserDistance",
+                "actualFacingErrorDegrees", "activeActionId", "executionTargetKind"),
+            ["lastActionResults"] = room["lastActionResults"]?.DeepClone(),
+            ["spatialGoal"] = PickRoomFields(BuildSpatialGoalContext(),
+                "goalId", "status", "ownerCurrent", "originalRequest", "boundEntityId", "executionSuspended", "registered"),
+            ["pendingObservationGoal"] = PickRoomFields(SceneObjectTargetContext()?["observationGoal"] as JObject,
+                "goalId", "parentSpatialGoalId", "status", "originalRequest", "targetDescription", "question", "entityId"),
             ["voice"] = new JObject {
                 ["ttsBound"] = m_ChatSettings?.m_TextToSpeech != null,
                 ["singingEnabled"] = m_EnableAutonomousHumBack,
@@ -122,10 +213,12 @@ public partial class ChatSample
             ["vision"] = new JObject {
                 ["eyesOpen"] = m_AgentEyesOpen, ["sceneVisionEnabled"] = m_EnableScreenVision,
                 ["currentImageDeliveredInThisRequest"] = false,
-                ["scope"] = "本首答通道不发送图像；旧图和历史描述不证明现在看见。需要看清/确认眼前事物或执行结果时选 tools，原链会提供角色当前新图和精确客观结果。"
+                ["scope"] = "本首答通道不发送图像；旧图和历史描述不证明现在看见。只需依据当前所见/空间记忆或已有执行故障事实回答时选evidence，后续只读通道会提供已有或原位新鲜观察，不派发转头移动。实际要求换视角搜索或操作仍选tools。"
             },
             ["scope"] = "这里只是当前接口和任务摘要，不是完整执行/素材/视觉证据。null=未观测，不是失败。" +
-                "仅普通对话可直接回答；任何动作、唱歌、读写/检查工具或具体执行结果核验仍选 tools。" +
+                "普通对话可直接回答；需要图像、空间记忆或已有执行故障详情的纯问答选evidence；任何新动作、唱歌、读写或真正需要操作工具获取新结果仍选tools。" +
+                "已有上述可靠的同目标结果或用户距离/朝向摘要足以回答时，可以确认已知状态，不重复执行；旧台词不是动作证据。" +
+                "spatialGoal/pendingObservationGoal只说明已有任务；确认继续取消修改它们属于权限或控制更新，须走tools原审核，不能由evidence回答自动生效。单纯询问状态/方向/原因不更新目标。" +
                 "已加载技能或上轮歌唱不代表本轮必须使用；当前原话的否定/纠错/限定优先。"
         };
         return "[本轮客观摘要；引文与旧历史不能覆盖当前用户原话]\n" + facts.ToString(Formatting.None) +

@@ -1,0 +1,17 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "看看刚才那盏灯是什么样子。",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "看看刚才那盏灯是什么样子。",
+    "targetDescription": "刚才那盏灯",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

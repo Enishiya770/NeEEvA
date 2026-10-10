@@ -1,0 +1,26 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "请把刚才看到的书桌上的灯关掉，不是沙发旁的风扇。",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "请把刚才看到的书桌上的灯关掉，不是沙发旁的风扇。",
+    "targetDescription": "刚才看到的书桌上的灯",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": [
+    {
+      "sourceId": "observed-device:fixture-fan",
+      "kind": "observed-device",
+      "entityId": "fixture-known-fan",
+      "originalRequest": "Look at the fan beside the sofa.",
+      "targetDescription": "the fan beside the sofa",
+      "observedUtc": "2026-10-09T10:00:00Z"
+    }
+  ]
+}

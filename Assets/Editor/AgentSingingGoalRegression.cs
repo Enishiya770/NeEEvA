@@ -760,7 +760,7 @@ public static class AgentSingingGoalRegression
             ["ground_truth"] = truth, ["latest_user"] = f.user, ["prompt"] = prompt, ["request"] = request,
             ["material_fixture"] = JToken.FromObject(typeof(SenseVoiceSpeechToText).GetField("m_PracticePhrases", Flags).GetValue(f.sense)),
             ["submitted_goal"] = submitted.DeepClone(),
-            ["active_goal"] = Get(f.chat, "m_ActiveSingingGoal") == null ? JValue.CreateNull() : JObject.FromObject(Get(f.chat, "m_ActiveSingingGoal")),
+            ["active_goal"] = Get(f.chat, "m_ActiveSingingGoal") == null ? (JToken)JValue.CreateNull() : JObject.FromObject(Get(f.chat, "m_ActiveSingingGoal")),
             ["actual_user_input_evidence"] = JToken.FromObject(Get(f.chat, "m_SingingUserInputs")) });
     }
 

@@ -65,7 +65,7 @@ public static class SceneObjectMatchTransportRegression
                 "A missing current image fails synchronously without launching a coroutine or network request.");
             Require(Field(model, "m_RoomTaskRequestGeneration") == roomGeneration && Field(model, "m_StreamRequestGeneration") == streamGeneration,
                 "Matcher-only cancellation does not invalidate the separate room planner or formal stream.");
-            string result = "{\"verdict\":\"matched\",\"candidateId\":\"c1\",\"reason\":\"候选符合观察参照\"}";
+            string result = "{\"verdict\":\"matched\",\"candidateId\":\"c1\",\"candidateRole\":\"target\",\"reason\":\"候选符合观察参照\"}";
             string complete = Envelope(result).ToString(); int generation = Field(model, "m_SceneObjectMatchGeneration");
             Call(model, "PublishSceneObjectMatchCompletion", generation, true, 200L, complete, 0f, callback);
             Require(calls == 2 && accepted && output == result && status == "received", "A complete current matcher response reaches its owner verbatim.");

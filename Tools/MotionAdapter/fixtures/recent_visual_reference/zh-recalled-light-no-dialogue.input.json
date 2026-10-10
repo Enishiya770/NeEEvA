@@ -1,0 +1,17 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "去把刚才你看到的那盏灯关掉。",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "去把刚才你看到的那盏灯关掉。",
+    "targetDescription": "刚才看到的那盏灯",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

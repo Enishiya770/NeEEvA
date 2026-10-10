@@ -324,7 +324,7 @@ namespace NeEEvA.Presentation
                     canvas.worldCamera = view;
                     if (!canvas.TryGetComponent<TrackedDeviceGraphicRaycaster>(out var tracked))
                     {
-                        tracked = canvas.gameObject.AddComponent<TrackedDeviceGraphicRaycaster>();
+                        tracked = canvas.gameObject.AddComponent<ReloadSafeTrackedDeviceGraphicRaycaster>();
                         tracked.checkFor2DOcclusion = false;
                         tracked.checkFor3DOcclusion = false;
                         ownedRaycasters.Add(tracked);

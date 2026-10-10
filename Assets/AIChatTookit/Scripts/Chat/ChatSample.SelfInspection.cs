@@ -43,6 +43,11 @@ public partial class ChatSample
 
     private void ResetWorkReviewState(bool open, bool clearSingingSession)
     {
+        CancelSceneSearchTask("user-work-reset");
+        CancelSpatialGoalRunner("user-work-reset");
+        PauseSpatialGoal("user-work-reset; semantic update pending");
+        m_SpatialGoalTerminalReplyGeneration = -1;
+        m_SpatialGoalTerminalProof = null;
         ++m_WorkEpoch;
         ClearStagedFormalObservation();
         ResetWorkProgress();
@@ -101,7 +106,7 @@ public partial class ChatSample
         m_SongMemoryInFlight || m_SpeakerManageInFlight || IsSingingRuntimeActivityActive() || HasPendingSingingPolicyReview() ||
         m_PendingMotionRepair != null || m_ActiveMotionRepair != null;
 
-    private bool ShouldReviewUserWork() => !m_UserSpeechActiveForAutonomy &&
+    private bool ShouldReviewUserWork() => !SpatialGoalRunnerOwnsGeneration(m_FormalResponseGeneration) && !m_UserSpeechActiveForAutonomy &&
         ((m_WorkReviewOpen && (m_WorkResponses.Count > 0 || HasPendingSingingGoalReview())) ||
             (HasAutonomousSingingGoal() && HasPendingSingingGoalReview()) ||
             (HasReviewedRecoveredUserSingingGoal() && m_WorkContinuations + m_AutonomousGoalContinuations < MaxWorkContinuations));
@@ -168,6 +173,11 @@ public partial class ChatSample
     {
         if (!m_WorkReviewOpen || decision == null || m_WorkNoProgress) return false;
         string status = (decision.work_status ?? "").Trim().ToLowerInvariant();
+        if ((status == "closed" || status == "none") && SpatialGoalPreventsWorkClosure())
+        {
+            status = decision.work_status = "continue";
+            decision.intent = "原设备目标尚未由匹配实体的实际状态回读证实；继续当前目标，不能用转身、到达或台词代替完成";
+        }
         if ((status == "closed" || status == "none") && IsSingingGoalAwaitingConfirmation())
             status = decision.work_status = "waiting_user";
         if ((status == "closed" || status == "none") && IsSingingGoalAwaitingExecution() && !HasAutonomousSingingGoal())
@@ -327,23 +337,33 @@ public partial class ChatSample
     }
 
     private void DispatchWorkFeedback(string feedback, string imageUrl, int generation)
+        => DispatchWorkFeedbackCore(feedback, imageUrl, generation, false);
+
+    private void DispatchPlannedWorkRoomReply(string feedback, string imageUrl, int generation)
+        => DispatchWorkFeedbackCore(feedback, imageUrl, generation, true);
+
+    private void DispatchWorkFeedbackCore(string feedback, string imageUrl, int generation, bool plannedRoomStep)
     {
         imageUrl = ResolveFormalSceneImage(generation);
-        bool guardSceneFeedback = ShouldGuardWorkSceneFeedback(generation);
-        string latest = BuildFormalObservationContext(feedback) + (guardSceneFeedback ? BuildWorkSceneFeedbackContext() : "");
+        bool terminalDeviceResult = generation == m_SpatialGoalTerminalReplyGeneration;
+        bool guardSceneFeedback = plannedRoomStep || ShouldGuardWorkSceneFeedback(generation);
+        string latest = terminalDeviceResult ? feedback : BuildFormalObservationContext(feedback) +
+            (guardSceneFeedback && !plannedRoomStep ? BuildWorkSceneFeedbackContext() : "");
         ObservationReceipt observations = CaptureObservationReceipt();
         bool consumed = false;
         var sceneSpeech = guardSceneFeedback ? new SpeechTextBuffer() : null;
         if (guardSceneFeedback)
         {
             m_WorkSceneFeedbackGuardGeneration = generation;
+            m_WorkRoomStepReplyGeneration = plannedRoomStep ? generation : -1;
             m_RoomSpeechGuardGeneration = generation;
+            m_RoomSpeechReviewModel = m_ChatSettings.m_ChatModel;
             m_PendingSceneFormalCaptureGeneration = generation;
             m_RoomTaskFormatError = false;
         }
         if (!string.IsNullOrEmpty(m_PendingSelfInspection)) ++m_SelfInspectionDeliveryAttempts;
         m_FormalResponseInFlight = true;
-        Debug.Log($"[Work/SceneFeedback] generation={generation} guarded={guardSceneFeedback} workEpoch={m_WorkEpoch} intent={m_RoomTaskIntent} action={m_RoomTaskActionId}", this);
+        Debug.Log($"[Work/SceneFeedback] generation={generation} guarded={guardSceneFeedback} plannedStep={plannedRoomStep} workEpoch={m_WorkEpoch} intent={m_RoomTaskIntent} action={m_RoomTaskActionId}", this);
         void OnPart(SpeechText part)
         {
             if (!consumed && generation == m_FormalResponseGeneration &&
@@ -365,8 +385,13 @@ public partial class ChatSample
         }
         try
         {
-            m_ChatSettings.m_ChatModel.PostSpeechFeedbackStream(BuildMotionRequestContext(""), latest,
-                OnPart, OnComplete, imageUrl, !guardSceneFeedback);
+            m_ChatSettings.m_ChatModel.PostSpeechFeedbackStreamForStage(
+                terminalDeviceResult ? SpatialGoalResultContextPolicy.BuildContext(
+                    (string)JObject.Parse(latest)["goal"]?["originalRequest"] ?? m_ActionConstraints.CurrentUserText, latest) :
+                    guardSceneFeedback ? BuildCommittedSpatialReplyContext("", generation) : BuildMotionRequestContext(""),
+                terminalDeviceResult ? "" : latest, OnPart, OnComplete, imageUrl, !guardSceneFeedback,
+                terminalDeviceResult ? FormalResponseStage.SpatialGoalResult :
+                    guardSceneFeedback ? FormalResponseStage.CommittedSpatialReply : FormalResponseStage.General);
         }
         catch (Exception error) when (guardSceneFeedback)
         {

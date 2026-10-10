@@ -490,7 +490,7 @@ namespace NeEEvA.Motion
         {
             foreach (var bone in bones)
             {
-                if (!bone.hasApplied || bone.transform == null) continue;
+                if (bone == null || !bone.hasApplied || bone.transform == null) continue;
                 bone.transform.localRotation = bone.baseline;
                 bone.hasApplied = false;
             }
@@ -502,6 +502,23 @@ namespace NeEEvA.Motion
             generatedAppliedFrame = generatedAppliedSerial = -1;
             if (!IsPlaying) return;
             if (target == null) { MotionPlaybackWasInterrupted = true; clip = null; constraintSession = null; return; }
+            // Domain reload and destroyed rig transforms can outlive a playback
+            // reference. Revoke that playback before sampling private bone data;
+            // a later explicit Bind may recover, but must not replay this clip.
+            if (!isBound || bones.Count == 0 ||
+                bones.Exists(bone => bone == null || bone.transform == null) ||
+                (constraintSession != null || !stopping && mask != ArdyMotionMask.UpperBody) &&
+                    (chestAnchor == null || chestAnchor.transform == null))
+            {
+                RestoreAnimatedPose();
+                MotionPlaybackWasInterrupted = true;
+                MotionPlaybackCompletedNaturally = false;
+                clip = null; constraintSession = null; isBound = false;
+                renderedConstraintPose = null; lastConstraintObservation = null;
+                constraintObservedFrame = -1;
+                Status = "骨骼绑定已失效，动作已停止，请重新绑定角色";
+                return;
+            }
             if (float.IsNaN(deltaTime) || float.IsInfinity(deltaTime) || deltaTime < 0)
                 throw new ArgumentOutOfRangeException(nameof(deltaTime));
             // A manual preview, switch or stop can evaluate twice in one frame.

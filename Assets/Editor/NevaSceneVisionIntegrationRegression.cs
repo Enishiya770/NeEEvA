@@ -48,12 +48,24 @@ public static class NevaSceneVisionIntegrationRegression
     private static bool DecisionRepairEnabled => Argument("-nevaDecisionRepair", "0") == "1";
     private static bool DecisionRepairNativeEnabled => Argument("-nevaDecisionRepairNative", "0") == "1";
     private static bool HalfTurnNativeEnabled => Argument("-nevaHalfTurnNative", "0") == "1";
+    private static bool SpatialMemoryEnabled => Argument("-nevaSpatialMemory", "0") == "1";
+    private static bool SceneSearchEnabled => Argument("-nevaSceneSearch", "0") == "1";
+    private static bool SceneSearchNativeEnabled => Argument("-nevaSceneSearchNative", "0") == "1";
+    private static bool SceneSearchLiveEnabled => Argument("-nevaSceneSearchLive", "0") == "1";
+    private static bool SpatialResultEnabled => Argument("-nevaSpatialResult", "0") == "1";
+    private static bool SpatialGoalRunnerEnabled => Argument("-nevaSpatialGoalRunner", "0") == "1";
+    private static bool SpatialGoalRunnerNativeEnabled => Argument("-nevaSpatialGoalRunnerNative", "0") == "1";
+    private static bool UnifiedDeviceEnabled => Argument("-nevaUnifiedDevice", "0") == "1";
+    private static bool UnifiedDeviceNativeEnabled => Argument("-nevaUnifiedDeviceNative", "0") == "1";
     private static bool ViewPositionEnabled => Argument("-nevaViewPosition", "0") == "1";
     private static bool ViewPositionNativeEnabled => Argument("-nevaViewPositionNative", "0") == "1";
     private static bool ResponseLatencyEnabled => Argument("-nevaResponseLatency", "0") == "1";
     private static bool FirstAudioRegressionEnabled => Argument("-nevaFirstAudioRegression", "0") == "1";
+    private static bool FirstReplyRegressionEnabled => Argument("-nevaFirstReplyRegression", "0") == "1";
+    private static bool RoomDecisionFailureRegressionEnabled => Argument("-roomDecisionFailureRegression", "0") == "1";
+    private static bool RoomCognitionRegressionEnabled => Argument("-roomCognitionRegression", "0") == "1";
     private static int RecordedFurnitureIndex => int.Parse(Argument("-nevaRecordedFurnitureIndex", "-1"));
-    private static bool UsesNativeService => NativeEnabled || LiveQwenEnabled || ProductionActionEnabled || ActiveViewEnabled || ObjectApproachNativeEnabled || DecisionRepairNativeEnabled || HalfTurnNativeEnabled || ViewPositionNativeEnabled || ResponseLatencyEnabled;
+    private static bool UsesNativeService => NativeEnabled || LiveQwenEnabled || ProductionActionEnabled || ActiveViewEnabled || ObjectApproachNativeEnabled || DecisionRepairNativeEnabled || HalfTurnNativeEnabled || ViewPositionNativeEnabled || ResponseLatencyEnabled || SpatialGoalRunnerNativeEnabled || SceneSearchNativeEnabled || UnifiedDeviceNativeEnabled;
 
     static NevaSceneVisionIntegrationRegression()
     {
@@ -270,6 +282,38 @@ public static class NevaSceneVisionIntegrationRegression
         int operation = bridge.Controller.OperationRevision;
         Vector3 root = avatar.transform.position;
 
+        if (RoomDecisionFailureRegressionEnabled || RoomCognitionRegressionEnabled)
+        {
+            Set(chat, "m_EnableSceneObjectAwareness", true);
+            Set(chat, "m_EnableSceneObjectTargetMatching", false);
+            report["focus"] = RoomCognitionRegressionEnabled ? "room-cognition-and-decision-failure" : "room-decision-failure-only";
+            yield return RoomSpeechFactScopeRegression.RunDecisionFailureChecks(chat, bridge, model, Output);
+            report["roomDecisionFailureEvidence"] = RoomSpeechFactScopeRegression.LastDecisionFailureReport;
+            Check((string)RoomSpeechFactScopeRegression.LastDecisionFailureReport["status"] == "passed",
+                "Room decision failures lost their current reply/ownership boundary.");
+            if (RoomCognitionRegressionEnabled)
+            {
+                yield return FirstReplyChatIntegrationRegression.RunChecks(chat, bridge, Output);
+                report["firstReplyChatEvidence"] = FirstReplyChatIntegrationRegression.LastReport;
+                yield return SceneGoalReferentRegression.RunRecentVisualSearchChecks(chat, bridge, model, Output);
+                report["recentVisualSearchEvidence"] = SceneGoalReferentRegression.LastRecentVisualSearchReport;
+                Check((string)SceneGoalReferentRegression.LastRecentVisualSearchReport["status"] == "passed",
+                    "Recent visual references lost their search authorization or reply boundary.");
+            }
+            Finish(null); yield break;
+        }
+
+        if (FirstReplyRegressionEnabled)
+        {
+            yield return FormalAudioHandoffRegression.RunChecks(chat, Output);
+            report["formalAudioHandoffEvidence"] = FormalAudioHandoffRegression.LastReport;
+            yield return FirstReplyFailureAudioRegression.RunChecks(chat, bridge, Output);
+            report["firstReplyFailureAudioEvidence"] = FirstReplyFailureAudioRegression.LastReport;
+            yield return FirstReplyChatIntegrationRegression.RunChecks(chat, bridge, Output);
+            report["firstReplyChatEvidence"] = FirstReplyChatIntegrationRegression.LastReport;
+            report["focus"] = "first-reply-only";
+            Finish(null); yield break;
+        }
         if (FirstAudioRegressionEnabled)
         {
             string recorded = Environment.GetEnvironmentVariable("NEEEVA_RECORDED_REVIEW_LOG");
@@ -295,7 +339,7 @@ public static class NevaSceneVisionIntegrationRegression
             Finish(null); yield break;
         }
 
-        if (RecordedFurnitureIndex >= 0 || DecisionRepairNativeEnabled || HalfTurnNativeEnabled || ViewPositionEnabled || ViewPositionNativeEnabled || ResponseLatencyEnabled)
+        if (RecordedFurnitureIndex >= 0 || DecisionRepairNativeEnabled || HalfTurnNativeEnabled || SpatialMemoryEnabled || SpatialResultEnabled || SpatialGoalRunnerEnabled || ViewPositionEnabled || ViewPositionNativeEnabled || ResponseLatencyEnabled || SceneSearchEnabled || SceneSearchLiveEnabled || UnifiedDeviceEnabled)
         {
             var recordedIdle = avatar.GetComponent<Animator>();
             recordedIdle.runtimeAnimatorController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/AIChatTookit/Animation/Animator Controller.controller");
@@ -306,7 +350,63 @@ public static class NevaSceneVisionIntegrationRegression
             Call(chat, "EnsureSceneVisionCapture");
             Check(chat.SceneVisionCapture != null, "Recorded fixture uses the actual avatar scene camera.");
             chat.SceneVisionCapture.SetObserving(true);
-            if (ResponseLatencyEnabled)
+            if (UnifiedDeviceEnabled)
+            {
+                report["visibleCatalogPureChecks"] = SceneVisibleCatalogRegression.RunPureChecks();
+                yield return SpatialDeviceGoalRegression.RunChecks(chat, bridge, Output);
+                report["spatialDeviceGoalEvidence"] = SpatialDeviceGoalRegression.LastReport;
+                Check((string)SpatialDeviceGoalRegression.LastReport["status"] == "passed", "Device authorization and dialogue mode regression failed.");
+                yield return SpatialGoalRunnerRegression.RunChecks(chat, bridge, model, Output);
+                report["spatialGoalRunnerEvidence"] = SpatialGoalRunnerRegression.LastReport;
+                Check((string)SpatialGoalRunnerRegression.LastReport["status"] == "passed", "Unified device task regression failed.");
+            }
+            else if (SceneSearchLiveEnabled)
+            {
+                Check(!SceneSearchEnabled && !UsesNativeService, "Live search is a separate run without native motion service.");
+                yield return SceneSearchLiveRegression.RunChecks(chat, bridge, model, Output);
+                report["sceneSearchLiveEvidence"] = SceneSearchLiveRegression.LastReport;
+                Check((string)SceneSearchLiveRegression.LastReport["status"] == "passed", "Live scene search failed; retained all actual model choices.");
+            }
+            else if (SceneSearchEnabled)
+            {
+                report["visibleCatalogPureChecks"] = SceneVisibleCatalogRegression.RunPureChecks();
+                yield return SceneSearchRegression.RunChecks(chat, bridge, model, Output, SceneSearchNativeEnabled);
+                report["sceneSearchEvidence"] = SceneSearchRegression.LastReport;
+                Check((string)SceneSearchRegression.LastReport["status"] == "passed", "Scene search regression failed.");
+            }
+            else if (SpatialResultEnabled || SpatialGoalRunnerEnabled)
+            {
+                yield return SpatialGoalResultTransportRegression.RunChecks(Output);
+                report["spatialResultTransportEvidence"] = SpatialGoalResultTransportRegression.LastReport;
+                Check((string)SpatialGoalResultTransportRegression.LastReport["status"] == "passed", "Short result HTTP regression failed.");
+                yield return ChatLatencyTransportRegression.RunFeedbackStageHttpChecks(Output);
+                report["feedbackStageHttpEvidence"] = ChatLatencyTransportRegression.FeedbackStageHttpReport;
+                if (SpatialGoalRunnerEnabled)
+                {
+                    yield return SpatialDeviceGoalRegression.RunChecks(chat, bridge, Output);
+                    report["spatialDeviceGoalEvidence"] = SpatialDeviceGoalRegression.LastReport;
+                    Check((string)SpatialDeviceGoalRegression.LastReport["status"] == "passed", "Device goal state regression failed.");
+                    yield return InputRecoveryRoomRegression.RunChecks(chat, bridge, model, Output);
+                    report["inputRecoveryRoomEvidence"] = InputRecoveryRoomRegression.LastReport;
+                    Check((string)InputRecoveryRoomRegression.LastReport["status"] == "passed", "Interrupted room task input recovery bypassed planning or speech audit.");
+                    yield return SpatialGoalRunnerRegression.RunChecks(chat, bridge, model, Output);
+                    report["spatialGoalRunnerEvidence"] = SpatialGoalRunnerRegression.LastReport;
+                    Check((string)SpatialGoalRunnerRegression.LastReport["status"] == "passed", "Event-driven device goal regression failed.");
+                    yield return SceneGoalReferentRegression.RunChecks(chat, bridge, model, Output);
+                    report["sceneGoalReferentEvidence"] = SceneGoalReferentRegression.LastReport;
+                    Check((string)SceneGoalReferentRegression.LastReport["status"] == "passed", "Persistent device referent/continuation regression failed.");
+                }
+            }
+            else if (SpatialMemoryEnabled)
+            {
+                yield return SceneSweepHttpRegression.RunChecks(Output);
+                report["sceneSweepHttpEvidence"] = SceneSweepHttpRegression.LastReport;
+                yield return SceneSpatialMemoryRegression.RunChecks(chat, bridge, Output);
+                report["spatialMemoryEvidence"] = SceneSpatialMemoryRegression.LastReport;
+                Check((string)SceneSpatialMemoryRegression.LastReport["status"] == "passed",
+                    "Spatial memory retained a failed or incomplete case; see scene-spatial-memory/report.json.");
+            }
+            else if (ResponseLatencyEnabled)
             {
                 yield return SceneDecisionRepairRegression.RunNativeChecks(chat, bridge, model, Output);
                 report["responseSetupApproachEvidence"] = SceneDecisionRepairRegression.LastReport;
@@ -420,13 +520,18 @@ public static class NevaSceneVisionIntegrationRegression
         Check(bridge.Controller.OperationRevision == operation, "Fresh none decision unexpectedly generated motion.");
         Case("expired-room-approach-requires-fresh-image-and-new-decision");
 
-        // Cancel through the actual formal-start lifecycle while GPU readback is pending.
+        // Cancel through the actual formal-start lifecycle while the real capture
+        // request is queued or awaiting GPU readback, before any model dispatch.
         foreach (bool disableComponent in new[] { true, false })
         {
             ResetRound(); beforeDecisions = model.Decisions.Count; beforeFormal = model.Speech.Count;
             Call(chat, "StartStreaming", "请描述此刻看到的场景。", false, null, false, false, false, null, false, null, false);
-            Check((bool)Get(chat, "m_FormalResponseInFlight") && !(bool)Get(chat, "m_StreamComplete"),
-                "Formal-start fixture did not reach the pending-capture state.");
+            Check((bool)Get(chat, "m_FormalResponseInFlight") && !(bool)Get(chat, "m_StreamComplete") &&
+                (int)Get(chat, "m_PendingSceneFormalCaptureGeneration") == (int)Get(chat, "m_FormalResponseGeneration") &&
+                chat.SceneVisionCapture != null && chat.SceneVisionCapture.IsCapturePending,
+                "Formal-start fixture did not reserve the current formal owner with a real pending capture before cancellation.");
+            Check(model.Decisions.Count == beforeDecisions && model.Speech.Count == beforeFormal,
+                "Pending-capture fixture already dispatched before cancellation; a cached/synchronous result cannot test late callback cancellation.");
             if (disableComponent) chat.enabled = false; else chat.StopAgentLoop();
             yield return WaitFrames(4);
             Check(!(bool)Get(chat, "m_FormalResponseInFlight") && (bool)Get(chat, "m_StreamComplete") &&
@@ -603,6 +708,8 @@ public static class NevaSceneVisionIntegrationRegression
         }
         ChatLatencyTransportRegression.RunInteractive();
         report["chatLatencyTransportChecks"] = "passed; production serializer, stage budget, cancellation and exact fact sharing";
+        yield return ChatLatencyTransportRegression.RunFeedbackStageHttpChecks(Output);
+        report["feedbackStageHttpEvidence"] = ChatLatencyTransportRegression.FeedbackStageHttpReport;
         report["sceneReviewQueuePureChecks"] = SceneReviewQueueRegression.RunPureChecks();
         yield return SceneReviewQueueRegression.RunChecks(chat, bridge, Output);
         report["sceneReviewQueueChecks"] = SceneReviewQueueRegression.LastReport;
@@ -796,11 +903,85 @@ public sealed class NevaSceneVisionIntegrationModel : LLM
         public Action<bool, string, string> RoomCallback;
         public Action<SpeechText> SpeechCallback;
         public Action<string> SpeechCompleteCallback;
+        public Action<FirstReplyCompletion> FirstReplyCallback;
         public bool RecordAssistantHistory;
+        public FormalResponseStage Stage;
+        public IReadOnlyList<RoomObservationImage> ObservationHistory;
         public void Complete(string json) => ProbeCallback(json);
         public void Complete(bool ok, string json, string status) => RoomCallback(ok, json, status);
     }
-    public readonly List<Request> Probes = new List<Request>(), Decisions = new List<Request>(), Speech = new List<Request>(), Wires = new List<Request>(), Matches = new List<Request>();
+    public readonly List<Request> Probes = new List<Request>(), Decisions = new List<Request>(), Speech = new List<Request>(), Wires = new List<Request>(), Matches = new List<Request>(), DeviceGoalReviews = new List<Request>();
+    public int RoomTaskPlanningCancellationCount;
+    public readonly List<Request> SceneSearchRequests = new List<Request>();
+    public readonly List<Request> FirstReplies = new List<Request>();
+    public bool EnableFirstReply;
+    public override bool SupportsFirstReplyRouting => EnableFirstReply;
+    public override void PostFirstReplyStream(string message, Action<SpeechText> onSpeech,
+        Action<FirstReplyCompletion> onComplete, string imageDataUrl = null, string transientContext = null, bool commitHistory = true)
+    {
+        FirstReplies.Add(new Request { Kind = "first-reply", Input = message, Context = transientContext,
+            Image = imageDataUrl, SpeechCallback = onSpeech, FirstReplyCallback = onComplete });
+    }
+    public int SceneSearchCancellationCount;
+    private ChatQW liveSceneSearch;
+    public readonly JArray LiveSceneSearchTraffic = new JArray();
+    public void EnableLiveSceneSearch(string endpoint, string modelId)
+    {
+        if (Array.IndexOf(Environment.GetCommandLineArgs(), "-nevaSceneSearchLive") < 0 ||
+            endpoint != "http://127.0.0.1:8080/v1/chat/completions" || string.IsNullOrWhiteSpace(modelId))
+            throw new InvalidOperationException("Live search requires its explicit isolated local-only flag and discovered model ID.");
+        DisableLiveSceneSearch(); LiveSceneSearchTraffic.Clear();
+        var host = new GameObject("Explicit live search and matching provider"); host.SetActive(false);
+        liveSceneSearch = host.AddComponent<ChatQW>(); liveSceneSearch.enabled = false;
+        liveSceneSearch.m_Backend = ChatQW.BackendType.Local; liveSceneSearch.m_LocalUrl = endpoint;
+        liveSceneSearch.m_LocalModelName = modelId;
+        // Awake binds the local URL. Disabled behaviour avoids Start's slot initialization;
+        // explicit public request methods can run coroutines on this active GameObject.
+        host.SetActive(true);
+    }
+    public void DisableLiveSceneSearch()
+    {
+        if (liveSceneSearch == null) return;
+        CancelSceneSearchDecisionMessage(); CancelSceneObjectMatchMessage();
+        UnityEngine.Object.DestroyImmediate(liveSceneSearch.gameObject); liveSceneSearch = null;
+    }
+    private void RecordLiveSceneSearchCancellation(string kind)
+    {
+        foreach (var record in LiveSceneSearchTraffic.OfType<JObject>().Where(item => (string)item["kind"] == kind && (string)item["status"] == "pending"))
+        {
+            record["status"] = "cancelled-before-provider-callback";
+            record["elapsedSeconds"] = Time.realtimeSinceStartup - (float)record["startedRealtime"];
+            File.WriteAllText(Path.Combine(output, Path.GetFileNameWithoutExtension((string)record["wire"]) + ".response.json"), record.ToString());
+        }
+    }
+    private Action<bool, string, string> LiveSceneSearchCallback(Request request, Action<bool, string, string> callback)
+    {
+        float started = Time.realtimeSinceStartup;
+        var record = new JObject { ["kind"] = request.Kind, ["wire"] = request.File, ["status"] = "pending",
+            ["startedRealtime"] = started, ["responseScope"] = "Unmodified completion text and status returned by the production ChatQW API; not a raw HTTP envelope." };
+        LiveSceneSearchTraffic.Add(record);
+        string prefix = Path.Combine(output, Path.GetFileNameWithoutExtension(request.File));
+        File.WriteAllText(prefix + ".input.json", request.Input);
+        File.WriteAllText(prefix + ".image-data-url.txt", request.Image ?? "");
+        File.WriteAllText(prefix + ".response.json", record.ToString());
+        return (ok, response, status) => {
+            record["accepted"] = ok; record["response"] = response; record["status"] = status;
+            record["elapsedSeconds"] = Time.realtimeSinceStartup - started;
+            File.WriteAllText(prefix + ".response.json", record.ToString());
+            callback(ok, response, status);
+        };
+    }
+    public override bool SupportsSceneSearchMessages => true;
+    public override void CancelSceneSearchDecisionMessage()
+    { ++SceneSearchCancellationCount; if (liveSceneSearch != null) RecordLiveSceneSearchCancellation("scene-search"); liveSceneSearch?.CancelSceneSearchDecisionMessage(); }
+    public override void PostSceneSearchDecisionMessage(string input, string imageDataUrl, Action<bool, string, string> callback)
+    {
+        var request = new Request { Kind = "scene-search", Input = input, Image = imageDataUrl, RoomCallback = callback };
+        request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(liveSceneSearch != null ? liveSceneSearch : serializer, "BuildSceneSearchRequestJson", input, imageDataUrl);
+        SceneSearchRequests.Add(request); Save(request);
+        if (liveSceneSearch != null) liveSceneSearch.PostSceneSearchDecisionMessage(input, imageDataUrl, LiveSceneSearchCallback(request, callback));
+    }
+    public override void CancelRoomTaskPlanningMessage() { ++RoomTaskPlanningCancellationCount; }
     private ChatQW serializer;
     private string output;
     public void Initialize(string path)
@@ -811,13 +992,25 @@ public sealed class NevaSceneVisionIntegrationModel : LLM
     }
     public override bool SupportsVisualDecisionMessages => true;
     public override bool SupportsRoomTaskMessages => true;
+    public override bool SupportsRoomDeviceGoalReview => true;
+    public override void PostRoomDeviceGoalReviewMessage(string input, Action<bool, string, string> callback)
+    {
+        var request = new Request { Kind = "device-goal-review", Input = input, RoomCallback = callback };
+        request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildRoomDeviceGoalReviewRequestJson", input);
+        DeviceGoalReviews.Add(request); Save(request);
+    }
+    public override void CancelRoomDeviceGoalReviewMessage() { }
+    public override bool SupportsRoomObservationHistory => true;
     public override bool SupportsSceneObjectMatchMessages => true;
     public override void PostSceneObjectMatchMessage(string input, string imageDataUrl, Action<bool,string,string> callback)
     {
         var request = new Request { Kind="object-match", Input=input, Image=imageDataUrl, RoomCallback=callback };
-        request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildSceneObjectMatchRequestJson", input, imageDataUrl);
+        request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(liveSceneSearch != null ? liveSceneSearch : serializer, "BuildSceneObjectMatchRequestJson", input, imageDataUrl);
         Matches.Add(request); Save(request);
+        if (liveSceneSearch != null) liveSceneSearch.PostSceneObjectMatchMessage(input, imageDataUrl, LiveSceneSearchCallback(request, callback));
     }
+    public override void CancelSceneObjectMatchMessage()
+    { if (liveSceneSearch != null) RecordLiveSceneSearchCancellation("object-match"); liveSceneSearch?.CancelSceneObjectMatchMessage(); }
     public override void PostEphemeralMsg(string prompt, Action<string> callback) => PostEphemeralMsg(prompt, null, callback);
     public override void PostAutonomyIntentMsg(string prompt, string imageDataUrl, Action<string> callback)
     {
@@ -833,12 +1026,26 @@ public sealed class NevaSceneVisionIntegrationModel : LLM
         request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildEphemeralRequestJsonWithImage", prompt, imageDataUrl, 1, false);
         Probes.Add(request); Save(request);
     }
-    public override void PostWorkReviewMsg(string prompt, string imageDataUrl, Action<string> callback) => PostEphemeralMsg(prompt, imageDataUrl, callback);
+    public override void PostWorkReviewMsg(string prompt, string imageDataUrl, Action<string> callback)
+    {
+        var request = new Request { Kind = "work-review", Input = prompt, Image = imageDataUrl, ProbeCallback = callback };
+        request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildWorkReviewRequestJsonWithImage", prompt, imageDataUrl);
+        Probes.Add(request); Save(request);
+    }
     public override void PostRoomTaskMessage(string input, bool review, Action<bool, string, string> callback) => PostRoomTaskMessage(input, null, review, callback);
     public override void PostRoomTaskMessage(string input, string imageDataUrl, bool review, Action<bool, string, string> callback)
     {
         var request = new Request { Kind = review ? "room-review" : "room", Input = input, Image = imageDataUrl, RoomCallback = callback };
         request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildRoomTaskRequestJsonWithImage", input, imageDataUrl, review);
+        Decisions.Add(request); Save(request);
+    }
+    public override void PostRoomTaskMessageWithObservationHistory(string input, string imageDataUrl,
+        IReadOnlyList<RoomObservationImage> history, Action<bool, string, string> callback)
+    {
+        var request = new Request { Kind = "room", Input = input, Image = imageDataUrl, RoomCallback = callback,
+            ObservationHistory = history == null ? Array.Empty<RoomObservationImage>() : history.ToArray() };
+        request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer,
+            "BuildRoomTaskRequestJsonWithObservationHistory", input, imageDataUrl, request.ObservationHistory, false);
         Decisions.Add(request); Save(request);
     }
     public override void PostSpeechStream(string message, Action<SpeechText> onSpeech, Action<string> onComplete, string imageDataUrl = null, bool recordAssistantHistory = true)
@@ -847,7 +1054,12 @@ public sealed class NevaSceneVisionIntegrationModel : LLM
         string imageDataUrl, bool recordAssistantHistory, FormalResponseStage stage)
     {
         m_DataList.Add(new SendData("user", message) { imageDataUrl = imageDataUrl });
-        var request = new Request { Kind = "formal", Input = message, Context = RequestContext, Image = imageDataUrl };
+        var request = new Request { Kind = "formal", Input = message, Context = RequestContext, Image = imageDataUrl,
+            RecordAssistantHistory = recordAssistantHistory, Stage = stage, SpeechCallback = onSpeech };
+        request.SpeechCompleteCallback = full => {
+            if (recordAssistantHistory) m_DataList.Add(new SendData("assistant", full));
+            onComplete(full);
+        };
         serializer.ActiveSkillContext = ActiveSkillContext;
         serializer.SkillCatalogContext = SkillCatalogContext;
         request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildStageRequestJsonForMessages", m_DataList, true, RequestContext, null, stage);
@@ -856,15 +1068,20 @@ public sealed class NevaSceneVisionIntegrationModel : LLM
     }
     public override void PostSpeechFeedbackStream(string context, string feedback, Action<SpeechText> onSpeech,
         Action<string> onComplete, string imageDataUrl, bool recordAssistantHistory)
+        => PostSpeechFeedbackStreamForStage(context, feedback, onSpeech, onComplete, imageDataUrl,
+            recordAssistantHistory, FormalResponseStage.General);
+    public override void PostSpeechFeedbackStreamForStage(string context, string feedback, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl, bool recordAssistantHistory, FormalResponseStage stage)
     {
+        if (stage == FormalResponseStage.SpatialGoalResult) recordAssistantHistory = false;
         var request = new Request { Kind = "work-feedback", Input = feedback, Context = context, Image = imageDataUrl,
-            RecordAssistantHistory = recordAssistantHistory, SpeechCallback = onSpeech };
+            RecordAssistantHistory = recordAssistantHistory, Stage = stage, SpeechCallback = onSpeech };
         request.SpeechCompleteCallback = full => {
             if (recordAssistantHistory) m_DataList.Add(new SendData("assistant", full));
             onComplete(full);
         };
         var wireHistory = NevaSceneVisionIntegrationRegression.Call(serializer, "CreateObservationRequestHistory", m_DataList, imageDataUrl);
-        request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildRequestJsonForMessagesWithFeedback", wireHistory, true, context, feedback);
+        request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildStageRequestJsonForMessages", wireHistory, true, context, feedback, stage);
         Speech.Add(request); Save(request);
     }
     private void Save(Request request)

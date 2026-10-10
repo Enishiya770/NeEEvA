@@ -447,7 +447,7 @@ public static class SceneViewPositionIntegrationRegression
     {
         var candidate=c.chat.LastSceneObjectCandidateView.Candidates.FirstOrDefault(x=>x.entityId==entity);
         c.Check(candidate!=null,"Actual candidate view contains the exact selected entity.");
-        return new JObject { ["verdict"]="matched",["candidateId"]=candidate.candidateId,
+        return new JObject { ["verdict"]="matched", ["candidateRole"]="target",["candidateId"]=candidate.candidateId,
             ["reason"]="Controlled fixture reply for the same actual visible target; no assertion of readability or whole-object fit." }.ToString();
     }
     private static string None()=>new JObject { ["intent"]="none",["origin"]="none",["evidence"]="" }.ToString();

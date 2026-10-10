@@ -61,7 +61,7 @@ public partial class ChatSample
             "Movement is to legal nearby same-level ground, not onto the surface.";
     }
 
-    private static bool IsSceneVisualIntent(string intent) => intent == "look-at" || intent == "approach-object" || intent == "reposition-view" || intent == "orient-view" || intent == "turn-in-place" || intent == "inspect-object" || intent == "set-object-state";
+    private static bool IsSceneVisualIntent(string intent) => intent == "search-scene" || intent == "look-at" || intent == "approach-object" || intent == "reposition-view" || intent == "orient-view" || intent == "turn-in-place" || intent == "inspect-object" || intent == "set-object-state";
 
     public string SceneActionContextJson => BuildSceneActionFacts().ToString(Newtonsoft.Json.Formatting.None);
 
@@ -72,9 +72,10 @@ public partial class ChatSample
             ["active"] = m_SceneActionActive,
             ["lastAction"] = m_SceneActionFact == null ? null : JObject.Parse(JsonUtility.ToJson(m_SceneActionFact)),
             ["objectContext"] = BuildSceneObjectFacts(),
+            ["sceneSearch"] = BuildSceneSearchContext(),
             ["capability"] = "look-at or approach-object using captureId plus normalized visible image point; " +
                 "reposition-view uses a freshly confirmed entity to adjust the same-floor observation station farther/closer/left/right by 0.2 to 1.2 metres while facing that target. see-whole/read-detail/avoid-occlusion are observation purposes, not promised outcomes; assess the new image after movement. " +
-                "orient-view changes real head direction without needing an already visible target; turn-in-place turns the actual body on its current legal floor. New view is captured only after real movement. No stairs or touching. " +
+                "orient-view changes real head direction without needing an already visible target; turn-in-place turns the actual body on its current legal floor. Bounded historical snapshots may be acquired during an actual body turn; a new current view is still captured after completion. No stairs or touching. " +
                 "When objectContext.enabled, inspect-object resolves only the selected visible entity; set-object-state on/off requires its explicit registered nearby device capability and fresh confirmation. look-at can focus an unresolved image region without claiming a measured object. Autonomous view changes bounded to three per 30 seconds."
         };
     }
@@ -88,6 +89,7 @@ public partial class ChatSample
         m_SceneActionFact = fact;
         RecordSceneActivity(fact.actionId, fact.intent, fact.visualLabel, phase, fact.reason);
         Debug.Log("[Vision/Action] " + JsonUtility.ToJson(fact), this);
+        ObserveSpatialGoalRunnerAction(fact);
     }
 
     private void BeginSceneAction(RoomTaskProtocol.Decision decision, SceneVisionObservation observation,
@@ -158,8 +160,11 @@ public partial class ChatSample
         }
         finally { (routine as IDisposable)?.Dispose(); }
         if (failure == null || epoch != m_SceneActionEpoch || generation != m_FormalResponseGeneration) yield break;
+        bool goalRunnerOwned = SpatialGoalRunnerOwnsGeneration(generation);
         CancelSceneAction("scene-preparation-exception");
         RecordSceneAction(fact, "failed", failure.Message);
+        if (goalRunnerOwned && SpatialGoalRunnerOwnsGeneration(generation))
+        { TryHandleSpatialGoalPlanSettled(generation); yield break; }
         // A partial dispatch cannot retain a busy speech round or later revive it.
         ++m_FormalResponseGeneration;
         m_ChatSettings?.m_ChatModel?.CancelActiveResponse();
@@ -313,8 +318,17 @@ public partial class ChatSample
     private IEnumerator PrepareSceneViewChange(RoomTaskProtocol.Decision decision, SceneVisionObservation source,
         SceneActionFact fact, ArdyRoomDialogueBridge bridge, int generation, int epoch, Action completed)
     {
+        SceneSweepLease sweep = null;
+        int workEpoch = m_WorkEpoch, userTurn = m_ActionConstraints.CurrentUserTurn, visionEpoch = m_SceneVisionEpoch;
+        var capture = m_SceneVisionCapture; var boundAvatar = bridge?.avatar;
+        var environment = bridge?.environmentRoot; var user = bridge?.userHead; var controller = bridge?.Controller;
         bool Current() => epoch == m_SceneActionEpoch && generation == m_FormalResponseGeneration &&
-            isActiveAndEnabled && SceneEyesOpen && !m_UserSpeechActiveForAutonomy;
+            workEpoch == m_WorkEpoch && userTurn == m_ActionConstraints.CurrentUserTurn && visionEpoch == m_SceneVisionEpoch &&
+            isActiveAndEnabled && SceneEyesOpen && !m_UserSpeechActiveForAutonomy && !m_SceneTimePaused && Time.timeScale > 0 &&
+            bridge != null && bridge.IsConnected && bridge.avatar == boundAvatar && bridge.environmentRoot == environment &&
+            bridge.userHead == user && bridge.Controller == controller && capture != null && capture == m_SceneVisionCapture &&
+            capture.Target == boundAvatar && capture.isActiveAndEnabled && capture.IsObservationBindingCurrent(source) &&
+            (sweep == null || SceneSweepBindingCurrent(sweep));
         void Finish(string phase, string reason, string dispatch)
         {
             if (!Current()) return;
@@ -323,6 +337,7 @@ public partial class ChatSample
         }
         void Fail(string reason)
         {
+            if (sweep != null) DiscardSceneSweep(reason);
             m_SceneAttention?.Release(fact.actionId, reason);
             if (bridge != null && bridge.ActionId == fact.actionId) bridge.StopMovement("cancelled", reason);
             Finish("rejected", reason, "not-completed: " + reason);
@@ -361,13 +376,16 @@ public partial class ChatSample
                 BeginSceneOrientWatch(bridge, fact.actionId);
                 if (!bridge.TryOrientScene(fact.actionId, fact.captureId, fact.requestedYaw, Validate, out string error))
                 { EndSceneOrientWatch(); Fail(error); yield break; }
-                RecordSceneAction(fact, "turning-body", "native ARDY is turning on the current validated floor; not yet observing unseen contents");
+                sweep = BeginSceneSweep(fact, source, bridge, generation, epoch);
+                RecordSceneAction(fact, "turning-body", "native ARDY is turning on the current validated floor; bounded historical images may be sampled during motion, without continuous sight or a claim about unseen contents");
                 deadline = Time.realtimeSinceStartup + 100f;
-                while (Current() && m_SceneOrientResult == null && Time.realtimeSinceStartup < deadline) yield return null;
+                while (Current() && m_SceneOrientResult == null && Time.realtimeSinceStartup < deadline)
+                { TickSceneSweep(sweep); yield return null; }
                 if (!Current()) yield break;
                 var result = m_SceneOrientResult; EndSceneOrientWatch();
                 if (result == null || result.actionId != fact.actionId || !result.oriented)
                 { Fail(result?.reason ?? "native-orientation-result-timeout"); yield break; }
+                EndSceneSweepMotion(sweep);
                 RecordSceneAction(fact, "turned", "native body turn completed; acquiring the actual resulting view");
             }
             SceneVisionObservation next = null; bool received = false;
@@ -380,11 +398,16 @@ public partial class ChatSample
             fact.actualViewChangeDegrees = Quaternion.Angle(source.CameraRotation, next.CameraRotation);
             if (fact.actualViewChangeDegrees < 1f) { Fail("actual-view-did-not-change"); yield break; }
             fact.confirmedCaptureId = fact.resultCaptureId = next.CaptureId;
+            ObserveKnownSceneObjects(next, "scene-view-change-result");
+            ObserveSpatialGoalView(next, "scene-view-change-result");
+            CompleteSceneSweep(sweep, next);
             BindFormalSceneObservation(next, generation);
             Finish("observed", "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents", "view-change-completed");
         }
         finally
         {
+            if (sweep != null && !sweep.completed && ReferenceEquals(m_SceneSweep, sweep))
+                DiscardSceneSweep("view-preparation-owner-invalidated");
             EndSceneOrientWatch(fact.actionId);
             if (epoch == m_SceneActionEpoch && m_SceneActionActive)
             {
@@ -438,7 +461,7 @@ public partial class ChatSample
                 });
                 float captureDeadline = Time.realtimeSinceStartup + 4.5f;
                 while (epoch == m_SceneActionEpoch && !received && Time.realtimeSinceStartup < captureDeadline) yield return null;
-                if (epoch == m_SceneActionEpoch && m_AgentRunning)
+                if (epoch == m_SceneActionEpoch && m_AgentRunning && !SpatialGoalRunnerOwnsAction(fact))
                     ScheduleNextTick(Mathf.Max(2f, m_MinTickSec), "scene-action-result");
                 yield break;
             }
@@ -483,6 +506,8 @@ public partial class ChatSample
 
     private void CancelSceneAction(string reason)
     {
+        HandleSpatialGoalActionCancellation(reason);
+        DiscardSceneSweep(reason);
         CancelSceneObjectTargetMatch();
         ++m_SceneActionEpoch;
         EndSceneResultWatch(m_SceneResultActionId);

@@ -375,7 +375,8 @@ public partial class ChatSample
             m_SceneAttention?.ReleaseLocomotionFocus(fact.actionId, "scene-object-attempt-ended");
             EndSceneResultWatch(fact.actionId); m_SceneActionActive = false;
             RecordSceneAction(fact, phase, reason);
-            if (m_AgentRunning) ScheduleNextTick(Mathf.Max(2f, m_MinTickSec), "scene-object-approach-result");
+            if (m_AgentRunning && !SpatialGoalRunnerOwnsAction(fact))
+                ScheduleNextTick(Mathf.Max(2f, m_MinTickSec), "scene-object-approach-result");
         }
         void Unconfirmed(string status, string reason)
         {

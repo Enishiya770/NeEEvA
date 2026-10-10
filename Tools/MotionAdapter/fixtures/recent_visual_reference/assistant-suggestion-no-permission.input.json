@@ -1,0 +1,22 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "What color is it?",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "What color is it?",
+    "targetDescription": "the lamp by the door",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [
+    {
+      "role": "assistant",
+      "quotedText": "There is a lamp by the door. I could turn it off."
+    }
+  ],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

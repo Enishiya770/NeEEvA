@@ -1,0 +1,26 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "Just describe it now; do not switch it off.",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "Just describe it now; do not switch it off.",
+    "targetDescription": "the lamp by the door",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [
+    {
+      "role": "user",
+      "quotedText": "Turn off the lamp by the door."
+    },
+    {
+      "role": "assistant",
+      "quotedText": "I can see that lamp."
+    }
+  ],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

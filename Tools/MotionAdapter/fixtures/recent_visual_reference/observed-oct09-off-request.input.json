@@ -1,0 +1,34 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "去把刚才你看到的那盏灯关掉。",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "去把刚才你看到的那盏灯关掉。",
+    "targetDescription": "刚才看到的那盏灯",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [
+    {
+      "role": "user",
+      "quotedText": "现在能看到什么？"
+    },
+    {
+      "role": "assistant",
+      "quotedText": "正面にはテレビとデスクトップ画面が見えるわ。コードやリストが書かれたウィンドウが開いているみたいね。その隣にはユウの棚があるし、足元には飾り用のランプも置かれているわ。"
+    },
+    {
+      "role": "user",
+      "quotedText": "来我身边。"
+    },
+    {
+      "role": "assistant",
+      "quotedText": "あなたのそばまで来たわ。"
+    }
+  ],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

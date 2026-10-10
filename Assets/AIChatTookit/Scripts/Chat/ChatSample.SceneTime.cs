@@ -79,8 +79,10 @@ public partial class ChatSample
         m_SceneTimeLastRealtime = Time.realtimeSinceStartupAsDouble;
         if (paused)
         {
+            CancelSceneSearchTask("application-paused");
             m_ScenePauseStartedRealtime = Time.realtimeSinceStartupAsDouble;
             PauseSceneAction();
+            CancelFirstReplyForPause();
             CancelRoomSpeechReview("application-paused");
             CancelAutonomyIntentProbe(); m_ScenePoseKnown = false;
             m_SceneMotionAt = m_SceneGazeAt = -1;
@@ -143,7 +145,8 @@ public partial class ChatSample
             m_SceneLastArrivalTime = fact;
         }
         if (phase == "failed" || phase == "rejected" || phase == "blocked") m_SceneLastFailureTime = fact;
-        if (changed && (phase == "arrived" || phase == "observed" || phase == "failed" || phase == "blocked" || phase == "rejected"))
+        if (changed && !SpatialGoalRunnerOwnsGeneration(m_FormalResponseGeneration) &&
+            (phase == "arrived" || phase == "observed" || phase == "failed" || phase == "blocked" || phase == "rejected"))
         {
             m_SceneActionReviewUserTurn = m_ActionConstraints.CurrentUserTurn;
             ScheduleNextTick(2f, "scene-action-" + phase);

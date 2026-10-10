@@ -1,0 +1,128 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5131d89f7c9095640a965973079f691d, type: 3}
+  m_Name: Artifairy_RenderCompatible-rest
+  m_EditorClassIdentifier: 
+  schema: 1
+  avatar: {fileID: 5929401533440927806, guid: 6b507019fb13f5640ab05c9350867e5a, type: 3}
+  sourcePath: Assets/Model/Artifairy/Artifairy_RenderCompatible.vrm
+  sourceSha256: 4c330fd54401afff51e95216553f146ebcf311e364ed90dd5f458669a8e471ff
+  sourceDependencyHash: 0f6379bf840326af7c663a1ff27d4ef9
+  entries:
+  - bone: 0
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 1
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 2
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 3
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 4
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 5
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 6
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 7
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 8
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 9
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 10
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 11
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 12
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 13
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 14
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 15
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 16
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 17
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 18
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 19
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 20
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 21
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 22
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 24
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 25
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 26
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 27
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 28
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 29
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 30
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 31
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 32
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 33
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 34
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 35
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 36
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 37
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 38
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 39
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 40
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 41
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 42
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 43
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 44
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 45
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 46
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 47
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 48
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 49
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 50
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 51
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 52
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 53
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}
+  - bone: 54
+    restInRoot: {x: 0, y: 0, z: 0, w: 1}

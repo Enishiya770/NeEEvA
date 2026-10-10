@@ -1,0 +1,22 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "Switch it off.",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "Switch it off.",
+    "targetDescription": "the fan by the window",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [
+    {
+      "role": "assistant",
+      "quotedText": "There is a fan by the window."
+    }
+  ],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

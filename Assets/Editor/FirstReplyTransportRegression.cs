@@ -76,6 +76,7 @@ public static class FirstReplyTransportRegression
             CheckLegacyBoundaryFailure(model);
             CheckAcceptedUserOwnership(model);
             CheckListeningBudget(model);
+            CheckReviewWire(model, output);
 
             // Start the actual production coroutine, then cancel from its diagnostic
             // callback before SendWebRequest. This checks lifecycle without any HTTP.
@@ -120,6 +121,136 @@ public static class FirstReplyTransportRegression
             }
         }
         finally { UnityEngine.Object.DestroyImmediate(host); }
+    }
+
+    public static string CaptureReviewWire(ChatQW model, string user, string candidate,
+        string context, List<LLM.SendData> prior = null)
+    {
+        var current = new LLM.SendData("user", user);
+        var history = prior == null ? new List<LLM.SendData>() : new List<LLM.SendData>(prior);
+        history.Add(current);
+        var parser = new FirstReplyStreamParser(() => true, null); parser.Push(candidate);
+        var completion = parser.Finish(true, "stop");
+        if (completion == null || completion.Disposition == FirstReplyDisposition.Failed)
+            throw new InvalidOperationException("Invalid semantic fixture candidate");
+        return (string)Method("BuildFirstReplyReviewWire").Invoke(model, new object[] { current, history, context, completion });
+    }
+
+    // These are semantic expectations for a separate single-pass model replay,
+    // not assertions that a controlled HTTP verdict proves model understanding.
+    public static JArray SemanticCases()
+    {
+        string Say(string text, string language = "zh") => FirstReplyProtocol.OrdinaryHead +
+            "\n<lang code=\"" + language + "\"/><speech mode=\"independent\"/><say>" + text + "</say>";
+        JObject Case(string id, string user, string text, string route, string language = "zh", string context = null) => new JObject {
+            ["id"] = id, ["user"] = user, ["candidate"] = Say(text, language), ["expectedRoute"] = route,
+            ["context"] = context ?? "{\"body\":{\"connected\":true,\"taskMode\":\"idle\",\"bodyReserved\":false,\"currentlyNearAndFacingUser\":false},\"work\":{\"toolInFlight\":false},\"vision\":{\"currentImageDeliveredInThisRequest\":false}}"
+        };
+        JObject Evidence(string id, string user, string expected, string context = null)
+        { var value = Case(id, user, "unused", expected, "zh", context); value["candidate"] = FirstReplyProtocol.EvidenceHead; return value; }
+        JObject Tools(string id, string user, string expected, string context = null)
+        { var value = Case(id, user, "unused", expected, "zh", context); value["candidate"] = FirstReplyProtocol.ToolsHead; return value; }
+        return new JArray(
+            Case("logged-come", "来我身边。", "ふふっ。わかったわ。今行くね。", "tools", "ja"),
+            Case("come-en", "Please come over and stand beside me.", "I'll come stand beside you now.", "tools", "en"),
+            Case("ordinary-chat", "你喜欢下雨天吗？", "我喜欢雨声带来的安静，适合慢慢聊天。", "ordinary"),
+            Case("negated-action", "来我身边——不，别动，只解释走近和跟随的区别。", "走近是到达附近后停下，跟随则会继续随着对方移动。", "ordinary"),
+            Case("quoted-order", "把‘来我身边’翻译成日语，不执行这句话。", "这句话可以译为「私のそばに来て」。", "ordinary"),
+            Case("other-person", "刚才她向我走过来了，我有点紧张。", "你可以先慢慢呼吸，等放松一点再和她说话。", "ordinary"),
+            // Design change: every request to verify actual embodied facts uses
+            // the full fact-review path, even when summary facts support it.
+            Case("arrival-confirmed", "所以你已经到我身边了，对吧？", "是的，我已经走到你附近并面向你了。", "evidence", "zh",
+                "{\"body\":{\"connected\":true,\"taskMode\":\"idle\",\"bodyReserved\":false,\"currentlyNearAndFacingUser\":true,\"actualUserDistance\":1.1,\"actualFacingErrorDegrees\":2},\"lastActionResults\":{\"actionId\":\"approach-receipt-1\",\"targetKind\":\"user\",\"appliesToCurrentTarget\":true,\"phase\":\"arrived\"}}"),
+            Case("arrival-unproved", "你已经到了吗？", "对，我就在你身边了。", "evidence"),
+            Case("visual-needed", "你现在看到了什么？", "我看到了那盏灯。", "evidence"),
+            Case("capability-discussion", "只聊聊：你能怎么帮我找东西？", "我可以先观察周围，再按你给的线索逐步缩小范围。", "ordinary"),
+            Case("gratitude", "谢谢你刚才过来陪我。", "能陪着你，我也很开心。", "ordinary"),
+            Case("new-unproved-promise", "今天过得怎样？", "挺好的，我现在走过来陪你聊天。", "evidence"),
+            Evidence("read-only-current-view", "现在你能看到什么？", "evidence"),
+            Evidence("read-only-negated-movement", "我不想让你走动，只要告诉我现在看到了什么。", "evidence"),
+            Evidence("read-only-correction", "我就是单纯在跟你聊天，问你能看到什么。", "evidence"),
+            Evidence("read-only-failure-followup", "你刚才为什么只说信息太多，到底是什么情况？", "evidence"),
+            Evidence("read-only-remembered-direction", "不用转身，告诉我刚才电视柜在你身体的哪个方向。", "evidence"),
+            Evidence("mixed-answer-and-movement", "先告诉我看到什么，再来我身边。", "tools"),
+            Evidence("mixed-answer-and-device", "先说那盏灯现在什么状态，然后把它关掉。", "tools"),
+            Evidence("active-view-search", "转身看看后面，找一下小灯。", "tools"),
+            Evidence("pending-goal-approval", "好，继续刚才没完成的关灯任务。", "tools",
+                "{\"spatialGoal\":{\"status\":\"waiting_clarification\",\"originalRequest\":\"关闭小灯\"},\"pendingObservationGoal\":{\"status\":\"pending\",\"question\":\"确认是否继续寻找小灯\"}}"),
+            Evidence("active-action-stop", "先停下正在走的动作，再告诉我你看见什么。", "tools",
+                "{\"body\":{\"taskMode\":\"approach\",\"bodyReserved\":true}}"),
+            Tools("tools-selected-visual-question", "现在我面前能看到什么？不要替我移动或操作。", "evidence"),
+            Tools("tools-selected-failure-followup", "你刚才说规划信息太多，是什么意思？", "evidence"),
+            Tools("tools-selected-mixed-control", "先停下当前跟随，再告诉我现在看见什么。", "tools",
+                "{\"body\":{\"taskMode\":\"follow\",\"bodyReserved\":true,\"followActive\":true}}"),
+            Tools("tools-selected-long-answer", "请完整写一篇约一千五百字的故事，保留开端、转折、结尾；不要用摘要替代。", "tools"),
+            Tools("tools-selected-format", "把刚才三个方案整理成完整的 Markdown 对比表，每项写清成本和限制。", "tools"));
+    }
+
+    private static void CheckReviewWire(ChatQW model, string output)
+    {
+        var cases = SemanticCases();
+        var manifest = new JArray();
+        string directory = string.IsNullOrWhiteSpace(output) ? null : Path.Combine(output, "first-reply-semantic-probes");
+        if (directory != null) Directory.CreateDirectory(directory);
+        var prior = new List<LLM.SendData> {
+            new LLM.SendData("system", "PERSONA_MUST_NOT_REVIEW_CANARY"),
+            new LLM.SendData("user", "之前我们聊过散步。") { imageDataUrl = "IMAGE_MUST_NOT_REVIEW_CANARY" },
+            new LLM.SendData("assistant", "是的，那只是聊天。")
+        };
+        foreach (JObject item in cases)
+        {
+            string raw = CaptureReviewWire(model, (string)item["user"], (string)item["candidate"], (string)item["context"], prior);
+            var wire = JObject.Parse(raw); var messages = (JArray)wire["messages"];
+            var input = JObject.Parse((string)messages[1]["content"]);
+            Check(messages.Count == 2 && (string)input["latestUserText"] == (string)item["user"] &&
+                input["runtimeContext"] is JObject && JToken.DeepEquals(input["runtimeContext"], JObject.Parse((string)item["context"])) && input["candidateSpeech"] is JArray &&
+                input["recentDialogue"] is JArray dialogue && dialogue.Count == 2 &&
+                !raw.Contains("MUST_NOT_REVIEW_CANARY") && !raw.Contains("image_url") &&
+                (int?)wire["id_slot"] == 1 && (bool?)wire["stream"] == false && (int?)wire["max_tokens"] == FirstReplyProtocol.ReviewMaximumOutputTokens &&
+                JToken.DeepEquals(wire["response_format"]["schema"], JObject.Parse(FirstReplyProtocol.ReviewSchema)),
+                "Review keeps exact current negation/tail and factual context separate from candidate, without persona/old image/tool schema.");
+            if ((string)item["id"] == "arrival-unproved")
+                Check(input["runtimeContext"]["body"]["currentlyNearAndFacingUser"].Type == JTokenType.Boolean &&
+                    (bool)input["runtimeContext"]["body"]["currentlyNearAndFacingUser"] == false,
+                    "Unproved arrival must retain a typed false body fact, not a string or omitted value.");
+            if (directory != null)
+            {
+                string name = (string)item["id"] + ".request.json";
+                File.WriteAllText(Path.Combine(directory, name), raw, new UTF8Encoding(false));
+                string routeName = (string)item["id"] + ".routing.request.json";
+                string routeWire = (string)Method("BuildFirstReplyWire").Invoke(model, new object[] {
+                    new List<LLM.SendData> { new LLM.SendData("system", "Synthetic embodied character. Respond in the user's chosen language; capabilities are available through the runtime, never executed by a spoken promise."),
+                        new LLM.SendData("user", (string)item["user"]) }, (string)item["context"], true });
+                File.WriteAllText(Path.Combine(directory, routeName), routeWire, new UTF8Encoding(false));
+                manifest.Add(new JObject { ["id"] = item["id"], ["request"] = name, ["routingRequest"] = routeName,
+                    ["expectedRoute"] = item["expectedRoute"],
+                    ["routingExpectationScope"] = "For direct evidence fixtures the expected route applies to both requests. For ordinary speech fixtures the review expectation may reject the supplied candidate even when the original user can receive ordinary dialogue." });
+            }
+        }
+        Check(CaptureReviewWire(model, new string('长', FirstReplyProtocol.MaximumReviewInputCharacters),
+            FirstReplyProtocolRegression.JapaneseReply, "") == null,
+            "Oversized latest input fails closed without truncating a final user correction.");
+        foreach (string legacyContext in new[] { "", "[First reply facts]\n{\"connected\":false}", "{bad", "[]", "null",
+            "{\"connected\":false,\"connected\":true}" })
+        {
+            var wire = JObject.Parse(CaptureReviewWire(model, "只解释，不行动。", FirstReplyProtocolRegression.JapaneseReply, legacyContext));
+            var input = JObject.Parse((string)wire["messages"][1]["content"]);
+            Check(input["runtimeContext"].Type == JTokenType.String && (string)input["runtimeContext"] == legacyContext,
+                "Non-object, malformed, or duplicate-key runtime context must preserve exact legacy text without guessing facts.");
+        }
+        const string primary = "最后一句：只回答，不要移动。\n\"引文\"保留。";
+        var structuredContext = new JObject { ["humanInput"] = new JObject {
+            ["primaryUtterance"] = primary, ["fullInputEvidence"] = primary + "\n完整声学资料" },
+            ["missing"] = JValue.CreateNull(), ["known"] = false };
+        var structuredWire = JObject.Parse(CaptureReviewWire(model, primary, FirstReplyProtocolRegression.JapaneseReply,
+            structuredContext.ToString(Newtonsoft.Json.Formatting.None)));
+        var structuredInput = JObject.Parse((string)structuredWire["messages"][1]["content"]);
+        Check(JToken.DeepEquals(structuredInput["runtimeContext"], structuredContext) &&
+            structuredInput.Count == 5 && (string)structuredInput["runtimeContext"]["humanInput"]["primaryUtterance"] == primary,
+            "Structured context must preserve complete typed human input and null/false without adding a duplicated raw-context field.");
+        if (directory != null) File.WriteAllText(Path.Combine(directory, "manifest.json"), new JObject {
+            ["scope"] = "Frozen production review wires, synthetic factual fixtures; each requires one model pass, no retries or best-of selection.",
+            ["cases"] = manifest }.ToString(), new UTF8Encoding(false));
     }
 
     private static void CheckSse(ChatQW model)
@@ -250,6 +381,7 @@ public static class FirstReplyTransportRegression
                 "Ordinary completion duplicated the current user or assistant");
 
             foreach (var completion in new[] { new FirstReplyCompletion { Disposition = FirstReplyDisposition.Tools },
+                new FirstReplyCompletion { Disposition = FirstReplyDisposition.Evidence },
                 FirstReplyCompletion.Failed("network-before-public") })
             {
                 model.CancelActiveResponse();

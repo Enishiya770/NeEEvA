@@ -284,6 +284,23 @@ public static class ArdyMotionRegression
         catch (Exception error) { Debug.LogException(error); EditorApplication.Exit(1); }
     }
 
+    public static void RunBindingLifecycleBatch()
+    {
+        checks = 0;
+        Directory.CreateDirectory(Output);
+        var report = new Report { status = "running", limitation =
+            "Real imported NeEEvA avatar and actual player/clip. Controlled loss of private runtime bone bindings; no claim of a full Editor hot-reload or XR lifecycle test." };
+        try
+        {
+            using (var fixture = new Fixture("Assets/Model/NeEEvA.vrm", 0f)) CheckBindingLifecycle(fixture);
+            report.status = "passed";
+        }
+        catch (Exception error) { report.status = "failed: " + error.Message; Debug.LogException(error); }
+        report.checks = checks;
+        File.WriteAllText(Path.Combine(Output, "binding-lifecycle.json"), JsonUtility.ToJson(report, true));
+        EditorApplication.Exit(report.status == "passed" ? 0 : 1);
+    }
+
     public static void RenderAnimationBatch()
     {
         try
@@ -372,11 +389,32 @@ public static class ArdyMotionRegression
             fixture.StepFor(ArdyMotionClip.Parse(Clip("left-wave").text).Duration + 1f);
             Check(!fixture.Player.IsPlaying, "Clip did not complete automatically");
             fixture.CheckNoJump(baseline, "Automatic completion");
+            CheckBindingLifecycle(fixture);
         }
         result.rootYawErrorDegrees = CheckRootYaw(asset);
         result.previews = previews.ToArray();
         return result;
     }
+
+    private static void CheckBindingLifecycle(Fixture fixture)
+    {
+        foreach (string invalidBinding in new[] { "chestAnchor", "isBound" })
+        {
+            fixture.Player.Bind(fixture.Vrm);
+            fixture.Player.Play(Clip("left-wave"), ArdyMotionMask.LeftArm);
+            typeof(ArdyMotionPlayer).GetField(invalidBinding,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .SetValue(fixture.Player, invalidBinding == "isBound" ? (object)false : null);
+            for (int i=0; i<120; i++) fixture.Player.Tick(.016f);
+            Check(!fixture.Player.IsPlaying && fixture.Player.MotionPlaybackWasInterrupted &&
+                !fixture.Player.MotionPlaybackCompletedNaturally && fixture.Player.BoundBoneCount == 0,
+                "Invalid runtime binding is interrupted once without a per-frame exception or false completion: " + invalidBinding);
+        }
+        fixture.Player.Bind(fixture.Vrm);
+        Check(!fixture.Player.IsPlaying && fixture.Player.BoundBoneCount > 0,
+            "Explicit rebinding restores readiness without replaying the interrupted action.");
+    }
+
 
     private static float CheckHeadAction(Fixture fixture, string resource)
     {

@@ -29,6 +29,10 @@ public class LLM:MonoBehaviour
     // Protocol failures are routed to the existing LLM correction path, never TTS.
     public event Action<string> OnOutputFormatError;
     protected void RaiseOutputFormatError(string reason) => OnOutputFormatError?.Invoke(reason);
+    // A bounded current request failed before complete delivery. Not a tool failure;
+    // consumers must discard buffered candidates, not replay already dispatched actions.
+    public event Action<string> OnResponseGenerationFailure;
+    protected void RaiseResponseGenerationFailure(string reason) => OnResponseGenerationFailure?.Invoke(reason);
     // Separate scope: invalid speech staging can coexist with a valid room motion.
     public event Action<string, string> OnSpeechPhaseError;
     protected void RaiseSpeechPhaseError(string reason, string correction) => OnSpeechPhaseError?.Invoke(reason, correction);
@@ -60,6 +64,7 @@ public class LLM:MonoBehaviour
     /// </summary>
     [Header("[回落] 回复语言 (留空；设置了Prompt Files则忽略)")]
     [SerializeField] protected string lan="日语";
+    public string DialogueLanguage => lan;
     /// <summary>
     /// 历史消息保留条数(高水位)。仅对使用基类 CheckHistory 的 provider 生效。
     ///
@@ -446,6 +451,14 @@ public class LLM:MonoBehaviour
         else onComplete?.Invoke("");
     }
 
+    /// <summary>One feedback request's execution authority. Legacy providers keep
+    /// their existing feedback transport and unrecorded-candidate behavior.</summary>
+    public virtual void PostSpeechFeedbackStreamForStage(string context, string feedback, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl, bool recordAssistantHistory, FormalResponseStage stage)
+    {
+        PostSpeechFeedbackStream(context, feedback, onSpeech, onComplete, imageDataUrl, recordAssistantHistory);
+    }
+
     /// <summary>
     /// 临时推理：给“用户仍在说话”的可撤销草稿使用。
     /// 实现必须保证请求和回答都不写入 m_DataList；不支持的 provider 返回空结果。
@@ -544,9 +557,20 @@ public class LLM:MonoBehaviour
 
     /// <summary>Same-model, request-local spatial decision and speech consistency check. No history or side effects.</summary>
     public virtual bool SupportsRoomTaskMessages => false;
+    /// <summary>Cancel only the private room planner; keep a newly started public result stream intact.</summary>
+    public virtual void CancelRoomTaskPlanningMessage() { }
+    public virtual bool SupportsRoomDeviceGoalReview => false;
+    /// <summary>Check a proposed durable device goal against the complete accepted user request. No history or action.</summary>
+    public virtual void PostRoomDeviceGoalReviewMessage(string input, Action<bool, string, string> callback)
+        => callback?.Invoke(false, "", "room-device-goal-review-unsupported");
+    public virtual void CancelRoomDeviceGoalReviewMessage() { }
     /// <summary>A shared model's first room-motion features must run before this turn's long spoken reply.</summary>
     public virtual bool RequiresRoomMotionReadinessBeforeSpeech => false;
     /// <summary>Request-local current-image semantic target matching; never writes dialogue history.</summary>
+    public virtual bool SupportsSceneSearchMessages => false;
+    public virtual void PostSceneSearchDecisionMessage(string input, string imageDataUrl, Action<bool, string, string> callback)
+        => callback?.Invoke(false, "", "scene-search-provider-unavailable");
+    public virtual void CancelSceneSearchDecisionMessage() { }
     public virtual bool SupportsSceneObjectMatchMessages => false;
     public virtual void PostSceneObjectMatchMessage(string input, string imageDataUrl,
         Action<bool, string, string> callback)
@@ -568,13 +592,34 @@ public class LLM:MonoBehaviour
         callback?.Invoke(false, "", "room-task-image-unsupported");
     }
 
+    /// <summary>A request-local historical RGB sample. It supplies observation evidence,
+    /// never current visibility, user authority or an executable capture reference.</summary>
+    public sealed class RoomObservationImage
+    {
+        public string CaptureId { get; }
+        public string MetadataJson { get; }
+        public string ImageDataUrl { get; }
+        public RoomObservationImage(string captureId, string metadataJson, string imageDataUrl)
+        { CaptureId = captureId; MetadataJson = metadataJson; ImageDataUrl = imageDataUrl; }
+    }
+
+    public virtual bool SupportsRoomObservationHistory => false;
+
+    /// <summary>Only spatial planning consumes bounded turn-history images. Existing providers
+    /// retain their single current-image path; speech review never inherits these attachments.</summary>
+    public virtual void PostRoomTaskMessageWithObservationHistory(string input, string imageDataUrl,
+        IReadOnlyList<RoomObservationImage> history, Action<bool, string, string> callback)
+        => PostRoomTaskMessage(input, imageDataUrl, false, callback);
+
     /// <summary>
     /// 撤销当前正式回复。用户重新开口或打断角色时调用。
     /// 子类应同时停止网络请求，并保证过期回调不再写入历史或触发 TTS。
     /// </summary>
     public virtual void CancelActiveResponse()
     {
+        CancelSceneSearchDecisionMessage();
         CancelSceneObjectMatchMessage();
+        CancelRoomDeviceGoalReviewMessage();
     }
 
     /// <summary>

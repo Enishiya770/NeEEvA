@@ -19,7 +19,7 @@ public partial class ChatSample
     /// <summary>Opt-in from a bound runtime room controller, never from a model response.</summary>
     public void ConfigureRoomMotionOutput(bool enabled)
     {
-        if (!enabled) { CancelClosedRoomPreparation("room-output-disabled"); CancelSceneAction("room-output-disabled"); }
+        if (!enabled) { CancelSceneSearchTask("room-output-disabled"); CancelClosedRoomPreparation("room-output-disabled"); CancelSceneAction("room-output-disabled"); }
         m_RoomMotionOutputEnabled = enabled;
     }
     [SerializeField, Tooltip("实验性语义动作规划。尚有约束理解遗漏；默认保留已验收的动作协议。")]
@@ -53,6 +53,11 @@ public partial class ChatSample
 
     private int BeginFormalResponseGeneration()
     {
+        CancelSceneSearchTask("formal-response-replaced");
+        // Release the old device transaction before a replacement can occupy
+        // the same model's auxiliary planner slot. Deferred runner cancellation
+        // would otherwise abort that new request on the next frame.
+        CancelSpatialGoalRunner("formal-response-replaced");
         if (m_ConfiguredSemanticMotionPlanning != m_UseSemanticMotionPlanning)
             ConfigureMotionOutput(m_MotionOutputEnabled, m_GeneratedMotionEnabled);
         // Speech generations reject stale model callbacks. A committed body action
@@ -232,6 +237,7 @@ public partial class ChatSample
 
     private void CancelDialogueMotion(string reason)
     {
+        CancelSceneSearchTask(reason);
         CancelSceneAction(reason);
         m_MotionDispatchedKeys.Clear();
         ResetMotionFeedback();

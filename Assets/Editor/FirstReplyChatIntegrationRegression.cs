@@ -57,7 +57,7 @@ public static class FirstReplyChatIntegrationRegression
             fillerCounter=host.AddComponent<FirstReplyFillerCounterTTS>();
             fillerOutput=host.AddComponent<AudioSource>();fillerOutput.playOnAwake=false;fillerOutput.enabled=false;
             settings.m_ChatModel=Model;
-            Set(chat,"m_AgentRunning",true);Set(chat,"m_SceneTimePaused",true);
+            Set(chat,"m_AgentRunning",true);Set(chat,"m_SceneTimePaused",false);Set(chat,"m_AgentRoundInFlight",true);
             chat.enabled=true;
             Generation=(int)Get(chat,"m_FormalResponseGeneration")+200;
             Epoch=(int)Get(chat,"m_WorkEpoch")+200;
@@ -70,13 +70,17 @@ public static class FirstReplyChatIntegrationRegression
             Set(Chat,"m_FormalResponseGeneration",Generation);Set(Chat,"m_WorkEpoch",Epoch);
             Set(Chat,"m_CurrentSpeechRoundId",Round);Set(Chat,"m_FirstReplyAttemptGeneration",-1);
             Set(Chat,"m_RoomTaskGeneration",-1);Set(Chat,"m_RoomSpeechGuardGeneration",-1);
-            foreach(string name in new[]{"m_EnableFirstReplyRouting","m_AgentRunning","m_SceneTimePaused","m_UseStreaming","m_IsVoiceMode","m_MotionOutputEnabled","m_RoomMotionOutputEnabled"})Set(Chat,name,true);
-            foreach(string name in new[]{"m_AgentCurrentRoundIsTick","m_AgentRoundInFlight","m_UserSpeechActiveForAutonomy","m_HoldSpeechForSongMemoryResult","m_HoldSpeechForHumBackResult","m_FormalResponseInFlight","m_StreamComplete","m_TTSSenderDone","m_RoundContinue","m_RoundSilent","m_RoundIsInner","m_RoundInnerCheckDone","m_RoundSilencedForRepeat","m_RoundRepeatCheckDone","m_RoundRepeatHold","m_FirstChunkFlushed","m_FirstDeltaLogged","m_WorkReviewOpen","m_HumBackPending","m_SongSingInFlight","m_SongSearchResultPending","m_SongCatalogResultPending","m_SongMemoryResultPending","m_HumBackResultPending","<IsAISpeaking>k__BackingField"})Set(Chat,name,false);
+            // A genuine accepted turn owns the round while the room is running.
+            // Pausing is not a test scheduler: RoomTask correctly revokes paused
+            // transactions before even dispatching their model request.
+            foreach(string name in new[]{"m_EnableFirstReplyRouting","m_AgentRunning","m_AgentRoundInFlight","m_UseStreaming","m_IsVoiceMode","m_MotionOutputEnabled","m_RoomMotionOutputEnabled"})Set(Chat,name,true);
+            foreach(string name in new[]{"m_SceneTimePaused","m_AgentCurrentRoundIsTick","m_UserSpeechActiveForAutonomy","m_HoldSpeechForSongMemoryResult","m_HoldSpeechForHumBackResult","m_FormalResponseInFlight","m_StreamComplete","m_TTSSenderDone","m_RoundContinue","m_RoundSilent","m_RoundIsInner","m_RoundInnerCheckDone","m_RoundSilencedForRepeat","m_RoundRepeatCheckDone","m_RoundRepeatHold","m_FirstChunkFlushed","m_FirstDeltaLogged","m_WorkReviewOpen","m_HumBackPending","m_SongSingInFlight","m_SongSearchResultPending","m_SongCatalogResultPending","m_SongMemoryResultPending","m_HumBackResultPending","<IsAISpeaking>k__BackingField"})Set(Chat,name,false);
             foreach(string name in new[]{"m_PendingSelfInspection","m_PendingToolCorrectionFrame","m_PendingSkillStatusFrame","m_SpokenBridgeTextThisTurn","m_CurrentlyPlayingText"})Set(Chat,name,"");
             Set(Chat,"m_SentenceBuffer",new SpeechTextBuffer());Set(Chat,"m_AssistantHeardText",new StringBuilder());
             Set(Chat,"m_ChatHistory",new List<string>{prompt});Set(Chat,"m_SilencedSpeechRoundIds",new HashSet<int>());
             foreach(string name in new[]{"m_PendingChunks","m_PendingClips","m_WorkResponses"})Set(Chat,name,Activator.CreateInstance(Get(Chat,name).GetType()));
             var ledger=new ArdyActionConstraintLedger();ledger.RecordUserTurn(prompt);Set(Chat,"m_ActionConstraints",ledger);
+            Set(Chat,"m_LastUserMsg",prompt);Set(Chat,"m_LastUserEvidence",prompt);
             Call(Chat,"ClearStagedFormalObservation");
         }
         public FirstReplyChatFixtureModel.Pending Dispatch()
@@ -134,18 +138,106 @@ public static class FirstReplyChatIntegrationRegression
             chat==null||!chat.gameObject.activeInHierarchy||bridge==null||!bridge.IsConnected)
             throw new InvalidOperationException("Use the connected isolated Play fixture only.");
         string directory=Path.Combine(output,"first-reply-chat");Directory.CreateDirectory(directory);
+        yield return FirstReplySemanticGateRegression.RunChecks(output);
         LastReport=new JObject{["status"]="running",["cases"]=new JArray(),["scope"]="Production ChatSample.DispatchFormalStream, typed speech callbacks, completion/fallback and observation receipts; deterministic fake LLM; zero HTTP and no TTS playback."};
+        LastReport["semanticGateTransport"] = FirstReplySemanticGateRegression.LastReport;
         using(var f=new Fixture(chat,bridge))
-        try
         {
+            var checks=RunFixtureChecks(f);
+            try
+            {
+                while(true)
+                {
+                    bool moved; object current;
+                    try { moved=checks.MoveNext();current=moved?checks.Current:null; }
+                    catch(Exception ex){LastReport["status"]="failed";LastReport["error"]=ex.ToString();throw;}
+                    if(!moved)break;
+                    yield return current;
+                }
+            }
+            finally
+            {
+                (checks as IDisposable)?.Dispose();
+                LastReport["checks"]=f.Checks;
+                File.WriteAllText(Path.Combine(directory,"report.json"),LastReport.ToString()+"\n");
+            }
+        }
+    }
+    private static IEnumerator RunFixtureChecks(Fixture f)
+    {
+            var chat=f.Chat;var bridge=f.Bridge;
             int operation=bridge.Controller.OperationRevision;
             f.Arm("今天我们只聊聊普通的事情，不要移动。");var p=f.Dispatch();
             f.Check(p.Prompt==f.Prompt&&p.Image==null&&p.CommitHistory,"The first-reply request preserves original text/history intent and receives no current image.");
             f.Check(p.Context.Contains("fixture-transient-context")&&p.Context.Contains("currentImageDeliveredInThisRequest"),"The actual request carries compact runtime context and image absence.");
+            var firstRuntime=JObject.Parse(p.Context.Split('\n')[1]);
+            f.Check((int?)firstRuntime["generation"]==f.Generation&&(int?)firstRuntime["workEpoch"]==f.Epoch&&
+                (int?)firstRuntime["userTurn"]==1&&(bool?)firstRuntime["humanInput"]?["currentHumanTurnPresent"]==true&&
+                (string)firstRuntime["humanInput"]?["primaryUtterance"]==f.Prompt,
+                "First-reply interpretation input lost its same-generation typed human turn or conflated user turn and work epoch.");
             p.Speech(new SpeechText("This is a normal conversation.","en"));p.Done(Ordinary("This is a normal conversation.",true));
             f.NoFallback("Ordinary completion bypasses room planning and the general formal request.");
             f.Check((bool)Get(chat,"m_StreamComplete")&&!(bool)Get(chat,"m_FormalResponseInFlight")&&f.QueuedText()=="This is a normal conversation.","Ordinary public speech enters the real queue exactly once and completes.");
             Add("ordinary actual-entry delivery without planner");
+
+            f.Arm("我不想让你走动，只要告诉我现在能看到什么。");
+            const string fullAuditory="[声学候选 uncertain；备选并非额外发言]\n完整听觉资料仍须保留。";
+            Set(chat,"m_LastUserEvidence",f.Prompt+fullAuditory);
+            Set(chat,"m_EnableScreenVision",true);Set(chat,"m_AgentEyesOpen",true);
+            p=f.Dispatch();
+            object retainedGoal=Get(chat,"m_SpatialDeviceGoal");
+            var retainedObservation=(Get(chat,"m_SceneObservationGoal") as JObject)?.DeepClone();
+            var understanding=new JObject{["referent"]="当前原位视野",["resolvedQuestion"]="不移动的情况下，当前能看到什么？",["needsEvidence"]="current-visual"};
+            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Evidence,QuestionUnderstanding=understanding,RequestKind="answer-only"});
+            understanding["resolvedQuestion"]="MUTATED_AFTER_HANDOFF";
+            var readOnlySemantics=(JObject)Call(chat,"ReadCurrentRequestSemantics",f.Generation);
+            f.Check((string)readOnlySemantics?["requestKind"]=="answer-only"&&
+                (bool?)readOnlySemantics?["requiresActionOrControl"]==false&&(bool?)readOnlySemantics?["actionAuthorization"]==false&&
+                (string)readOnlySemantics?["humanInput"]?["fullInputEvidence"]==f.Prompt+fullAuditory,
+                "A read-only handoff must retain complete typed input without acquiring action authority.");
+            float evidenceDeadline=Time.realtimeSinceStartup+12f;
+            while(f.Model.FormalCalls==0&&Time.realtimeSinceStartup<evidenceDeadline)yield return null;
+            f.Check(f.Model.FormalCalls==1&&f.Model.Room.Count==0&&f.Model.FormalStage==FormalResponseStage.CommittedSpatialReply&&
+                f.Model.FormalPrompt==f.Prompt&&!f.Model.FormalRecordHistory,
+                "Reviewed evidence handoff preserves the whole question and starts one guarded writer with zero planner requests or premature history.");
+            f.Check(!string.IsNullOrEmpty(f.Model.FormalImage)&&
+                ((NeEEvA.Perception.SceneVisionObservation)Call(chat,"GetFormalSceneObservation",f.Generation))?.HasImage==true,
+                "The visual fixture must supply an actual current capture before approving a visual claim.");
+            f.Check((string)Get(chat,"m_RoomTaskIntent")=="none"&&(string)Get(chat,"m_RoomTaskDispatch")=="read-only-evidence"&&
+                Get(chat,"m_RoomTaskDecisionFailure")==null&&f.Model.RequestContext.Contains("只读场景问答"),
+                "Evidence question acquired a movement intent or inherited a planning-failure obligation.");
+            var boundReply=CommittedSpatialReplyProtocol.ReadReplyFacts(f.Model.RequestContext);
+            var interpretation=boundReply?["readOnlyEvidenceReply"]?["questionUnderstanding"];
+            f.Check((string)interpretation?["interpretation"]?["resolvedQuestion"]=="不移动的情况下，当前能看到什么？"&&
+                (string)interpretation?["source"]=="independent-first-reply-semantic-review"&&(int?)interpretation?["generation"]==f.Generation&&
+                (string)boundReply?["humanInput"]?["primaryUtterance"]==f.Prompt&&
+                (string)boundReply?["humanInput"]?["fullInputEvidence"]==f.Prompt+fullAuditory,
+                "Writer lost exact original primary/evidence or the source-labelled immutable question interpretation.");
+            f.Check(ReferenceEquals(retainedGoal,Get(chat,"m_SpatialDeviceGoal"))&&
+                JToken.DeepEquals(retainedObservation,Get(chat,"m_SceneObservationGoal") as JObject),
+                "Answer-only routing changed or authorized an existing spatial/observation goal.");
+            const string evidenceAnswer="I can describe only the current captured scene; no movement was requested.";
+            f.Model.FormalSpeech(new SpeechText(evidenceAnswer,"en",actionDependency:SpeechActionDependency.Independent));
+            f.Check(f.QueuedText()=="","Evidence candidate became audible before its room speech review.");
+            f.Model.FormalComplete("<speech mode=\"independent\"/>"+evidenceAnswer);
+            while(f.Model.Room.Count==0&&Time.realtimeSinceStartup<evidenceDeadline)yield return null;
+            f.Check(f.Model.Room.Count==1&&f.Model.RoomReview[0]&&f.QueuedText()=="",
+                "Evidence reply bypassed the normal semantic speech review or called an action planner.");
+            f.Check(JObject.Parse(f.Model.Room[0])["visualObservation"]?.Type==JTokenType.Object,
+                "A visual-scoped approval requires actual image evidence in the review request.");
+            var speechReview=JObject.Parse(f.Model.Room[0]);
+            f.Check(JToken.DeepEquals(interpretation,speechReview["readOnlyEvidenceReply"]?["questionUnderstanding"])&&
+                (string)speechReview["humanInput"]?["fullInputEvidence"]==f.Prompt+fullAuditory,
+                "Independent speech review lost the question interpretation or replaced complete original input with it.");
+            f.Model.RoomCallbacks[0](true,new JObject{["verdict"]="consistent",["reason"]="The sentence states only current evidence scope; no action claim.",
+                ["factScope"]="visual-observation",["resultReport"]="not-applicable",["requestDisposition"]="answer-only",
+                ["planningFailureReport"]="not-mentioned"}.ToString(),"received");
+            f.Check(f.QueuedText()==evidenceAnswer&&(bool)Get(chat,"m_StreamComplete")&&!(bool)Get(chat,"m_FormalResponseInFlight"),
+                "Reviewed visual answer was replaced by a planning-failure template or failed to complete.");
+            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Evidence});
+            f.Check(f.Model.FormalCalls==1&&f.Model.Room.Count==1&&bridge.Controller.OperationRevision==operation,
+                "Duplicate evidence handoff replayed generation/review or performed an action.");
+            Add("fresh evidence question uses one read-only reviewed writer with zero planner or goal mutation");
 
             f.Arm("请用英语说两小行。");p=f.Dispatch();
             // Keep the unrelated maximum-length policy from splitting this
@@ -169,15 +261,70 @@ public static class FirstReplyChatIntegrationRegression
             f.OneFallback("Whitespace-only deltas are preserved as formatting but cannot claim public speech and suppress the original-turn fallback.");
             Add("whitespace-only stream failure remains eligible for one fallback");
 
-            f.Arm("跟着我走。最后更正：不要走动，只检查目前状态。");p=f.Dispatch();
-            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools});p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools});
+            f.Arm("解释刚才的失败。最后要求：现在向左转九十度。");p=f.Dispatch();
+            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools,RequestKind="mixed"});p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools,RequestKind="answer-only"});
             f.OneFallback("Tools selection falls back once, including duplicate provider completion.");
-            Add("tools route preserves original input and single fallback");
+            var currentSemantics=(JObject)Call(chat,"ReadCurrentRequestSemantics",f.Generation);
+            f.Check((string)currentSemantics?["requestKind"]=="mixed"&&(bool?)currentSemantics?["actionAuthorization"]==false&&
+                (bool)Call(chat,"CurrentRequestRequiresActionOrControl",f.Generation)&&
+                (string)currentSemantics?["humanInput"]?["primaryUtterance"]==f.Prompt,
+                "One current completion binds mixed request semantics and the full last instruction without treating it as authorization.");
+            currentSemantics["requestKind"]="answer-only";
+            f.Check((bool)Call(chat,"CurrentRequestRequiresActionOrControl",f.Generation),
+                "Consumers must not be able to mutate a current semantic receipt or let duplicate callbacks overwrite it.");
+            var compactSemantics=(JObject)Call(chat,"ReadCompactCurrentRequestSemantics",f.Generation);
+            f.Check((string)compactSemantics?["requestKind"]=="mixed"&&compactSemantics["humanInput"]==null&&
+                compactSemantics["currentUserText"]==null&&compactSemantics.Count==8,
+                "Downstream semantics must carry the current typed requirement without duplicating whole ASR/history payloads.");
+            Add("tools route preserves complete input, typed mixed request, clone isolation and single fallback");
+
+            foreach(string revoke in new[]{"generation","work-epoch","user-turn","model","pause","user-speaking"})
+            {
+                f.Arm("继续尚未完成的请求。");
+                Call(chat,"RememberFirstReplyRequestSemantics",new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools,RequestKind="control"},f.Generation,f.Model);
+                f.Check((bool)Call(chat,"CurrentRequestRequiresActionOrControl",f.Generation),"Current controlled receipt binds before revocation.");
+                if(revoke=="generation")Set(chat,"m_FormalResponseGeneration",f.Generation+1);
+                else if(revoke=="work-epoch")Set(chat,"m_WorkEpoch",f.Epoch+1);
+                else if(revoke=="user-turn")((ArdyActionConstraintLedger)Get(chat,"m_ActionConstraints")).RecordUserTurn("现在换了请求。");
+                else if(revoke=="model")f.ReplaceModel();
+                else if(revoke=="pause")Set(chat,"m_SceneTimePaused",true);
+                else Set(chat,"m_UserSpeechActiveForAutonomy",true);
+                f.Check(Call(chat,"ReadCurrentRequestSemantics",f.Generation)==null&&
+                    !(bool)Call(chat,"CurrentRequestRequiresActionOrControl",f.Generation),
+                    "A stale interpretation must not constrain a replacement turn: "+revoke);
+                f.NoFallback("Binding and invalidating interpretation receipts must never execute or restart work.");
+            }
+            Add("current request semantics expire with generation, work, user, model, pause and speaking ownership");
 
             f.Arm("看看前方。更正：只讨论怎么观察，不要执行。");p=f.Dispatch();
             p.Done(FirstReplyCompletion.Failed("fixture-disconnected"));p.Done(FirstReplyCompletion.Failed("duplicate"));
             f.OneFallback("No-delta failure falls back once without a second first-reply probe.");
             Add("transport failure before speech uses one original-turn fallback");
+
+            foreach(var pausedRoute in new[]{FirstReplyDisposition.Tools,FirstReplyDisposition.Evidence,FirstReplyDisposition.Ordinary})
+            {
+                f.Arm("随后暂停的首答请求。");p=f.Dispatch();int cancelCalls=f.Model.CancelCalls;
+                Call(chat,"OnApplicationPause",true);
+                f.Check((int)Get(chat,"m_FormalResponseGeneration")!=f.Generation&&
+                    !(bool)Get(chat,"m_FormalResponseInFlight")&&(bool)Get(chat,"m_StreamComplete")&&
+                    (bool)Get(chat,"m_TTSSenderDone")&&!(bool)Get(chat,"m_AgentRoundInFlight")&&
+                    (int)Get(chat,"m_FirstReplyActiveGeneration")==-1&&f.Model.CancelCalls>cancelCalls,
+                    "Actual application pause immediately cancels and settles a first reply without requiring its callback: "+pausedRoute);
+                p.Done(pausedRoute==FirstReplyDisposition.Ordinary?Ordinary("LATE_PAUSED_REPLY.",false):
+                    new FirstReplyCompletion{Disposition=pausedRoute});
+                p.Speech(new SpeechText("LATE_PAUSED_REPLY.","en"));
+                f.NoFallback("Application pause rejects late ordinary, evidence and tools handoffs: "+pausedRoute);
+                f.Check(f.QueuedText()==""&&(int)Get(chat,"m_RoomSpeechGuardGeneration")==-1,
+                    "Paused first reply cannot create an evidence owner, speech queue or planner request: "+pausedRoute);
+                Call(chat,"OnApplicationPause",false);
+                p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Evidence});
+                f.NoFallback("Resuming does not restore a revoked first-reply lease.");
+            }
+            f.Arm("恢复之后的新一轮。");p=f.Dispatch();p.Done(Ordinary("A fresh answer after resume.",false));
+            f.Check(!(bool)Get(chat,"m_FormalResponseInFlight")&&(bool)Get(chat,"m_StreamComplete"),
+                "A new first reply after resume completes without retaining the paused owner.");
+            f.NoFallback("A fresh ordinary reply after pause stays on its ordinary route.");
+            Add("application pause cancels and settles all first-reply routes; stale callbacks remain revoked after resume");
 
             foreach(bool reported in new[]{true,false})
             {
@@ -224,6 +371,7 @@ public static class FirstReplyChatIntegrationRegression
                 else if(revoked=="user-speaking")Set(chat,"m_UserSpeechActiveForAutonomy",true);
                 else f.ReplaceModel();
                 p.Speech(new SpeechText("REVOKED_SPEECH.","en"));p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools});
+                p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Evidence});
                 f.Check(f.QueuedText()==""&&(bool)Get(chat,"m_FormalResponseInFlight"),"Revoked callback is inert: "+revoked);f.NoFallback("Revoked callback cannot fall back: "+revoked);
             }
             Add("work cancellation user speech and model replacement fence callbacks");
@@ -259,9 +407,6 @@ public static class FirstReplyChatIntegrationRegression
             f.Check(f.Model.UnexpectedCalls+f.Other.UnexpectedCalls==0,"No unstubbed continuation or other model transport was invoked.");
             Add("protected rounds remain on existing route and no action executes");
             LastReport["status"]="passed";
-        }
-        catch(Exception ex){LastReport["status"]="failed";LastReport["error"]=ex.ToString();throw;}
-        finally{LastReport["checks"]=f.Checks;File.WriteAllText(Path.Combine(directory,"report.json"),LastReport.ToString()+"\n");}
         yield break;
     }
     private static FirstReplyCompletion Ordinary(string text,bool delivered)=>new FirstReplyCompletion{Disposition=FirstReplyDisposition.Ordinary,SpeechDelivered=delivered,SafeOutput="<speech mode=\"independent\"/><lang code=\"en\"/><say>"+text+"</say>"};
@@ -280,15 +425,22 @@ public sealed class FirstReplyChatFixtureModel:LLM
         public Action<SpeechText> Speech;public Action<FirstReplyCompletion> Done;
     }
     public readonly List<Pending> First=new List<Pending>();public readonly List<string> Room=new List<string>();
+    public readonly List<bool> RoomReview=new List<bool>();
+    public readonly List<Action<bool,string,string>> RoomCallbacks=new List<Action<bool,string,string>>();
+    public FormalResponseStage FormalStage;public string FormalPrompt,FormalImage;public bool FormalRecordHistory;
+    public Action<SpeechText> FormalSpeech;public Action<string> FormalComplete;
     public int FormalCalls,UnexpectedCalls,CancelCalls;
     public override bool SupportsFirstReplyRouting=>true;
     public override bool SupportsRoomTaskMessages=>true;
-    public void Reset(){First.Clear();Room.Clear();FormalCalls=0;}
+    public override bool SupportsVisualDecisionMessages=>true;
+    public void Reset(){First.Clear();Room.Clear();RoomReview.Clear();RoomCallbacks.Clear();FormalCalls=0;FormalSpeech=null;FormalComplete=null;FormalImage=null;}
     public override void PostFirstReplyStream(string message,Action<SpeechText> onSpeech,Action<FirstReplyCompletion> onComplete,string imageDataUrl=null,string transientContext=null,bool commitHistory=true)
         =>First.Add(new Pending{Prompt=message,Image=imageDataUrl,Context=transientContext,CommitHistory=commitHistory,Speech=onSpeech,Done=onComplete});
-    public override void PostRoomTaskMessage(string input,string imageDataUrl,bool reviewSpeech,Action<bool,string,string> callback)=>Room.Add(input);
-    public override void PostRoomTaskMessage(string input,bool reviewSpeech,Action<bool,string,string> callback)=>Room.Add(input);
-    public override void PostSpeechStreamForStage(string message,Action<SpeechText> onSpeech,Action<string> onComplete,string imageDataUrl,bool recordAssistantHistory,FormalResponseStage stage)=>FormalCalls++;
+    private void RecordRoom(string input,bool reviewSpeech,Action<bool,string,string> callback){Room.Add(input);RoomReview.Add(reviewSpeech);RoomCallbacks.Add(callback);}
+    public override void PostRoomTaskMessage(string input,string imageDataUrl,bool reviewSpeech,Action<bool,string,string> callback)=>RecordRoom(input,reviewSpeech,callback);
+    public override void PostRoomTaskMessage(string input,bool reviewSpeech,Action<bool,string,string> callback)=>RecordRoom(input,reviewSpeech,callback);
+    public override void PostSpeechStreamForStage(string message,Action<SpeechText> onSpeech,Action<string> onComplete,string imageDataUrl,bool recordAssistantHistory,FormalResponseStage stage)
+    {FormalCalls++;FormalStage=stage;FormalPrompt=message;FormalImage=imageDataUrl;FormalRecordHistory=recordAssistantHistory;FormalSpeech=onSpeech;FormalComplete=onComplete;}
     public override void PostMsg(string message,Action<string> callback)=>UnexpectedCalls++;
     public override void PostMsgStream(string message,Action<string> onDelta,Action<string> onComplete,string imageDataUrl=null,bool recordAssistantHistory=true)=>UnexpectedCalls++;
     public override void PostSpeechContinuationStream(string context,Action<SpeechText> onSpeech,Action<string> onComplete,string imageDataUrl=null)=>UnexpectedCalls++;

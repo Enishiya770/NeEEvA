@@ -1,6 +1,7 @@
 using NeEEvA.Perception;
 using UnityEditor;
 using UnityEngine;
+using Newtonsoft.Json.Linq;
 
 /// <summary>Read-only preview of the runtime observation source; does not open eyes or own a camera.</summary>
 public sealed class NevaSceneVisionWindow : EditorWindow
@@ -13,8 +14,20 @@ public sealed class NevaSceneVisionWindow : EditorWindow
     private SceneObjectCandidateView candidateView;
     private Texture2D candidateTexture;
     private bool showCandidates = true;
+    private SceneObjectCandidateView searchView;
+    private Texture2D searchTexture;
+    private bool showSearch = true, showCatalog = true, showMemory;
+    private double nextDiagnostics;
+    private NevaSceneVisionCapture diagnosticsSource;
+    private JObject diagnostics;
 
-    private void OnDisable() { if (candidateTexture != null) DestroyImmediate(candidateTexture); candidateTexture = null; candidateView = null; }
+    private void OnDisable()
+    {
+        if (candidateTexture != null) DestroyImmediate(candidateTexture);
+        if (searchTexture != null) DestroyImmediate(searchTexture);
+        candidateTexture = searchTexture = null; candidateView = searchView = null;
+        diagnostics = null; diagnosticsSource = null;
+    }
 
     [MenuItem("Tools/NeEEvA/Character Scene Vision")]
     public static void Open() => GetWindow<NevaSceneVisionWindow>("角色场景视觉");
@@ -27,6 +40,7 @@ public sealed class NevaSceneVisionWindow : EditorWindow
             nextRefresh = EditorApplication.timeSinceStartup + 1;
             RequestPreview();
         }
+        RefreshDiagnostics();
         Repaint();
     }
 
@@ -54,6 +68,8 @@ public sealed class NevaSceneVisionWindow : EditorWindow
         var sceneChat = source.GetComponent<ChatSample>();
         if (sceneChat != null)
         {
+            if (diagnosticsSource != source) RefreshDiagnostics();
+            DrawObservationCatalog();
             var facts = Newtonsoft.Json.Linq.JObject.Parse(sceneChat.SceneActionContextJson);
             EditorGUILayout.LabelField("视觉目标动作", (bool)facts["active"] ? "执行中" : "可接受新目标");
             var last = facts["lastAction"];
@@ -107,6 +123,7 @@ public sealed class NevaSceneVisionWindow : EditorWindow
                 if (showCandidates)
                 {
                     EditorGUILayout.LabelField(candidateView.CapturedAtUtc, EditorStyles.wordWrappedLabel);
+                    EditorGUILayout.SelectableLabel(candidateView.CaptureId, GUILayout.Height(EditorGUIUtility.singleLineHeight));
                     EditorGUILayout.HelpBox("左侧为当时视野中的实际可见轮廓，右侧为同图局部放大。编号对应本次候选，不表示已经认对目标。", MessageType.None);
                     float width = Mathf.Max(240, position.width - 28);
                     EditorGUI.DrawPreviewTexture(GUILayoutUtility.GetRect(width, width * candidateTexture.height / candidateTexture.width), candidateTexture, null, ScaleMode.ScaleToFit);
@@ -115,6 +132,7 @@ public sealed class NevaSceneVisionWindow : EditorWindow
                             candidate.localHierarchy == null ? candidate.sceneLabel : string.Join(" → ", candidate.localHierarchy.partToEntityRoot), EditorStyles.wordWrappedLabel);
                 }
             }
+            DrawSearchPreview(sceneChat);
         }
         var observation = source.LatestObservation;
         if (observation != null)
@@ -159,5 +177,85 @@ public sealed class NevaSceneVisionWindow : EditorWindow
             requestStatus = value.HasImage ? "本次预览采集完成。" : value.Reason;
             Repaint();
         });
+    }
+
+    private void RefreshDiagnostics()
+    {
+        if (diagnosticsSource == source && EditorApplication.timeSinceStartup < nextDiagnostics) return;
+        diagnosticsSource = source; nextDiagnostics = EditorApplication.timeSinceStartup + 1;
+        var chat = source != null ? source.GetComponent<ChatSample>() : null;
+        diagnostics = chat != null ? JObject.Parse(chat.GetSceneVisibleCatalogDiagnosticsJson()) : null;
+    }
+
+    private void DrawObservationCatalog()
+    {
+        if (diagnostics == null) return;
+        EditorGUILayout.Space();
+        EditorGUILayout.HelpBox("目录来自普通对话、自主观察或搜索实际采集的图；编号仅对应当页候选。Unity 名称是作者线索，模型描述和目标核对另行记录。每秒预览只刷新 RGB，不调用模型。", MessageType.None);
+        bool current = (bool?)diagnostics["currentViewUsable"] == true;
+        showCatalog = EditorGUILayout.Foldout(showCatalog,
+            "当前观察目录（" + (current ? diagnostics["currentCatalogCandidates"] + " 个候选" : "暂无新鲜有效图") + "）", true);
+        if (showCatalog && current)
+        {
+            EditorGUILayout.LabelField("采集 UTC", (string)diagnostics["currentCapturedAtUtc"], EditorStyles.wordWrappedLabel);
+            EditorGUILayout.SelectableLabel((string)diagnostics["currentCaptureId"], GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            foreach (JObject item in (JArray)diagnostics["currentObjects"]) DrawObservedObject(item);
+        }
+        var memory = (JArray)diagnostics["retainedObjects"];
+        showMemory = EditorGUILayout.Foldout(showMemory, "保留的观察记忆（" + memory.Count + "；含当前已见物件）", true);
+        if (showMemory) foreach (JObject item in memory) DrawObservedObject(item);
+    }
+
+    private static void DrawObservedObject(JObject item)
+    {
+        var authored = item["authoredHint"] as JObject;
+        string label = (string)authored?["sceneLabel"];
+        if (string.IsNullOrEmpty(label)) label = (string)authored?["entityRootName"];
+        if (string.IsNullOrEmpty(label)) label = (string)authored?["rendererName"];
+        EditorGUILayout.LabelField(label ?? "未命名可见物件", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Unity 作者线索", authored == null ? "无" :
+            (string)authored["rendererName"] + " / " + (string)authored["entityRootName"], EditorStyles.wordWrappedLabel);
+        EditorGUILayout.SelectableLabel((string)item["entityId"], GUILayout.Height(EditorGUIUtility.singleLineHeight));
+        EditorGUILayout.LabelField("记录层级", (string)item["semanticStatus"], EditorStyles.wordWrappedLabel);
+        EditorGUILayout.LabelField("图中可见 / 冻结点有效", item["visibleInCurrentCapture"] + " / " + item["positionMemoryValid"]);
+        EditorGUILayout.LabelField("观察 UTC", (string)item["capturedAtUtc"], EditorStyles.wordWrappedLabel);
+        EditorGUILayout.SelectableLabel((string)item["sourceCaptureId"], GUILayout.Height(EditorGUIUtility.singleLineHeight));
+        EditorGUILayout.LabelField("捕获时表面点", item["pointAtCapture"]?.ToString(Newtonsoft.Json.Formatting.None), EditorStyles.wordWrappedLabel);
+        if (item["directionFromCurrentPose"] is JObject bearing)
+        {
+            var gaze = bearing["relativeToCurrentView"] as JObject;
+            var body = bearing["relativeToCurrentBody"] as JObject;
+            EditorGUILayout.LabelField("相对视线 / 身体转角（右为正）", gaze?["yawDegreesRight"] + "° / " + body?["yawDegrees"] + "°", EditorStyles.wordWrappedLabel);
+        }
+        if (!string.IsNullOrEmpty((string)item["modelDescription"]))
+            EditorGUILayout.LabelField("模型描述（未核对）", (string)item["modelDescription"], EditorStyles.wordWrappedLabel);
+        if (!string.IsNullOrEmpty((string)item["matchedOriginalTarget"]))
+        {
+            EditorGUILayout.LabelField("核对过的目标原文", (string)item["matchedOriginalTarget"], EditorStyles.wordWrappedLabel);
+            EditorGUILayout.LabelField("核对图", (string)item["targetMatchCaptureId"], EditorStyles.wordWrappedLabel);
+        }
+    }
+
+    private void DrawSearchPreview(ChatSample chat)
+    {
+        var next = chat.LastSceneSearchCandidateView;
+        if (!ReferenceEquals(searchView, next))
+        {
+            if (searchTexture != null) DestroyImmediate(searchTexture);
+            searchTexture = null; searchView = next;
+            if (next != null)
+            {
+                searchTexture = new Texture2D(2, 2);
+                searchTexture.LoadImage(System.Convert.FromBase64String(next.ImageDataUrl.Substring(next.ImageDataUrl.IndexOf(',') + 1)));
+            }
+        }
+        if (searchTexture == null) return;
+        showSearch = EditorGUILayout.Foldout(showSearch, "最近搜索图（历史快照 / " + chat.LastSceneSearchPreviewPurpose + "）", true);
+        if (!showSearch) return;
+        EditorGUILayout.LabelField(searchView.CapturedAtUtc, EditorStyles.wordWrappedLabel);
+        EditorGUILayout.SelectableLabel(searchView.CaptureId, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+        EditorGUILayout.HelpBox("分页沿用同一张 RGB；换页不代表转头或新观察。编号只是该图候选，核对阶段也不等于核对成功。", MessageType.None);
+        float width = Mathf.Max(240, position.width - 28);
+        EditorGUI.DrawPreviewTexture(GUILayoutUtility.GetRect(width, width * searchTexture.height / searchTexture.width), searchTexture, null, ScaleMode.ScaleToFit);
     }
 }

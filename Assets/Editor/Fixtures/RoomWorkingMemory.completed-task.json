@@ -1,0 +1,356 @@
+{
+  "goalId": "device-goal-68ad5c938e744dd98d17030c54fd863c",
+  "status": "satisfied",
+  "ownerCurrent": true,
+  "reason": "same-target-fresh-device-readback-matches-request",
+  "executionCurrent": true,
+  "executionSuspended": false,
+  "executionRevision": 3,
+  "latestUserText": "还记得你刚才看到的东西吗？电视机柜上有一个呃小灯，你去把它关掉。",
+  "userUpdates": [],
+  "workEpoch": 4,
+  "userTurn": 4,
+  "formalGeneration": 11,
+  "visionEpoch": 6,
+  "originalRequest": "还记得你刚才看到的东西吗？电视机柜上有一个呃小灯，你去把它关掉。",
+  "requestQuote": "电视机柜上有一个呃小灯，你去把它关掉。",
+  "targetDescription": "还记得你刚才看到的东西吗？电视机柜上有一个呃小灯，你去把它关掉。",
+  "desiredState": "off",
+  "boundEntityId": "scene-object-a636106f8b4749b5b1ead887006e1f48",
+  "targetDescriptionSource": "original-user-request; proposal visual guesses are not established identity",
+  "referenceContext": {
+    "quotedDialogue": [
+      {
+        "role": "assistant",
+        "quotedText": "正面にはテレビと棚が見えるわ。テレビにはデスクトップ画面が映っているみたいね。でも、ユウの姿は直接見えていないわ。",
+        "textTruncated": false
+      },
+      {
+        "role": "user",
+        "quotedText": "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.66] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.37; 语言:zh; 音域:A2～A5; 音高稳定度:0.57; 旋律:A5-F5-A#2-B2-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 来我身边。",
+        "textTruncated": false
+      },
+      {
+        "role": "assistant",
+        "quotedText": "あなたのそばまで来たわ。",
+        "textTruncated": false
+      },
+      {
+        "role": "user",
+        "quotedText": "声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":2.7300000190734865,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"还记得你刚才看到的东西吗？\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"还记得你刚才看到的东西吗？电视机。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.0,\"end_seconds\":3.130000114440918}]}\r\n{\"id\":2,\"start_seconds\":2.7300000190734865,\"end_seconds\":4.869999885559082,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"机柜上有一个。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"电视机柜上有一个呃。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":2.3299999237060549,\"end_seconds\":5.269999980926514},{\"source\":\"recovery_context\",\"text\":\"机柜上有一个呃小灯，你去把它关掉。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":2.7300000190734865,\"end_seconds\":7.380000114440918}]}\r\n{\"id\":3,\"start_seconds\":4.869999885559082,\"end_seconds\":7.380000114440918,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"呃，小灯你去把它关掉。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\r\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"还记得你刚才看到的东西吗？电视机柜上有一个呃小灯，你去把它关掉。\"}]",
+        "textTruncated": true
+      }
+    ],
+    "scope": "Frozen recent dialogue quotations for resolving descriptive references only. They do not verify an entity, visibility, position, state, or completion. The complete current/original user request is the sole new operation authority. Recheck the same description in real observations; multiple matching objects remain unresolved. No subsequent dialogue may silently change this snapshot."
+  },
+  "confirmedTarget": {
+    "entityId": "scene-object-a636106f8b4749b5b1ead887006e1f48",
+    "sceneLabel": "桌面装饰灯",
+    "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-6cc1fd28980c4cd79d9b5cf59aceb568",
+    "observedUtc": "2026-10-09T16:53:47.4120352Z",
+    "scope": "Historical opaque entity independently matched to the original user request. The scene label describes the registered entity; it does not replace the user's constraints or establish current visibility."
+  },
+  "referentKind": "unbound",
+  "referentSourceId": "none",
+  "createdUtc": "2026-10-09T16:53:04.0331914Z",
+  "completionPredicate": {
+    "kind": "same-semantically-matched-entity-current-registered-device-readback",
+    "entityId": "scene-object-a636106f8b4749b5b1ead887006e1f48",
+    "desiredState": "off",
+    "requiresCurrentOpaqueReobservation": true,
+    "requiresFreshReadback": true,
+    "substepCompletionDoesNotSatisfyGoal": true
+  },
+  "completionEvidence": {
+    "actionId": "7ddbaaf862004bcea745d03761078452:11:7",
+    "entityId": "scene-object-a636106f8b4749b5b1ead887006e1f48",
+    "resultCaptureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-267c8dd79cbb4077894f5b65aa75749e",
+    "observedUtc": "2026-10-09T16:53:47.9211977Z",
+    "readAtUtc": "2026-10-09T16:53:48.0158277Z",
+    "actual": {
+      "entityId": "scene-object-a636106f8b4749b5b1ead887006e1f48",
+      "sceneLabel": "桌面装饰灯",
+      "lightState": "disabled",
+      "emissionState": "off",
+      "conflict": "",
+      "registered": true,
+      "on": false,
+      "lightEnabled": false,
+      "emissionEnabled": false,
+      "bakedLightingResidualUncontrolled": true,
+      "emissionColor": {
+        "r": 0.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "lightIntensity": 1.0,
+      "lightBakeType": "Baked",
+      "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+    },
+    "desiredState": "off",
+    "scope": "Same direct-target semantically matched entity, fresh opaque frame and registered runtime readback. Live read here only invalidates a changed saved readback; it cannot create new perception. This proves the requested device state, not room-wide darkness, visual brightness or physical touching."
+  },
+  "completionEvidenceValid": true,
+  "boundEntityMemory": {
+    "entityId": "scene-object-a636106f8b4749b5b1ead887006e1f48",
+    "sceneLabel": "桌面装饰灯",
+    "identitySource": "scene-authored",
+    "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-267c8dd79cbb4077894f5b65aa75749e",
+    "observedUtc": "2026-10-09T16:53:47.9211977Z",
+    "capturedAtRealtime": 154.616989,
+    "pointAtCapture": {
+      "x": -0.2981248,
+      "y": -0.07890856,
+      "z": -4.77439
+    },
+    "cameraPositionAtCapture": {
+      "x": -1.350838,
+      "y": 0.717983,
+      "z": -6.065724
+    },
+    "cameraRotationAtCapture": {
+      "x": -0.198590145,
+      "y": -0.332905233,
+      "z": 0.0897619054,
+      "w": -0.917431235
+    },
+    "bodyPositionAtCapture": {
+      "x": -1.35713077,
+      "y": -0.72,
+      "z": -6.064464
+    },
+    "bodyRotationAtCapture": {
+      "x": 0.0,
+      "y": -0.3360345,
+      "z": 0.0,
+      "w": -0.9418497
+    },
+    "viewDirectionWorldAtCapture": {
+      "x": 0.57518363,
+      "y": -0.42415002,
+      "z": 0.6994721
+    },
+    "capabilities": [
+      "inspect-object",
+      "look-at",
+      "set-object-state:on|off"
+    ],
+    "samplePurpose": "selected-object-observation",
+    "rootPositionAtCapture": {
+      "x": -0.251999855,
+      "y": -0.008000851,
+      "z": -4.71600246
+    },
+    "rootRotationAtCapture": {
+      "x": -0.707106948,
+      "y": 0.0,
+      "z": 0.0,
+      "w": 0.7071068
+    },
+    "rootScaleAtCapture": {
+      "x": 0.06,
+      "y": 0.0600000359,
+      "z": 0.0600000359
+    },
+    "scope": "Previously confirmed opaque pixels and their exact capture-time geometry/view. Root snapshot is recorded only while captured renderer geometry still matches. Historical location is a search hint, never current visibility, a navigation destination, device state or action permission.",
+    "historical": true,
+    "positionMemoryValid": true,
+    "positionInvalidReason": null,
+    "requiresReobservation": true,
+    "actionAuthorization": false,
+    "currentVisibility": "not-established"
+  },
+  "searchProgress": {
+    "completedSteps": [
+      {
+        "actionId": "7ddbaaf862004bcea745d03761078452:8:4",
+        "intent": "turn-in-place",
+        "phase": "observed",
+        "reason": "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents",
+        "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-fccf73a5b56942eb9155892234ddf5fc-25efdbf671594f05951db921a6771af9",
+        "entityId": null,
+        "targetPurpose": null,
+        "observedUtc": "2026-10-09T16:53:15.0359372Z",
+        "actualRoot": {
+          "x": -2.22536016,
+          "y": -0.72,
+          "z": -7.14316273
+        },
+        "actualViewChangeDegrees": 129.698578,
+        "mainGoalSatisfied": false
+      },
+      {
+        "actionId": "7ddbaaf862004bcea745d03761078452:11:6",
+        "intent": "approach-object",
+        "phase": "arrived",
+        "reason": "actual nearby floor station and facing reached; the same entity is visible in a new arrival image; no touching or device operation",
+        "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-503e3c91b10445338e7565f87a3d8c17",
+        "entityId": "scene-object-a636106f8b4749b5b1ead887006e1f48",
+        "targetPurpose": "direct-target",
+        "observedUtc": "2026-10-09T16:53:43.8958583Z",
+        "actualRoot": {
+          "x": -1.35713077,
+          "y": -0.72,
+          "z": -6.064464
+        },
+        "actualViewChangeDegrees": 0.0,
+        "mainGoalSatisfied": false
+      },
+      {
+        "actionId": "7ddbaaf862004bcea745d03761078452:11:7",
+        "intent": "set-object-state",
+        "phase": "performed",
+        "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+        "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-267c8dd79cbb4077894f5b65aa75749e",
+        "entityId": "scene-object-a636106f8b4749b5b1ead887006e1f48",
+        "targetPurpose": "direct-target",
+        "observedUtc": "2026-10-09T16:53:48.0173407Z",
+        "actualRoot": {
+          "x": -1.35713077,
+          "y": -0.72,
+          "z": -6.064464
+        },
+        "actualViewChangeDegrees": 0.0,
+        "mainGoalSatisfied": true
+      }
+    ],
+    "stepCount": 3,
+    "observedViews": [
+      {
+        "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-cbf2f5ee27c246bfab8eb6c011c195fa",
+        "capturedAtUtc": "2026-10-09T16:53:42.7770019Z",
+        "capturedAtRealtime": 149.472626,
+        "cameraPosition": {
+          "x": -1.4397831,
+          "y": 0.7032151,
+          "z": -6.1331234
+        },
+        "viewDirectionWorld": {
+          "x": 0.610881448,
+          "y": -0.391259044,
+          "z": 0.6882883
+        },
+        "purpose": "scene-object-moving-focus",
+        "confirmedBoundEntityIds": [
+          "scene-object-a636106f8b4749b5b1ead887006e1f48"
+        ],
+        "notVisibleBoundEntityIds": [],
+        "historical": true,
+        "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+      },
+      {
+        "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-81310e0d56214d578ac7b7d705cdab71",
+        "capturedAtUtc": "2026-10-09T16:53:43.2899565Z",
+        "capturedAtRealtime": 149.9858,
+        "cameraPosition": {
+          "x": -1.39257908,
+          "y": 0.710747242,
+          "z": -6.084139
+        },
+        "viewDirectionWorld": {
+          "x": 0.6016204,
+          "y": -0.3485703,
+          "z": 0.718715549
+        },
+        "purpose": "scene-object-moving-focus",
+        "confirmedBoundEntityIds": [
+          "scene-object-a636106f8b4749b5b1ead887006e1f48"
+        ],
+        "notVisibleBoundEntityIds": [],
+        "historical": true,
+        "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+      },
+      {
+        "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-503e3c91b10445338e7565f87a3d8c17",
+        "capturedAtUtc": "2026-10-09T16:53:43.7995276Z",
+        "capturedAtRealtime": 150.495224,
+        "cameraPosition": {
+          "x": -1.36631155,
+          "y": 0.7236247,
+          "z": -6.08247328
+        },
+        "viewDirectionWorld": {
+          "x": 0.628501654,
+          "y": -0.0470298454,
+          "z": 0.776385367
+        },
+        "purpose": "scene-object-arrival-confirm",
+        "confirmedBoundEntityIds": [
+          "scene-object-a636106f8b4749b5b1ead887006e1f48"
+        ],
+        "notVisibleBoundEntityIds": [],
+        "historical": true,
+        "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+      },
+      {
+        "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-b71fe2d97b294e30972cfbd20a2e8fa1",
+        "capturedAtUtc": "2026-10-09T16:53:44.3135824Z",
+        "capturedAtRealtime": 151.009018,
+        "cameraPosition": {
+          "x": -1.37211215,
+          "y": 0.723667,
+          "z": -6.080164
+        },
+        "viewDirectionWorld": {
+          "x": 0.634972334,
+          "y": -0.0278818756,
+          "z": 0.7720318
+        },
+        "purpose": "device-task-current-step",
+        "confirmedBoundEntityIds": [
+          "scene-object-a636106f8b4749b5b1ead887006e1f48"
+        ],
+        "notVisibleBoundEntityIds": [],
+        "historical": true,
+        "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+      },
+      {
+        "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-6cc1fd28980c4cd79d9b5cf59aceb568",
+        "capturedAtUtc": "2026-10-09T16:53:47.4120352Z",
+        "capturedAtRealtime": 154.107788,
+        "cameraPosition": {
+          "x": -1.34912336,
+          "y": 0.718062639,
+          "z": -6.06722641
+        },
+        "viewDirectionWorld": {
+          "x": 0.5725235,
+          "y": -0.415195,
+          "z": 0.7069868
+        },
+        "purpose": "scene-object-confirm",
+        "confirmedBoundEntityIds": [
+          "scene-object-a636106f8b4749b5b1ead887006e1f48"
+        ],
+        "notVisibleBoundEntityIds": [],
+        "historical": true,
+        "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+      },
+      {
+        "captureId": "92f666be21a34f3d9e299c4c4cdf4e02-44a4701c853142e6a306cdfc06ef5050-267c8dd79cbb4077894f5b65aa75749e",
+        "capturedAtUtc": "2026-10-09T16:53:47.9211977Z",
+        "capturedAtRealtime": 154.616989,
+        "cameraPosition": {
+          "x": -1.350838,
+          "y": 0.717983,
+          "z": -6.065724
+        },
+        "viewDirectionWorld": {
+          "x": 0.57518363,
+          "y": -0.42415002,
+          "z": 0.6994721
+        },
+        "purpose": "scene-object-state-result",
+        "confirmedBoundEntityIds": [
+          "scene-object-a636106f8b4749b5b1ead887006e1f48"
+        ],
+        "notVisibleBoundEntityIds": [],
+        "historical": true,
+        "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+      }
+    ]
+  },
+  "failedCandidates": [],
+  "scope": "Independently reviewed current-user objective, bounded real action progress and per-capture failed candidates. Steps, arrival and historical sightings do not complete device state. Failures are not global exclusions or proof of absence. A reviewed engine-listed historical source may constrain the same entity; execution still needs direct-target semantic match and fresh opaque confirmation. Stored identity/position is never device action authority."
+}

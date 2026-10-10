@@ -1,0 +1,285 @@
+{
+  "scope": "Source-free operation-semantic review uses the exact production provider projection/schema/normalizer. Historical dialogue only explains references, does not authorize or bind an entity. One observed-session reconstruction and independently fixed multilingual/pronoun/negative/ambiguity controls; expected labels are sidecar-only. No visual matching or action success claimed.",
+  "cases": [
+    {
+      "id": "observed-oct09-off-request",
+      "input": "observed-oct09-off-request.input.json",
+      "expected": {
+        "verdict": "approved",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "Reconstructed from frozen Oct09 session: actual user LF20981 and played speech LF18747/18820/20537; proposal descriptor is controlled, not a byte-identical historical wire."
+      }
+    },
+    {
+      "id": "zh-recalled-light-no-dialogue",
+      "input": "zh-recalled-light-no-dialogue.input.json",
+      "expected": {
+        "verdict": "approved",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "en-reading-lamp",
+      "input": "en-reading-lamp.input.json",
+      "expected": {
+        "verdict": "approved",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "ja-recalled-fan",
+      "input": "ja-recalled-fan.input.json",
+      "expected": {
+        "verdict": "approved",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "zh-pronoun-grounded",
+      "input": "zh-pronoun-grounded.input.json",
+      "expected": {
+        "verdict": "approved",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "en-pronoun-grounded",
+      "input": "en-pronoun-grounded.input.json",
+      "expected": {
+        "verdict": "approved",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "zh-pronoun-unresolved",
+      "input": "zh-pronoun-unresolved.input.json",
+      "expected": {
+        "verdict": "uncertain",
+        "requestAssessment": "target-unclear",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "en-two-equal-lamps",
+      "input": "en-two-equal-lamps.input.json",
+      "expected": {
+        "verdict": "uncertain",
+        "requestAssessment": "target-unclear",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "en-two-dialogue-referents",
+      "input": "en-two-dialogue-referents.input.json",
+      "expected": {
+        "verdict": "uncertain",
+        "requestAssessment": "target-unclear",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "zh-observation-only",
+      "input": "zh-observation-only.input.json",
+      "expected": {
+        "verdict": "rejected",
+        "requestAssessment": "not-requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "ja-negated-operation",
+      "input": "ja-negated-operation.input.json",
+      "expected": {
+        "verdict": "rejected",
+        "requestAssessment": "not-requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "en-quoted-command",
+      "input": "en-quoted-command.input.json",
+      "expected": {
+        "verdict": "rejected",
+        "requestAssessment": "not-requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "en-wrong-state",
+      "input": "en-wrong-state.input.json",
+      "expected": {
+        "verdict": "rejected",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "en-wrong-target",
+      "input": "en-wrong-target.input.json",
+      "expected": {
+        "verdict": "rejected",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "assistant-suggestion-no-permission",
+      "input": "assistant-suggestion-no-permission.input.json",
+      "expected": {
+        "verdict": "rejected",
+        "requestAssessment": "not-requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "latest-negation-over-old-command",
+      "input": "latest-negation-over-old-command.input.json",
+      "expected": {
+        "verdict": "rejected",
+        "requestAssessment": "not-requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic control"
+      }
+    },
+    {
+      "id": "unrelated-source-new-lamp",
+      "input": "unrelated-source-new-lamp.input.json",
+      "expected": {
+        "verdict": "approved",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic boundary control; source rows are controlled fixtures, not actual Unity receipts"
+      }
+    },
+    {
+      "id": "unrelated-source-recalled-lamp",
+      "input": "unrelated-source-recalled-lamp.input.json",
+      "expected": {
+        "verdict": "approved",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic boundary control; source rows are controlled fixtures, not actual Unity receipts"
+      }
+    },
+    {
+      "id": "truncated-pronoun-context",
+      "input": "truncated-pronoun-context.input.json",
+      "expected": {
+        "verdict": "uncertain",
+        "requestAssessment": "target-unclear",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic boundary control; source rows are controlled fixtures, not actual Unity receipts"
+      }
+    },
+    {
+      "id": "truncated-but-self-contained",
+      "input": "truncated-but-self-contained.input.json",
+      "expected": {
+        "verdict": "approved",
+        "requestAssessment": "requested",
+        "relation": "new",
+        "referentKind": "unbound",
+        "referentSourceId": "none"
+      },
+      "provenance": {
+        "kind": "synthetic semantic boundary control; source rows are controlled fixtures, not actual Unity receipts"
+      }
+    }
+  ]
+}

@@ -14,6 +14,10 @@ public partial class ChatQW : LLM
     private UnityWebRequest m_ActiveStreamRequest;
     private int m_StreamRequestGeneration = 0;
 
+    [SerializeField, Min(1f)] private float m_StreamFirstPublicOutputSeconds = 30f;
+    [SerializeField, Min(1f)] private float m_StreamIdleSeconds = 15f;
+    [SerializeField, Min(1f)] private float m_StreamTotalSeconds = 90f;
+
     [SerializeField] private bool m_CompactSceneFactContext = true;
     private string CompactScenePromptContext(string context, bool log = false)
     {
@@ -158,7 +162,13 @@ public partial class ChatQW : LLM
         var facts = new StringBuilder();
         foreach (string line in text.ToString().Split('\n'))
             if (line.StartsWith("[Sing/Inventory]", StringComparison.Ordinal) ||
+                // The ring is only addressable while these lines survive into later rounds.
+                line.StartsWith("[Audio/Recent]", StringComparison.Ordinal) ||
+                line.StartsWith("[Audio/Capture]", StringComparison.Ordinal) ||
                 line.StartsWith("[Sing/Clip]", StringComparison.Ordinal) ||
+                // The collapsed low-signal candidates are only addressable while this one
+                // line survives; it is the whole reason they were folded rather than cut.
+                line.StartsWith("[Sing/ClipLowSignal]", StringComparison.Ordinal) ||
                 line.StartsWith("[Sing/LatestRecording]", StringComparison.Ordinal) ||
                 line.StartsWith("[Sing/PlaybackFact]", StringComparison.Ordinal) ||
                 line.StartsWith("[Sing/Execution]", StringComparison.Ordinal))
@@ -178,8 +188,34 @@ public partial class ChatQW : LLM
     private string BuildStageRequestJsonForMessages(List<SendData> messages, bool stream,
         string transientSystemContext, string executionFeedback, FormalResponseStage stage)
     {
+        if (stage == FormalResponseStage.SpatialGoalResult)
+            return BuildSpatialGoalResultRequestJsonForMessages(messages, stream, transientSystemContext, executionFeedback,
+                messages != null && messages.Count > 0 ? messages[messages.Count - 1]?.imageDataUrl : null);
         string skillContext = FormalResponseContextPolicy.SkillContext(stage, ActiveSkillContext, SkillCatalogContext);
         transientSystemContext = CompactScenePromptContext(transientSystemContext);
+        if (stage == FormalResponseStage.CommittedSpatialReply)
+            transientSystemContext = CommittedSpatialReplyProtocol.AddContract(transientSystemContext);
+        // 定位每轮重算的起点。实测 s16：prompt 38–43k，服务端每次仍要评估 26–31k
+        // (timings.prompt_n)，prefill 占 LLM 时间 65%，而 prefill 与重算量严格线性
+        // (约 6.3 token/ms)。哪一块最先变化决定了后面全部要重算——逐块记下顺序、
+        // token 估算与稳定哈希，跨请求比对第一个变化的块即可。只读，不改任何顺序。
+        List<string> promptTrace = m_LogRequestStats ? new List<string>() : null;
+        int promptTraceTokens = 0;
+        void TraceBlock(string label, SendData data)
+        {
+            if (promptTrace == null) return;
+            string body = data?.content ?? "";
+            uint hash = StableBlockHash(body);
+            string image = "";
+            if (data != null && !data.imageArchived && !string.IsNullOrEmpty(data.imageDataUrl))
+            {
+                image = "+img" + data.imageDataUrl.Length;
+                hash ^= StableBlockHash(data.imageDataUrl);
+            }
+            promptTraceTokens += EstimateTokens(body);
+            promptTrace.Add(label + "/" + (data?.role ?? "?") + " tok=" + EstimateTokens(body) +
+                " cum=" + promptTraceTokens + " h=" + hash.ToString("x8") + image);
+        }
         var sb = new StringBuilder(2048);
         sb.Append('{');
         sb.Append("\"model\":");
@@ -187,7 +223,10 @@ public partial class ChatQW : LLM
         sb.Append(",\"stream\":").Append(stream ? "true" : "false");
         if (stream) sb.Append(",\"stream_options\":{\"include_usage\":true}");
         //顶层 enable_thinking 给 DashScope 用；Local 后端会再注入 chat_template_kwargs(下方)
-        sb.Append(",\"enable_thinking\":").Append(m_EnableThinking ? "true" : "false");
+        bool stageThinking = stage != FormalResponseStage.CommittedSpatialReply && m_EnableThinking;
+        sb.Append(",\"enable_thinking\":").Append(stageThinking ? "true" : "false");
+        if (stage == FormalResponseStage.CommittedSpatialReply)
+            sb.Append(",\"max_tokens\":").Append(CommittedSpatialReplyProtocol.MaximumOutputTokens);
         sb.Append(",\"messages\":[");
         // 易变上下文(按需技能、记忆块)排在**最后一条用户消息之前**，而不是整个列表末尾。
         //
@@ -217,18 +256,23 @@ public partial class ChatQW : LLM
         // This compact stage/capability guide does not change with each observation.
         // Keep it directly after the existing leading persona/system prefix; dynamic
         // memories and exact current results still follow history before the last user.
-        int skillsAt = trailingAt;
-        if (stage == FormalResponseStage.CommittedSpatialReply || stage == FormalResponseStage.FirstReplyRouting)
-        {
-            skillsAt = 0;
-            while (skillsAt < messages.Count && (messages[skillsAt] == null || messages[skillsAt].role == "system")) skillsAt++;
-        }
+        // 技能规则是静态文本，原先排在最后一条 user 之前（trailingAt），于是 history 里
+        // 任何一处抖动都会把它和它后面的一切一起作废。实测 s17：General 请求可复用前缀
+        // 中位只有 14905（仅人格一块），每轮重算中位 28919 token，而 prefill 与重算量线性
+        // （6.13 token/ms）、占 LLM 时间 54%；同一场里已经走这条顺序的 FirstReplyRouting
+        // 可复用 16531、重算仅约 4000。把 skill 提到人格正后方，它就不再被 history 连累，
+        // 可复用下限从 14905 抬到约 21199。
+        // 只动这一处：trailing/transient 仍在最后一条 user 之前，用户的话仍是最后一条，
+        // 上面那条"易变上下文不能拼在整个列表末尾"的结论不受影响。
+        int skillsAt = 0;
+        while (skillsAt < messages.Count && (messages[skillsAt] == null || messages[skillsAt].role == "system")) skillsAt++;
         for (int i = 0; i < messages.Count; i++)
         {
             if (i == skillsAt && !string.IsNullOrEmpty(skillContext))
             {
                 if (sb[sb.Length - 1] != '[') sb.Append(',');
                 AppendMessage(sb, new SendData("system", skillContext));
+                TraceBlock("skill", new SendData("system", skillContext));
             }
             if (i == trailingAt)
             {
@@ -236,22 +280,26 @@ public partial class ChatQW : LLM
                 {
                     if (sb[sb.Length - 1] != '[') sb.Append(',');
                     AppendMessage(sb, new SendData("system", TrailingContext));
+                    TraceBlock("trailing", new SendData("system", TrailingContext));
                 }
                 if (!string.IsNullOrEmpty(transientSystemContext))
                 {
                     if (sb[sb.Length - 1] != '[') sb.Append(',');
                     AppendMessage(sb, new SendData("system", transientSystemContext));
+                    TraceBlock("transient", new SendData("system", transientSystemContext));
                 }
             }
             var msg = MessageForRequest(messages, i);
             if (msg == null) continue;
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, msg);
+            TraceBlock("history[" + i + "]", msg);
         }
         if (skillsAt >= messages.Count && !string.IsNullOrEmpty(skillContext))
         {
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, new SendData("system", skillContext));
+            TraceBlock("skill", new SendData("system", skillContext));
         }
         if (trailingAt >= messages.Count)
         {
@@ -259,11 +307,13 @@ public partial class ChatQW : LLM
             {
                 if (sb[sb.Length - 1] != '[') sb.Append(',');
                 AppendMessage(sb, new SendData("system", TrailingContext));
+                TraceBlock("trailing", new SendData("system", TrailingContext));
             }
             if (!string.IsNullOrEmpty(transientSystemContext))
             {
                 if (sb[sb.Length - 1] != '[') sb.Append(',');
                 AppendMessage(sb, new SendData("system", transientSystemContext));
+                TraceBlock("transient", new SendData("system", transientSystemContext));
             }
         }
         //已经出声的开场排在最后：用户的话仍是最后一条 user，它跟在后面，
@@ -274,6 +324,7 @@ public partial class ChatQW : LLM
         {
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, new SendData("assistant", SpokenPrefix));
+            TraceBlock("spokenPrefix", new SendData("assistant", SpokenPrefix));
         }
         // A tool result happened AFTER the recorded assistant action. Only this short
         // execution fact goes last; ordinary memory/contracts retain their old position.
@@ -282,17 +333,47 @@ public partial class ChatQW : LLM
         {
             if (sb[sb.Length - 1] != '[') sb.Append(',');
             AppendMessage(sb, new SendData("system", executionFeedback));
+            TraceBlock("execFeedback", new SendData("system", executionFeedback));
+        }
+        if (stage == FormalResponseStage.CommittedSpatialReply)
+        {
+            // Wire-only stage instruction; neither a human turn nor accepted
+            // history. It points back to the exact request and latest facts.
+            if (sb[sb.Length - 1] != '[') sb.Append(',');
+            var instruction = new SendData("user", BuildCommittedReplyWritingInstruction(messages, transientSystemContext));
+            AppendMessage(sb, instruction);
+            TraceBlock("spatialReplyInstruction", instruction);
         }
         sb.Append(']');
         if (m_Backend == BackendType.Local)
         {
             sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":")
-              .Append(m_EnableThinking ? "true" : "false")
+              .Append(stageThinking ? "true" : "false")
               .Append('}');
+            if (stage == FormalResponseStage.CommittedSpatialReply)
+            {
+                sb.Append(",\"grammar\":");
+                AppendJsonString(sb, CommittedSpatialReplyProtocol.OutputGrammar);
+            }
         }
         AppendSlot(sb, k_SlotMainConversation);
         sb.Append('}');
+        if (promptTrace != null)
+            Debug.Log("[LLM/PromptBlocks] stage=" + stage + " stream=" + stream +
+                " blocks=" + promptTrace.Count + " estTokens=" + promptTraceTokens +
+                "\n  " + string.Join("\n  ", promptTrace) +
+                "\n按提交顺序排列。跨请求比对：第一个 h= 变化的块就是重算起点，它的 cum= 约等于服务端" +
+                " promptEvaluatedTokens 之前能复用的量。估算值仅用于定位块边界，不是服务端真实分词。");
         return sb.ToString();
+    }
+
+    /// FNV-1a：进程间稳定，可跨会话比对；仅用于定位 prompt 块是否变化。
+    private static uint StableBlockHash(string value)
+    {
+        uint hash = 2166136261u;
+        if (value != null)
+            for (int i = 0; i < value.Length; i++) { hash ^= value[i]; hash *= 16777619u; }
+        return hash;
     }
 
     /// <summary>
@@ -1444,6 +1525,12 @@ public partial class ChatQW : LLM
     private void BeginStageSpeechRequest(string _msg, Action<string> _onDelta, Action<string> _onComplete,
         string imageDataUrl, bool recordAssistantHistory, Action<SpeechText> onSpeech, FormalResponseStage stage)
     {
+        if (stage == FormalResponseStage.SpatialGoalResult)
+        {
+            string resultContext = RequestContext; RequestContext = "";
+            BeginSpeechContinuation(resultContext, _onDelta, _onComplete, imageDataUrl, onSpeech, null, false, stage);
+            return;
+        }
         var transferredUser = ClaimFirstReplyUserHandoff();
         //Agent loop 的正式回复走这条流式路径，所以抢占预热必须放在这里——只加在
         //PostMsg/PostEphemeralMsg 上会漏掉它，实测首轮排在 14.82s 的预热后面，
@@ -1484,7 +1571,7 @@ public partial class ChatQW : LLM
             _onDelta,
             _onComplete,
             recordAssistantHistory,
-            AddSpeechOutputContract(context), onSpeech, null, null, stage));
+            AddStageSpeechOutputContract(context, stage), onSpeech, null, null, stage));
     }
 
     private SendData RegisterStageSpeechUser(SendData transferredUser, string message, string imageDataUrl)
@@ -1526,25 +1613,35 @@ public partial class ChatQW : LLM
         BeginSpeechContinuation(context, null, onComplete, imageDataUrl, onSpeech, feedback, recordAssistantHistory);
     }
 
+    public override void PostSpeechFeedbackStreamForStage(string context, string feedback, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl, bool recordAssistantHistory, FormalResponseStage stage)
+    {
+        BeginSpeechContinuation(context, null, onComplete, imageDataUrl, onSpeech, feedback, recordAssistantHistory, stage);
+    }
+
     private void BeginSpeechContinuation(string transientSystemContext, Action<string> _onDelta,
         Action<string> _onComplete, string imageDataUrl, Action<SpeechText> onSpeech, string executionFeedback = null,
-        bool recordAssistantHistory = true)
+        bool recordAssistantHistory = true, FormalResponseStage stage = FormalResponseStage.General)
     {
         AbortPrewarmIfRunning();
         CancelEphemeralMsg();
         CancelTurnBoundaryMsg();
         CancelActiveResponse();
         int generation = m_StreamRequestGeneration;
-        CheckHistory();
-        StartCoroutine(RequestStreamWithObservation(
+        if (stage != FormalResponseStage.SpatialGoalResult) CheckHistory();
+        StartCoroutine(RequestStageStreamWithObservation(
             "",
             generation,
             _onDelta,
             _onComplete,
             recordAssistantHistory,
-            AddSpeechOutputContract(transientSystemContext), onSpeech, executionFeedback,
-            imageDataUrl));
+            AddStageSpeechOutputContract(transientSystemContext, stage), onSpeech, executionFeedback,
+            imageDataUrl, stage));
     }
+
+    private static string AddStageSpeechOutputContract(string context, FormalResponseStage stage)
+        => stage == FormalResponseStage.SpatialGoalResult ? context :
+            stage == FormalResponseStage.CommittedSpatialReply ? CommittedSpatialReplyProtocol.AddContract(context) : AddSpeechOutputContract(context);
 
     private static string AddSpeechOutputContract(string context)
     {
@@ -1554,8 +1651,10 @@ public partial class ChatQW : LLM
 
     public override void CancelActiveResponse()
     {
+        CancelSceneSearchDecisionMessage();
         CancelRoomTaskMessage();
         CancelSceneObjectMatchMessage();
+        CancelRoomDeviceGoalReviewMessage();
         m_StreamRequestGeneration++;
         if (m_ActiveStreamRequest != null)
         {
@@ -2244,14 +2343,34 @@ public partial class ChatQW : LLM
         => RequestStreamWithObservation(_postWord, generation, _onDelta, _onComplete, recordAssistantHistory,
             transientSystemContext, onSpeech, executionFeedback, null);
 
+    private sealed class ObservationEnvelope : SendData
+    {
+        public ObservationEnvelope(string image) : base("user",
+            "[本轮场景观察] 结合本轮采集资料与待完成事项继续判断；此附件本身不构成新的用户发言。")
+        { imageDataUrl = image; }
+    }
+
+    private static string BuildCommittedReplyWritingInstruction(List<SendData> messages, string context)
+    {
+        var entry = messages?.FindLast(message => message != null && message.role == "user" && !(message is ObservationEnvelope));
+        string human = entry?.content;
+        if (!string.IsNullOrEmpty(human) && human.StartsWith("[感知帧", StringComparison.Ordinal))
+        {
+            int marker = human.IndexOf(k_FrameUserMarker, StringComparison.Ordinal);
+            // A program-only frame ends this selection; never walk back to an
+            // older imperative and mislabel it as this autonomous turn's input.
+            human = marker < 0 ? null : human.Substring(marker + k_FrameUserMarker.Length);
+        }
+        return CommittedSpatialReplyProtocol.BuildFinalWritingInstruction(human, context);
+    }
+
     private static List<SendData> CreateObservationRequestHistory(List<SendData> history, string imageDataUrl)
     {
         if (string.IsNullOrEmpty(imageDataUrl)) return history;
         // Only the wire receives this observation envelope. The accepted history uses
         // the original list, so the image cannot become a synthetic new user turn.
         var selected = new List<SendData>(history);
-        selected.Add(new SendData("user", "[本轮场景观察] 结合本轮采集资料与待完成事项继续判断；此附件本身不构成新的用户发言。")
-            { imageDataUrl = imageDataUrl });
+        selected.Add(new ObservationEnvelope(imageDataUrl));
         return selected;
     }
 
@@ -2267,6 +2386,9 @@ public partial class ChatQW : LLM
         FormalResponseStage stage)
     {
         if (generation != m_StreamRequestGeneration) yield break;
+        bool compactResult = stage == FormalResponseStage.SpatialGoalResult;
+        bool committedReply = stage == FormalResponseStage.CommittedSpatialReply;
+        bool closedPublicReply = compactResult || committedReply;
         // Continuation callbacks may immediately start another request. Keep this
         // span local so that their stopwatch cannot erase the current duration.
         var requestClock = System.Diagnostics.Stopwatch.StartNew();
@@ -2274,6 +2396,7 @@ public partial class ChatQW : LLM
             string.IsNullOrEmpty(executionFeedback) ? "formal" : "work-feedback");
         double? firstContentSeconds = null, firstSpeechSeconds = null;
         int firstSpeechCharacters = 0;
+        int requestThinkStripState = 0, requestThinkBufferCharacters = 0;
         var publicReceipt = new PublicSpeechStreamReceipt();
         ResetThinkStrip();
 
@@ -2291,15 +2414,25 @@ public partial class ChatQW : LLM
                 publicReceipt.Record(part.Text, part.ActionDependency);
             }
         }, RoleOutputBoundaryPolicy.ExplicitPublicSayWithActions);
+        // The strict result writers are decoded only after full validation. Keep a
+        // separate diagnostic parser with no public callback so malformed thought
+        // output remains observable without leaking an inner say or valid prefix.
+        var progressChannels = closedPublicReply
+            ? new RoleOutputChannels(null, RoleOutputBoundaryPolicy.ExplicitPublicSayWithActions) : channels;
 
-        PruneOldImagesInPlace(m_DataList, m_KeepRecentImages);
-        transientSystemContext = CompactScenePromptContext(transientSystemContext, true);
+        if (!compactResult) PruneOldImagesInPlace(m_DataList, m_KeepRecentImages);
+        if (!compactResult) transientSystemContext = CompactScenePromptContext(transientSystemContext, true);
+        if (committedReply) transientSystemContext = CommittedSpatialReplyProtocol.AddContract(transientSystemContext);
         string budgetContext = string.IsNullOrWhiteSpace(executionFeedback) ? transientSystemContext
             : (transientSystemContext ?? "") + "\n\n" + executionFeedback;
+        if (committedReply)
+        {
+            budgetContext = (budgetContext ?? "") + "\n\n" + BuildCommittedReplyWritingInstruction(m_DataList, transientSystemContext);
+        }
         string skillContext = FormalResponseContextPolicy.SkillContext(stage, ActiveSkillContext, SkillCatalogContext);
-        List<SendData> requestHistory = CreateStageRequestHistory(budgetContext, imageDataUrl, skillContext);
+        List<SendData> requestHistory = compactResult ? new List<SendData>() : CreateStageRequestHistory(budgetContext, imageDataUrl, skillContext);
         List<SendData> wireHistory = CreateObservationRequestHistory(requestHistory, imageDataUrl);
-        int rawEstimate = EstimateStageRequestTokens(wireHistory, budgetContext, skillContext);
+        int rawEstimate = compactResult ? SpatialGoalResultContextPolicy.EstimateTextTokens(budgetContext) : EstimateStageRequestTokens(wireHistory, budgetContext, skillContext);
         int imageAllowance = ImageTokenAllowance(wireHistory);
         bool hasImages = wireHistory.Exists(m => m != null && !m.imageArchived &&
             !string.IsNullOrEmpty(m.imageDataUrl));
@@ -2307,7 +2440,15 @@ public partial class ChatQW : LLM
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
             m_ActiveStreamRequest = request;
-            string _jsonText = BuildStageRequestJsonForMessages(wireHistory, true, transientSystemContext, executionFeedback, stage);
+            string _jsonText = compactResult
+                ? BuildSpatialGoalResultRequestJsonForMessages(null, true, transientSystemContext, executionFeedback, imageDataUrl)
+                : BuildStageRequestJsonForMessages(wireHistory, true, transientSystemContext, executionFeedback, stage);
+            if (string.IsNullOrEmpty(_jsonText))
+            {
+                if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null;
+                Debug.LogWarning($"[LLM/SpatialGoalResult] generation={generation} rejected=invalid-context-or-text-budget budget={SpatialGoalResultContextPolicy.TextTokenEstimateBudget} noHttp=true");
+                _onComplete?.Invoke(""); yield break;
+            }
             if (m_LogRequestStats && stage != FormalResponseStage.General)
                 Debug.Log($"[LLM/ContextStage] generation={generation} stage={stage} skillTokens={EstimateTokens(ActiveSkillContext)}→{EstimateTokens(skillContext)} currentUserAndFactsPreserved=true");
             RaiseRequestDiagnostic(_jsonText);
@@ -2320,7 +2461,12 @@ public partial class ChatQW : LLM
                 if (generation != m_StreamRequestGeneration) return;
                 if (!firstContentSeconds.HasValue) firstContentSeconds = requestClock.Elapsed.TotalSeconds;
                 wireTiming.MarkContent(requestClock.Elapsed.TotalSeconds);
+                // Strict result candidates are all-or-nothing envelopes. A normal
+                // HTTP finish does not make an unclosed thought or tool tail public.
+                if (closedPublicReply) { progressChannels.Push(delta); return; }
                 string clean = StripLeadingThinkBlock(delta);
+                requestThinkStripState = m_ThinkStripState;
+                requestThinkBufferCharacters = m_ThinkStripBuffer.Length;
                 if (clean.Length == 0) return;
                 string spoken = channels.Push(clean);
                 if (generation != m_StreamRequestGeneration) return;
@@ -2341,7 +2487,37 @@ public partial class ChatQW : LLM
             wireTiming.MarkSent(requestClock.Elapsed.TotalSeconds, Time.realtimeSinceStartupAsDouble, DateTime.UtcNow.ToString("O"));
             var sendOperation = request.SendWebRequest();
             if (m_LogRequestStats) Debug.Log("[LLM/HttpTiming] " + wireTiming.Snapshot("sent", null, null).ToString(Newtonsoft.Json.Formatting.None));
-            yield return sendOperation;
+            string deadlineReason = null;
+            double nextProgressLog = 10;
+            void LogProgress(string state)
+            {
+                Debug.Log("[LLM/StreamProgress] " + new Newtonsoft.Json.Linq.JObject {
+                    ["state"] = state, ["stage"] = stage.ToString(),
+                    ["http"] = wireTiming.Snapshot(state, request.responseCode, request.result.ToString()),
+                    ["wire"] = handler.ProgressSnapshot(), ["channels"] = progressChannels.ProgressSnapshot(),
+                    ["thinkStripState"] = requestThinkStripState, ["thinkBufferCharacters"] = requestThinkBufferCharacters,
+                    ["finishReason"] = handler.FinishReason,
+                    ["candidateSpeechOnly"] = true, ["deferredPublicEnvelope"] = closedPublicReply
+                }.ToString(Newtonsoft.Json.Formatting.None));
+            }
+            double firstPublicLimit = Math.Max(0.1, m_StreamFirstPublicOutputSeconds);
+            double idleLimit = Math.Max(0.1, m_StreamIdleSeconds);
+            double totalLimit = Math.Max(0.1, m_StreamTotalSeconds);
+            if (stage == FormalResponseStage.CommittedSpatialReply || compactResult)
+                totalLimit = Math.Min(totalLimit, firstPublicLimit);
+            // A heartbeat/HTTP 200 is not a usable reply. Check progress each frame,
+            // including after the first content bytes; yield-return-operation had no bound.
+            while (!sendOperation.isDone && generation == m_StreamRequestGeneration)
+            {
+                deadlineReason = FormalStreamProgress.Deadline(handler.Progress.Seconds,
+                    handler.Progress.LastDeltaSeconds,
+                    firstSpeechSeconds.HasValue || channels.ExplicitlySilent || channels.HasActions,
+                    firstPublicLimit, idleLimit, totalLimit);
+                if (deadlineReason != null) { request.Abort(); break; }
+                if (handler.Progress.Seconds >= nextProgressLog)
+                { LogProgress("pending"); nextProgressLog += 15; }
+                yield return null;
+            }
             wireTiming.MarkComplete(requestClock.Elapsed.TotalSeconds);
             if (m_LogRequestStats) Debug.Log("[LLM/HttpTiming] " + wireTiming.Snapshot(
                 generation == m_StreamRequestGeneration ? "completed" : "superseded", request.responseCode,
@@ -2351,17 +2527,62 @@ public partial class ChatQW : LLM
             //正常过期请求：不报错、不写 assistant 历史，也不触发任何旧回调。
             if (generation != m_StreamRequestGeneration)
             {
+                LogProgress("superseded");
                 if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null;
                 yield break;
             }
 
             if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null;
 
+            if (deadlineReason != null)
+            {
+                LogProgress(deadlineReason);
+                // Only a complete response can authorize actions/history. The speech
+                // guard also discards any buffered candidate prefix on this event.
+                m_DataList.Add(new SendData("system", "[response_generation_failure] reason=" + deadlineReason +
+                    "; stage=" + stage + "; 本次回复生成超过等待上限，未取得完整可交付结果；不能据此推断用户表达不清，" +
+                    "也不能编造角色行为原因。先前动作是否已执行仍以各自回执为准，不能因本次回复失败重复动作或宣称动作失败。" +
+                    publicReceipt.Describe()));
+                RaiseResponseGenerationFailure(deadlineReason);
+                if (generation != m_StreamRequestGeneration) yield break;
+                RaiseSystemNotice(new SystemNotice("llm_response_deadline", SystemNoticeSeverity.Error,
+                    "角色回复生成超时，已停止等待。", deadlineReason, "ChatQW", true));
+                if (generation == m_StreamRequestGeneration) _onComplete?.Invoke("");
+                yield break;
+            }
+
+            if (!firstSpeechSeconds.HasValue || request.result != UnityWebRequest.Result.Success)
+                LogProgress("completed");
+
             if (request.responseCode == 200 && request.result == UnityWebRequest.Result.Success)
             {
-                ObservePromptUsage(handler.PromptTokens,
+                if (!compactResult) ObservePromptUsage(handler.PromptTokens,
                     rawEstimate - imageAllowance, hasImages);
                 string rawContent = handler.GetFullContent();
+                if (closedPublicReply)
+                {
+                    string resultReason = "incomplete-result", normalized = null;
+                    bool stopped = handler.FinishReason == "stop";
+                    bool validResult = stopped && (compactResult
+                        ? SpatialGoalResultContextPolicy.TryValidateOutput(rawContent, out normalized, out resultReason)
+                        : CommittedSpatialReplyProtocol.TryValidateOutput(rawContent, out normalized, out resultReason));
+                    Debug.Log($"[LLM/ClosedPublicReply] generation={generation} stage={stage} accepted={validResult} reason={resultReason} finish={handler.FinishReason} characters={rawContent.Length}");
+                    if (!validResult)
+                    {
+                        RaiseRawResponse(rawContent);
+                        if (generation != m_StreamRequestGeneration) yield break;
+                        if (!stopped) ReportRoleOutputCompletion(handler.FinishReason);
+                        else RaiseSystemNotice(new SystemNotice("llm_output_invalid", SystemNoticeSeverity.Error,
+                            "角色本次回复格式无效，未交付台词或动作。", resultReason, "ChatQW", true));
+                        if (generation != m_StreamRequestGeneration) yield break;
+                        RaiseResponseGenerationFailure("incomplete-output");
+                        if (generation == m_StreamRequestGeneration) _onComplete?.Invoke("");
+                        yield break;
+                    }
+                    channels.Push(normalized);
+                    if (generation != m_StreamRequestGeneration) yield break;
+                    rawContent = normalized;
+                }
                 string lastSpoken = channels.Finish();
                 if (generation != m_StreamRequestGeneration) yield break;
                 if (channels.HasInvalidLanguage || channels.HasUndeclaredSpeech)
@@ -2376,23 +2597,26 @@ public partial class ChatQW : LLM
                 if (generation != m_StreamRequestGeneration) yield break;
                 string full = StripLeadingThinkBlock(rawContent, true);
                 var completedChannels = RoleOutputChannels.Parse(full, RoleOutputBoundaryPolicy.ExplicitPublicSayWithActions);
-                bool hasContent = ProjectFormalCompletion(full, completedChannels, true).Length > 0;
-                string merged = MergeSpokenPrefix(hasContent ? full : "");
-                if (hasContent) CommitRequestHistory(requestHistory);
-                if (recordAssistantHistory && !string.IsNullOrWhiteSpace(merged))
+                bool fullyFinished = handler.FinishReason == "stop";
+                bool hasContent = fullyFinished && ProjectFormalCompletion(full, completedChannels, true).Length > 0;
+                string merged = compactResult ? (hasContent ? full : "") : MergeSpokenPrefix(hasContent ? full : "");
+                if (!compactResult && hasContent) CommitRequestHistory(requestHistory);
+                if (!compactResult && recordAssistantHistory && !string.IsNullOrWhiteSpace(merged))
                     m_DataList.Add(new SendData("assistant", merged));
                 Debug.Log($"[LLM/Channels] speech={completedChannels.Speech.Length} private={completedChannels.PrivateCharacters} actions={completedChannels.HasActions}");
                 bool complete = ReportRoleOutputCompletion(handler.FinishReason);
                 if (generation != m_StreamRequestGeneration) yield break;
+                if (!complete) RaiseResponseGenerationFailure("incomplete-output");
+                if (generation != m_StreamRequestGeneration) yield break;
                 ReportRoleOutputFormatFactsWithReceipt(completedChannels, complete, publicReceipt);
                 if (generation != m_StreamRequestGeneration) yield break;
-                string executable = ProjectFormalCompletion(full, completedChannels, complete);
+                string executable = complete ? ProjectFormalCompletion(full, completedChannels, true) : "";
                 if (m_LogRequestStats)
                     Debug.Log("[LLM/Performance] " + new Newtonsoft.Json.Linq.JObject {
                         ["requestGeneration"] = generation,
                         ["requestKind"] = string.IsNullOrEmpty(executionFeedback) ? "formal" : "work-feedback",
                         ["backend"] = m_Backend.ToString(),
-                        ["slot"] = m_Backend == BackendType.Local ? (int?)k_SlotMainConversation : null,
+                        ["slot"] = m_Backend == BackendType.Local ? (int?)(compactResult ? k_SlotAuxiliary : k_SlotMainConversation) : null,
                         ["requestSeconds"] = requestClock.Elapsed.TotalSeconds,
                         ["firstWireContentSeconds"] = firstContentSeconds,
                         ["firstSpeechDeltaSeconds"] = firstSpeechSeconds,
@@ -2406,17 +2630,18 @@ public partial class ChatQW : LLM
             }
             else
             {
-                //出错时把请求体结构打出来(base64 替换成长度占位)，方便对比 server 报错
-                string bodyDigest = SummarizeRequestBody(_jsonText);
-                //流式 handler 不保留错误正文，所以 400 时永远是"(空)"——8/22 为此
-                //绕了一整轮才从 llama-server 日志里找到"exceeds the available context"。
-                //把估算的 prompt 大小直接打出来：400 基本只有超长这一种原因。
-                Debug.LogError("Qwen流式失败: code=" + request.responseCode
-                    + " err=" + request.error
-                    + " / 本次请求prompt约" + rawEstimate + "token(未校准估算；预算"
-                    + m_MaxPromptTokens + ")"
-                    + " / 响应体: " + (string.IsNullOrEmpty(request.downloadHandler.text) ? "(空)" : request.downloadHandler.text)
-                    + " / 请求体摘要: " + bodyDigest);
+                // HTTP 400 alone does not identify context overflow. Keep a bounded,
+                // redacted error envelope, never the full request or a partial SSE answer.
+                Debug.LogError("[LLM/StreamHttpFailure] " + new Newtonsoft.Json.Linq.JObject {
+                    ["generation"] = generation, ["stage"] = stage.ToString(),
+                    ["error"] = BuildRoomTaskHttpFailure(request.responseCode,
+                        request.responseCode == 200 ? "" : handler.GetErrorBody(), request.error),
+                    ["request"] = BuildRoomTaskRequestDiagnostic(_jsonText)
+                }.ToString(Newtonsoft.Json.Formatting.None));
+                m_DataList.Add(new SendData("system", "[response_generation_failure] reason=http-failure; " +
+                    "本次回复生成请求未正常完成，不是用户表达不清。先前动作仍按实际回执说明，不能重复动作或编造分心原因。" + publicReceipt.Describe()));
+                RaiseResponseGenerationFailure("http-failure");
+                if (generation != m_StreamRequestGeneration) yield break;
                 RaiseSystemNotice(new SystemNotice(
                     "llm_response_failed",
                     SystemNoticeSeverity.Error,
@@ -2424,7 +2649,7 @@ public partial class ChatQW : LLM
                     "HTTP " + request.responseCode + ": " + (request.error ?? "unknown error"),
                     "ChatQW",
                     true));
-                if (_onComplete != null) _onComplete("");
+                if (generation == m_StreamRequestGeneration) _onComplete?.Invoke("");
             }
 
             requestClock.Stop();
@@ -2707,10 +2932,11 @@ public partial class ChatQW : LLM
 
     private bool ReportRoleOutputCompletion(string finishReason)
     {
-        if (finishReason != "length") return true;
-        Debug.LogWarning("[LLM/Channels] 输出达到生成长度上限，未完成的决策不派发工具；已说出的发言无法撤回。");
+        if (finishReason == "stop") return true;
+        Debug.LogWarning("[LLM/Channels] 输出未完整结束，未完成的决策不派发工具；已说出的发言无法撤回。");
         RaiseSystemNotice(new SystemNotice("llm_output_truncated", SystemNoticeSeverity.Error,
-            "角色本次回复被截断，工具动作尚未执行。", "finish_reason=length；可重新请求。", "ChatQW", true));
+            "角色本次回复未完整结束，本条回复的工具动作尚未执行。",
+            finishReason == "length" ? "finish_reason=length" : "finish_reason 未确认完整结束", "ChatQW", true));
         return false;
     }
 
@@ -2741,6 +2967,7 @@ public partial class ChatQW : LLM
             int remaining = MaximumPrefixCharacters - prefix.Length;
             if (remaining > 0) prefix.Append(value, 0, Math.Min(value.Length, remaining));
         }
+        internal bool HasDelivery => characterCount > 0;
         internal string Describe()
         {
             if (characterCount == 0) return "";
@@ -2753,10 +2980,26 @@ public partial class ChatQW : LLM
                 ["delivery"] = "public-stream-callback", ["playback"] = "not-observed-here"
             };
             return "\n[public_stream_prefix] " + fact.ToString(Newtonsoft.Json.Formatting.None) +
-                "\n这是格式出错之前已送往公开流回调的有效台词前缀；不能据此断言用户已听到，" +
+                "\n这是本次响应结束前已送往公开流回调的有效台词前缀；不能据此断言用户已听到，" +
                 "after_action 仍可能被播放门控扣留。结合真实播放事实继续回应，避免自动重复整段前缀；" +
                 "未包含错误尾部或动作，不能把它当作动作完成证明。";
         }
+    }
+
+    // 扣住误标 independent 的台词只能作用在完成投递上：independent 台词在流式阶段就逐句
+    // 送出，而契约要求工具写在闭合 say 之后，所以动作被拒时台词通常早已播出（s13 实测：
+    // executable 已是 <silent/>，三句仍然播完）。收据是唯一能分辨这两种情况的证据；断言
+    // "没有播出"会让她为用户其实听到了的话道歉或整段重说。
+    private static string DescribeMislabeledIndependentSpeechDelivery(
+        RoleOutputChannels channels, PublicSpeechStreamReceipt publicReceipt)
+    {
+        if (!channels.WithheldMislabeledIndependentSpeech) return "";
+        if (publicReceipt == null)
+            return "本次无法确认该台词是否已经播出；不要断言用户没听到，按实际播放事实继续。";
+        return publicReceipt.HasDelivery
+            ? "该台词在格式错误被发现之前已经送往公开流，用户可能已经听到，无法撤回；" +
+              "不要整段重说，也不要说自己保持了沉默，只补上被拒的动作。"
+            : "该台词没有送往公开流，用户没有听到；可以重新组织后再说一次。";
     }
 
     private void ReportRoleOutputFormatFactsWithReceipt(RoleOutputChannels channels, bool complete,
@@ -2770,16 +3013,32 @@ public partial class ChatQW : LLM
                 "请依据本轮原话和实际事实重新组织自然台词，不复制内部记录，不把未交付说成主动保持沉默。"
             : "";
         if (channels.HasInvalidPublicBoundary && publicReceipt != null) boundaryReason += publicReceipt.Describe();
-        if (!complete) currentFormatFacts.AppendLine(RoleOutputFormatFactHistory.TruncationFact);
+        if (!complete)
+        {
+            currentFormatFacts.AppendLine(RoleOutputFormatFactHistory.TruncationFact);
+            if (!channels.HasInvalidPublicBoundary && publicReceipt != null) currentFormatFacts.Append(publicReceipt.Describe());
+        }
         if (channels.HasInvalidPublicBoundary) currentFormatFacts.AppendLine(boundaryReason);
         if (channels.HasInvalidSpeechPhase)
-            currentFormatFacts.AppendLine(channels.SpeechPhaseExecutionFact + channels.SpeechPhaseCorrection);
+            currentFormatFacts.AppendLine(channels.SpeechPhaseExecutionFact +
+                DescribeMislabeledIndependentSpeechDelivery(channels, publicReceipt) +
+                channels.SpeechPhaseCorrection);
         if (channels.HasMalformedTool)
             currentFormatFacts.AppendLine(reason + "可使用标准 <工具名 属性=\"值\"/> 重新决定或询问；不能称为已执行。");
+        // A rescued preamble is a shape note, not a failure: the reply was delivered.
+        // Say so plainly so the next turn writes thought explicitly, without spending a
+        // correction round on an output that already worked.
+        if (!channels.HasInvalidPublicBoundary && channels.HasAbsorbedBarePreamble)
+            currentFormatFacts.AppendLine("[public_output_boundary/preamble] 上一条回复在首个标签之前写了无标记正文。" +
+                "它已按内部思考处理：没有朗读，也没有改变本条已交付的台词与已受理的动作。" +
+                "下次把内部判断放进闭合的 <thought>，公开台词仍放在 <say> 内。");
         // Replace before callbacks: immediate correction requests see this output's
         // facts. A valid completion clears obsolete format errors, not body history.
         RoleOutputFormatFactHistory.ReplaceCurrent(m_DataList, message => message.role,
             message => message.content, fact => new SendData("system", fact), currentFormatFacts.ToString().Trim());
+        if (channels.HasAbsorbedBarePreamble)
+            Debug.Log("[LLM/Channels] 首个标签之前的无标记正文已按内部思考吸收 privateCharacters=" +
+                channels.PrivateCharacters + " boundaryRejected=" + channels.HasInvalidPublicBoundary);
         if (channels.HasInvalidSpeechPhase)
         {
             string phaseReason = channels.SpeechPhaseExecutionFact;
@@ -2866,12 +3125,15 @@ public partial class ChatQW : LLM
         private Action<string> m_OnDelta;
         private StringBuilder m_LineBuf = new StringBuilder();
         private StringBuilder m_FullContent = new StringBuilder();
+        private readonly StringBuilder m_ErrorBody = new StringBuilder();
         private readonly Decoder m_Utf8Decoder = Encoding.UTF8.GetDecoder();
         public int PromptTokens { get; private set; }
         public string FinishReason { get; private set; }
         public readonly CompletionPerformance Performance = new CompletionPerformance();
         public Action OnFirstData;
         private bool m_HasReceivedData;
+        public readonly FormalStreamProgress Progress = new FormalStreamProgress();
+        public Newtonsoft.Json.Linq.JObject ProgressSnapshot() => Progress.Snapshot(m_LineBuf.Length);
 
         public SSEDownloadHandler(Action<string> onDelta) : base(new byte[4096])
         {
@@ -2879,16 +3141,20 @@ public partial class ChatQW : LLM
         }
 
         public string GetFullContent() { return m_FullContent.ToString(); }
+        public string GetErrorBody() { return m_ErrorBody.ToString(); }
 
         protected override bool ReceiveData(byte[] data, int dataLength)
         {
             if (data == null || dataLength == 0) return false;
+            Progress.Receive(dataLength);
             if (!m_HasReceivedData) { m_HasReceivedData = true; OnFirstData?.Invoke(); }
 
             // A network packet may split one Chinese/Japanese UTF-8 character.
             char[] chars = new char[Encoding.UTF8.GetMaxCharCount(dataLength)];
             int charCount = m_Utf8Decoder.GetChars(data, 0, dataLength, chars, 0, false);
             string incoming = new string(chars, 0, charCount);
+            int errorRoom = 8192 - m_ErrorBody.Length;
+            if (errorRoom > 0) m_ErrorBody.Append(incoming, 0, Math.Min(errorRoom, incoming.Length));
             m_LineBuf.Append(incoming);
 
             string bufStr = m_LineBuf.ToString();
@@ -2908,11 +3174,12 @@ public partial class ChatQW : LLM
                 if (!line.StartsWith("data:")) continue;
 
                 string payload = line.Substring(5).Trim();
-                if (payload == "[DONE]") continue;
+                if (payload == "[DONE]") { Progress.MarkDone(); continue; }
 
                 try
                 {
                     StreamChunk chunk = JsonUtility.FromJson<StreamChunk>(payload);
+                    Progress.Event();
                     // Metadata often arrives in a final choices:[] event. Do not
                     // tie usage/timing observation to a spoken content delta.
                     Performance.Observe(payload);
@@ -2923,6 +3190,7 @@ public partial class ChatQW : LLM
                         if (!string.IsNullOrEmpty(chunk.choices[0].finish_reason))
                             FinishReason = chunk.choices[0].finish_reason;
                         string delta = chunk.choices[0].delta != null ? chunk.choices[0].delta.content : null;
+                        Progress.Delta(delta, chunk.choices[0].delta?.reasoning_content);
                         //忽略 reasoning_content (Qwen3思考过程)，只取最终答复content
                         if (!string.IsNullOrEmpty(delta))
                         {
@@ -2933,7 +3201,8 @@ public partial class ChatQW : LLM
                 }
                 catch (Exception e)
                 {
-                    Debug.LogWarning("SSE解析失败: " + e.Message + " / " + payload);
+                    Progress.ParseFailure();
+                    Debug.LogWarning("SSE解析失败: type=" + e.GetType().Name + " eventCharacters=" + payload.Length);
                 }
             }
             return true;

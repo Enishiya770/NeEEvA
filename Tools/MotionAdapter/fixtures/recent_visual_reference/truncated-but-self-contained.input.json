@@ -1,0 +1,22 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "Turn off the reading lamp by the bookcase.",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "Turn off the reading lamp by the bookcase.",
+    "targetDescription": "the reading lamp by the bookcase",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [
+    {
+      "role": "assistant",
+      "quotedText": "A fan stands by the cabinet. irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail irrelevant background detail There is a reading lamp by the bookcase."
+    }
+  ],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

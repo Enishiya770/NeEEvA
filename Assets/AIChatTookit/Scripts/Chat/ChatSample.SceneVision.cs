@@ -22,6 +22,8 @@ public partial class ChatSample
     public NevaSceneVisionCapture SceneVisionCapture => m_SceneVisionCapture;
     public bool SceneEyesOpen => m_AgentRunning && m_EnableScreenVision && m_AgentEyesOpen;
 
+    private Transform m_SceneHistoricalEnvironment;
+
     private NevaSceneVisionCapture EnsureSceneVisionCapture()
     {
         Vrm10Instance target = m_SceneVisionAvatar;
@@ -45,6 +47,10 @@ public partial class ChatSample
             m_SceneVisionCapture = GetComponent<NevaSceneVisionCapture>() ?? gameObject.AddComponent<NevaSceneVisionCapture>();
         if (m_SceneVisionCapture.Target != target)
             m_SceneVisionCapture.Configure(target, target.GetComponent<NevaEyeTracking>());
+        var historicalEnvironment = GetComponent<ArdyRoomDialogueBridge>()?.environmentRoot;
+        if (m_SceneHistoricalEnvironment != null && historicalEnvironment != null && m_SceneHistoricalEnvironment != historicalEnvironment)
+            m_SceneVisionCapture.InvalidateHistoricalSession("room-binding-changed");
+        if (historicalEnvironment != null) m_SceneHistoricalEnvironment = historicalEnvironment;
         EnsureSceneObjectCatalog();
         return m_SceneVisionCapture;
     }
@@ -92,6 +98,13 @@ public partial class ChatSample
                 return;
             }
             m_SceneVisionState = observation?.State ?? "capture-unavailable";
+            // Turn callbacks carry their own action lease. Let that owner validate
+            // cancellation/supersession before its captured frames update memory.
+            if (purpose != "scene-turn-sweep" && purpose != "scene-view-change-result" && purpose != "spatial-goal-next-step" && purpose != "scene-search-next-step")
+            {
+                ObserveKnownSceneObjects(observation, purpose);
+                ObserveSpatialGoalView(observation, purpose);
+            }
             RecordSceneObservationTime(observation, purpose);
             Debug.Log($"[Vision/Observation] purpose={purpose} state={m_SceneVisionState} capture={observation?.CaptureId ?? "none"} frame={observation?.Frame ?? -1}", this);
             callback(observation);
@@ -145,7 +158,7 @@ public partial class ChatSample
             observation.MetadataJson + "\n提交时图像年龄秒=" + age.ToString("F3", System.Globalization.CultureInfo.InvariantCulture) +
             "; 当前视点仍兼容=" + IsFreshSceneObservation(observation).ToString().ToLowerInvariant() +
             "。房间电视只有实际入镜且清楚可读时才提供桌面内容；看不清就保留不确定。" +
-            "旧图、记忆和当前身体/位置反馈分开使用；不能仅凭图像判断落脚或宣称已执行动作。";
+            "旧图、记忆和当前身体/位置反馈分开使用；不能仅凭图像判断落脚或宣称已执行动作。" + BuildSceneCognitionContext(observation);
     }
 
     private void ClearFormalSceneObservation()
@@ -163,15 +176,15 @@ public partial class ChatSample
             return null;
         }
         var observation = GetFormalSceneObservation(generation);
+        if (observation?.HasImage == true) RememberSceneDialogueView(observation);
         return observation?.HasImage == true ? observation.ImageDataUrl : null;
     }
 
     private void ResetSceneVision(string reason, bool close)
     {
-        CancelRoomSpeechReview(reason);
-        CancelSceneVisionStopPreparation();
-        CancelSceneAction(reason);
-        if (m_AutonomyProbeInFlight) CancelAutonomyIntentProbe();
+        // Capture cancellation publishes its result synchronously. Retire every
+        // observation owner first so cancelled pixels cannot start a new plan
+        // while stopping a still-enabled agent or invalidating its session.
         int pending = m_PendingSceneFormalCaptureGeneration;
         m_PendingSceneFormalCaptureGeneration = -1;
         if (pending >= 0 && pending == m_FormalResponseGeneration)
@@ -187,6 +200,13 @@ public partial class ChatSample
         }
         ++m_SceneVisionEpoch;
         ClearFormalSceneObservation();
+        if (reason == "session-start" || reason == "session-stopped" || reason == "chat-destroyed")
+            m_SceneVisionCapture?.InvalidateHistoricalSession(reason);
+        CancelSceneSearchTask(reason);
+        CancelRoomSpeechReview(reason);
+        CancelSceneVisionStopPreparation();
+        CancelSceneAction(reason);
+        if (m_AutonomyProbeInFlight) CancelAutonomyIntentProbe();
         if (close) m_SceneVisionCapture?.SetObserving(false);
         else m_SceneVisionCapture?.CancelPending(reason);
         m_SceneVisionState = reason;

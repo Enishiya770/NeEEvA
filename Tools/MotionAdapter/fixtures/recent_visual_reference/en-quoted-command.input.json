@@ -1,0 +1,17 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "The sign says turn off the projector. What does it mean?",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "The sign says turn off the projector. What does it mean?",
+    "targetDescription": "the projector",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

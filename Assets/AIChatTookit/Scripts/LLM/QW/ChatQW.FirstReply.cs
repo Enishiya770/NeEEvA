@@ -10,6 +10,7 @@ using UnityEngine.Networking;
 public partial class ChatQW
 {
     private int m_FirstReplyOwnedGeneration = -1;
+    private const float k_FirstReplyReviewSeconds = 6f;
     private FirstReplyUserLease m_FirstReplyUserLease;
     private sealed class FirstReplyUserLease
     {
@@ -108,11 +109,9 @@ public partial class ChatQW
         string wire = BuildFirstReplyWire(history, context, !commitHistory);
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var timing = new ChatRequestWireTiming(generation, commitHistory ? "first-reply" : "first-reply-preparation");
-        var parser = new FirstReplyStreamParser(Current, part => {
-            if (!Current()) return;
-            timing.MarkSpeech(clock.Elapsed.TotalSeconds);
-            onSpeech?.Invoke(part);
-        });
+        // Syntax-valid ordinary output is still only a candidate. Nothing leaves
+        // this request (including assistant history) before semantic route review.
+        var parser = new FirstReplyStreamParser(Current, null);
         int estimate = EstimateStageRequestTokens(history, context + FirstReplyProtocol.RouteContract +
             RoleOutputPublicBoundary.OutputContract,
             FormalResponseContextPolicy.SkillContext(FormalResponseStage.FirstReplyRouting, ActiveSkillContext, SkillCatalogContext));
@@ -143,7 +142,36 @@ public partial class ChatQW
             bool success = request.responseCode == 200 && request.result == UnityWebRequest.Result.Success;
             var completion = parser.Finish(success, handler.FinishReason);
             if (!Current() || completion == null) yield break;
+            completion.SpeechDelivered = false;
+            var candidateRoute = completion.Disposition;
             RaiseRawResponse(handler.GetFullContent());
+            if (!Current()) yield break;
+            double reviewSeconds = 0;
+            string reviewStatus = "not-required";
+            if (completion.Disposition != FirstReplyDisposition.Failed)
+            {
+                string reviewWire = BuildFirstReplyReviewWire(current, history, context, completion);
+                string reviewedRoute = null;
+                string requestKind = null;
+                string responseDemand = null;
+                bool? candidateSufficient = null;
+                JObject questionUnderstanding = null;
+                double reviewStart = clock.Elapsed.TotalSeconds;
+                if (reviewWire == null) reviewStatus = "first-reply-review-input-budget";
+                else yield return RequestFirstReplyReview(reviewWire, generation,
+                    (route, understanding, kind, sufficient, demand, status) => { reviewedRoute = route; questionUnderstanding = understanding; requestKind = kind; candidateSufficient = sufficient; responseDemand = demand; reviewStatus = status; });
+                reviewSeconds = clock.Elapsed.TotalSeconds - reviewStart;
+                if (!Current()) yield break;
+                completion = FirstReplyProtocol.ResolveReviewedCompletion(completion, reviewedRoute, reviewStatus, questionUnderstanding, requestKind, candidateSufficient, responseDemand);
+                if (completion.Disposition == FirstReplyDisposition.Ordinary)
+                    foreach (var part in completion.Speech)
+                    {
+                        if (!Current()) yield break;
+                        timing.MarkSpeech(clock.Elapsed.TotalSeconds);
+                        onSpeech?.Invoke(part);
+                        completion.SpeechDelivered |= !string.IsNullOrEmpty(part.Text);
+                    }
+            }
             if (!Current()) yield break;
             SettleFirstReplyUserLease(userLease, completion, history);
             if (success)
@@ -154,7 +182,11 @@ public partial class ChatQW
             if (m_LogRequestStats)
                 Debug.Log("[LLM/FirstReply] " + new JObject {
                     ["requestGeneration"] = generation,
+                    ["candidateRoute"] = candidateRoute.ToString(),
                     ["route"] = completion.Disposition.ToString(), ["failure"] = completion.Failure,
+                    ["requestKind"] = completion.RequestKind,
+                    ["responseDemand"] = completion.ResponseDemand,
+                    ["candidateSufficient"] = completion.CandidateSufficient,
                     ["finishReason"] = handler.FinishReason,
                     ["responseCharacters"] = handler.GetFullContent().Length,
                     ["maximumResponseTokens"] = 768,
@@ -162,13 +194,108 @@ public partial class ChatQW
                     ["maximumResponseCharacters"] = FirstReplyProtocol.MaximumResponseCharacters,
                     ["preparation"] = !commitHistory, ["publicDeltaDelivered"] = completion.SpeechDelivered,
                     ["speechCharacters"] = completion.SpeechCharacters,
+                    ["semanticReviewSeconds"] = reviewSeconds, ["semanticReviewStatus"] = reviewStatus,
+                    ["totalThroughReleaseSeconds"] = clock.Elapsed.TotalSeconds,
                     ["estimatedPromptTokens"] = estimate, ["server"] = handler.Performance.Snapshot(),
                     ["http"] = timing.Snapshot("completed", request.responseCode, request.result.ToString()),
-                    ["scope"] = "Provider HTTP and validated public deltas, not actual audible PCM or user-stop latency. Tools route retains its accepted user, with no public/assistant output."
+                    ["scope"] = "Provider HTTP and validated public deltas, not actual audible PCM or user-stop latency. All valid candidate routes require independent semantic review. Tools/evidence handoffs retain their accepted user, with no public/assistant output. Evidence grants no action permission."
                 }.ToString(Formatting.None));
             onComplete?.Invoke(completion);
         }
         if (m_FirstReplyOwnedGeneration == generation) m_FirstReplyOwnedGeneration = -1;
+    }
+
+    // A small independent task, without persona, executable skills, old images or
+    // the generator's route claim. Preserve the whole latest user and each quoted
+    // history entry; oversized mandatory input hands back to the normal pipeline.
+    private string BuildFirstReplyReviewWire(SendData current, List<SendData> history,
+        string context, FirstReplyCompletion candidate)
+    {
+        var dialogue = new JArray();
+        int characters = 0;
+        bool incomplete = false;
+        int end = history.IndexOf(current);
+        if (end < 0) end = history.Count;
+        for (int i = end - 1; i >= 0; --i)
+        {
+            var row = history[i];
+            if (row == null || (row.role != "user" && row.role != "assistant")) continue;
+            string text = row.content ?? "";
+            if (dialogue.Count >= 6 || characters + text.Length > 4000) { incomplete = true; break; }
+            dialogue.Insert(0, new JObject { ["role"] = row.role, ["text"] = text });
+            characters += text.Length;
+        }
+        var speech = new JArray();
+        foreach (var part in candidate.Speech)
+            speech.Add(new JObject { ["language"] = part.LanguageCode, ["text"] = part.Text });
+        // Preserve typed runtime facts, including explicit false and null, rather
+        // than nesting a second escaped JSON document inside the review input.
+        // Unknown legacy text remains intact; ambiguous duplicate keys are text.
+        JToken runtimeContext = new JValue(context ?? "");
+        try
+        {
+            runtimeContext = JObject.Parse(context ?? "", new JsonLoadSettings {
+                DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+        }
+        catch (JsonException) { }
+        string input = new JObject {
+            ["latestUserText"] = current.content ?? "", ["recentDialogue"] = dialogue,
+            ["recentDialogueIncomplete"] = incomplete, ["runtimeContext"] = runtimeContext,
+            ["candidateSpeech"] = speech
+        }.ToString(Formatting.None);
+        if (input.Length > FirstReplyProtocol.MaximumReviewInputCharacters) return null;
+        var wire = new StringBuilder("{\"model\":"); AppendJsonString(wire, CurrentModelName);
+        wire.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":")
+            .Append(FirstReplyProtocol.ReviewMaximumOutputTokens).Append(",\"response_format\":{\"type\":\"json_object\",\"schema\":")
+            .Append(FirstReplyProtocol.ReviewSchema).Append("},\"messages\":[");
+        AppendMessage(wire, new SendData("system", FirstReplyProtocol.ReviewContract));
+        wire.Append(','); AppendMessage(wire, new SendData("user", input)); wire.Append(']');
+        wire.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        AppendSlot(wire, k_SlotAuxiliary); wire.Append('}');
+        return wire.ToString();
+    }
+
+    private IEnumerator RequestFirstReplyReview(string wire, int generation, Action<string, JObject, string, bool?, string, string> callback)
+    {
+        bool Current() => generation == m_StreamRequestGeneration;
+        if (!Current()) yield break;
+        float started = Time.realtimeSinceStartup;
+        using (var request = new UnityWebRequest(url, "POST"))
+        {
+            m_ActiveStreamRequest = request;
+            request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(wire));
+            request.downloadHandler = new DownloadHandlerBuffer(); request.timeout = (int)k_FirstReplyReviewSeconds;
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Authorization", "Bearer " + (string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
+            RaiseRequestDiagnostic(wire);
+            if (!Current()) { if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null; yield break; }
+            var operation = request.SendWebRequest();
+            while (!operation.isDone && Current() && Time.realtimeSinceStartup - started < k_FirstReplyReviewSeconds)
+                yield return null;
+            bool expired = Time.realtimeSinceStartup - started >= k_FirstReplyReviewSeconds;
+            if (!operation.isDone) request.Abort();
+            if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null;
+            if (!Current()) yield break;
+            string output = "", route = null, status = expired ? "first-reply-review-timeout" : "first-reply-review-http-failure";
+            JObject questionUnderstanding = null;
+            string requestKind = null;
+            string rawRoute = null;
+            string responseDemand = null;
+            bool? candidateSufficient = null;
+            bool received = !expired && request.responseCode == 200 && request.result == UnityWebRequest.Result.Success &&
+                TryReadRoomTaskCompletion(request.downloadHandler.text, out output, out status);
+            if (received && FirstReplyProtocol.TryCurrentReview(output, out route, out questionUnderstanding, out requestKind, out candidateSufficient, out responseDemand))
+            { status = "reviewed-" + route; rawRoute = (string)JObject.Parse(output)["route"]; }
+            else if (received) status = "first-reply-review-invalid-output";
+            Debug.Log("[LLM/FirstReplyReview] " + new JObject {
+                ["requestGeneration"] = generation, ["route"] = route, ["status"] = status,
+                ["requestKind"] = requestKind,
+                ["candidateSufficient"] = candidateSufficient, ["rawRoute"] = rawRoute,
+                ["responseDemand"] = responseDemand,
+                ["elapsed"] = Time.realtimeSinceStartup - started, ["rawResponse"] = output
+            }.ToString(Formatting.None));
+            callback?.Invoke(route, questionUnderstanding, requestKind, candidateSufficient, responseDemand, status);
+        }
     }
 
     private FirstReplyUserLease BeginFirstReplyUserLease(SendData current, int generation, bool commitHistory)
@@ -197,6 +324,7 @@ public partial class ChatQW
         // Keep the accepted user while the asynchronous planner runs. Removing it
         // here loses that turn if the user interrupts before legacy formal dispatch.
         if (!completion.SpeechDelivered && (completion.Disposition == FirstReplyDisposition.Tools ||
+            completion.Disposition == FirstReplyDisposition.Evidence ||
             completion.Disposition == FirstReplyDisposition.Failed)) lease.HandoffPending = true;
     }
 

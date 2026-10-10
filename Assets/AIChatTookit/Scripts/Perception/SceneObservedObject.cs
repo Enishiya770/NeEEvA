@@ -17,6 +17,15 @@ namespace NeEEvA.Perception
         public Vector2 ImagePoint { get; }
         public bool VisibleConfirmed { get; }
         public bool GeometryIsCurrent => TryValidate(out _) && entry.TryValidateObserved(true, out _);
+        // Historical coverage/rejection evidence may outlive a frame's action
+        // lifetime. Callers must separately retain their room/avatar/source lease
+        // and history budget. This never makes the old pixels current/executable.
+        public bool TryValidateFrozenGeometry(out string reason)
+        {
+            if (!VisibleConfirmed || source == null || !source.isActiveAndEnabled)
+            { reason = "historical opaque observation source unavailable"; return false; }
+            return entry.TryValidateObserved(true, out reason);
+        }
         public string MeasurementScope => VisibleConfirmed ?
             "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability" :
             "conservative companion-geometry candidate only; transparency or unsupported rendering prevents a verified visible identity";

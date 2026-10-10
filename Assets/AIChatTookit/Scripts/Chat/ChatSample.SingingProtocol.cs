@@ -36,25 +36,83 @@ public partial class ChatSample
     {
         var ready = sense.DescribePracticePhrases();
         var pending = sense.DescribeQuarantinedSingingCandidates();
+        // 坐标必须和时长一起给。实测 s20：帧里只有 audio=7.54s（一个长度），而提示词让她
+        // "照清单填 clean=[起点,终点]"——清单里根本没有坐标。用户说"前半部分漏了"，她只能
+        // 拿那个长度去凑，写出 end_seconds="5.0"，补回了开头又把 5 秒之后全切掉，
+        // 下一轮用户就说"后半部分漏掉了"。缺的是事实，不是约束。
         var rows = ready.Select(p => new { p.ClipRef, p.RecordingSequence,
-            Source = p.PendingConfirmation ? "pending" : "confirmed_user", Playback = "ready", p.Seconds, p.Lyrics })
+            Source = p.PendingConfirmation ? "pending" : "confirmed_user", Playback = "ready", p.Seconds, p.Lyrics,
+            CleanStart = p.CleanStartSeconds, CleanEnd = p.CleanEndSeconds,
+            ExpStart = p.ExpandedStartSeconds, ExpEnd = p.ExpandedEndSeconds,
+            CurSource = p.ActiveCapture,
+            CurStart = (p.ActiveCapture == "expanded" ? p.ExpandedStartSeconds : p.CleanStartSeconds) + p.ActiveTrimHeadSeconds,
+            CurEnd = (p.ActiveCapture == "expanded" ? p.ExpandedEndSeconds : p.CleanEndSeconds) - p.ActiveTrimTailSeconds })
             .Concat(pending.Select(p => new { p.ClipRef, p.RecordingSequence, Source = p.SourceStatus,
                 Playback = p.PlaybackStatus, p.Seconds,
-                Lyrics = string.IsNullOrWhiteSpace(p.SingingSegmentText) ? p.Lyrics : p.SingingSegmentText }))
+                Lyrics = string.IsNullOrWhiteSpace(p.SingingSegmentText) ? p.Lyrics : p.SingingSegmentText,
+                CleanStart = p.CleanStartSeconds, CleanEnd = p.CleanEndSeconds,
+                ExpStart = p.ExpandedStartSeconds, ExpEnd = p.ExpandedEndSeconds,
+                CurSource = p.CurrentCapture,
+                CurStart = p.CurrentStartSeconds, CurEnd = p.CurrentEndSeconds }))
             .OrderBy(p => p.RecordingSequence).ToList();
         var sb = new StringBuilder();
         sb.AppendLine($"\n[Sing/Inventory] retained={rows.Count} confirmed_list={rows.Count(p => p.Source == "confirmed_user")} pending_list={rows.Count(p => p.Source == "pending")}；以下按录音先后并列，不是播放顺序。来源待确认不等于没有录到。");
         sb.AppendLine("最近留存的录音证据=" + (rows.LastOrDefault()?.ClipRef ?? "none") + "；只是录音时间事实，不替你选择或确认来源。");
         sb.AppendLine("playback=ready仅表示音频可执行，不是歌唱判定；结合整段转写、声学证据和语境选择或询问。shared_prefix表示联合识别复用了前段音频，不是又唱了一次，也不证明是同一说话人。");
         sb.AppendLine("录音先后（早→晚；不是角色播放顺序）见下列 recording 编号；不是练唱清单编号。");
-        for (int i = 0; i < rows.Count; i++)
+        // A sub-3s evidence-only candidate with no lyrics is a VAD artefact (asr_event=NoSpeech).
+        // Nine of them sat in every frame this session while the request was already ~6k tokens
+        // over budget. Collapse rather than drop: each stays addressable by ref if she decides
+        // one of them matters, and retained= above still counts them all.
+        bool LowSignal(string playback, string lyrics, double seconds) =>
+            playback == "evidence_only" && string.IsNullOrWhiteSpace(lyrics) && seconds < 3.0;
+        var shown = rows.Where(p => !LowSignal(p.Playback, p.Lyrics, p.Seconds)).ToList();
+        var collapsed = rows.Where(p => LowSignal(p.Playback, p.Lyrics, p.Seconds)).ToList();
+        for (int i = 0; i < shown.Count; i++)
         {
-            var p = rows[i];
+            var p = shown[i];
             string lyric = TruncateForFrame(p.Lyrics, 64).Replace('\n', ' ').Replace('\r', ' ');
-            sb.AppendLine($"[Sing/Clip] recording={p.RecordingSequence} ref={p.ClipRef} source={p.Source} playback={p.Playback} audio={p.Seconds:F2}s lyrics={lyric}" +
+            // 都是该份原录音内的秒坐标，起点 0；audio= 是当前版本的时长，不是坐标。
+            string bounds = $" clean=[{p.CleanStart:F2},{p.CleanEnd:F2}]" +
+                $" expanded=[{p.ExpStart:F2},{p.ExpEnd:F2}]" +
+                $" current={p.CurSource}=[{p.CurStart:F2},{p.CurEnd:F2}]";
+            sb.AppendLine($"[Sing/Clip] recording={p.RecordingSequence} ref={p.ClipRef} source={p.Source} playback={p.Playback} audio={p.Seconds:F2}s{bounds} lyrics={lyric}" +
                 sense.DescribeSingingClipObservation(p.ClipRef));
             string latest = sense.DescribeLatestSingingRecordingEvidence(p.ClipRef);
             if (!string.IsNullOrEmpty(latest)) sb.AppendLine(latest);
+        }
+        if (collapsed.Count > 0)
+            sb.AppendLine($"[Sing/ClipLowSignal] 另有 {collapsed.Count} 段不足3秒、无歌词、仅证据的候选未逐条展开：" +
+                string.Join("、", collapsed.Select(p => p.ClipRef)) +
+                "；通常是换气或环境噪声。它们仍然存在，需要时可按 ref 直接指定。");
+        // 最近几个用户轮的完整录音。它们不在清单里，也没有被判定成歌唱——程序只是还留着
+        // 字节。指代（「刚才那一段」）永远比音频晚一轮到达，这一段就是给那一轮用的。
+        var recent = sense.DescribeRecentCaptures();
+        if (recent.Count > 0)
+        {
+            // 一旦有条目被 clip_adopt 收走，"不在清单里"就和紧跟其后的"已收进清单 → clip:…"
+            // 直接打架。按实际状态分叉，别让同一节里出现自相矛盾的两句话。
+            int adoptedCount = recent.Count(r => r.Adopted);
+            sb.AppendLine("\n[Audio/Recent] 最近 " + recent.Count +
+                (adoptedCount == 0
+                    ? " 个用户轮的完整原始录音仍在内存（未判定模态、不在清单里）："
+                    : " 个用户轮的完整原始录音仍在内存；其中 " + adoptedCount +
+                      " 段已收进清单，逐条标注在下面，其余未判定模态、不在清单里："));
+            for (int i = 0; i < recent.Count; i++)
+            {
+                var r = recent[i];
+                if (r.Adopted)
+                {
+                    sb.AppendLine($"[Audio/Capture] {r.CaptureRef} 已收进清单 → {r.AdoptedClipRef}");
+                    continue;
+                }
+                sb.AppendLine($"[Audio/Capture] {r.CaptureRef} audio={r.Seconds:F2}s " +
+                    $"p={r.SingingProbability:F2} stab={r.PitchStability:F2} 旋律岛={r.MelodicIslandSeconds:F2}s " +
+                    $"text={TruncateForFrame(r.Text, 48).Replace('\n', ' ').Replace('\r', ' ')}");
+            }
+            sb.AppendLine("p 只是声学测量，实测它分不开演唱和噪声，不能当模态结论；结合这一轮用户原话判断。" +
+                "要用其中一段先 <clip_adopt ref=\"cap:…\" reason=\"…\"/> 收进清单，收进来仍是 source=pending，" +
+                "播放仍需 sing_goal 与独立审核。不收也不会删除，最近几轮之后自然淘汰。");
         }
         sb.AppendLine("[Sing/PlaybackFact] 角色最近完整播放（位置从左至右1起；不是清单编号）last_completed=" +
             (m_LastCompletedPracticePlaybackFacts.Length > 0 ? m_LastCompletedPracticePlaybackFacts : "none") +
@@ -115,7 +173,22 @@ public partial class ChatSample
                     "clip_revision_failed", "只准备范围，不会播放；原录音保留，可询问用户。", "clip_revise");
                 return;
             }
-            RecordPracticeEditResult($"{request.ClipRefs} 当前版本已准备，played=false；ref不变。", false);
+            // 只说"已准备"不够：她拿不到这一段现在到底是哪个范围，也不知道下一条
+            // sing_goal 写 range="clean"/"expanded" 会把这次修订原样抹掉。
+            var revised = sense.DescribePracticePhrases().Find(p => p.ClipRef == request.ClipRefs);
+            string state = "";
+            if (revised != null)
+            {
+                float revisedStart = (revised.ActiveCapture == "expanded"
+                    ? revised.ExpandedStartSeconds : revised.CleanStartSeconds) + revised.ActiveTrimHeadSeconds;
+                float revisedEnd = (revised.ActiveCapture == "expanded"
+                    ? revised.ExpandedEndSeconds : revised.CleanEndSeconds) - revised.ActiveTrimTailSeconds;
+                state = $"当前范围={revised.ActiveCapture} raw=[{revisedStart:F2},{revisedEnd:F2}] " +
+                    $"revision={revised.Revision}；";
+            }
+            RecordPracticeEditResult($"{request.ClipRefs} 当前版本已准备，played=false；ref不变。{state}" +
+                "接下来要按这个范围唱，sing_goal 的 range 写 current 或整个省略；" +
+                "写成 clean/expanded 会对全部 refs 统一取值，这次修订就作废了。", false);
         }
     }
 
@@ -149,6 +222,46 @@ public partial class ChatSample
             m_PracticePitchStates.Remove(stable);
         }
         RecordPracticeDropResult("已移除 " + string.Join(",", clips) + "；其它 clip 身份不变，长期曲库未删除。", false);
+    }
+
+    /// <summary>
+    /// 把最近录音环里的一条收进素材清单。它只回答「够不够得着」，不回答「是谁唱的」
+    /// 和「能不能播」——收进来仍是 source=pending，播放仍要 sing_goal 与独立审核。
+    /// </summary>
+    private void ExtractAndApplyClipAdoptTags(ref string text, bool apply)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        var pattern = new Regex(@"<clip_adopt\b(?<attrs>[^>]*)>", RegexOptions.IgnoreCase);
+        var matches = pattern.Matches(text);
+        text = pattern.Replace(text, "");
+        if (!apply || matches.Count == 0) return;
+        var sense = m_ChatSettings != null ? m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText : null;
+        if (sense == null)
+        {
+            RecordPracticeEditFailureForLlm("当前没有录音素材接口；没有收进任何录音。",
+                "no_audio_interface", "如实说明，不要声称已经取到。", "clip_adopt");
+            return;
+        }
+        foreach (Match match in matches)
+        {
+            string captureRef = ReadToolAttribute(match.Groups["attrs"].Value, "ref");
+            if (!sense.TryAdoptRecentCapture(captureRef, out string clipRef, out string failure,
+                    out bool alreadyInList))
+            {
+                // 重复收取不是素材丢失。按 unavailable 上报会连带一句"如实说明那段已经不在"，
+                // 而那段就在清单里——照着说就是对用户谎报音频没了。
+                if (alreadyInList)
+                    RecordPracticeEditFailureForLlm(failure, "recent_capture_already_adopted",
+                        "那段已经在清单里，不要再收一次，也不要说它已经不在。" +
+                        "直接用上面这个 clip: 引用继续；需要演唱仍须登记 sing_goal 并等待独立审核。", "clip_adopt");
+                else
+                    RecordPracticeEditFailureForLlm(failure, "recent_capture_unavailable",
+                        "按最近录音清单里的 cap: 引用重新选择，或如实说明那段已经不在。", "clip_adopt");
+                return;
+            }
+            RecordPracticeEditResult($"{captureRef} 已收进清单，引用是 {clipRef}；" +
+                "来源仍是 pending，尚未选定范围，也还没有播放。需要演唱仍须登记 sing_goal 并等待独立审核。", false);
+        }
     }
 
     private void ExtractAndApplyClipConfirmTags(ref string text, bool apply)
@@ -221,10 +334,18 @@ public partial class ChatSample
         request.UnifiedSing = true;
         request.ClipRefs = (ReadToolAttribute(attrs, "refs") ?? "").Trim();
         request.ConfirmUser = ReadToolBoolAttribute(attrs, "confirm_user", false);
-        request.Range = (ReadToolAttribute(attrs, "range") ?? "current").Trim().ToLowerInvariant();
-        if (request.Range.Length == 0) request.Range = "current";
+        string suppliedRange = (ReadToolAttribute(attrs, "range") ?? "").Trim().ToLowerInvariant();
+        request.RangeExplicit = suppliedRange.Length > 0;
+        request.Range = request.RangeExplicit ? suppliedRange : "current";
         request.StartSeconds = ReadToolFloatAttributeUnclamped(attrs, "start_seconds");
         request.EndSeconds = ReadToolFloatAttributeUnclamped(attrs, "end_seconds");
+        // 目标语义直接写在 sing 上，不必再单开一个 sing_goal 说第二遍。
+        request.GoalOrigin = (ReadToolAttribute(attrs, "origin") ?? "").Trim().ToLowerInvariant();
+        request.GoalIntent = (ReadToolAttribute(attrs, "intent") ?? "").Trim().ToLowerInvariant();
+        request.GoalFeedback = (ReadToolAttribute(attrs, "feedback") ?? "").Trim().ToLowerInvariant();
+        request.GoalCompletion = (ReadToolAttribute(attrs, "completion") ?? "").Trim().ToLowerInvariant();
+        request.GoalEvidence = (ReadToolAttribute(attrs, "evidence") ?? "").Trim();
+        request.GoalChangeQuote = (ReadToolAttribute(attrs, "change_quote") ?? "").Trim();
         request.Mode = "practice";
         request.Source = "practice";
         request.Order = "";
@@ -319,10 +440,19 @@ public partial class ChatSample
         if (!preparationOnly && !TryValidateSingingGoalRequestDetailed(request, sense, out detail)) return false;
         var order = new List<string>();
         var prepared = new List<string>();
+        // 目标级 range 是单个标量，会盖掉每一段自己的 ActiveCapture。实测 s12：她先用
+        // clip_revise 把第一段设成 expanded，下一条 sing_goal 写 range="clean"，那次修订
+        // 就此作废且全程无任何提示——用户连着四轮说"第一段还是没变"。覆盖本身是合法的，
+        // 静默才是问题，所以这里只如实播报，不拒绝。
+        var overridden = new List<string>();
         foreach (string clip in refs)
         {
             var previous = sense.DescribePracticePhrases().Find(p => p.ClipRef == clip);
             int oldRevision = previous?.Revision ?? -1;
+            if (!preparationOnly && float.IsNaN(request.StartSeconds) && previous != null &&
+                (request.Range == "clean" || request.Range == "expanded") &&
+                !string.Equals(previous.ActiveCapture, request.Range, StringComparison.OrdinalIgnoreCase))
+                overridden.Add($"{clip} 当前 {previous.ActiveCapture} → 本次按 {request.Range}");
             int stableId;
             bool ready = !float.IsNaN(request.StartSeconds)
                 ? sense.TrySelectSingingClipWindow(clip, request.ConfirmUser, request.StartSeconds,
@@ -338,6 +468,15 @@ public partial class ChatSample
                 m_PracticePitchStates.Remove(stableId);
             order.Add("stable:" + stableId.ToString(CultureInfo.InvariantCulture));
             prepared.Add(clip);
+        }
+        if (overridden.Count > 0)
+        {
+            string notice = "本次 range=" + request.Range + " 覆盖了这些段自己的当前范围：" +
+                string.Join("；", overridden) +
+                "。目标级 range 对全部 refs 统一生效，会丢弃逐段 clip_revise 的结果。" +
+                "要沿用各段自己的当前范围，range 写 current 或整个省略；只想改其中一段就先 clip_revise 再用 current。";
+            RecordPracticeEditResult(notice, false);
+            Debug.LogWarning("[Sing/RangeOverride] " + notice);
         }
         // A concrete stable order pins the material before any asynchronous SVC work.
         request.Order = string.Join(",", order);

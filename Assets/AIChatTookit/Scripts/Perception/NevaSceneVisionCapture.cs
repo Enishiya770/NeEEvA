@@ -43,6 +43,7 @@ namespace NeEEvA.Perception
         private Readback inFlight;
         private int generation;
         private string binding = Guid.NewGuid().ToString("N");
+        private string historicalSession = Guid.NewGuid().ToString("N");
         private float nextCaptureAt;
         private bool rendering;
         private sealed class Readback
@@ -51,7 +52,7 @@ namespace NeEEvA.Perception
             internal string id, utc, sceneName, scenePath, sceneFingerprint;
             internal int sceneHandle;
             internal float time, fov;
-            internal Pose pose;
+            internal Pose pose, bodyPose;
             internal RenderTexture target;
             internal List<Action<SceneVisionObservation>> callbacks;
             internal SceneVisionGrounding.Pending groundingPending;
@@ -67,7 +68,7 @@ namespace NeEEvA.Perception
             if (target == null) throw new ArgumentNullException(nameof(target));
             if (tracking != null && tracking.Target != target)
                 throw new ArgumentException("The eye reference must belong to the same character.");
-            CancelPending("角色视觉绑定已更新。");
+            InvalidateHistoricalSession("角色视觉绑定已更新。");
             DisposeCamera();
             if (avatar != target) { neutralViewCalibrated = false; calibratedHead = null; }
             avatar = target;
@@ -116,10 +117,27 @@ namespace NeEEvA.Perception
         internal bool IsObservationBindingCurrent(SceneVisionObservation observation)
         {
             return IsObserving && observation != null && observation.HasImage &&
-                observation.CaptureId.StartsWith(binding + "-", StringComparison.Ordinal) &&
+                observation.CaptureId.StartsWith(historicalSession + "-" + binding + "-", StringComparison.Ordinal) &&
                 avatar != null && avatar.gameObject.scene.handle == observation.SceneHandle &&
                 avatar.gameObject.scene.path == observation.ScenePath &&
                 observation.LoadedSceneFingerprint == CurrentLoadedSceneFingerprint();
+        }
+
+        /// <summary>Historical pixels retain their source across cancellation/closed eyes.
+        /// This is not a freshness, current-visibility, geometric validity or action gate.</summary>
+        public bool IsObservationHistoryBindingCurrent(SceneVisionObservation observation)
+        {
+            return isActiveAndEnabled && observation != null && observation.HasImage &&
+                observation.CaptureId.StartsWith(historicalSession + "-", StringComparison.Ordinal) &&
+                avatar != null && avatar.gameObject.scene.handle == observation.SceneHandle &&
+                avatar.gameObject.scene.path == observation.ScenePath &&
+                observation.LoadedSceneFingerprint == CurrentLoadedSceneFingerprint();
+        }
+
+        public void InvalidateHistoricalSession(string reason)
+        {
+            historicalSession = Guid.NewGuid().ToString("N");
+            CancelPending(reason);
         }
 
         public bool TryResolve(SceneVisionObservation observation, Vector2 imagePoint,
@@ -186,6 +204,13 @@ namespace NeEEvA.Perception
             string preferredEntityId, out SceneObjectCandidateView view, out string reason) =>
             SceneObjectCandidateView.TryBuild(this, observation, focusPixel, preferredEntityId, out view, out reason);
 
+        /// <summary>Discovers only stable opaque pixels in this actual RGB/ID/depth frame.
+        /// Historical sweep samples may be collected after the camera moves; resolving
+        /// an actionable current candidate still requires a compatible fresh view.</summary>
+        public bool TryBuildVisibleObjectCatalog(SceneVisionObservation observation,
+            out SceneVisibleObjectCatalog catalog, out string reason) =>
+            SceneVisibleObjectCatalog.TryBuild(this, observation, out catalog, out reason);
+
         public void SetObserving(bool observing)
         {
             if (IsObserving == observing) return;
@@ -243,9 +268,10 @@ namespace NeEEvA.Perception
                 EnsureCamera();
                 int width = Mathf.Clamp(captureWidth, 320, 1280), height = Mathf.Clamp(captureHeight, 180, 960);
                 float fov = Mathf.Clamp(verticalFieldOfView, 40, 100);
-                item = new Readback { generation = generation, id = binding + "-" + Guid.NewGuid().ToString("N"),
+                item = new Readback { generation = generation, id = historicalSession + "-" + binding + "-" + Guid.NewGuid().ToString("N"),
                     utc = DateTime.UtcNow.ToString("o"), time = Time.realtimeSinceStartup, frame = Time.frameCount,
-                    pose = pose, fov = fov, width = width, height = height, callbacks = callbacks,
+                    pose = pose, bodyPose = new Pose(avatar.transform.position, avatar.transform.rotation),
+                    fov = fov, width = width, height = height, callbacks = callbacks,
                     sceneHandle = avatar.gameObject.scene.handle, sceneName = avatar.gameObject.scene.name,
                     scenePath = avatar.gameObject.scene.path,
                     sceneFingerprint = CurrentLoadedSceneFingerprint(),
@@ -368,7 +394,7 @@ namespace NeEEvA.Perception
                     if (jpeg == null || jpeg.Length == 0) throw new InvalidOperationException("场景图片编码失败。");
                     var result = new SceneVisionObservation(item.id, "ready", "", item.utc, item.time, item.frame,
                         item.pose, item.fov, item.width, item.height, "data:image/jpeg;base64," + Convert.ToBase64String(jpeg),
-                        item.sceneHandle, item.sceneName, item.scenePath, item.sceneFingerprint, item.grounding);
+                        item.sceneHandle, item.sceneName, item.scenePath, item.sceneFingerprint, item.grounding, item.bodyPose);
                     owner.ClearPreview(); owner.preview = texture; texture = null;
                     var callbacks = new List<Action<SceneVisionObservation>>(item.callbacks); item.callbacks.Clear();
                     owner.Publish(result, callbacks);
@@ -432,7 +458,7 @@ namespace NeEEvA.Perception
         }
         private void OnDisable()
         {
-            IsObserving = false; CancelPending("场景视觉组件已停用。", "closed");
+            IsObserving = false; InvalidateHistoricalSession("场景视觉组件已停用。");
             if (!rendering) DisposeCamera();
         }
         private void OnDestroy() { IsObserving = false; CancelPending("场景视觉组件已销毁。", "closed"); DisposeCamera(); }

@@ -1,0 +1,719 @@
+{
+  "provenance": {
+    "kind": "real-log-derived-unprojected-multistep-facts",
+    "source": "Logs/dialogue-two-tests-20261009-121424/Editor.snapshot.log",
+    "sha256": "8e15bf4f5f144adb439242c822cd9df8ee6658ebc6a5403ba347284a06891b0e",
+    "lineMethod": "UTF8 bytes decode and LF split, 1-based",
+    "goalLine": 34282,
+    "actionLine": 34269,
+    "reviewLine": 32819,
+    "observedObjectLine": 29726,
+    "notes": "Projection stress fixture, not captured original wire. Full logged goal/action/observation nodes retain actual IDs, proof, five steps and bulky geometry/history. The envelope and search/runner counts are derived from those facts; runtime capability booleans reflect the completed registered operation. Existing runtime terminal builder already selects subsets of these source nodes. No image is claimed from this JSON."
+  },
+  "originalUserRequest": "去把刚才你看到的那盏小灯关掉。",
+  "facts": {
+    "goal": {
+      "goalId": "device-goal-513ef6548d67406d984845b85d7befe8",
+      "status": "satisfied",
+      "ownerCurrent": true,
+      "reason": "same-target-fresh-device-readback-matches-request",
+      "executionCurrent": true,
+      "executionSuspended": false,
+      "executionRevision": 0,
+      "latestUserText": "去把刚才你看到的那盏小灯关掉。",
+      "userUpdates": [],
+      "workEpoch": 4,
+      "userTurn": 4,
+      "formalGeneration": 6,
+      "visionEpoch": 4,
+      "originalRequest": "去把刚才你看到的那盏小灯关掉。",
+      "requestQuote": "去把刚才你看到的那盏小灯关掉。",
+      "targetDescription": "电视柜上的小灯",
+      "desiredState": "off",
+      "boundEntityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+      "referentKind": "observed-device",
+      "referentSourceId": "observed-device:7aec0aa5cbd84baea445ada1a171e8ed:2:1",
+      "createdUtc": "2026-10-09T03:03:58.4297601Z",
+      "completionPredicate": {
+        "kind": "same-semantically-matched-entity-current-registered-device-readback",
+        "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+        "desiredState": "off",
+        "requiresCurrentOpaqueReobservation": true,
+        "requiresFreshReadback": true,
+        "substepCompletionDoesNotSatisfyGoal": true
+      },
+      "completionEvidence": {
+        "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:9",
+        "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+        "resultCaptureId": "0174025a3adb4536994af90a3f3d7d43-8599477624cf43a4bf76b907438b8b6c",
+        "observedUtc": "2026-10-09T03:04:36.6011856Z",
+        "readAtUtc": "2026-10-09T03:04:36.6702264Z",
+        "actual": {
+          "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+          "sceneLabel": "桌面装饰灯",
+          "lightState": "disabled",
+          "emissionState": "off",
+          "conflict": "",
+          "registered": true,
+          "on": false,
+          "lightEnabled": false,
+          "emissionEnabled": false,
+          "bakedLightingResidualUncontrolled": true,
+          "emissionColor": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "lightIntensity": 1.0,
+          "lightBakeType": "Baked",
+          "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+        },
+        "desiredState": "off",
+        "scope": "Same direct-target semantically matched entity, fresh opaque frame and registered runtime readback. Live read here only invalidates a changed saved readback; it cannot create new perception. This proves the requested device state, not room-wide darkness, visual brightness or physical touching."
+      },
+      "completionEvidenceValid": true,
+      "boundEntityMemory": {
+        "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+        "sceneLabel": "桌面装饰灯",
+        "identitySource": "scene-authored",
+        "captureId": "0174025a3adb4536994af90a3f3d7d43-8599477624cf43a4bf76b907438b8b6c",
+        "observedUtc": "2026-10-09T03:04:36.6011856Z",
+        "capturedAtRealtime": 121.467789,
+        "pointAtCapture": {
+          "x": -0.3090285,
+          "y": -0.0764160156,
+          "z": -4.77000856
+        },
+        "cameraPositionAtCapture": {
+          "x": -1.53583074,
+          "y": 0.7170806,
+          "z": -5.90358067
+        },
+        "cameraRotationAtCapture": {
+          "x": 0.227321759,
+          "y": 0.376215816,
+          "z": -0.0233199764,
+          "w": 0.8979103
+        },
+        "viewDirectionWorldAtCapture": {
+          "x": 0.6650138,
+          "y": -0.425775766,
+          "z": 0.613572955
+        },
+        "capabilities": [
+          "inspect-object",
+          "look-at",
+          "set-object-state:on|off"
+        ],
+        "samplePurpose": "selected-object-observation",
+        "rootPositionAtCapture": {
+          "x": -0.251999855,
+          "y": -0.008000851,
+          "z": -4.71600246
+        },
+        "rootRotationAtCapture": {
+          "x": -0.707106948,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 0.7071068
+        },
+        "rootScaleAtCapture": {
+          "x": 0.06,
+          "y": 0.0600000359,
+          "z": 0.0600000359
+        },
+        "scope": "Previously confirmed opaque pixels and their exact capture-time geometry/view. Root snapshot is recorded only while captured renderer geometry still matches. Historical location is a search hint, never current visibility, a navigation destination, device state or action permission.",
+        "historical": true,
+        "positionMemoryValid": true,
+        "positionInvalidReason": null,
+        "requiresReobservation": true,
+        "actionAuthorization": false,
+        "currentVisibility": "not-established"
+      },
+      "searchProgress": {
+        "completedSteps": [
+          {
+            "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:5",
+            "intent": "set-object-state",
+            "phase": "rejected",
+            "reason": "object-target-uncertain: 本轮候选为窗框、墙壁、地板、沙发、电视及屏幕，均非“电视柜上的小灯”。图中未见电视柜或发光小灯，无法确认目标。",
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-12838e3b201d4ecf8d2a6eca9bd26674",
+            "entityId": null,
+            "targetPurpose": "direct-target",
+            "observedUtc": "2026-10-09T03:04:00.0016121Z",
+            "actualRoot": {
+              "x": -2.20911,
+              "y": -0.72,
+              "z": -6.55875254
+            },
+            "actualViewChangeDegrees": 0.0,
+            "mainGoalSatisfied": false
+          },
+          {
+            "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:6",
+            "intent": "turn-in-place",
+            "phase": "observed",
+            "reason": "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents",
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-8ae0b1ba32684152814c35819887f792",
+            "entityId": null,
+            "targetPurpose": null,
+            "observedUtc": "2026-10-09T03:04:07.6433176Z",
+            "actualRoot": {
+              "x": -2.20651364,
+              "y": -0.72,
+              "z": -6.56052
+            },
+            "actualViewChangeDegrees": 119.507614,
+            "mainGoalSatisfied": false
+          },
+          {
+            "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:7",
+            "intent": "set-object-state",
+            "phase": "rejected",
+            "reason": "device-outside-nearby-operation-distance",
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-e6690a65ba1b40829ffc9b2688247aae",
+            "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+            "targetPurpose": "direct-target",
+            "observedUtc": "2026-10-09T03:04:15.7291204Z",
+            "actualRoot": {
+              "x": -2.20651364,
+              "y": -0.72,
+              "z": -6.56052
+            },
+            "actualViewChangeDegrees": 0.0,
+            "mainGoalSatisfied": false
+          },
+          {
+            "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:8",
+            "intent": "approach-object",
+            "phase": "arrived",
+            "reason": "actual nearby floor station and facing reached; the same entity is visible in a new arrival image; no touching or device operation",
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-f55d8d0ae7714412b07e0caa63f35192",
+            "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+            "targetPurpose": "observe-closer",
+            "observedUtc": "2026-10-09T03:04:28.1284428Z",
+            "actualRoot": {
+              "x": -1.528586,
+              "y": -0.72,
+              "z": -5.912918
+            },
+            "actualViewChangeDegrees": 0.0,
+            "mainGoalSatisfied": false
+          },
+          {
+            "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:9",
+            "intent": "set-object-state",
+            "phase": "performed",
+            "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-8599477624cf43a4bf76b907438b8b6c",
+            "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+            "targetPurpose": "direct-target",
+            "observedUtc": "2026-10-09T03:04:36.6702264Z",
+            "actualRoot": {
+              "x": -1.528586,
+              "y": -0.72,
+              "z": -5.912918
+            },
+            "actualViewChangeDegrees": 0.0,
+            "mainGoalSatisfied": true
+          }
+        ],
+        "stepCount": 5,
+        "observedViews": [
+          {
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-6c3c04dcce384359ae750fbc0282094c",
+            "capturedAtUtc": "2026-10-09T03:04:26.8182626Z",
+            "capturedAtRealtime": 111.684959,
+            "cameraPosition": {
+              "x": -1.75504088,
+              "y": 0.670825958,
+              "z": -6.10458
+            },
+            "viewDirectionWorld": {
+              "x": 0.6838017,
+              "y": -0.3323345,
+              "z": 0.649592
+            },
+            "purpose": "scene-object-moving-focus",
+            "confirmedBoundEntityIds": [
+              "scene-object-874c4f7dd8ef432a83ac48e6d72c8567"
+            ],
+            "notVisibleBoundEntityIds": [],
+            "historical": true,
+            "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+          },
+          {
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-1e83808dd40e482984536fe424682693",
+            "capturedAtUtc": "2026-10-09T03:04:27.5192027Z",
+            "capturedAtRealtime": 112.384911,
+            "cameraPosition": {
+              "x": -1.58101439,
+              "y": 0.7128253,
+              "z": -5.942216
+            },
+            "viewDirectionWorld": {
+              "x": 0.6691249,
+              "y": -0.41023314,
+              "z": 0.619662464
+            },
+            "purpose": "scene-object-moving-focus",
+            "confirmedBoundEntityIds": [
+              "scene-object-874c4f7dd8ef432a83ac48e6d72c8567"
+            ],
+            "notVisibleBoundEntityIds": [],
+            "historical": true,
+            "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+          },
+          {
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-f55d8d0ae7714412b07e0caa63f35192",
+            "capturedAtUtc": "2026-10-09T03:04:28.0560650Z",
+            "capturedAtRealtime": 112.921532,
+            "cameraPosition": {
+              "x": -1.55354834,
+              "y": 0.7228813,
+              "z": -5.92129135
+            },
+            "viewDirectionWorld": {
+              "x": 0.7316213,
+              "y": -0.00476864,
+              "z": 0.681695044
+            },
+            "purpose": "scene-object-arrival-confirm",
+            "confirmedBoundEntityIds": [
+              "scene-object-874c4f7dd8ef432a83ac48e6d72c8567"
+            ],
+            "notVisibleBoundEntityIds": [],
+            "historical": true,
+            "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+          },
+          {
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-09d0eb67ed9d495583d1846200acf499",
+            "capturedAtUtc": "2026-10-09T03:04:28.5653777Z",
+            "capturedAtRealtime": 113.431244,
+            "cameraPosition": {
+              "x": -1.55226851,
+              "y": 0.7229978,
+              "z": -5.92189264
+            },
+            "viewDirectionWorld": {
+              "x": 0.730859339,
+              "y": -0.010313563,
+              "z": 0.682450533
+            },
+            "purpose": "spatial-goal-next-step",
+            "confirmedBoundEntityIds": [
+              "scene-object-874c4f7dd8ef432a83ac48e6d72c8567"
+            ],
+            "notVisibleBoundEntityIds": [],
+            "historical": true,
+            "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+          },
+          {
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-ef5779f8a7214985b07558db8c31cf76",
+            "capturedAtUtc": "2026-10-09T03:04:36.0912743Z",
+            "capturedAtRealtime": 120.957451,
+            "cameraPosition": {
+              "x": -1.53536785,
+              "y": 0.7176492,
+              "z": -5.90504742
+            },
+            "viewDirectionWorld": {
+              "x": 0.670868158,
+              "y": -0.412788659,
+              "z": 0.6160699
+            },
+            "purpose": "scene-object-confirm",
+            "confirmedBoundEntityIds": [
+              "scene-object-874c4f7dd8ef432a83ac48e6d72c8567"
+            ],
+            "notVisibleBoundEntityIds": [],
+            "historical": true,
+            "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+          },
+          {
+            "captureId": "0174025a3adb4536994af90a3f3d7d43-8599477624cf43a4bf76b907438b8b6c",
+            "capturedAtUtc": "2026-10-09T03:04:36.6011856Z",
+            "capturedAtRealtime": 121.467789,
+            "cameraPosition": {
+              "x": -1.53583074,
+              "y": 0.7170806,
+              "z": -5.90358067
+            },
+            "viewDirectionWorld": {
+              "x": 0.6650138,
+              "y": -0.425775766,
+              "z": 0.613572955
+            },
+            "purpose": "scene-object-state-result",
+            "confirmedBoundEntityIds": [
+              "scene-object-874c4f7dd8ef432a83ac48e6d72c8567"
+            ],
+            "notVisibleBoundEntityIds": [],
+            "historical": true,
+            "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+          }
+        ]
+      },
+      "failedCandidates": [
+        {
+          "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:5",
+          "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+          "captureId": "0174025a3adb4536994af90a3f3d7d43-12838e3b201d4ecf8d2a6eca9bd26674",
+          "verdict": "uncertain",
+          "reason": "object-target-uncertain: 本轮候选为窗框、墙壁、地板、沙发、电视及屏幕，均非“电视柜上的小灯”。图中未见电视柜或发光小灯，无法确认目标。",
+          "observedUtc": "2026-10-09T03:04:00.0016121Z",
+          "scope": "Failure of this candidate/step in this frame; not a global exclusion or missing/broken device proof."
+        },
+        {
+          "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:7",
+          "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+          "captureId": "0174025a3adb4536994af90a3f3d7d43-b6009afe3ce0400286d0ad361420177c",
+          "verdict": "matched",
+          "reason": "device-outside-nearby-operation-distance",
+          "observedUtc": "2026-10-09T03:04:15.7291204Z",
+          "scope": "Failure of this candidate/step in this frame; not a global exclusion or missing/broken device proof."
+        }
+      ],
+      "scope": "Independently reviewed current-user objective, bounded real action progress and per-capture failed candidates. Steps, arrival and historical sightings do not complete device state. Failures are not global exclusions or proof of absence. A reviewed engine-listed historical source may constrain the same entity; execution still needs direct-target semantic match and fresh opaque confirmation. Stored identity/position is never device action authority.",
+      "searchSummary": {
+        "searchAttempted": true,
+        "completedStepCount": 5,
+        "observedViewCount": 6,
+        "failedCandidateCount": 2,
+        "latestFailure": null
+      }
+    },
+    "lastAction": {
+      "source": "Unity-visible-target-execution",
+      "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:9",
+      "intent": "set-object-state",
+      "origin": "user",
+      "captureId": "0174025a3adb4536994af90a3f3d7d43-09d0eb67ed9d495583d1846200acf499",
+      "confirmedCaptureId": "0174025a3adb4536994af90a3f3d7d43-ef5779f8a7214985b07558db8c31cf76",
+      "resultCaptureId": "0174025a3adb4536994af90a3f3d7d43-8599477624cf43a4bf76b907438b8b6c",
+      "surfaceId": "",
+      "visualLabel": "桌面装饰灯",
+      "phase": "performed",
+      "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+      "observedUtc": "2026-10-09T03:04:36.6702264Z",
+      "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+      "focusKind": "visible-object",
+      "requestedEntityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+      "requestedState": "off",
+      "targetResolutionSource": "candidate-confirmed",
+      "requestedImagePoint": {
+        "x": 0.47864583134651184,
+        "y": 0.8583333492279053
+      },
+      "objectConfirmed": true,
+      "stateChanged": true,
+      "groundArrived": false,
+      "objectReobserved": false,
+      "postArrivalObservationStatus": "",
+      "targetPurpose": "direct-target",
+      "targetDescription": "去把刚才你看到的那盏小灯关掉。",
+      "targetMatchVerdict": "matched",
+      "targetMatchReason": "本轮c1为电视柜上的发光小灯，符合“电视柜上的小灯”描述。",
+      "matchCaptureId": "0174025a3adb4536994af90a3f3d7d43-09d0eb67ed9d495583d1846200acf499",
+      "semanticTargetConfirmed": true,
+      "needsCloserObservation": false,
+      "navigationFocusImagePoint": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "observationStandOff": 0.0,
+      "predictedObservationPitch": 0.0,
+      "observationGoalId": "",
+      "viewDirection": "",
+      "viewPurpose": "",
+      "viewPurposeStatus": "",
+      "requestedViewDistance": 0.0,
+      "actualViewOffset": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "viewBefore": {
+        "captureId": "",
+        "entityId": "",
+        "capturedAtUtc": "",
+        "frame": 0,
+        "width": 0,
+        "height": 0,
+        "visibleOpaquePixels": 0,
+        "normalizedVisibleBounds": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 0.0
+        },
+        "visiblePixelFraction": 0.0,
+        "cameraDistanceToObservedPoint": 0.0,
+        "touchesImageBoundary": false,
+        "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+      },
+      "viewAfter": {
+        "captureId": "",
+        "entityId": "",
+        "capturedAtUtc": "",
+        "frame": 0,
+        "width": 0,
+        "height": 0,
+        "visibleOpaquePixels": 0,
+        "normalizedVisibleBounds": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 0.0
+        },
+        "visiblePixelFraction": 0.0,
+        "cameraDistanceToObservedPoint": 0.0,
+        "touchesImageBoundary": false,
+        "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+      },
+      "intentFocusWorldPoint": {
+        "x": -0.3087770938873291,
+        "y": -0.07636243104934692,
+        "z": -4.770300388336182
+      },
+      "hasIntentFocus": true,
+      "navigationFocusAdjusted": false,
+      "trackingVisibility": "",
+      "trackingCaptureId": "",
+      "trackingFocusStatus": "",
+      "trackingFocusWorldPoint": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "trackingConfirmedImages": 0,
+      "trackingMovingConfirmedImages": 0,
+      "trackingLastSeenRealtime": -1.0,
+      "trackingFocusLastAppliedFrame": -1,
+      "trackingFocusAppliedDegrees": 0.0,
+      "measuredSurface": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "actualRoot": {
+        "x": -1.5285860300064087,
+        "y": -0.7200000286102295,
+        "z": -5.9129180908203125
+      },
+      "requestedYaw": 0.0,
+      "requestedPitch": 0.0,
+      "actualViewChangeDegrees": 0.0,
+      "active": false,
+      "reached": false,
+      "canReobserveTarget": false,
+      "scope": "Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation."
+    },
+    "runner": {
+      "goalId": "device-goal-513ef6548d67406d984845b85d7befe8",
+      "phase": "satisfied",
+      "steps": 5,
+      "noProgressSteps": 0,
+      "terminalReason": "requested-goal-satisfied-by-runtime-evidence",
+      "receipts": [
+        {
+          "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:5",
+          "intent": "set-object-state",
+          "phase": "rejected",
+          "reason": "object-target-uncertain: 本轮候选为窗框、墙壁、地板、沙发、电视及屏幕，均非“电视柜上的小灯”。图中未见电视柜或发光小灯，无法确认目标。",
+          "captureId": "0174025a3adb4536994af90a3f3d7d43-12838e3b201d4ecf8d2a6eca9bd26674",
+          "entityId": null,
+          "targetPurpose": "direct-target",
+          "observedUtc": "2026-10-09T03:04:00.0016121Z",
+          "actualRoot": {
+            "x": -2.20911,
+            "y": -0.72,
+            "z": -6.55875254
+          },
+          "actualViewChangeDegrees": 0.0,
+          "mainGoalSatisfied": false
+        },
+        {
+          "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:6",
+          "intent": "turn-in-place",
+          "phase": "observed",
+          "reason": "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents",
+          "captureId": "0174025a3adb4536994af90a3f3d7d43-8ae0b1ba32684152814c35819887f792",
+          "entityId": null,
+          "targetPurpose": null,
+          "observedUtc": "2026-10-09T03:04:07.6433176Z",
+          "actualRoot": {
+            "x": -2.20651364,
+            "y": -0.72,
+            "z": -6.56052
+          },
+          "actualViewChangeDegrees": 119.507614,
+          "mainGoalSatisfied": false
+        },
+        {
+          "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:7",
+          "intent": "set-object-state",
+          "phase": "rejected",
+          "reason": "device-outside-nearby-operation-distance",
+          "captureId": "0174025a3adb4536994af90a3f3d7d43-e6690a65ba1b40829ffc9b2688247aae",
+          "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+          "targetPurpose": "direct-target",
+          "observedUtc": "2026-10-09T03:04:15.7291204Z",
+          "actualRoot": {
+            "x": -2.20651364,
+            "y": -0.72,
+            "z": -6.56052
+          },
+          "actualViewChangeDegrees": 0.0,
+          "mainGoalSatisfied": false
+        },
+        {
+          "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:8",
+          "intent": "approach-object",
+          "phase": "arrived",
+          "reason": "actual nearby floor station and facing reached; the same entity is visible in a new arrival image; no touching or device operation",
+          "captureId": "0174025a3adb4536994af90a3f3d7d43-f55d8d0ae7714412b07e0caa63f35192",
+          "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+          "targetPurpose": "observe-closer",
+          "observedUtc": "2026-10-09T03:04:28.1284428Z",
+          "actualRoot": {
+            "x": -1.528586,
+            "y": -0.72,
+            "z": -5.912918
+          },
+          "actualViewChangeDegrees": 0.0,
+          "mainGoalSatisfied": false
+        },
+        {
+          "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:9",
+          "intent": "set-object-state",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "captureId": "0174025a3adb4536994af90a3f3d7d43-8599477624cf43a4bf76b907438b8b6c",
+          "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+          "targetPurpose": "direct-target",
+          "observedUtc": "2026-10-09T03:04:36.6702264Z",
+          "actualRoot": {
+            "x": -1.528586,
+            "y": -0.72,
+            "z": -5.912918
+          },
+          "actualViewChangeDegrees": 0.0,
+          "mainGoalSatisfied": true
+        }
+      ]
+    },
+    "latestGoalReview": {
+      "generation": 6,
+      "workEpoch": 4,
+      "userTurn": 4,
+      "verdict": "approved",
+      "reason": "用户明确要求关闭刚才看到的同一盏小灯，目标限定与状态清晰。虽无已执行操作，但历史观察记录确认为同一实体，故批准建立新目标。",
+      "modelReason": "用户明确要求关闭刚才看到的同一盏小灯，目标限定与状态清晰。虽无已执行操作，但历史观察记录确认为同一实体，故批准建立新目标。",
+      "validationFailure": null,
+      "referentKind": "observed-device",
+      "referentSourceId": "observed-device:7aec0aa5cbd84baea445ada1a171e8ed:2:1",
+      "legacyReferentGoalId": null,
+      "legacyReferentEntityId": null,
+      "registered": true,
+      "wireStatus": "received"
+    },
+    "objectContext": {
+      "stateResult": {
+        "actionId": "7aec0aa5cbd84baea445ada1a171e8ed:6:9",
+        "actual": {
+          "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+          "sceneLabel": "桌面装饰灯",
+          "lightState": "disabled",
+          "emissionState": "off",
+          "conflict": "",
+          "registered": true,
+          "on": false,
+          "lightEnabled": false,
+          "emissionEnabled": false,
+          "bakedLightingResidualUncontrolled": true,
+          "emissionColor": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "lightIntensity": 1.0,
+          "lightBakeType": "Baked",
+          "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+        },
+        "resultCaptureId": "0174025a3adb4536994af90a3f3d7d43-8599477624cf43a4bf76b907438b8b6c"
+      },
+      "runtimeDeviceControl": {
+        "implementationConnected": true,
+        "featureEnabled": true,
+        "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+        "physicalHandRequired": false,
+        "requiresCurrentTargetConfirmation": true,
+        "requiresIndependentUserAuthorization": true
+      },
+      "verifiedObservedDeviceHistory": [
+        {
+          "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "f2eee7fca46749649740c37491dbeca3-9def10a9de4c40ceb5f4230368524425",
+          "observedUtc": "2026-10-09T03:03:13.0526040Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.317955017,
+            "y": -0.09274733,
+            "z": -4.71402454
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-874c4f7dd8ef432a83ac48e6d72c8567",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-09T03:03:13.1073086Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        }
+      ]
+    },
+    "visualObservation": {
+      "captureId": "0174025a3adb4536994af90a3f3d7d43-8599477624cf43a4bf76b907438b8b6c",
+      "source": "character-scene-rgb",
+      "state": "ready",
+      "capturedAtUtc": "2026-10-09T03:04:36.6011856Z",
+      "frame": 21961,
+      "hasImage": true
+    },
+    "roomDecision": {
+      "intent": "set-object-state",
+      "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+    }
+  }
+}

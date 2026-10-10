@@ -1,0 +1,22 @@
+{
+  "mode": "new-proposal",
+  "currentUserText": "Turn it off.",
+  "proposal": {
+    "operation": "set",
+    "requestQuote": "Turn it off.",
+    "targetDescription": "the reading lamp",
+    "desiredState": "off"
+  },
+  "existingGoal": {
+    "status": "none"
+  },
+  "recentDialogue": [
+    {
+      "role": "assistant",
+      "quotedText": "I see a reading lamp and a fan beside the cabinet."
+    }
+  ],
+  "verifiedDeviceHistory": [],
+  "verifiedObservedDeviceHistory": [],
+  "referentSources": []
+}

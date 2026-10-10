@@ -18,6 +18,7 @@ public static class ChatLatencyTransportRegression
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
     private static int checks;
     public static JObject PublicBoundaryHttpReport { get; private set; }
+    public static JObject FeedbackStageHttpReport { get; private set; }
 
     [MenuItem("Tools/NeEEvA/Validate chat latency transport")]
     public static void RunInteractive()
@@ -28,6 +29,7 @@ public static class ChatLatencyTransportRegression
         CheckStagedObservations();
         CheckSceneFactRequestSharing();
         CheckFormalResponseStages();
+        CheckFeedbackProviderCompatibility();
         checks += SceneFactCompactionRegression.RunChecks();
         Debug.Log("[ChatLatencyTransportRegression] passed checks=" + checks);
     }
@@ -147,9 +149,10 @@ public static class ChatLatencyTransportRegression
                 Check((string)typeof(LLM).GetField("url", Flags).GetValue(model) == server.Url,
                     "Isolated transport selected a non-loopback provider.");
                 const string valid = "<lang code=\"ja\"/><speech mode=\"independent\"/><say>今の状態を確認しているよ。</say><motion name=\"nod\"/>";
+                const string barePreamble = "ユーザーは二つの録音を連結したい。先に内部手順を確認する。";
                 var outputs = new Dictionary<string, string> {
                     { "naked-protocol", "lang code=ja\n\nspeech mode=after_action\n\n確認しているよ。<sing refs=\"clip:fixture\"/>" },
-                    { "unmarked-reasoning", "ユーザーは二つの録音を連結したい。先に内部手順を確認する。\n" + valid },
+                    { "unmarked-reasoning", barePreamble + "\n" + valid },
                     { "public-prefix-then-invalid-tail", valid + "裸の内部記録<continue/>" },
                     { "valid-public-action", valid }
                 };
@@ -200,7 +203,8 @@ public static class ChatLatencyTransportRegression
                             "Public contract injection removed current task/evidence.");
                         var emitted = new StringBuilder(); foreach (SpeechText part in parts) emitted.Append(part.Text);
                         emitted.Append(plain);
-                        bool validCase = sample.Key == "valid-public-action";
+                        bool absorbedPreambleCase = sample.Key == "unmarked-reasoning";
+                        bool validCase = sample.Key == "valid-public-action" || absorbedPreambleCase;
                         bool publicPrefixCase = sample.Key == "public-prefix-then-invalid-tail";
                         if (validCase)
                         {
@@ -209,6 +213,10 @@ public static class ChatLatencyTransportRegression
                                 "Valid public speech or validated tool projection changed through actual transport.");
                             if (typedSpeech) Check(parts.TrueForAll(p => p.LanguageCode == "ja" &&
                                 p.ActionDependency == SpeechActionDependency.Independent), "Transport lost language/phase metadata.");
+                            if (absorbedPreambleCase)
+                                Check(!emitted.ToString().Contains(barePreamble) && !complete.Contains(barePreamble) &&
+                                    model.m_DataList.Exists(m => m.role == "system" && m.content.Contains("[public_output_boundary/preamble]")),
+                                    "Rescued preamble reached the public stream/actions or lost its non-failure shape observation.");
                         }
                         else
                         {
@@ -234,7 +242,11 @@ public static class ChatLatencyTransportRegression
                         }
                         observations.Add(new JObject { ["case"] = sample.Key, ["request"] = feedback ? (typedSpeech ? "work-feedback" : "continuation") : "formal",
                             ["callback"] = typedSpeech ? "SpeechText" : "string", ["spokenCharacters"] = emitted.Length,
-                            ["formatErrors"] = errors.Count, ["projectedActions"] = complete.Contains("<motion"), ["passed"] = true });
+                            ["formatErrors"] = errors.Count, ["projectedActions"] = complete.Contains("<motion"),
+                            ["absorbedPreambleCase"] = absorbedPreambleCase,
+                            ["rawAssistantHistoryContainsPreamble"] = absorbedPreambleCase &&
+                                model.m_DataList.Exists(m => m.role == "assistant" && m.content.Contains(barePreamble)),
+                            ["passed"] = true });
                     }
                     finally { model.OnOutputFormatError -= errorSink; model.CancelActiveResponse(); }
                 }
@@ -267,7 +279,7 @@ public static class ChatLatencyTransportRegression
                 CheckBoundedPublicReceipt();
                 PublicBoundaryHttpReport = new JObject { ["passed"] = true, ["checks"] = checks - before,
                     ["loopbackRequests"] = observations.Count, ["cases"] = observations,
-                    ["scope"] = "Production ChatQW public entrypoints → ephemeral loopback UnityWebRequest/SSE → speech callbacks/executable projection. Synthetic payloads, no real model, TTS or scene actions." };
+                    ["scope"] = "Production ChatQW public entrypoints → ephemeral loopback UnityWebRequest/SSE → speech callbacks/executable projection. Absorbed preambles stay out of public speech/actions; existing General raw assistant history is observed, not sanitized by this test. Spatial unapproved-candidate history isolation is covered by the separate feedback-stage test. Synthetic payloads, no real model, TTS or scene actions." };
                 if (!string.IsNullOrWhiteSpace(output))
                 {
                     Directory.CreateDirectory(output);
@@ -282,12 +294,129 @@ public static class ChatLatencyTransportRegression
         }
     }
 
+    // Tests the actual feedback entrypoint, not merely the serializer with a stage
+    // supplied by the test. Consecutive requests share one provider and accepted
+    // user turn; only the explicit request stage may change its skill projection.
+    public static IEnumerator RunFeedbackStageHttpChecks(string output)
+    {
+        var observations = new JArray();
+        var host = new GameObject("FeedbackStageLoopbackFixture"); host.SetActive(false);
+        ChatQW model = null; TextAsset singing = null;
+        int before = checks;
+        using (var server = new PublicBoundaryLoopbackServer())
+        {
+            try
+            {
+                model = host.AddComponent<ChatQW>(); model.enabled = false;
+                model.m_Backend = ChatQW.BackendType.Local; model.m_LocalUrl = server.Url;
+                model.m_PrewarmPrefixOnStart = false; model.m_LogRequestStats = false;
+                typeof(LLM).GetField("url", Flags).SetValue(model, server.Url);
+                singing = new TextAsset(File.ReadAllText("Assets/AIChatTookit/Prompts/Skills/singing.txt")) { name = "singing" };
+                typeof(LLM).GetField("m_SkillFiles", Flags).SetValue(model, new[] { singing });
+                model.SkillCatalogContext = "可唱歌、观察和操作已登记设备。"; model.SetActiveSkills("singing");
+                string active = model.ActiveSkillContext;
+                const string original = "靠近那盏灯后关掉它；刚才的录音已经唱完，不要重复。";
+                const string image = "data:image/jpeg;base64,Zml4dHVyZQ==";
+                var user = new LLM.SendData("user", original);
+                model.m_DataList.Add(new LLM.SendData("system", "Synthetic persona: speak Chinese."));
+                model.m_DataList.Add(user);
+                model.m_DataList.Add(new LLM.SendData("assistant", "我正在靠近灯。"));
+                host.SetActive(true);
+                Check((string)typeof(LLM).GetField("url", Flags).GetValue(model) == server.Url,
+                    "Feedback-stage fixture selected a non-loopback provider");
+                const string response = "<lang code=\"zh\"/><speech mode=\"independent\"/><say>已经靠近，关灯还没有执行。</say>";
+                // Legacy five/six-argument entrypoints must still be General. The
+                // first spatial candidate is unrecorded; a later accepted reply
+                // proves recordAssistantHistory=true is not lost by stage routing.
+                for (int sample = 0; sample < 5; ++sample)
+                {
+                    bool spatial = sample == 1 || sample == 4;
+                    bool record = sample == 0 || sample == 4;
+                    var stage = spatial ? FormalResponseStage.CommittedSpatialReply : FormalResponseStage.General;
+                    string context = "[fixture current observation] capture=feedback-" + sample;
+                    string feedback = "[fixture actual execution] actionId=approach-7 phase=arrived lightOn=true switchSubmitted=false result-" + sample;
+                    var parts = new List<SpeechText>(); string completed = null;
+                    int acceptedBefore = model.m_DataList.Count;
+                    var exchange = server.ServeOne(response);
+                    if (sample == 0)
+                        model.PostSpeechFeedbackStream(context, feedback, parts.Add, value => completed = value, image);
+                    else if (sample == 3)
+                        model.PostSpeechFeedbackStream(context, feedback, parts.Add, value => completed = value, image, false);
+                    else
+                        model.PostSpeechFeedbackStreamForStage(context, feedback, parts.Add, value => completed = value, image, record, stage);
+                    float deadline = Time.realtimeSinceStartup + 12f;
+                    while (completed == null || !exchange.IsCompleted)
+                    {
+                        if (exchange.IsFaulted) throw exchange.Exception;
+                        if (Time.realtimeSinceStartup > deadline) throw new TimeoutException("Feedback-stage loopback request " + sample);
+                        yield return null;
+                    }
+                    var request = JObject.Parse(exchange.Result); var messages = (JArray)request["messages"];
+                    string skill = (string)messages[1]["content"];
+                    Check(spatial ? skill.StartsWith(FormalResponseContextPolicy.SpatialSkillScope, StringComparison.Ordinal) &&
+                        !skill.Contains("<sing_goal") : skill == active,
+                        "Actual feedback entrypoint dropped its explicit stage or leaked spatial projection into General");
+                    int feedbackIndex = messages.Count - (spatial ? 2 : 1);
+                    Check((string)messages[feedbackIndex]["role"] == "system" &&
+                        (string)messages[feedbackIndex]["content"] == feedback &&
+                        (!spatial || ((string)messages[messages.Count - 1]["role"] == "user" &&
+                            (string)messages[messages.Count - 1]["content"] == CommittedSpatialReplyProtocol.BuildFinalWritingInstruction(original))) &&
+                        exchange.Result.Contains(original) && exchange.Result.Contains(image) && exchange.Result.Contains(context),
+                        "Feedback-stage transport changed original evidence or detached its result-writing instruction from the latest execution fact");
+                    bool hasPublicContract = false;
+                    foreach (JObject message in messages)
+                        hasPublicContract |= (string)message["role"] == "system" && message["content"]?.Type == JTokenType.String &&
+                            ((string)message["content"]).Contains(spatial
+                                ? CommittedSpatialReplyProtocol.OutputContract : RoleOutputPublicBoundary.OutputContract);
+                    Check(hasPublicContract,
+                        "Feedback-stage decoded system messages omitted the public boundary contract; case=" + sample);
+                    Check(parts.Count > 0 && parts.TrueForAll(part => part.LanguageCode == "zh"),
+                        "Feedback-stage typed language changed; case=" + sample + " parts=" + parts.Count +
+                        " languages=" + BoundedFixtureValue(string.Join(",", parts.ConvertAll(part => part.LanguageCode ?? "<null>"))));
+                    Check(completed == "<speech mode=\"independent\"/>已经靠近，关灯还没有执行。",
+                        "Feedback-stage completion projection changed; case=" + sample + " actual=" + BoundedFixtureValue(completed));
+                    Check(model.m_DataList.Count == acceptedBefore + (record ? 1 : 0) &&
+                        model.m_DataList.FindAll(message => message.role == "user").Count == 1 &&
+                        ReferenceEquals(model.m_DataList[1], user) && user.content == original &&
+                        !model.m_DataList.Exists(message => message.content.Contains("fixture actual execution") || message.content.Contains("fixture current observation")),
+                        "Feedback stage wrote an unaudited candidate, fake user or transient execution evidence to history");
+                    Check(model.ActiveSkillContext == active && (sample == 0 || !exchange.Result.Contains("result-" + (sample - 1))),
+                        "Feedback request stage/results persisted in the shared provider");
+                    observations.Add(new JObject { ["case"] = sample, ["stage"] = stage.ToString(),
+                        ["entrypoint"] = sample == 0 ? "legacy-five-argument" : sample == 3 ? "legacy-six-argument" : "explicit-stage",
+                        ["recordAssistantHistory"] = record, ["acceptedHistoryDelta"] = model.m_DataList.Count - acceptedBefore,
+                        ["projectedSkillCharacters"] = skill.Length, ["passed"] = true });
+                }
+                FeedbackStageHttpReport = new JObject { ["passed"] = true, ["checks"] = checks - before,
+                    ["loopbackRequests"] = observations.Count, ["cases"] = observations,
+                    ["scope"] = "Actual per-request feedback stage through ChatQW public entrypoints, UnityWebRequest and SSE. Shared provider, General/spatial/General sequence, exact facts and candidate-history control; synthetic loopback only." };
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    Directory.CreateDirectory(output);
+                    File.WriteAllText(Path.Combine(output, "feedback-stage-http.json"), FeedbackStageHttpReport.ToString(), new UTF8Encoding(false));
+                }
+            }
+            finally
+            {
+                if (model != null) model.CancelActiveResponse();
+                UnityEngine.Object.DestroyImmediate(host);
+                if (singing != null) UnityEngine.Object.DestroyImmediate(singing);
+            }
+        }
+    }
+
     private static JObject ReadPublicReceipt(string fact)
     {
         const string marker = "[public_stream_prefix] ";
         foreach (string line in fact.Split('\n'))
             if (line.StartsWith(marker, StringComparison.Ordinal)) return JObject.Parse(line.Substring(marker.Length));
         throw new InvalidOperationException("Missing structured public stream receipt.");
+    }
+
+    private static string BoundedFixtureValue(string value)
+    {
+        if (value == null) return "<null>";
+        return value.Length <= 160 ? value : value.Substring(0, 160) + "…";
     }
 
     private static void CheckBoundedPublicReceipt()
@@ -354,17 +483,44 @@ public static class ChatLatencyTransportRegression
         {
             var model = host.AddComponent<ChatQW>();
             const string mixed = "先说一句。\n[分段观测]0–2 speech；2–5 singing\n青い空。静かな夜。\n只听就好，不用回唱。";
-            model.m_DataList.Add(new LLM.SendData("system", "Stable persona"));
-            model.m_DataList.Add(new LLM.SendData("user", mixed));
-            model.ActiveSkillContext = "Stable selected contract";
+            var persona = new LLM.SendData("system", "Stable persona");
+            var originalUser = new LLM.SendData("user", mixed);
+            model.m_DataList.Add(persona); model.m_DataList.Add(originalUser);
+            const string stableSkill = "Stable selected contract";
+            model.ActiveSkillContext = stableSkill;
             JObject first = Request(model, "[感知帧 10:00:00] current facts");
             model.m_DataList.Add(new LLM.SendData("assistant", "听到了。"));
             model.m_DataList.Add(new LLM.SendData("user", "最近天气很好。"));
             JObject second = Request(model, "[感知帧 10:00:05] fresh facts");
             var messages = (JArray)second["messages"];
-            Check((string)((JArray)first["messages"])[0]["content"] == (string)messages[0]["content"], "Stable system content changed");
-            Check((string)messages[1]["content"] == mixed && model.m_DataList[1].content == mixed,
-                "Previous mixed transcript, lyrics or tail request were rewritten for caching");
+            var firstMessages = (JArray)first["messages"];
+            var firstDialogue = new List<JObject>(); var dialogue = new List<JObject>();
+            foreach (JObject message in firstMessages)
+                if ((string)message["role"] == "user" || (string)message["role"] == "assistant") firstDialogue.Add(message);
+            foreach (JObject message in messages)
+                if ((string)message["role"] == "user" || (string)message["role"] == "assistant") dialogue.Add(message);
+            Check((string)firstMessages[0]["content"] == persona.content &&
+                (string)messages[0]["content"] == persona.content, "Stable system content changed");
+            Check(firstDialogue.Count == 1 && (string)firstDialogue[0]["role"] == "user" &&
+                (string)firstDialogue[0]["content"] == mixed && dialogue.Count == 3 &&
+                (string)dialogue[0]["role"] == "user" && (string)dialogue[0]["content"] == mixed &&
+                (string)dialogue[1]["role"] == "assistant" && (string)dialogue[1]["content"] == "听到了。" &&
+                (string)dialogue[2]["role"] == "user" && (string)dialogue[2]["content"] == "最近天气很好。" &&
+                ReferenceEquals(model.m_DataList[1], originalUser) && originalUser.content == mixed,
+                "Previous mixed transcript, lyrics, tail request or accepted dialogue order were changed for caching");
+            int firstDialogueAt = firstMessages.IndexOf(firstDialogue[0]), dialogueAt = messages.IndexOf(dialogue[0]);
+            int firstSkillAt = -1, skillAt = -1;
+            for (int i = 0; i < firstMessages.Count; ++i)
+                if ((string)firstMessages[i]["role"] == "system" && (string)firstMessages[i]["content"] == stableSkill) firstSkillAt = i;
+            for (int i = 0; i < messages.Count; ++i)
+                if ((string)messages[i]["role"] == "system" && (string)messages[i]["content"] == stableSkill) skillAt = i;
+            bool stablePrefix = firstSkillAt >= 0 && firstSkillAt == skillAt && firstSkillAt < firstDialogueAt && skillAt < dialogueAt;
+            for (int i = 0; i <= firstSkillAt; ++i)
+            {
+                stablePrefix &= i < messages.Count && JToken.DeepEquals(firstMessages[i], messages[i]);
+            }
+            Check(stablePrefix && model.ActiveSkillContext == stableSkill,
+                "Stable persona/skill prefix changed or moved behind changing dialogue between requests");
             string serialized = second.ToString();
             Check(serialized.IndexOf("[感知帧", StringComparison.Ordinal) == serialized.LastIndexOf("[感知帧", StringComparison.Ordinal),
                 "A previous request-only observation was retained in subsequent dialogue");
@@ -394,7 +550,11 @@ public static class ChatLatencyTransportRegression
                 "Scene sharing changed persona or current raw user quote");
             Check(ReferenceEquals(model.m_DataList[0], persona) && ReferenceEquals(model.m_DataList[1], entry) && entry.content == user,
                 "Request-only scene sharing mutated accepted history");
-            Check(((string)messages[1]["content"]).Contains(SceneFactContextCompactor.ReferenceKey),
+            bool hasSharedSystemFacts = false;
+            foreach (JObject message in messages)
+                hasSharedSystemFacts |= (string)message["role"] == "system" && message["content"]?.Type == JTokenType.String &&
+                    ((string)message["content"]).Contains(SceneFactContextCompactor.ReferenceKey);
+            Check(hasSharedSystemFacts,
                 "Actual request serializer did not use the production sharing helper");
             var other = Request(model, "unrelated fresh frame");
             Check(!other.ToString().Contains("[Scene fact sharing v1]"), "Prior transient canonical definitions leaked into a later request");
@@ -435,13 +595,29 @@ public static class ChatLatencyTransportRegression
             Check((string)messages[0]["content"] == persona.content &&
                 ((string)messages[1]["content"]).StartsWith(FormalResponseContextPolicy.SpatialSkillScope, StringComparison.Ordinal),
                 "Committed stage changed persona or placed stable skill scope after changing dialogue");
-            var last = (JArray)messages[messages.Count - 1]["content"];
-            Check(last[0]["image_url"]["url"].Value<string>() == latest.imageDataUrl &&
-                last[1]["text"].Value<string>().Contains(user), "Typed stage changed full user/audio evidence or the actual image");
+            int imageOwnerCount = 0; bool fullImageUserEvidence = false, hasSpeechContract = false;
+            foreach (JObject message in messages)
+            {
+                if ((string)message["role"] == "system" && message["content"]?.Type == JTokenType.String)
+                    hasSpeechContract |= ((string)message["content"]).Contains(SpeechText.OutputContract);
+                if ((string)message["role"] != "user" || !(message["content"] is JArray parts)) continue;
+                bool ownsImage = false, ownsWords = false;
+                foreach (JObject part in parts)
+                {
+                    ownsImage |= (string)part["type"] == "image_url" && (string)part["image_url"]?["url"] == latest.imageDataUrl;
+                    ownsWords |= (string)part["type"] == "text" && ((string)part["text"] ?? "").Contains(user);
+                }
+                if (ownsImage) { imageOwnerCount++; fullImageUserEvidence |= ownsWords; }
+            }
+            Check(imageOwnerCount == 1 && fullImageUserEvidence,
+                "Typed stage detached full user/audio evidence from its unique actual image owner");
             Check(compact.Contains(facts) && compact.Contains(memory) && compact.Contains("action has not arrived"),
                 "Typed stage removed exact current identity, timestamp, unknown or pending work");
-            Check(((string)messages[messages.Count - 2]["content"]).Contains(SpeechText.OutputContract),
+            Check(hasSpeechContract,
                 "Typed stage dropped production speech language/channel contract");
+            Check((string)messages[messages.Count - 1]["role"] == "user" &&
+                (string)messages[messages.Count - 1]["content"] == CommittedSpatialReplyProtocol.BuildFinalWritingInstruction(user),
+                "Committed stage lost its wire-only final result-writing instruction");
             Check(!compact.Contains("<sing_goal") && compact.Length < baseline.Length &&
                 Stage(FormalResponseStage.General) == baseline && Legacy() == baseline && model.ActiveSkillContext == originalSkill,
                 "Stage scope leaked across consecutive shared-provider requests or mutated capability state");
@@ -458,14 +634,62 @@ public static class ChatLatencyTransportRegression
                 "Cancelled stage coroutine reached HTTP preparation or changed the next request");
             Check(ReferenceEquals(model.m_DataList[0], persona) && ReferenceEquals(model.m_DataList[3], latest) && latest.content == user,
                 "Stage serialization mutated accepted history references");
+            const string result = "[actual execution] actionId=now-7 entityId=lamp-6 phase=arrived lightOn=true; no switch operation submitted.";
+            var feedbackHistory = new List<LLM.SendData>(model.m_DataList) { new LLM.SendData("assistant", "I am approaching the lamp.") };
+            string Feedback(FormalResponseStage stage) => (string)typeof(ChatQW).GetMethod("BuildStageRequestJsonForMessages", Flags)
+                .Invoke(model, new object[] { feedbackHistory, true, context, result, stage });
+            string feedbackBaseline = (string)typeof(ChatQW).GetMethod("BuildRequestJsonForMessagesWithFeedback", Flags)
+                .Invoke(model, new object[] { feedbackHistory, true, context, result });
+            string feedbackCompact = Feedback(FormalResponseStage.CommittedSpatialReply);
+            var feedbackMessages = (JArray)JObject.Parse(feedbackCompact)["messages"];
+            Check((string)feedbackMessages[feedbackMessages.Count - 2]["role"] == "system" &&
+                (string)feedbackMessages[feedbackMessages.Count - 2]["content"] == result &&
+                (string)feedbackMessages[feedbackMessages.Count - 3]["content"] == "I am approaching the lamp." &&
+                (string)feedbackMessages[feedbackMessages.Count - 1]["role"] == "user" &&
+                (string)feedbackMessages[feedbackMessages.Count - 1]["content"] == CommittedSpatialReplyProtocol.BuildFinalWritingInstruction(user),
+                "Spatial feedback displaced or rewrote the current result after its completed assistant action");
+            Check(!feedbackCompact.Contains("<sing_goal") && feedbackCompact.Contains(facts) && feedbackCompact.Contains(memory) &&
+                feedbackCompact.Contains(latest.imageDataUrl) && feedbackCompact.Length < feedbackBaseline.Length,
+                "Feedback stage lost exact evidence or restored the non-executable skill grammar");
+            Check(Feedback(FormalResponseStage.General) == feedbackBaseline &&
+                Feedback(FormalResponseStage.CommittedSpatialReply) == feedbackCompact &&
+                model.ActiveSkillContext == originalSkill && model.m_DataList.Count == 4,
+                "Feedback stage projection leaked across successive requests or mutated accepted history");
             Debug.Log("[FormalResponseStageRegression] " + new JObject { ["baselineWireCharacters"] = baseline.Length,
-                ["stageWireCharacters"] = compact.Length, ["baselineEstimatedTokens"] = oldEstimate, ["stageEstimatedTokens"] = newEstimate });
+                ["stageWireCharacters"] = compact.Length, ["baselineEstimatedTokens"] = oldEstimate, ["stageEstimatedTokens"] = newEstimate,
+                ["feedbackBaselineWireCharacters"] = feedbackBaseline.Length, ["feedbackStageWireCharacters"] = feedbackCompact.Length });
         }
         finally
         {
             UnityEngine.Object.DestroyImmediate(host);
             if (singing != null) UnityEngine.Object.DestroyImmediate(singing);
         }
+    }
+
+    private static void CheckFeedbackProviderCompatibility()
+    {
+        var host = new GameObject("InactiveLegacyFeedbackStageFixture"); host.SetActive(false);
+        try
+        {
+            var provider = host.AddComponent<FormalResponseLegacyFeedbackFixture>();
+            var parts = new List<SpeechText>();
+            string completed = null;
+            provider.PostSpeechFeedbackStreamForStage("context", "current-result", parts.Add, value => completed = value,
+                "fixture-image", false, FormalResponseStage.CommittedSpatialReply);
+            Check(provider.FeedbackCalls == 0 && parts.Count == 0 && completed == "" && provider.m_DataList.Count == 0,
+                "Legacy stage fallback published or recorded an unapproved feedback candidate");
+            provider.PostSpeechFeedbackStreamForStage("context", "current-result", parts.Add, value => completed = value,
+                "fixture-image", true, FormalResponseStage.CommittedSpatialReply);
+            Check(provider.FeedbackCalls == 1 && provider.LastContext == "context" && provider.LastFeedback == "current-result" &&
+                provider.LastImage == "fixture-image" && completed == "legacy-complete" && provider.m_DataList.Count == 1,
+                "Recorded stage fallback did not preserve the legacy feedback provider override");
+            provider.PostSpeechFeedbackStreamForStage("next-context", "next-result", parts.Add, value => completed = value,
+                null, true, FormalResponseStage.General);
+            Check(provider.FeedbackCalls == 2 && provider.LastContext == "next-context" && provider.LastFeedback == "next-result" &&
+                provider.LastImage == null && provider.m_DataList.Count == 2,
+                "A prior spatial stage changed later legacy-provider feedback/history behavior");
+        }
+        finally { UnityEngine.Object.DestroyImmediate(host); }
     }
 
     private static void CheckStagedObservations()
@@ -519,5 +743,18 @@ public static class ChatLatencyTransportRegression
             Check(reviewer.Contains("判定顺序") && reviewer.Contains("waiting_tool"), "Compacting formal context removed the independent reviewer's judging rubric");
         }
         finally { UnityEngine.Object.DestroyImmediate(host); }
+    }
+}
+
+public sealed class FormalResponseLegacyFeedbackFixture : LLM
+{
+    public int FeedbackCalls;
+    public string LastContext, LastFeedback, LastImage;
+    public override void PostSpeechFeedbackStream(string context, string feedback, Action<SpeechText> onSpeech,
+        Action<string> onComplete, string imageDataUrl = null)
+    {
+        ++FeedbackCalls; LastContext = context; LastFeedback = feedback; LastImage = imageDataUrl;
+        m_DataList.Add(new SendData("assistant", "legacy-complete"));
+        onComplete?.Invoke("legacy-complete");
     }
 }

@@ -263,16 +263,17 @@ public static class SceneObjectApproachRegression
         Set(fact,"entityId",actual.EntityId); Set(fact,"objectConfirmed",true);
         Set(fact,"intentFocusWorldPoint",selected.WorldPoint); Set(fact,"hasIntentFocus",true);
         Set(fact,"targetPurpose","observe-closer"); Set(fact,"targetDescription","本测试从实际视图选出的稳定参照表面");
-        Set(fact,"semanticTargetConfirmed",true); Set(fact,"targetMatchVerdict","match");
-        Set(fact,"targetMatchReason","Controlled precondition for navigation regression, not a model semantic result.");
+        Set(fact,"semanticTargetConfirmed",false); Set(fact,"targetMatchVerdict","matched");
+        Set(fact,"targetMatchReason","Controlled matched landmark precondition for navigation; original small target remains unconfirmed.");
         Set(c.chat,"m_SceneActionFact",fact); Set(c.chat,"m_SceneActionEpoch",epoch); Set(c.chat,"m_SceneActionActive",true);
         Call(c.chat,"RecordSceneAction",fact,"confirmed","controlled semantic precondition; actual same-entity capture acquired");
         int previousOperation=c.bridge.Controller.OperationRevision;
-        var decision=new RoomTaskProtocol.Decision { intent="approach-object",origin="user",evidence="靠近所选参照观察。" };
+        var decision=new RoomTaskProtocol.Decision { intent="approach-object",origin="user",evidence="靠近所选参照观察。",targetPurpose="observe-closer" };
         bool completed=false;
         if (hideOnArrival) c.arrived=value=> { if (value.actionId==actionId && value.reached && value.status=="arrived") c.HideView(); };
         yield return (IEnumerator)Call(c.chat,"SubmitConfirmedSceneObjectApproach",decision,actual,confirmed,fact,c.bridge,generation,epoch,new Action(()=>completed=true));
-        c.Check(completed && c.bridge.Controller.OperationRevision>previousOperation,"Confirmed approach hands off to an actual native controller operation.");
+        c.Check(completed && c.bridge.Controller.OperationRevision>previousOperation && !(bool)Get(fact,"semanticTargetConfirmed"),
+            "A confirmed observation landmark submits a real native approach without inventing original-target semantic proof.");
         Vector3 prior=c.bridge.avatar.transform.position; float priorAt=Time.realtimeSinceStartup,deadline=priorAt+65;
         float maxRootStep=0, maximumWalkingHeadFocus=0, maximumActualAppliedDegrees=0, lastGazeSample=-100;
         int walkingAppliedFrames=0; var walkingGaze=new JArray();
@@ -325,7 +326,7 @@ public static class SceneObjectApproachRegression
             "Ground arrival and actual same-entity reobservation have distinct truthful outcomes: "+final);
         c.Check((string)final["entityId"]==actual.EntityId && (string)final["resultCaptureId"]!=confirmed.CaptureId &&
             !string.IsNullOrEmpty((string)final["resultCaptureId"]),"Post-arrival result uses a distinct real image and retains the exact target identity.");
-        c.Check((bool?)final["stateChanged"]!=true && (string)final["targetPurpose"]=="observe-closer",
+        c.Check((bool?)final["stateChanged"]!=true && (bool?)final["semanticTargetConfirmed"]!=true && (string)final["targetPurpose"]=="observe-closer",
             "Closer observation of this referent does not claim a device operation or identification of a smaller nearby object.");
         c.Check(Horizontal((Vector3)Get(fact,"measuredSurface")-(Vector3)Get(fact,"intentFocusWorldPoint"))<=.5001f,
             "The actual navigation focus stays within 0.5 m XZ of the intended object region.");
