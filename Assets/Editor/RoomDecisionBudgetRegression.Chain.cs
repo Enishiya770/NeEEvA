@@ -139,16 +139,21 @@ public static partial class RoomDecisionBudgetRegression
             input["currentRequestOnly"] = false;
             string wire = (string)Call(provider, "BuildRoomTaskRequestJsonWithObservationHistory", input.ToString(Formatting.None), "data:image/png;base64,CURRENT_BUDGET_ONLY", images, false);
             var result = Budget(wire, false); reports.Add(result["diagnostic"].DeepClone());
-            Require((bool)result["ok"] && (int)result["diagnostic"]["final"]["schemaUtf8Bytes"] == 19437 &&
+            Require((bool)result["ok"] && JToken.DeepEquals(JObject.Parse(wire)["response_format"]["schema"],
+                    JObject.Parse((string)result["wire"])["response_format"]["schema"]) &&
                 (long)result["diagnostic"]["original"]["estimatedUnits"] > 61440 &&
                 (long)result["diagnostic"]["final"]["estimatedUnits"] <= 61440,
-                "Post-search full native grammar + six current/six historical objects + two image reserves fit unchanged ceilings after projection.");
+                "Post-search full native grammar + six current/six historical objects + two image reserves fit unchanged ceilings after projection: " + result["diagnostic"]);
             var after = Input((string)result["wire"]); Call(null, "RestoreRoomDecisionSharedEvidence", after);
             Require((string)after["currentUserText"] == utterance && (string)after["latestUserText"] == utterance &&
                 JToken.DeepEquals(after["currentRequestSemantics"], input["currentRequestSemantics"]) &&
                 ((JArray)after["visibleObjectCatalog"]["current"]["candidates"]).Count == 6 &&
                 ((JArray)after["visibleObjectCatalog"]["memory"]).Count == 6,
-                "Protected words, compact request receipt and all twelve real-capture object records remain in the admitted chain request.");
+                "Protected words, compact request receipt and all twelve real-capture object records remain in the admitted chain request: " + new JObject {
+                    ["actualUser"] = after["currentUserText"], ["latestUser"] = after["latestUserText"],
+                    ["actualSemantics"] = after["currentRequestSemantics"], ["expectedSemantics"] = input["currentRequestSemantics"],
+                    ["currentCount"] = ((JArray)after["visibleObjectCatalog"]["current"]["candidates"]).Count,
+                    ["memoryCount"] = ((JArray)after["visibleObjectCatalog"]["memory"]).Count, ["budget"] = result["diagnostic"] });
             Require(JToken.DeepEquals(JObject.Parse(wire)["response_format"], JObject.Parse((string)result["wire"])["response_format"]) &&
                 JObject.Parse((string)result["wire"]).SelectTokens("$..image_url.url").Count() == 2,
                 "Both image attachments and full native schema survive chain projection unchanged.");

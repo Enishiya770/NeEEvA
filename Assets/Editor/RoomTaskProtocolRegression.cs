@@ -14,7 +14,7 @@ public static class RoomTaskProtocolRegression
     public static int RunChecks()
     {
         checks = 0;
-        GoalUpdateResponseModeCases(); DecisionSchemaCases(); VisualSchemaCases(); DecisionDiagnosticCases(); ReviewSchemaCases(); SpeechGateCases(); SpatialAnswerCases();
+        GoalUpdateResponseModeCases(); DecisionSchemaCases(); DeviceGoalGrammarParityCases(); VisualSchemaCases(); DecisionDiagnosticCases(); ReviewSchemaCases(); SpeechGateCases(); SpatialAnswerCases();
 #if UNITY_EDITOR
         ProviderCases();
 #endif
@@ -61,7 +61,7 @@ public static class RoomTaskProtocolRegression
         ordinary["intent"]="approach"; ordinary["origin"]="user"; ordinary["evidence"]="Come here";
         Check(!RoomTaskProtocol.TryDecision(ordinary.ToString(), "Come here", false, out _), "A reply scope cannot be attached to an action.");
         var schema=JObject.Parse(RoomTaskProtocol.DecisionSchema);
-        var none=((JArray)schema["oneOf"]).OfType<JObject>().Single(x=>((JArray)x["properties"]["intent"]["enum"]).Values<string>().Contains("none"));
+        var none=((JArray)schema["oneOf"]).OfType<JObject>().Single(x=>x["properties"]["deviceGoal"] == null && ((JArray)x["properties"]["intent"]["enum"]).Values<string>().Contains("none"));
         Check(((JArray)none["required"]).Values<string>().Contains("replyScope"), "The actual model grammar requires an explicit none reply classification.");
         foreach(string status in new[]{"found","completed","incomplete","blocked","cancelled"})
         {
@@ -213,6 +213,40 @@ public static class RoomTaskProtocolRegression
             ExpectDecision(malformed, user, false, false);
     }
 
+    private static void DeviceGoalGrammarParityCases()
+    {
+        var schema = JObject.Parse(RoomTaskProtocol.DecisionSchema);
+        var compact = JObject.Parse(RoomTaskProtocol.CompactNativeDecisionSchema(RoomTaskProtocol.DecisionSchema));
+        Check(JToken.DeepEquals(schema, SceneObjectProtocolRegression.ExpandNativeSchema(compact)) &&
+            compact.ToString(Newtonsoft.Json.Formatting.None).Length < RoomTaskProtocol.DecisionSchema.Length * .75,
+            "Native schema shares identical definitions, with exact expansion and no removed constraints.");
+        const string request = "请处理这个设备任务，然后按本轮要求行动。";
+        foreach (string intent in schema["properties"]["intent"]["enum"].Values<string>())
+        foreach (string operation in new[] { "set", "cancel" })
+        foreach (string origin in new[] { "user", "autonomous", "none" })
+        {
+            var value = new JObject { ["intent"] = intent, ["origin"] = origin, ["evidence"] = request };
+            if (intent == "none") value["replyScope"] = "spatial";
+            if (new[] { "look-at", "approach-object", "inspect-object", "set-object-state", "reposition-view" }.Contains(intent))
+                value["visualTarget"] = new JObject { ["captureId"] = "capture", ["x"] = .5, ["y"] = .5, ["label"] = "灯" };
+            if (intent == "set-object-state") value["objectState"] = "off";
+            if (intent == "orient-view" || intent == "turn-in-place")
+                value["viewChange"] = new JObject { ["captureId"] = "capture", ["yaw"] = 20, ["pitch"] = 0 };
+            if (intent == "search-scene") value["searchTask"] = new JObject { ["mode"] = "find" };
+            if (intent == "reposition-view") value["viewPosition"] = new JObject { ["direction"] = "left", ["distance"] = .5, ["purpose"] = "avoid-occlusion" };
+            value["deviceGoal"] = new JObject { ["operation"] = operation, ["requestQuote"] = request };
+            if (operation == "set") { value["deviceGoal"]["targetDescription"] = "灯"; value["deviceGoal"]["desiredState"] = "off"; }
+            bool expected = origin == "user" && (operation == "cancel" ? intent == "none" || intent == "stop-moving" :
+                intent != "approach" && intent != "follow" && intent != "stop-moving");
+            bool grammar = SceneObjectProtocolRegression.MatchesSchemaShape(schema, value);
+            bool runtime = RoomTaskProtocol.TryDecision(value.ToString(), request, origin == "autonomous", out _);
+            Check(grammar == expected && runtime == expected && SceneObjectProtocolRegression.MatchesSchemaShape(compact, value) == expected,
+                "Device proposal expanded/native grammar/runtime parity: " + intent + "/" + operation + "/" + origin);
+        }
+        Check(RoomTaskProtocol.DecisionRepairConstraint("invalid-device-goal-proposal-or-origin")?["field"]?.ToString() == "deviceGoal" &&
+            RoomTaskProtocol.DecisionRepairConstraint("unrelated") == null, "Repair receives the violated field and concrete compatibility constraint.");
+    }
+
     private static void ReviewSchemaCases()
     {
         const string consistent = "{\"verdict\":\"consistent\",\"reason\":\"台词仅表达正在尝试。\"}";
@@ -241,6 +275,22 @@ public static class RoomTaskProtocolRegression
 
     private static void SpeechGateCases()
     {
+        var languageSchema = JObject.Parse(RoomTaskProtocol.BuildSpeechReviewSchemaForInput("{\"publicSpeechLanguage\":\"ja\"}"));
+        Check(((JArray)languageSchema["required"]).Values<string>().Contains("actualLanguage") &&
+            ((JObject)languageSchema["properties"]).Properties().First().Name == "actualLanguage",
+            "Actual spoken language is independently classified before the factual verdict.");
+        foreach (string actual in new[] { "zh", "mixed", "und", null })
+            Check(RoomTaskProtocol.ReviewLanguageRejection(new JObject { ["verdict"] = "consistent", ["actualLanguage"] = actual }, "ja") != null,
+                "A consistent fact verdict cannot approve another or unreviewed language.");
+        Check(RoomTaskProtocol.ReviewLanguageRejection(new JObject { ["actualLanguage"] = "ja" }, "ja") == null,
+            "Matching spoken language remains eligible for independent factual validation.");
+        var languageInput = new JObject { ["publicSpeech"] = "刚才的灯已经重新打开了。", ["publicSpeechLanguage"] = "ja",
+            ["configuredDialogueLanguage"] = "日本語", ["unknownConstraint"] = false };
+        var blind = JObject.Parse(RoomTaskProtocol.ProjectSpeechReviewInput(languageInput.ToString()));
+        Check(blind["publicSpeechLanguage"] == null && blind["configuredDialogueLanguage"] == null &&
+            JToken.DeepEquals(blind["publicSpeech"], languageInput["publicSpeech"]) && (bool?)blind["unknownConstraint"] == false &&
+            (string)languageInput["publicSpeechLanguage"] == "ja",
+            "Language classification receives exact speech without declaration/configuration hints; original runtime labels and unknown facts remain intact.");
         Check(RoomTaskProtocol.IsPlainSpeech("我正在尝试走近。") && RoomTaskProtocol.IsPlainSpeech(new string('字', 1600)),
             "Ordinary reviewed speech was not representable.");
         foreach (string raw in new[] { "", null, " \n", "<silent/>隐私", "<thought>隐私</thought>",
@@ -323,7 +373,7 @@ public static class RoomTaskProtocolRegression
                     "Auxiliary planning/review received private history or spoken-output instructions.");
                 Check((string)request["response_format"]["type"] == "json_object", "Provider lost structured JSON mode.");
                 if (backend == ChatQW.BackendType.Local)
-                    Check((int)request["id_slot"] == 1 && JToken.DeepEquals(request["response_format"]["schema"], JObject.Parse(schema)) &&
+                    Check((int)request["id_slot"] == 1 && JToken.DeepEquals(SceneObjectProtocolRegression.ExpandNativeSchema(request["response_format"]["schema"]), JObject.Parse(schema)) &&
                         (bool)request["chat_template_kwargs"]["enable_thinking"] == false, "Local task used main slot or omitted schema/thinking control.");
                 else
                     Check(request["id_slot"] == null && request["chat_template_kwargs"] == null && request["response_format"]["schema"] == null,
@@ -384,6 +434,7 @@ public static class RoomTaskProtocolRegression
 
     private static void CheckDecisionFieldGuide(JObject schema, JObject guide)
     {
+        guide = SceneObjectProtocolRegression.ExpandNativeSchema(guide);
         Check(guide.Property("oneOf") == null && JToken.DeepEquals(guide["properties"], schema["properties"]),
             "Local field guide omits repeated oneOf arms while retaining every exact field definition.");
         var expectedBase = (JObject)schema.DeepClone(); expectedBase.Remove("oneOf");
@@ -411,7 +462,7 @@ public static class RoomTaskProtocolRegression
                 "Compacted required and allowed fields exactly retain the branch, including target alternatives and search mode.");
             var overrides = constraint["fieldOverrides"] as JObject;
             int differingFields = 0;
-            foreach (var property in properties.Properties().Where(item => !common.Contains(item.Name)))
+            foreach (var property in properties.Properties().Where(item => item.Name != "intent"))
             {
                 bool differs = !JToken.DeepEquals(property.Value, schema["properties"][property.Name]);
                 if (differs) differingFields++;

@@ -25,6 +25,17 @@ public partial class ChatSample
         m_WorkRoomRequestText = m_ActionConstraints.CurrentUserText;
     }
 
+    private JObject BuildWorkRoomCompletionObservation()
+    {
+        if (m_WorkRoomTaskEpoch != m_WorkEpoch || m_WorkRoomTaskUserTurn != m_ActionConstraints.CurrentUserTurn ||
+            string.IsNullOrEmpty(m_WorkRoomTaskActionId)) return null;
+        var room = ReadCompactRoomTaskFacts(GetComponent<ArdyRoomDialogueBridge>());
+        return new JObject { ["intent"] = m_WorkRoomTaskIntent, ["actionId"] = m_WorkRoomTaskActionId,
+            ["currentRoomFacts"] = room,
+            ["movementReportRequirement"] = RoomMovementResultPolicy.Requirement(room, m_WorkRoomTaskIntent, m_WorkRoomTaskActionId),
+            ["scope"] = "Read current matching execution before proposing continuation. Generated replies and an old attempt-submitted dispatch cannot override actual arrival. Satisfied movement is not a reason to move again; independently unfinished requirements remain separate." };
+    }
+
     private WorkRoomStepRequest CreateWorkRoomStepRequest()
     {
         if (!HasRoomTaskPlanner || !m_WorkReviewOpen || m_WorkStatus != "continue" || m_WorkNoProgress ||

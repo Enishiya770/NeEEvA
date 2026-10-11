@@ -21,6 +21,7 @@ public partial class ChatQW : LLM
     [SerializeField] private bool m_CompactSceneFactContext = true;
     private string CompactScenePromptContext(string context, bool log = false)
     {
+        context = ProjectSceneAttentionText(context);
         if (!m_CompactSceneFactContext) return context;
         string result = SceneFactContextCompactor.Compact(context, out var report);
         if (log && m_LogRequestStats && report.blocks > 0)
@@ -188,9 +189,19 @@ public partial class ChatQW : LLM
     private string BuildStageRequestJsonForMessages(List<SendData> messages, bool stream,
         string transientSystemContext, string executionFeedback, FormalResponseStage stage)
     {
+        if (stage == FormalResponseStage.CommittedSpatialReply && !CommittedSpatialReplyProtocol.IsPlanningFailureOnly(transientSystemContext))
+            return BuildBudgetedReplyRequest(messages, stream, transientSystemContext, executionFeedback);
+        return BuildStageRequestJsonCore(messages, stream, transientSystemContext, executionFeedback, stage);
+    }
+
+    private string BuildStageRequestJsonCore(List<SendData> messages, bool stream,
+        string transientSystemContext, string executionFeedback, FormalResponseStage stage)
+    {
         if (stage == FormalResponseStage.SpatialGoalResult)
             return BuildSpatialGoalResultRequestJsonForMessages(messages, stream, transientSystemContext, executionFeedback,
                 messages != null && messages.Count > 0 ? messages[messages.Count - 1]?.imageDataUrl : null);
+        if (stage == FormalResponseStage.CommittedSpatialReply && CommittedSpatialReplyProtocol.IsPlanningFailureOnly(transientSystemContext))
+            return null; // Caller reports this engine-owned receipt locally; never generate another promise.
         string skillContext = FormalResponseContextPolicy.SkillContext(stage, ActiveSkillContext, SkillCatalogContext);
         transientSystemContext = CompactScenePromptContext(transientSystemContext);
         if (stage == FormalResponseStage.CommittedSpatialReply)
@@ -2388,6 +2399,14 @@ public partial class ChatQW : LLM
         if (generation != m_StreamRequestGeneration) yield break;
         bool compactResult = stage == FormalResponseStage.SpatialGoalResult;
         bool committedReply = stage == FormalResponseStage.CommittedSpatialReply;
+        if (committedReply && CommittedSpatialReplyProtocol.IsPlanningFailureOnly(transientSystemContext))
+        {
+            // The ordinary request entry/handoff and cancellation have already
+            // been handled. ChatSample now speaks its localized, owner-checked
+            // receipt without model generation or a second semantic review.
+            Debug.Log($"[LLM/PlanningFailureContext] generation={generation} route=local-receipt httpRequests=0");
+            _onComplete?.Invoke(""); yield break;
+        }
         bool closedPublicReply = compactResult || committedReply;
         // Continuation callbacks may immediately start another request. Keep this
         // span local so that their stopwatch cannot erase the current duration.
@@ -2421,6 +2440,8 @@ public partial class ChatQW : LLM
             ? new RoleOutputChannels(null, RoleOutputBoundaryPolicy.ExplicitPublicSayWithActions) : channels;
 
         if (!compactResult) PruneOldImagesInPlace(m_DataList, m_KeepRecentImages);
+        string sourceReplyContext = transientSystemContext;
+        if (committedReply) transientSystemContext = ProjectReplyFacts(transientSystemContext, 0, out _);
         if (!compactResult) transientSystemContext = CompactScenePromptContext(transientSystemContext, true);
         if (committedReply) transientSystemContext = CommittedSpatialReplyProtocol.AddContract(transientSystemContext);
         string budgetContext = string.IsNullOrWhiteSpace(executionFeedback) ? transientSystemContext
@@ -2430,7 +2451,9 @@ public partial class ChatQW : LLM
             budgetContext = (budgetContext ?? "") + "\n\n" + BuildCommittedReplyWritingInstruction(m_DataList, transientSystemContext);
         }
         string skillContext = FormalResponseContextPolicy.SkillContext(stage, ActiveSkillContext, SkillCatalogContext);
-        List<SendData> requestHistory = compactResult ? new List<SendData>() : CreateStageRequestHistory(budgetContext, imageDataUrl, skillContext);
+        List<SendData> requestHistory = compactResult ? new List<SendData>() : committedReply
+            ? CreateStageRequestHistoryFrom(CreateReplyWriterMessages(m_DataList), budgetContext, imageDataUrl, skillContext)
+            : CreateStageRequestHistory(budgetContext, imageDataUrl, skillContext);
         List<SendData> wireHistory = CreateObservationRequestHistory(requestHistory, imageDataUrl);
         int rawEstimate = compactResult ? SpatialGoalResultContextPolicy.EstimateTextTokens(budgetContext) : EstimateStageRequestTokens(wireHistory, budgetContext, skillContext);
         int imageAllowance = ImageTokenAllowance(wireHistory);
@@ -2442,11 +2465,21 @@ public partial class ChatQW : LLM
             m_ActiveStreamRequest = request;
             string _jsonText = compactResult
                 ? BuildSpatialGoalResultRequestJsonForMessages(null, true, transientSystemContext, executionFeedback, imageDataUrl)
-                : BuildStageRequestJsonForMessages(wireHistory, true, transientSystemContext, executionFeedback, stage);
+                : BuildStageRequestJsonForMessages(wireHistory, true, committedReply ? sourceReplyContext : transientSystemContext, executionFeedback, stage);
             if (string.IsNullOrEmpty(_jsonText))
             {
                 if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null;
                 Debug.LogWarning($"[LLM/SpatialGoalResult] generation={generation} rejected=invalid-context-or-text-budget budget={SpatialGoalResultContextPolicy.TextTokenEstimateBudget} noHttp=true");
+                _onComplete?.Invoke(""); yield break;
+            }
+            bool admitted = AdmitSceneSpeechWire(_jsonText, out var speechBudget);
+            speechBudget["stage"] = stage.ToString(); speechBudget["generation"] = generation;
+            speechBudget["httpRequestSent"] = false;
+            Debug.Log("[LLM/SpeechBudget] " + speechBudget.ToString(Newtonsoft.Json.Formatting.None));
+            if (!admitted)
+            {
+                if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null;
+                RaiseResponseGenerationFailure("context-budget");
                 _onComplete?.Invoke(""); yield break;
             }
             if (m_LogRequestStats && stage != FormalResponseStage.General)

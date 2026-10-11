@@ -15,8 +15,8 @@ MonoBehaviour:
   schema: 1
   avatar: {fileID: 5929401533440927806, guid: bf2647ec9b2f87749a32bcf3beb5ca62, type: 3}
   sourcePath: Assets/Model/Artifairy/Artifairy_RibbonSpreadCompatible.vrm
-  sourceSha256: 85c3d4523bcb801a8dd8e89e1a75cd661fa0283d48b0c01982acc60bc50bb404
-  sourceDependencyHash: cfdc43cd61e3e4c637520cb054b69b2e
+  sourceSha256: df4740a6a790c22c9ca3272567a09f3302a4676ce0f062dc237a744b3f99c53c
+  sourceDependencyHash: a3819e9565a291b942e2e0f5f849ea98
   entries:
   - bone: 0
     restInRoot: {x: 0, y: 0, z: 0, w: 1}

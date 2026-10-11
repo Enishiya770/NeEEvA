@@ -62,9 +62,9 @@ public static class SceneViewPositionProtocolRegression
             "View position has exactly three required fields, no world coordinates or capability grants.");
         var branches = ((JArray)schema["oneOf"]).OfType<JObject>().Where(x =>
             x["properties"]["intent"]["enum"].Values<string>().Contains("reposition-view")).ToArray();
-        Require(branches.Length == 2 && branches.All(x => x["required"].Values<string>().Contains("viewPosition") &&
+        Require(branches.Length == 4 && branches.All(x => x["required"].Values<string>().Contains("viewPosition") &&
             x["properties"]["observationGoalId"] == null && x["properties"]["targetSelection"] != null),
-            "Both target representations require the same position shape and forbid observation-goal inheritance.");
+            "Both target representations, with and without a user device proposal, require the same position shape and forbid observation-goal inheritance.");
         foreach (bool entity in new[] { false, true })
         foreach (string direction in new[] { "farther", "closer", "left", "right" })
         foreach (string purpose in new[] { "see-whole", "read-detail", "avoid-occlusion" })

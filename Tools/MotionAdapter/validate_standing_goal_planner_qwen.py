@@ -94,7 +94,7 @@ public partial class PlannerWireProbe {
     # The production serializer now prepares a bounded working set before wire
     # assembly. Compile its complete pure dependencies, never stub out selection.
     policy_sources = []
-    for name in ("ChatQW.RoomTaskRecovery.cs", "ChatQW.RoomDecisionBudget.cs", "ChatQW.RoomWorkingMemory.cs"):
+    for name in ("ChatQW.RoomTaskRecovery.cs", "ChatQW.RoomDecisionBudget.cs", "ChatQW.RoomWorkingMemory.cs", "ChatQW.SceneAttention.cs"):
         path = ROOT / "Assets/AIChatTookit/Scripts/LLM/QW" / name
         destination = build / name
         destination.write_text(path.read_text(encoding="utf-8-sig").replace("partial class ChatQW", "partial class PlannerWireProbe"), encoding="utf-8")

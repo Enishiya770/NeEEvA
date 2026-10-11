@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -65,6 +65,27 @@ public static class SpatialGoalResultTransportRegression
                     SpatialGoalResultContextPolicy.ProjectResultFacts(facts).ToString(Formatting.Indented));
                 string context = SpatialGoalResultContextPolicy.BuildContext(Original, facts.ToString(Formatting.None));
                 Require(SpatialGoalResultContextPolicy.TryReadContext(context, out var original, out var parsed) && original == Original && JToken.DeepEquals(parsed, facts), "Original request and all mandatory facts round trip exactly.", ref checks);
+                var failureFacts = new JObject {
+                    ["planningFailureOnly"] = true,
+                    ["humanInput"] = new JObject { ["currentHumanTurnPresent"] = true, ["primaryUtterance"] = "把刚才关掉的小灯重新打开。" },
+                    ["currentRequestSemantics"] = new JObject { ["requestKind"] = "action", ["requiresActionOrControl"] = true },
+                    ["decisionFailure"] = new JObject { ["kind"] = "input-budget-exceeded", ["newActionSubmittedByThisDecision"] = false,
+                        ["providerDiagnostic"] = new JObject { ["httpRequestSent"] = false, ["attempts"] = 0 } }
+                };
+                string failureContext = CommittedSpatialReplyProtocol.AppendReplyFacts("", failureFacts);
+                Require(CommittedSpatialReplyProtocol.IsPlanningFailureOnly(failureContext),
+                    "Pure-action planning failure selects its local receipt route.", ref checks);
+                var mixedFailure = (JObject)failureFacts.DeepClone();
+                mixedFailure["currentRequestSemantics"]["requestKind"] = "mixed";
+                Require(!CommittedSpatialReplyProtocol.IsPlanningFailureOnly(CommittedSpatialReplyProtocol.AppendReplyFacts("", mixedFailure)),
+                    "Mixed question/action requests cannot lose their answer evidence through the local failure shortcut.", ref checks);
+                foreach (string field in new[] { "currentRequestSemantics", "decisionFailure", "humanInput" })
+                {
+                    var incomplete = (JObject)failureFacts.DeepClone(); incomplete[field] = JValue.CreateNull();
+                    Require(!CommittedSpatialReplyProtocol.IsPlanningFailureOnly(CommittedSpatialReplyProtocol.AppendReplyFacts("", incomplete)),
+                        "A JSON-null " + field + " cannot select the local failure route or break ordinary replies.", ref checks);
+                }
+                File.WriteAllText(Path.Combine(directory, "planning-failure-context.txt"), failureContext);
                 foreach (var backend in new[] { ChatQW.BackendType.Local, ChatQW.BackendType.Cloud })
                 {
                     model.m_Backend = backend;
@@ -115,6 +136,32 @@ public static class SpatialGoalResultTransportRegression
                     value => { Require(value == "", "Oversized mandatory context completes safely empty.", ref checks); noHttpDone = true; }, Image, false, FormalResponseStage.SpatialGoalResult);
                 yield return null;
                 Require(noHttpDone && server.Count == sent && model.m_DataList.SequenceEqual(history), "Mandatory budget rejection does not send HTTP or mutate history.", ref checks);
+
+                bool localFailureDone = false;
+                model.PostSpeechFeedbackStreamForStage(failureContext, "", _ => { throw new Exception("Model must not invent failure speech"); },
+                    value => { Require(value == "", "Local receipt returns to the owner's factual speech path.", ref checks); localFailureDone = true; },
+                    Image, false, FormalResponseStage.CommittedSpatialReply);
+                yield return null;
+                Require(localFailureDone && server.Count == sent,
+                    "Planning failure performs zero generation HTTP even with large old history and an image.", ref checks);
+
+                bool? reviewBudgetAccepted = null; string reviewBudgetStatus = null;
+                model.PostRoomTaskMessage(new JObject {
+                    ["requestedUserText"] = "报告当前状态", ["publicSpeech"] = "尚未开始。",
+                    ["unknownMandatoryEvidence"] = new string('证', 65000)
+                }.ToString(Formatting.None), true, (ok, value, status) => { reviewBudgetAccepted = ok; reviewBudgetStatus = status; });
+                yield return null;
+                Require(reviewBudgetAccepted == false && reviewBudgetStatus.Contains("attempts=0") && server.Count == sent,
+                    "Speech review rejects oversized protected evidence locally without sending HTTP or discarding it.", ref checks);
+                bool formalBudgetDone = false;
+                string oversizedReply = CommittedSpatialReplyProtocol.AppendReplyFacts("", new JObject {
+                    ["humanInput"] = new JObject { ["currentHumanTurnPresent"] = true, ["primaryUtterance"] = new string('原', 65000) }
+                });
+                model.PostSpeechFeedbackStreamForStage(oversizedReply, "", _ => { throw new Exception("Oversize formal speech"); },
+                    value => { Require(value == "", "Oversized committed reply completes safely empty.", ref checks); formalBudgetDone = true; },
+                    null, false, FormalResponseStage.CommittedSpatialReply);
+                yield return null;
+                Require(formalBudgetDone && server.Count == sent, "Formal reply applies the shared complete-payload budget before HTTP.", ref checks);
 
                 var listedSources = new JArray(
                     new JObject { ["kind"]="observed-device", ["sourceId"]="observed-device:fixture-observation", ["entityId"]="fixture-lamp" },

@@ -178,6 +178,8 @@ public static partial class RoomDecisionBudgetRegression
             CheckFreshProducerShape(provider);
             CheckRealProducerProjection(provider);
             CheckWorkingMemory(provider);
+            CheckSharedSceneAttention(provider);
+            CheckReplyFactPackets(provider);
             LastReport["raw"] = rawDiagnostic; LastReport["budget"] = result["diagnostic"].DeepClone();
             LastReport["status"] = "passed";
             return checks;

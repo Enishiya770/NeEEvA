@@ -91,13 +91,14 @@ public static class SceneObjectProtocolRegression
         int start = checks;
         JObject schema = JObject.Parse(RoomTaskProtocol.DecisionSchema);
         var branches = (JArray)schema["oneOf"];
-        Require(branches != null && branches.Count == 14, "Decision grammar advertises fourteen explicit intent/target shapes, including a separately classified no-action reply and bounded search.");
+        Require(branches != null && branches.Count == 31, "Decision grammar closes sixteen intent/target shapes and fifteen legal user-device proposal alternatives.");
         Require(branches.OfType<JObject>().All(branch => (bool)branch["additionalProperties"] == false &&
             branch["required"].Values<string>().Contains("intent") && branch["required"].Values<string>().Contains("origin") &&
             branch["required"].Values<string>().Contains("evidence")), "Every intent branch independently closes its fields.");
         foreach (string intent in schema["properties"]["intent"]["enum"].Values<string>())
         {
             int expected = new[] { "approach-object", "inspect-object", "set-object-state", "reposition-view" }.Contains(intent) ? 2 : 1;
+            if (intent != "approach" && intent != "follow") expected *= 2; // optional user-owned device proposal is a closed branch
             Require(branches.Count(branch => branch["properties"]["intent"]["enum"].Values<string>().Contains(intent)) == expected,
                 "The grammar has exactly the supported target alternatives for " + intent + ".");
         }
@@ -111,7 +112,7 @@ public static class SceneObjectProtocolRegression
                 "Production parser: " + reason + " :: " + text);
         }
         var searchBranch = branches.OfType<JObject>().Single(branch =>
-            branch["properties"]["intent"]["enum"].Values<string>().Contains("search-scene"));
+            branch["properties"]["deviceGoal"] == null && branch["properties"]["intent"]["enum"].Values<string>().Contains("search-scene"));
         var searchShape = (JObject)searchBranch["properties"]["searchTask"];
         Require(searchBranch["required"].Values<string>().Contains("searchTask") &&
             (bool)searchShape["additionalProperties"] == false &&
@@ -246,8 +247,38 @@ public static class SceneObjectProtocolRegression
 
     // Independent structural evaluation of precisely the JSON Schema keywords used
     // by DecisionSchema. Unknown keywords fail the test instead of being ignored.
+    internal static JObject ExpandNativeSchema(JToken schema)
+    {
+        if (!(schema is JObject root)) return null;
+        JToken Expand(JToken value, int depth = 0)
+        {
+            Require(depth < 64, "Shared definitions must be acyclic.");
+            if (value is JObject obj)
+            {
+                if (obj["$ref"] != null)
+                {
+                    string reference = (string)obj["$ref"];
+                    Require(obj.Count == 1 && reference.StartsWith("#/", StringComparison.Ordinal), "Every shared field is a local JSON pointer.");
+                    JToken resolved = root;
+                    foreach (string part in reference.Substring(2).Split('/'))
+                        resolved = resolved is JArray rows ? rows[int.Parse(part)] : resolved?[part.Replace("~1", "/").Replace("~0", "~")];
+                    Require(resolved is JObject, "Shared schema field resolves to a complete definition.");
+                    return Expand(resolved, depth + 1);
+                }
+                var result = new JObject();
+                foreach (var property in obj.Properties())
+                    if (property.Name != "$defs") result[property.Name] = Expand(property.Value, depth + 1);
+                return result;
+            }
+            if (value is JArray array) return new JArray(array.Select(v => Expand(v, depth + 1)));
+            return value.DeepClone();
+        }
+        return (JObject)Expand(root);
+    }
+
     internal static bool MatchesSchemaShape(JObject schema, JToken value)
     {
+        if (schema["$defs"] != null) schema = ExpandNativeSchema(schema);
         string[] supported = { "type", "additionalProperties", "required", "properties", "enum", "oneOf", "minimum", "maximum", "minLength", "maxLength" };
         foreach (var property in schema.Properties())
             if (!supported.Contains(property.Name)) throw new InvalidOperationException("Structural schema test needs support for: " + property.Name);

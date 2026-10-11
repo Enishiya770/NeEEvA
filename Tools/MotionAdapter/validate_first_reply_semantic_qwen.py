@@ -1,7 +1,9 @@
 """Prepare or single-pass replay the actual FirstReply release-review payload/parser.
 
 Default is offline compilation and preparation only. --execute-model sends each
-frozen case once with the production six-second deadline, no retry/repair/best-of.
+frozen case once with the production six-second deadline. Optional
+--allow-production-grounding-repair applies the production one-repair rule only
+to a syntactically complete but ungrounded review; never to a wrong expectation.
 This tests the independent semantic gate, not a live avatar, TTS or full turn.
 """
 from __future__ import annotations
@@ -41,7 +43,7 @@ def compile_probe(output: Path) -> dict:
         "private string BuildFirstReplyReviewWire(", "private string BuildFirstReplyWire(")]
     snippets += [method(core, signature) for signature in (
         "private void AppendSlot(", "private static void AppendMessage(", "private static void AppendJsonString(",
-        "private string BuildStageRequestJsonForMessages(", "private static SendData MessageForRequest(",
+        "private string BuildStageRequestJsonCore(", "private static SendData MessageForRequest(",
         "private static string BuildCommittedReplyWritingInstruction(", "private sealed class ObservationEnvelope :",
         "private string CompactScenePromptContext(", "private static uint StableBlockHash(", "private static int EstimateTokens(")]
     snippets += [constant(core, name) for name in ("k_AttachedImageNote", "k_ArchivedImageNote", "k_FrameUserMarker")]
@@ -55,6 +57,10 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 public class FirstReplyWireProbe {
+    private string BuildStageRequestJsonForMessages(List<SendData> m,bool s,string c,string f,FormalResponseStage stage)
+        => BuildStageRequestJsonCore(m,s,c,f,stage);
+    private static string ProjectSceneAttentionText(string context)
+        => throw new InvalidOperationException("Routing attention requires the Unity replay; this compiled probe supports the review payload only.");
     private enum BackendType { Local, Cloud }
     private BackendType m_Backend = BackendType.Local;
     private string CurrentModelName;
@@ -82,11 +88,15 @@ public class FirstReplyWireProbe {
             var fixture=JObject.Parse(File.ReadAllText(args[1]));
             var parser=new FirstReplyStreamParser(()=>true,null);parser.Push((string)fixture["candidate"]);
             var candidate=parser.Finish(true,"stop");
-            bool valid=FirstReplyProtocol.TryCurrentReview(File.ReadAllText(args[2]),out string route,out JObject understanding,out string kind,out bool? sufficient,out string demand);
+            bool valid=FirstReplyProtocol.TryGroundedReview(File.ReadAllText(args[2]),(string)fixture["user"],out string route,out JObject understanding,out string kind,out bool? sufficient,out string demand,out JObject proof);
             var result=valid ? FirstReplyProtocol.ResolveReviewedCompletion(candidate,route,"probe",understanding,kind,sufficient,demand) : null;
             Console.Write(new JObject { ["valid"]=valid && result?.Succeeded==true,["route"]=result?.Disposition.ToString().ToLowerInvariant(),
                 ["reviewedRoute"]=route,["requestKind"]=result?.RequestKind,["candidateSufficient"]=result?.CandidateSufficient,["responseDemand"]=result?.ResponseDemand,
-                ["questionUnderstanding"]=result?.QuestionUnderstanding,["speechCharacters"]=result?.SpeechCharacters });return 0;
+                ["questionUnderstanding"]=result?.QuestionUnderstanding,["speechCharacters"]=result?.SpeechCharacters,
+                ["repairableGrounding"]=!valid && FirstReplyProtocol.CanRepairGrounding(File.ReadAllText(args[2])) });return 0;
+        }
+        if(args[0]=="repair-payload") {
+            Console.Write(FirstReplyProtocol.BuildGroundingRepairWire(File.ReadAllText(args[1]),File.ReadAllText(args[2])));return 0;
         }
         if(args[0]=="parse-route") {
             var parser=new FirstReplyStreamParser(()=>true,null);parser.Push(File.ReadAllText(args[1]));
@@ -138,7 +148,7 @@ public class FirstReplyWireProbe {
     if result.returncode:
         raise RuntimeError("Production FirstReply compile failed; inspect parser/compile.log")
     return {"compiledProjectionSha256": digest(harness.encode("utf-8")),
-            "scope": "Exact production first-reply/review payload methods, stage serializer, compactor, prompts, grammars and parsers. Synthetic persona/history and transport fields; Unity logging is inert. Unused terminal-result branch throws. No model expectations enter either payload."}
+            "scope": "Production review payload, contract, grammar, grounding parser and bounded repair builder. Synthetic history/runtime and inert Unity logging. Routing with scene attention is unsupported here; use Unity replay. No expectations enter payloads."}
 
 
 def probe(output: Path, *args: str):
@@ -155,17 +165,22 @@ def main() -> int:
     parser.add_argument("--url", default="http://127.0.0.1:8080")
     parser.add_argument("--model", default="antoneva")
     parser.add_argument("--execute-model", action="store_true")
+    parser.add_argument("--allow-production-grounding-repair", action="store_true")
     parser.add_argument("--mode", choices=("review", "routing", "both"), default="review")
+    parser.add_argument("--routing-wires", type=Path, help="For routing/both, use actual Unity-exported <case-id>.routing.request.json wires, including current scene attention.")
     parser.add_argument("--only", nargs="*", help="Explicit fixture ids for a necessary follow-up; no expectation changes.")
     parser.add_argument("--fixtures", type=Path, help="Frozen JSON array with complete user/context/history and evaluator-only expected routes/kinds.")
     args = parser.parse_args()
+    if args.mode != "review" and not args.routing_wires:
+        parser.error("Routing now requires --routing-wires from FirstReplyTransportRegression's Unity export; the isolated review probe does not approximate scene attention.")
     output = args.output.resolve(); output.mkdir(parents=True, exist_ok=False)
     files = list(dict.fromkeys([PROVIDER, CORE, CASES, NEWTONSOFT, *PURE]))
     sources = {name: digest((ROOT / name).read_bytes()) for name in files}
     report = {"status": "preparing", "sources": sources, "compilation": compile_probe(output),
               "pureChecks": probe(output, "checks"), "scriptSha256": digest(Path(__file__).read_bytes()),
               "modelRequests": 0, "cases": [], "productionDeadlineSeconds": {"review": 6, "routing": 25},
-              "policy": "One serial request per case. No retries, repair, answer selection, tool execution or TTS.",
+              "policy": "One serial request per case; one production grounding repair on parser rejection only when explicitly enabled. No best-of, expectation-driven retry, tool execution or TTS.",
+              "groundingRepairEnabled": args.allow_production_grounding_repair,
               "scope": "Production independent release-review and first-reply routing wires/parsers. Synthetic controlled runtime summaries. No avatar, action execution or TTS; expected routes are evaluator-only."}
     prepared = []
     fixtures = strict_json(args.fixtures.read_text(encoding="utf-8-sig")) if args.fixtures else probe(output, "cases")
@@ -182,7 +197,8 @@ def main() -> int:
         for mode in modes:
             if mode == "routing" and fixture["candidate"] != "<route>evidence</route>":
                 continue  # Other fixture expectations concern candidate quality, not routing.
-            wire = probe(output, "payload" if mode == "review" else "routing-payload", str(fixture_path), args.model)
+            wire = probe(output, "payload", str(fixture_path), args.model) if mode == "review" else strict_json(
+                (args.routing_wires / (case_id + ".routing.request.json")).read_text(encoding="utf-8-sig"))
             if mode == "review":
                 input_value = strict_json(wire["messages"][1]["content"])
                 if input_value["latestUserText"] != fixture["user"] or "MUST_NOT_REVIEW_CANARY" in json.dumps(wire):
@@ -246,6 +262,35 @@ def main() -> int:
             item["usage"] = envelope.get("usage")
             if item["mode"] == "review":
                 item["rawReview"] = strict_json(message["content"])
+                if args.allow_production_grounding_repair and parsed.get("repairableGrounding"):
+                    item["initialParser"] = parsed
+                    item["initialRequestSeconds"] = elapsed
+                    repair_wire = probe(output, "repair-payload", str(output / (item["id"] + ".request.json")), str(response_path))
+                    write(output / (item["id"] + ".repair.request.json"), repair_wire)
+                    repair_request = urllib.request.Request(args.url.rstrip("/") + "/v1/chat/completions",
+                        json.dumps(repair_wire, ensure_ascii=False, separators=(",", ":")).encode("utf-8"),
+                        {"Content-Type": "application/json", "Authorization": "Bearer ollama"})
+                    if elapsed > deadline:
+                        raise ValueError("Initial review exceeded production deadline; no repair allowed")
+                    report["modelRequests"] += 1
+                    repair_started = time.perf_counter()
+                    with urllib.request.urlopen(repair_request, timeout=6) as response:
+                        repair_raw = response.read()
+                    item["repairRequestSeconds"] = time.perf_counter() - repair_started
+                    elapsed = max(elapsed, item["repairRequestSeconds"])
+                    (output / (item["id"] + ".repair.envelope.json")).write_bytes(repair_raw)
+                    repair_envelope = strict_json(repair_raw.decode("utf-8-sig"))
+                    repair_choices = repair_envelope.get("choices", [])
+                    if len(repair_choices) != 1 or repair_choices[0].get("finish_reason") != "stop":
+                        raise ValueError("Incomplete repair output")
+                    repair_message = repair_choices[0].get("message", {})
+                    if repair_message.get("role") != "assistant" or not isinstance(repair_message.get("content"), str) or repair_message.get("tool_calls") or repair_message.get("function_call") or repair_message.get("refusal"):
+                        raise ValueError("Invalid repair completion envelope")
+                    repair_path = output / (item["id"] + ".repair.response.json")
+                    repair_path.write_bytes(repair_message["content"].encode("utf-8"))
+                    parsed = probe(output, "resolve-review", str(output / (item["fixtureId"] + ".fixture.json")), str(repair_path))
+                    item["repairReview"] = strict_json(repair_message["content"])
+                    item["repairUsage"] = repair_envelope.get("usage")
             if not parsed["valid"] or parsed["route"] != item["expectedRoute"]:
                 errors.append("wrong-or-invalid-semantic-route")
             if item["mode"] == "review" and item.get("expectedRequestKinds") and parsed.get("requestKind") not in item["expectedRequestKinds"]:

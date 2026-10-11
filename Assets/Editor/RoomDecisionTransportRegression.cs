@@ -67,7 +67,7 @@ public static class RoomDecisionTransportRegression
                     "Object pronouns are resolved from context before selecting the current verb; unknown referents cannot default to user approach.");
                 Require(!wire.ToString().Contains("PRIVATE_"), "Decision transport does not read private provider history or formal context.");
                 Require(backend == ChatQW.BackendType.Local ? (int?)wire["id_slot"] == 1 &&
-                    JToken.DeepEquals(wire["response_format"]["schema"], JObject.Parse(emptyGoalSchema)) :
+                    JToken.DeepEquals(SceneObjectProtocolRegression.ExpandNativeSchema(wire["response_format"]["schema"]), JObject.Parse(emptyGoalSchema)) :
                     wire["id_slot"] == null && wire["response_format"]["schema"] == null,
                     "Current-turn separation preserves backend slot and structured-schema ownership.");
                 var review = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", source, Image, true));
@@ -95,7 +95,7 @@ public static class RoomDecisionTransportRegression
                 var allowedWire = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", allowed.ToString(), Image, false));
                 string allowedSchema = RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(new[] { "goal-current-a", "goal-current-b" });
                 CheckDecisionSchemaText(allowedWire, backend, allowedSchema);
-                JObject actualSchema = backend == ChatQW.BackendType.Local ? (JObject)allowedWire["response_format"]["schema"] :
+                JObject actualSchema = backend == ChatQW.BackendType.Local ? SceneObjectProtocolRegression.ExpandNativeSchema(allowedWire["response_format"]["schema"]) :
                     JObject.Parse(((string)allowedWire["messages"][0]["content"]).Substring(RoomTaskProtocol.DecisionContract.Length + 1));
                 var goalEnums = actualSchema.SelectTokens("$..properties.observationGoalId.enum").ToArray();
                 Require(goalEnums.Length > 1 && goalEnums.All(ids => JToken.DeepEquals(ids, new JArray("goal-current-a", "goal-current-b"))) &&
@@ -201,7 +201,7 @@ public static class RoomDecisionTransportRegression
         {
             model.m_Backend = backend;
             var wire = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(), Image, false));
-            var schema = backend == ChatQW.BackendType.Local ? (JObject)wire["response_format"]["schema"] :
+            var schema = backend == ChatQW.BackendType.Local ? SceneObjectProtocolRegression.ExpandNativeSchema(wire["response_format"]["schema"]) :
                 JObject.Parse(((string)wire["messages"][0]["content"]).Substring(RoomTaskProtocol.DecisionContract.Length + 1));
             Require(JToken.DeepEquals(schema["properties"]["intent"]["enum"], new JArray("none")) &&
                 JToken.DeepEquals(schema["properties"]["origin"]["enum"], new JArray("none")) &&
@@ -224,20 +224,20 @@ public static class RoomDecisionTransportRegression
         const string header = "\n[Native decision field guide]\n";
         string prefix = RoomTaskProtocol.DecisionContract + header;
         Require(actual.StartsWith(prefix, StringComparison.Ordinal), "Local guide retains the complete decision contract before field definitions.");
-        var guide = JObject.Parse(actual.Substring(prefix.Length));
+        var guide = SceneObjectProtocolRegression.ExpandNativeSchema(JObject.Parse(actual.Substring(prefix.Length)));
         var expected = (JObject)schema.DeepClone(); expected.Remove("oneOf");
         var definitions = (JObject)guide.DeepClone(); definitions.Remove("intentConstraints"); definitions.Remove("directionConvention"); definitions.Remove("noActionReply");
         Require(((string)guide["noActionReply"] ?? "").Contains("replyScope=spatial"), "The actual wire teaches no-action spatial answers.");
         Require(JToken.DeepEquals(definitions, expected) && JToken.DeepEquals(guide["properties"], schema["properties"]) &&
             JToken.DeepEquals(guide["required"], schema["required"]) && guide["oneOf"] == null &&
-            JToken.DeepEquals(wire["response_format"]["schema"], schema) && ((JArray)schema["oneOf"]).Count > 1,
+            JToken.DeepEquals(SceneObjectProtocolRegression.ExpandNativeSchema(wire["response_format"]["schema"]), schema) && ((JArray)schema["oneOf"]).Count > 1,
             "Local text deduplicates field definitions; all exact fields and the full native dynamic grammar survive.");
         var constraints = (JArray)guide["intentConstraints"];
         Require(constraints.Count == ((JArray)schema["oneOf"]).Count &&
             constraints.OfType<JObject>().All(x => x["required"] is JArray && x["allowedAdditionalFields"] is JArray),
             "The compact guide retains each alternative's required and allowed fields instead of losing intent-specific restrictions.");
         JObject Turn(string intent) => constraints.OfType<JObject>().Single(x =>
-            ((JArray)x["intents"]).Values<string>().Contains(intent));
+            !((JArray)x["required"]).Values<string>().Contains("deviceGoal") && ((JArray)x["intents"]).Values<string>().Contains(intent));
         var head = Turn("orient-view"); var body = Turn("turn-in-place");
         Require(JToken.DeepEquals(head["required"], new JArray("viewChange")) &&
             JToken.DeepEquals(body["required"], new JArray("viewChange")) &&

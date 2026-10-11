@@ -33,7 +33,7 @@ public partial class ChatSample
     {
         var current = ReadCurrentRequestSemantics(generation);
         return current == null ? null : PickRoomFields(current, "source", "generation", "workEpoch", "userTurn",
-            "requestKind", "requiresActionOrControl", "effectiveRoute", "actionAuthorization");
+            "requestKind", "currentTurnEvidence", "requiresActionOrControl", "effectiveRoute", "actionAuthorization");
     }
 
     private void RememberFirstReplyRequestSemantics(FirstReplyCompletion result, int generation, LLM model)
@@ -47,6 +47,7 @@ public partial class ChatSample
             ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
             ["currentUserText"] = m_ActionConstraints.CurrentUserText,
             ["requestKind"] = result.RequestKind,
+            ["currentTurnEvidence"] = result.CurrentTurnEvidence?.DeepClone(),
             ["responseDemand"] = result.ResponseDemand,
             ["requiresActionOrControl"] = FirstReplyProtocol.RequiresActionOrControl(result.RequestKind),
             ["effectiveRoute"] = result.Disposition.ToString().ToLowerInvariant(),

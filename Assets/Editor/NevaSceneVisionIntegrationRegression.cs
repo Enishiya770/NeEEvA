@@ -817,6 +817,21 @@ public static class NevaSceneVisionIntegrationRegression
         }
         return result;
     }
+    public static void ConfigureActualRoleSerializer(ChatQW real)
+    {
+        var config = (JObject)report["actualRoleConfiguration"];
+        foreach (var item in config.Properties())
+        {
+            FieldInfo field = typeof(ChatQW).GetField(item.Name, Flags);
+            object value = item.Name == "m_PromptFiles" || item.Name == "m_SkillFiles"
+                ? ((JArray)item.Value).Select(x => AssetDatabase.LoadAssetAtPath<TextAsset>((string)x["path"])).ToArray()
+                : item.Value.ToObject(field.FieldType);
+            field.SetValue(real, value);
+        }
+        real.InitSystemMessage();
+        real.SkillCatalogContext = model.SkillCatalogContext; real.SetActiveSkills("singing");
+    }
+
     private static void ExportActualRoleRequest(NevaSceneVisionIntegrationModel.Request probe)
     {
         var host = new GameObject("Inactive actual-role vision serializer"); host.SetActive(false);
@@ -908,7 +923,22 @@ public sealed class NevaSceneVisionIntegrationModel : LLM
         public FormalResponseStage Stage;
         public IReadOnlyList<RoomObservationImage> ObservationHistory;
         public void Complete(string json) => ProbeCallback(json);
-        public void Complete(bool ok, string json, string status) => RoomCallback(ok, json, status);
+        public void Complete(bool ok, string json, string status)
+        {
+            // Older controlled fact fixtures explicitly assume matching speech
+            // language. New mismatch/missing-language fixtures use the bypass or
+            // supply their own independent classification. This is not detection.
+            if (Kind == "room-review" && ok && !status.StartsWith("language-test:", StringComparison.Ordinal))
+                try
+                {
+                    var verdict = JObject.Parse(json); var input = JObject.Parse(Input);
+                    if (verdict["actualLanguage"] == null && input["publicSpeechLanguage"] != null)
+                        verdict["actualLanguage"] = input["publicSpeechLanguage"].DeepClone();
+                    json = verdict.ToString();
+                }
+                catch (Newtonsoft.Json.JsonException) { }
+            RoomCallback(ok, json, status);
+        }
     }
     public readonly List<Request> Probes = new List<Request>(), Decisions = new List<Request>(), Speech = new List<Request>(), Wires = new List<Request>(), Matches = new List<Request>(), DeviceGoalReviews = new List<Request>();
     public int RoomTaskPlanningCancellationCount;

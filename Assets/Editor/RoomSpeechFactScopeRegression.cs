@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 /// <summary>Real room camera + actual pending public-review callbacks. No model HTTP or synthesized audio.</summary>
-public static class RoomSpeechFactScopeRegression
+public static partial class RoomSpeechFactScopeRegression
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     private static int checks;
@@ -272,14 +272,21 @@ public static class RoomSpeechFactScopeRegression
                     if (requestKind == "control") Set(chat, "m_SpatialGoalTerminalReplyGeneration", currentGeneration);
                     const string oldAnswer="探してみたけれど、まだ見つからないわ。";
                     int historyBefore=model.m_DataList.Count;
+                    int reviewsBefore=model.Decisions.Count;
                     Call(chat, "CompleteRoomSpeech", Buffer(oldAnswer), oldAnswer, currentGeneration, true, null);
-                    var currentReview=model.Decisions.Last();
-                    var inputFacts=JObject.Parse(currentReview.Input);
-                    Require((string)inputFacts["currentRequestSemantics"]?["requestKind"] == requestKind,
-                        "Same-turn typed intent reaches the actual speech reviewer unchanged.");
-                    // Reproduce the semantic reviewer claiming an answer-only old
-                    // result is coherent despite an unexecuted current command.
-                    currentReview.Complete(true, Verdict("consistent", "scene-action", "not-mentioned"), "controlled-old-goal-mask");
+                    if (requestKind == "mixed")
+                    {
+                        var currentReview=model.Decisions.Last();
+                        var inputFacts=JObject.Parse(currentReview.Input);
+                        Require(model.Decisions.Count == reviewsBefore+1 &&
+                            (string)inputFacts["currentRequestSemantics"]?["requestKind"] == requestKind,
+                            "Mixed request evidence still reaches the actual speech reviewer unchanged.");
+                        // Reproduce the reviewer masking an unexecuted current
+                        // command with a coherent but answer-only old result.
+                        currentReview.Complete(true, Verdict("consistent", "scene-action", "not-mentioned"), "controlled-old-goal-mask");
+                    }
+                    else Require(model.Decisions.Count == reviewsBefore,
+                        "Pure action/control failure uses the local receipt without another model review.");
                     Require(model.m_DataList.Count == historyBefore+1 &&
                         model.m_DataList.Last().content.Contains("情報が多すぎて") &&
                         model.m_DataList.Last().content != oldAnswer,
@@ -299,17 +306,16 @@ public static class RoomSpeechFactScopeRegression
             Call(chat, "RememberFirstReplyRequestSemantics", new FirstReplyCompletion {
                 Disposition=FirstReplyDisposition.Tools, RequestKind="action" }, naturalFailureGeneration, model);
             model.Decisions.Last().Complete(false, "", "room-task-http-context-budget;attempts=0;recovery=preflight-budget");
-            const string naturalFailure="扱う情報が多すぎて、今回は動作を決められなかったわ。まだ体は動かしていないの。";
+            const string naturalFailure="頭の中を整理したら、ちゃんと灯りを点けるね。";
             object naturalOldTerminal=Get(chat, "m_SpatialGoalTerminalReplyGeneration");
             Set(chat, "m_SpatialGoalTerminalReplyGeneration", naturalFailureGeneration);
+            int reviewsBeforeLocalReceipt = model.Decisions.Count;
             Call(chat, "CompleteRoomSpeech", Buffer(naturalFailure), naturalFailure, naturalFailureGeneration, true, null);
-            var naturalVerdict=JObject.Parse(Verdict("consistent", "scene-action", "input-budget-exceeded"));
-            naturalVerdict["requestDisposition"]="action-request";
-            model.Decisions.Last().Complete(true, naturalVerdict.ToString(), "controlled-truthful-natural-failure");
             Set(chat, "m_SpatialGoalTerminalReplyGeneration", naturalOldTerminal);
-            Require(model.m_DataList.Last().content == naturalFailure,
-                "A correctly reviewed natural explanation may report the exact current failure without a canned rewrite, even with an old terminal obligation.");
-            ((JArray)LastDecisionFailureReport["cases"]).Add("truthful-natural-current-failure-keeps-role-voice");
+            Require(model.m_DataList.Last().content == "動作を考えるための情報が多すぎて計画を作れなかったので、まだ新しい動作は始めていないわ。" &&
+                model.Decisions.Count == reviewsBeforeLocalReceipt,
+                "Pure action failure reports the engine receipt locally, with no review and no invented promise, even with an old terminal obligation.");
+            ((JArray)LastDecisionFailureReport["cases"]).Add("pure-action-local-receipt-no-model-promise-or-review");
             foreach (string scope in new[] { "visual-observation", "none", "scene-action", "user-target", "combined" })
             {
                 yield return PrepareRoomPlanning(chat, bridge, scope == "none" ? "我只是想和你聊天。" : "现在你能看到什么？");
@@ -445,7 +451,7 @@ public static class RoomSpeechFactScopeRegression
             {
                 Call(chat, "HandleResponseGenerationFailure", "no-public-output-deadline");
                 Call(chat, "CompleteRoomSpeech", new SpeechTextBuffer(), "", timeoutGeneration, true, null);
-                Require(model.m_DataList.Last().content == "返事の生成が時間切れになってしまったわ。動作を計画するサービスへのリクエストが失敗したので、新しい動作は始めていないわ。" &&
+                Require(model.m_DataList.Last().content == "動作を計画するサービスへのリクエストが失敗したので、新しい動作は始めていないわ。返事の生成が時間切れになってしまったわ。" &&
                     bridge.Controller.OperationRevision == timeoutOperations,
                     "No-public-speech timeout uses the configured role language, reports both distinct failures, and does not dispatch another action.");
             }
@@ -460,7 +466,7 @@ public static class RoomSpeechFactScopeRegression
                 Call(chat, "HandleResponseGenerationFailure", incomplete);
                 Call(chat, "CompleteRoomSpeech", Buffer("すぐに行くわ。"), "", incompleteGeneration, true, null);
                 Require(model.Decisions.Count == reviewCount && bridge.Controller.OperationRevision == operationCount &&
-                    model.m_DataList.Last().content == "返事を最後まで生成できなかったわ。動作を計画するサービスへのリクエストが失敗したので、新しい動作は始めていないわ。",
+                    model.m_DataList.Last().content == "動作を計画するサービスへのリクエストが失敗したので、新しい動作は始めていないわ。" + (incomplete == "http-failure" ? "返事を生成するサービスへのリクエストが失敗したわ。" : "返事を最後まで生成できなかったわ。"),
                     "A broken/truncated stream discards its buffered promise without a semantic review or new action.");
                 ((JArray)LastDecisionFailureReport["cases"]).Add(incomplete + "-discards-buffered-candidate");
             }
@@ -475,6 +481,7 @@ public static class RoomSpeechFactScopeRegression
             Require(Call(chat, "ReadRoomTaskDecisionFailure") == null && model.Speech.Count == speechCount,
                 "A late failed callback from a cancelled planner cannot publish facts or start a new reply.");
             ((JArray)LastDecisionFailureReport["cases"]).Add("cancelled-failure-callback-stays-revoked");
+            yield return RunReplyReceiptChecks(chat, bridge, model, output);
             LastDecisionFailureReport["status"] = "passed";
         }
         finally
@@ -523,6 +530,7 @@ public static class RoomSpeechFactScopeRegression
             yield return Wait(() => model.Decisions.Count == decisions + 1, "Repair fixture first review");
             var firstReview = model.Decisions.Last();
             string rejection = new JObject { ["verdict"] = mode.StartsWith("guard-", StringComparison.Ordinal) ? "consistent" : "inconsistent", ["factScope"] = "scene-action",
+                ["actualLanguage"] = "zh",
                 ["reason"] = "候选只讲画面，没有回答用户追问的上一轮规划失败原因。",
                 ["requestDisposition"] = "answer-only", ["planningFailureReport"] =
                     mode.StartsWith("guard-", StringComparison.Ordinal) ? "other-cause" : "not-mentioned" }.ToString();

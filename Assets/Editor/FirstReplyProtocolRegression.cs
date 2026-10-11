@@ -14,6 +14,7 @@ public static class FirstReplyProtocolRegression
     public static int RunChecks()
     {
         checks = 0;
+        CurrentTurnGroundingCases();
         var schema = JObject.Parse(FirstReplyProtocol.ReviewSchema);
         Check(schema["required"].ToString().Contains("requestKind") &&
             ((JArray)schema["properties"]["requestKind"]["enum"]).Count == 5,
@@ -282,6 +283,30 @@ public static class FirstReplyProtocolRegression
         LastReport = new JObject { ["passed"] = true, ["checks"] = checks,
             ["scope"] = "Pure actual parser across all character splits, language switch, tool fallthrough, invalid metadata/late tools, incomplete response and lease cancellation; no model semantic or audible-delivery claim." };
         return checks;
+    }
+
+    private static void CurrentTurnGroundingCases()
+    {
+        const string current = "很好，然后来我身边。";
+        var value = new JObject { ["requestKind"] = "mixed", ["responseDemand"] = "full-response",
+            ["candidateSufficient"] = false, ["route"] = "tools", ["reason"] = "old question is mistakenly carried forward",
+            ["questionUnderstanding"] = null, ["currentTurnEvidence"] = new JObject {
+                ["answerQuote"] = "你刚才有在电视机柜上看到一个发光的小灯吗？", ["actionQuote"] = "来我身边" } };
+        bool Valid(string source) => FirstReplyProtocol.TryGroundedReview(value.ToString(), source,
+            out _, out _, out _, out _, out _, out _);
+        Check(!Valid(current) && FirstReplyProtocol.CanRepairGrounding(value.ToString()),
+            "A previous-turn question cannot justify mixed, even with a valid tools verdict; one provenance correction is allowed.");
+        value["requestKind"] = "action"; value["currentTurnEvidence"]["answerQuote"] = null;
+        Check(Valid(current), "A current movement request binds to its literal current clause.");
+        value["requestKind"] = "mixed"; value["currentTurnEvidence"]["answerQuote"] = "为什么停下了？";
+        Check(Valid("为什么停下了？然后来我身边。"), "A real question plus action retains both requirements.");
+        value["currentTurnEvidence"]["answerQuote"] = "来我身边";
+        Check(!Valid(current), "Repeating one action quote cannot manufacture an independent question.");
+        value["requestKind"] = "control"; value["currentTurnEvidence"]["answerQuote"] = null;
+        value["currentTurnEvidence"]["actionQuote"] = "继续吧";
+        Check(Valid("那就继续吧。"), "Elliptical continuation remains possible without quoting an old command.");
+        value.Remove("currentTurnEvidence");
+        Check(!Valid(current), "A legacy ungrounded classifier cannot approve a live request.");
     }
 
     private static string Repeat(string value, int count)

@@ -111,8 +111,8 @@ public partial class ChatQW
 
     private static JObject RoomDecisionValueMeasure(JToken value)
     {
-        string text = value.ToString(Formatting.None);
-        return new JObject { ["utf8Bytes"] = Encoding.UTF8.GetByteCount(text), ["estimatedTextUnits"] = EstimateRoomDecisionTextUnits(text) };
+        string text = value?.ToString(Formatting.None) ?? "";
+        return new JObject { ["characters"] = text.Length, ["utf8Bytes"] = Encoding.UTF8.GetByteCount(text), ["estimatedTextUnits"] = EstimateRoomDecisionTextUnits(text) };
     }
 
     private static readonly string[] RoomDecisionMeasuredFields = {
@@ -161,6 +161,9 @@ public partial class ChatQW
                 var wire = ReadRoomTaskRecoveryJson(json);
                 if (!TryFindRoomTaskInput(wire, out var textToken, out _)) break;
                 var projected = ProjectRoomDecisionInput(originalInput, optionalRows);
+                if (workingMemory)
+                    ApplySceneAttention(new[] { projected }, optionalRows,
+                        Math.Min(SceneAttentionDetailUnits, optionalRows * 300));
                 string text = (string)textToken;
                 textToken.Replace(text.Substring(0, text.IndexOf('{')) + projected.ToString(Formatting.None));
                 string candidate = wire.ToString(Formatting.None);

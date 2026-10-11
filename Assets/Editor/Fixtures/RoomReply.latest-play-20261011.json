@@ -1,0 +1,1524 @@
+{
+  "scope": "Reconstructed latest five-turn load from actual log receipts and observations; full rejected HTTP body was never logged. Paired with complete earlier producer geometry fixture, not claimed to be a byte-identical Play replay.",
+  "turns": [
+    {
+      "utterance": "现在能看到什么？",
+      "finalReceipt": {
+        "line": 24218,
+        "generation": 2,
+        "userTurn": 2,
+        "recordedAtUtc": "2026-10-11T02:36:57.3500628Z",
+        "replyFailure": null,
+        "planningFailure": null,
+        "reviewStatus": "received",
+        "intent": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "execution": {
+          "actionId": "",
+          "targetKind": "user",
+          "captureId": "",
+          "sceneTargetId": "",
+          "phase": "ready",
+          "stage": "user-target-validation",
+          "reason": "房间移动已连接，可以请求走近、持续跟随用户或停止移动。",
+          "executionReason": "NotSubmittedToController",
+          "operationRevision": 0,
+          "observedUtc": "2026-10-11T02:36:27.1698554Z",
+          "matchesRequestedAction": false
+        },
+        "sceneAction": {},
+        "publicText": "正面にはテレビとデスクトップが見えるわ。左には棚があり、TV台の上にはランプと観葉植物が置いてあるわよ。",
+        "scope": "Accepted final public reply and contemporaneous independent execution receipts. Historical snapshot, not current state or retry permission; accepted text does not prove audio playback."
+      },
+      "observedObjects": [],
+      "lastSceneAction": null,
+      "expectedKind": "answer-only"
+    },
+    {
+      "utterance": "来我身边。",
+      "finalReceipt": {
+        "line": 26133,
+        "generation": 4,
+        "userTurn": 3,
+        "recordedAtUtc": "2026-10-11T02:37:32.2821576Z",
+        "replyFailure": null,
+        "planningFailure": null,
+        "reviewStatus": "received",
+        "intent": "approach",
+        "dispatch": "attempt-submitted",
+        "actionId": "c676fbd4afc04ffb8f3c779417777cdc:4:2",
+        "execution": {
+          "actionId": "c676fbd4afc04ffb8f3c779417777cdc:4:2",
+          "targetKind": "user",
+          "captureId": "",
+          "sceneTargetId": "",
+          "phase": "arrived",
+          "stage": "completed",
+          "reason": "行走已结束；是否已到身边并面对用户，以实际距离和朝向观测为准。",
+          "executionReason": "Completed",
+          "operationRevision": 3,
+          "observedUtc": "2026-10-11T02:37:28.6398691Z",
+          "matchesRequestedAction": true
+        },
+        "sceneAction": {},
+        "publicText": "あなたのそばまで来たわ。",
+        "scope": "Accepted final public reply and contemporaneous independent execution receipts. Historical snapshot, not current state or retry permission; accepted text does not prove audio playback."
+      },
+      "observedObjects": [],
+      "lastSceneAction": null,
+      "expectedKind": "action"
+    },
+    {
+      "utterance": "你刚才有在电视机柜上看到一个发光的小灯吗？能去把它关掉吗？",
+      "finalReceipt": {
+        "line": 29266,
+        "generation": 6,
+        "userTurn": 4,
+        "recordedAtUtc": "2026-10-11T02:38:33.9168731Z",
+        "replyFailure": null,
+        "planningFailure": null,
+        "reviewStatus": "received",
+        "intent": "set-object-state",
+        "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+        "actionId": "c676fbd4afc04ffb8f3c779417777cdc:6:6",
+        "execution": {
+          "actionId": "c676fbd4afc04ffb8f3c779417777cdc:6:5",
+          "targetKind": "scene-object",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-87b935173ea84be68875ecd7e627c318",
+          "sceneTargetId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "phase": "arrived",
+          "stage": "completed",
+          "reason": "已实际到达视觉目标附近的地面站位并面向目标；仍需新视野确认所见。",
+          "executionReason": "Completed",
+          "operationRevision": 7,
+          "observedUtc": "2026-10-11T02:38:24.2037403Z",
+          "matchesRequestedAction": false
+        },
+        "sceneAction": {
+          "actionId": "c676fbd4afc04ffb8f3c779417777cdc:6:6",
+          "intent": "set-object-state",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "observedUtc": "2026-10-11T02:38:28.9178239Z",
+          "reached": false,
+          "stateChanged": true
+        },
+        "publicText": "テレビ台の小さなランプ、無事に消しましたよ。",
+        "scope": "Accepted final public reply and contemporaneous independent execution receipts. Historical snapshot, not current state or retry permission; accepted text does not prove audio playback."
+      },
+      "observedObjects": [
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-468bc7b02772451e9ff7ed62f14a4c54",
+          "observedUtc": "2026-10-11T02:38:14.2309566Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.298319578,
+            "y": -0.09115535,
+            "z": -4.78107548
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:14.3309432Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-87b935173ea84be68875ecd7e627c318",
+          "observedUtc": "2026-10-11T02:38:17.4787704Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.300374031,
+            "y": -0.08514923,
+            "z": -4.77780342
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:17.5638466Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-d5efac61b2fe4280862bc6d1703d5a8b",
+          "observedUtc": "2026-10-11T02:38:24.5770754Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.295008361,
+            "y": -0.0804310441,
+            "z": -4.77522373
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:24.6587106Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-bc7b6600436d464492af59e742ef8ebe",
+          "observedUtc": "2026-10-11T02:38:28.3040213Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.29159832,
+            "y": -0.07955754,
+            "z": -4.774747
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:28.4311610Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-f03fa009618b4252874c8634b698fca2",
+          "observedUtc": "2026-10-11T02:38:28.8132767Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.29471606,
+            "y": -0.07878226,
+            "z": -4.774321
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "disabled",
+            "emissionState": "off",
+            "conflict": "",
+            "registered": true,
+            "on": false,
+            "lightEnabled": false,
+            "emissionEnabled": false,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:28.9158237Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        }
+      ],
+      "lastSceneAction": {
+        "source": "Unity-visible-target-execution",
+        "actionId": "c676fbd4afc04ffb8f3c779417777cdc:6:6",
+        "intent": "set-object-state",
+        "origin": "user",
+        "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-b1d5eeadc52b428fa5fbd17f24cde63b",
+        "confirmedCaptureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-bc7b6600436d464492af59e742ef8ebe",
+        "resultCaptureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-f03fa009618b4252874c8634b698fca2",
+        "surfaceId": "",
+        "visualLabel": "桌面装饰灯",
+        "phase": "performed",
+        "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+        "observedUtc": "2026-10-11T02:38:28.9178239Z",
+        "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+        "focusKind": "visible-object",
+        "requestedEntityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+        "requestedState": "off",
+        "targetResolutionSource": "candidate-confirmed",
+        "requestedImagePoint": {
+          "x": 0.47864583134651184,
+          "y": 0.8583333492279053
+        },
+        "objectConfirmed": true,
+        "stateChanged": true,
+        "groundArrived": false,
+        "objectReobserved": false,
+        "postArrivalObservationStatus": "",
+        "targetPurpose": "direct-target",
+        "targetDescription": "你刚才有在电视机柜上看到一个发光的小灯吗？能去把它关掉吗？",
+        "targetMatchVerdict": "matched",
+        "targetMatchReason": "c1为电视柜上的发光小灯，符合“电视机柜上发光的小灯”描述。",
+        "matchCaptureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-b1d5eeadc52b428fa5fbd17f24cde63b",
+        "semanticTargetConfirmed": true,
+        "needsCloserObservation": false,
+        "navigationFocusImagePoint": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "observationStandOff": 0.0,
+        "predictedObservationPitch": 0.0,
+        "observationGoalId": "",
+        "viewDirection": "",
+        "viewPurpose": "",
+        "viewPurposeStatus": "",
+        "requestedViewDistance": 0.0,
+        "actualViewOffset": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "viewBefore": {
+          "captureId": "",
+          "entityId": "",
+          "capturedAtUtc": "",
+          "frame": 0,
+          "width": 0,
+          "height": 0,
+          "visibleOpaquePixels": 0,
+          "normalizedVisibleBounds": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 0.0
+          },
+          "visiblePixelFraction": 0.0,
+          "cameraDistanceToObservedPoint": 0.0,
+          "touchesImageBoundary": false,
+          "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+        },
+        "viewAfter": {
+          "captureId": "",
+          "entityId": "",
+          "capturedAtUtc": "",
+          "frame": 0,
+          "width": 0,
+          "height": 0,
+          "visibleOpaquePixels": 0,
+          "normalizedVisibleBounds": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 0.0
+          },
+          "visiblePixelFraction": 0.0,
+          "cameraDistanceToObservedPoint": 0.0,
+          "touchesImageBoundary": false,
+          "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+        },
+        "intentFocusWorldPoint": {
+          "x": -0.2956377863883972,
+          "y": -0.08216989040374756,
+          "z": -4.776177883148193
+        },
+        "hasIntentFocus": true,
+        "navigationFocusAdjusted": false,
+        "trackingVisibility": "",
+        "trackingCaptureId": "",
+        "trackingFocusStatus": "",
+        "trackingFocusWorldPoint": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "trackingConfirmedImages": 0,
+        "trackingMovingConfirmedImages": 0,
+        "trackingLastSeenRealtime": -1.0,
+        "trackingFocusLastAppliedFrame": -1,
+        "trackingFocusAppliedDegrees": 0.0,
+        "measuredSurface": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "actualRoot": {
+          "x": -1.2555201053619385,
+          "y": -0.7200000286102295,
+          "z": -6.185367107391357
+        },
+        "requestedYaw": 0.0,
+        "requestedPitch": 0.0,
+        "actualViewChangeDegrees": 0.0,
+        "active": false,
+        "reached": false,
+        "canReobserveTarget": false,
+        "scope": "Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation."
+      },
+      "expectedKind": "mixed"
+    },
+    {
+      "utterance": "很好，然后来我身边。",
+      "finalReceipt": {
+        "line": 30769,
+        "generation": 8,
+        "userTurn": 5,
+        "recordedAtUtc": "2026-10-11T02:38:55.8495775Z",
+        "replyFailure": {
+          "kind": "reply-budget-exceeded",
+          "reason": "context-budget",
+          "generation": 8,
+          "userTurn": 5,
+          "httpRequestSent": false,
+          "scope": "Formal reply generation only; this does not change planning or execution outcomes."
+        },
+        "planningFailure": null,
+        "reviewStatus": "missing-or-invalid-public-speech",
+        "intent": "approach",
+        "dispatch": "attempt-submitted",
+        "actionId": "c676fbd4afc04ffb8f3c779417777cdc:8:8",
+        "execution": {
+          "actionId": "c676fbd4afc04ffb8f3c779417777cdc:8:8",
+          "targetKind": "user",
+          "captureId": "",
+          "sceneTargetId": "",
+          "phase": "moving",
+          "stage": "playback",
+          "reason": "正在房间内移动；逐帧检查障碍物和地面边界",
+          "executionReason": "None",
+          "operationRevision": 9,
+          "observedUtc": "2026-10-11T02:38:55.4387204Z",
+          "matchesRequestedAction": true
+        },
+        "sceneAction": {
+          "actionId": "c676fbd4afc04ffb8f3c779417777cdc:6:6",
+          "intent": "set-object-state",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "observedUtc": "2026-10-11T02:38:28.9178239Z",
+          "reached": false,
+          "stateChanged": true
+        },
+        "publicText": "あなたのそばへ向かっているわ。情報量が返事の処理枠を超えたわ。",
+        "scope": "Accepted final public reply and contemporaneous independent execution receipts. Historical snapshot, not current state or retry permission; accepted text does not prove audio playback."
+      },
+      "observedObjects": [
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-468bc7b02772451e9ff7ed62f14a4c54",
+          "observedUtc": "2026-10-11T02:38:14.2309566Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.298319578,
+            "y": -0.09115535,
+            "z": -4.78107548
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:14.3309432Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-87b935173ea84be68875ecd7e627c318",
+          "observedUtc": "2026-10-11T02:38:17.4787704Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.300374031,
+            "y": -0.08514923,
+            "z": -4.77780342
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:17.5638466Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-d5efac61b2fe4280862bc6d1703d5a8b",
+          "observedUtc": "2026-10-11T02:38:24.5770754Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.295008361,
+            "y": -0.0804310441,
+            "z": -4.77522373
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:24.6587106Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-bc7b6600436d464492af59e742ef8ebe",
+          "observedUtc": "2026-10-11T02:38:28.3040213Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.29159832,
+            "y": -0.07955754,
+            "z": -4.774747
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:28.4311610Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-f03fa009618b4252874c8634b698fca2",
+          "observedUtc": "2026-10-11T02:38:28.8132767Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.29471606,
+            "y": -0.07878226,
+            "z": -4.774321
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "disabled",
+            "emissionState": "off",
+            "conflict": "",
+            "registered": true,
+            "on": false,
+            "lightEnabled": false,
+            "emissionEnabled": false,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:28.9158237Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        }
+      ],
+      "lastSceneAction": {
+        "source": "Unity-visible-target-execution",
+        "actionId": "c676fbd4afc04ffb8f3c779417777cdc:6:6",
+        "intent": "set-object-state",
+        "origin": "user",
+        "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-b1d5eeadc52b428fa5fbd17f24cde63b",
+        "confirmedCaptureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-bc7b6600436d464492af59e742ef8ebe",
+        "resultCaptureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-f03fa009618b4252874c8634b698fca2",
+        "surfaceId": "",
+        "visualLabel": "桌面装饰灯",
+        "phase": "performed",
+        "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+        "observedUtc": "2026-10-11T02:38:28.9178239Z",
+        "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+        "focusKind": "visible-object",
+        "requestedEntityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+        "requestedState": "off",
+        "targetResolutionSource": "candidate-confirmed",
+        "requestedImagePoint": {
+          "x": 0.47864583134651184,
+          "y": 0.8583333492279053
+        },
+        "objectConfirmed": true,
+        "stateChanged": true,
+        "groundArrived": false,
+        "objectReobserved": false,
+        "postArrivalObservationStatus": "",
+        "targetPurpose": "direct-target",
+        "targetDescription": "你刚才有在电视机柜上看到一个发光的小灯吗？能去把它关掉吗？",
+        "targetMatchVerdict": "matched",
+        "targetMatchReason": "c1为电视柜上的发光小灯，符合“电视机柜上发光的小灯”描述。",
+        "matchCaptureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-b1d5eeadc52b428fa5fbd17f24cde63b",
+        "semanticTargetConfirmed": true,
+        "needsCloserObservation": false,
+        "navigationFocusImagePoint": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "observationStandOff": 0.0,
+        "predictedObservationPitch": 0.0,
+        "observationGoalId": "",
+        "viewDirection": "",
+        "viewPurpose": "",
+        "viewPurposeStatus": "",
+        "requestedViewDistance": 0.0,
+        "actualViewOffset": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "viewBefore": {
+          "captureId": "",
+          "entityId": "",
+          "capturedAtUtc": "",
+          "frame": 0,
+          "width": 0,
+          "height": 0,
+          "visibleOpaquePixels": 0,
+          "normalizedVisibleBounds": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 0.0
+          },
+          "visiblePixelFraction": 0.0,
+          "cameraDistanceToObservedPoint": 0.0,
+          "touchesImageBoundary": false,
+          "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+        },
+        "viewAfter": {
+          "captureId": "",
+          "entityId": "",
+          "capturedAtUtc": "",
+          "frame": 0,
+          "width": 0,
+          "height": 0,
+          "visibleOpaquePixels": 0,
+          "normalizedVisibleBounds": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 0.0
+          },
+          "visiblePixelFraction": 0.0,
+          "cameraDistanceToObservedPoint": 0.0,
+          "touchesImageBoundary": false,
+          "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+        },
+        "intentFocusWorldPoint": {
+          "x": -0.2956377863883972,
+          "y": -0.08216989040374756,
+          "z": -4.776177883148193
+        },
+        "hasIntentFocus": true,
+        "navigationFocusAdjusted": false,
+        "trackingVisibility": "",
+        "trackingCaptureId": "",
+        "trackingFocusStatus": "",
+        "trackingFocusWorldPoint": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "trackingConfirmedImages": 0,
+        "trackingMovingConfirmedImages": 0,
+        "trackingLastSeenRealtime": -1.0,
+        "trackingFocusLastAppliedFrame": -1,
+        "trackingFocusAppliedDegrees": 0.0,
+        "measuredSurface": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "actualRoot": {
+          "x": -1.2555201053619385,
+          "y": -0.7200000286102295,
+          "z": -6.185367107391357
+        },
+        "requestedYaw": 0.0,
+        "requestedPitch": 0.0,
+        "actualViewChangeDegrees": 0.0,
+        "active": false,
+        "reached": false,
+        "canReobserveTarget": false,
+        "scope": "Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation."
+      },
+      "expectedKind": "action"
+    },
+    {
+      "utterance": "去把刚才你关掉的那盏小灯重新打开。",
+      "finalReceipt": {
+        "line": 33689,
+        "generation": 10,
+        "userTurn": 6,
+        "recordedAtUtc": "2026-10-11T02:39:46.9686442Z",
+        "replyFailure": null,
+        "planningFailure": null,
+        "reviewStatus": "received",
+        "intent": "set-object-state",
+        "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+        "actionId": "c676fbd4afc04ffb8f3c779417777cdc:10:12",
+        "execution": {
+          "actionId": "c676fbd4afc04ffb8f3c779417777cdc:10:11",
+          "targetKind": "scene-object",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-1a59e5779fc4489682b4ac33ac926e2d-5066bf2613c84a1ea795c344ae5d5d0f",
+          "sceneTargetId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "phase": "arrived",
+          "stage": "completed",
+          "reason": "已实际到达视觉目标附近的地面站位并面向目标；仍需新视野确认所见。",
+          "executionReason": "Completed",
+          "operationRevision": 13,
+          "observedUtc": "2026-10-11T02:39:37.5811048Z",
+          "matchesRequestedAction": false
+        },
+        "sceneAction": {
+          "actionId": "c676fbd4afc04ffb8f3c779417777cdc:10:12",
+          "intent": "set-object-state",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "observedUtc": "2026-10-11T02:39:42.1304732Z",
+          "reached": false,
+          "stateChanged": true
+        },
+        "publicText": "刚才关掉的那盏小灯，已经重新打开了哦。",
+        "scope": "Accepted final public reply and contemporaneous independent execution receipts. Historical snapshot, not current state or retry permission; accepted text does not prove audio playback."
+      },
+      "observedObjects": [
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-468bc7b02772451e9ff7ed62f14a4c54",
+          "observedUtc": "2026-10-11T02:38:14.2309566Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.298319578,
+            "y": -0.09115535,
+            "z": -4.78107548
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:14.3309432Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-87b935173ea84be68875ecd7e627c318",
+          "observedUtc": "2026-10-11T02:38:17.4787704Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.300374031,
+            "y": -0.08514923,
+            "z": -4.77780342
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:17.5638466Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-d5efac61b2fe4280862bc6d1703d5a8b",
+          "observedUtc": "2026-10-11T02:38:24.5770754Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.295008361,
+            "y": -0.0804310441,
+            "z": -4.77522373
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:24.6587106Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-bc7b6600436d464492af59e742ef8ebe",
+          "observedUtc": "2026-10-11T02:38:28.3040213Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.29159832,
+            "y": -0.07955754,
+            "z": -4.774747
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:28.4311610Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-aa5d8e5dcb0146e981b206e785d56d17-f03fa009618b4252874c8634b698fca2",
+          "observedUtc": "2026-10-11T02:38:28.8132767Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.29471606,
+            "y": -0.07878226,
+            "z": -4.774321
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "disabled",
+            "emissionState": "off",
+            "conflict": "",
+            "registered": true,
+            "on": false,
+            "lightEnabled": false,
+            "emissionEnabled": false,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:38:28.9158237Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-1a59e5779fc4489682b4ac33ac926e2d-4c90233283124f2ab9a7fd163aa524a4",
+          "observedUtc": "2026-10-11T02:39:28.7465672Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.318061829,
+            "y": -0.09294659,
+            "z": -4.70934868
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "disabled",
+            "emissionState": "off",
+            "conflict": "",
+            "registered": true,
+            "on": false,
+            "lightEnabled": false,
+            "emissionEnabled": false,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:39:28.8438925Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-1a59e5779fc4489682b4ac33ac926e2d-5066bf2613c84a1ea795c344ae5d5d0f",
+          "observedUtc": "2026-10-11T02:39:32.1215328Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.318144321,
+            "y": -0.09309906,
+            "z": -4.710947
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "disabled",
+            "emissionState": "off",
+            "conflict": "",
+            "registered": true,
+            "on": false,
+            "lightEnabled": false,
+            "emissionEnabled": false,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:39:32.2051161Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-1a59e5779fc4489682b4ac33ac926e2d-a99f00115e884245ac98e3367c11837e",
+          "observedUtc": "2026-10-11T02:39:37.8303650Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.316540956,
+            "y": -0.09016144,
+            "z": -4.71146154
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "disabled",
+            "emissionState": "off",
+            "conflict": "",
+            "registered": true,
+            "on": false,
+            "lightEnabled": false,
+            "emissionEnabled": false,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:39:37.9110964Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-1a59e5779fc4489682b4ac33ac926e2d-5033e9e893c84ccd8c928d426d37a37d",
+          "observedUtc": "2026-10-11T02:39:41.5373793Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.316149473,
+            "y": -0.08944523,
+            "z": -4.70990753
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "disabled",
+            "emissionState": "off",
+            "conflict": "",
+            "registered": true,
+            "on": false,
+            "lightEnabled": false,
+            "emissionEnabled": false,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.0,
+              "g": 0.0,
+              "b": 0.0,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:39:41.6166091Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        },
+        {
+          "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "captureId": "9d4f1101427e48e2a93569c4c478dae8-1a59e5779fc4489682b4ac33ac926e2d-1c40a89d7da046e1ab27365c4e8f70e0",
+          "observedUtc": "2026-10-11T02:39:42.0442432Z",
+          "visibleInCapturedFrame": true,
+          "pointAtCapture": {
+            "x": -0.315850139,
+            "y": -0.08889902,
+            "z": -4.71056366
+          },
+          "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+          "capabilities": [
+            "inspect-object",
+            "look-at",
+            "set-object-state:on|off"
+          ],
+          "runtimeDeviceStateReadAfterObservation": {
+            "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+            "sceneLabel": "桌面装饰灯",
+            "lightState": "enabled",
+            "emissionState": "on",
+            "conflict": "",
+            "registered": true,
+            "on": true,
+            "lightEnabled": true,
+            "emissionEnabled": true,
+            "bakedLightingResidualUncontrolled": true,
+            "emissionColor": {
+              "r": 0.7566349506378174,
+              "g": 1.11836576461792,
+              "b": 1.3041188716888428,
+              "a": 1.0
+            },
+            "lightIntensity": 1.0,
+            "lightBakeType": "Baked",
+            "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+          },
+          "stateReadAtUtc": "2026-10-11T02:39:42.1264522Z",
+          "localStructure": {
+            "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+            "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+            "emissivePartName": "スタンドライト.001",
+            "lightComponentNodeName": "Point Light"
+          }
+        }
+      ],
+      "lastSceneAction": {
+        "source": "Unity-visible-target-execution",
+        "actionId": "c676fbd4afc04ffb8f3c779417777cdc:10:12",
+        "intent": "set-object-state",
+        "origin": "user",
+        "captureId": "9d4f1101427e48e2a93569c4c478dae8-1a59e5779fc4489682b4ac33ac926e2d-17f1a383fe4049cabbddd53000e71b85",
+        "confirmedCaptureId": "9d4f1101427e48e2a93569c4c478dae8-1a59e5779fc4489682b4ac33ac926e2d-5033e9e893c84ccd8c928d426d37a37d",
+        "resultCaptureId": "9d4f1101427e48e2a93569c4c478dae8-1a59e5779fc4489682b4ac33ac926e2d-1c40a89d7da046e1ab27365c4e8f70e0",
+        "surfaceId": "",
+        "visualLabel": "桌面装饰灯",
+        "phase": "performed",
+        "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+        "observedUtc": "2026-10-11T02:39:42.1304732Z",
+        "entityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+        "focusKind": "visible-object",
+        "requestedEntityId": "scene-object-20c7c084b3ea4d8a8f9d7336c437cb4b",
+        "requestedState": "on",
+        "targetResolutionSource": "candidate-confirmed",
+        "requestedImagePoint": {
+          "x": 0.47447916865348816,
+          "y": 0.8638888597488403
+        },
+        "objectConfirmed": true,
+        "stateChanged": true,
+        "groundArrived": false,
+        "objectReobserved": false,
+        "postArrivalObservationStatus": "",
+        "targetPurpose": "direct-target",
+        "targetDescription": "去把刚才你关掉的那盏小灯重新打开。",
+        "targetMatchVerdict": "matched",
+        "targetMatchReason": "c1为电视柜上的桌面装饰灯，位置与历史操作一致，符合“刚才关掉的小灯”描述。",
+        "matchCaptureId": "9d4f1101427e48e2a93569c4c478dae8-1a59e5779fc4489682b4ac33ac926e2d-17f1a383fe4049cabbddd53000e71b85",
+        "semanticTargetConfirmed": true,
+        "needsCloserObservation": false,
+        "navigationFocusImagePoint": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "observationStandOff": 0.0,
+        "predictedObservationPitch": 0.0,
+        "observationGoalId": "",
+        "viewDirection": "",
+        "viewPurpose": "",
+        "viewPurposeStatus": "",
+        "requestedViewDistance": 0.0,
+        "actualViewOffset": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "viewBefore": {
+          "captureId": "",
+          "entityId": "",
+          "capturedAtUtc": "",
+          "frame": 0,
+          "width": 0,
+          "height": 0,
+          "visibleOpaquePixels": 0,
+          "normalizedVisibleBounds": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 0.0
+          },
+          "visiblePixelFraction": 0.0,
+          "cameraDistanceToObservedPoint": 0.0,
+          "touchesImageBoundary": false,
+          "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+        },
+        "viewAfter": {
+          "captureId": "",
+          "entityId": "",
+          "capturedAtUtc": "",
+          "frame": 0,
+          "width": 0,
+          "height": 0,
+          "visibleOpaquePixels": 0,
+          "normalizedVisibleBounds": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 0.0
+          },
+          "visiblePixelFraction": 0.0,
+          "cameraDistanceToObservedPoint": 0.0,
+          "touchesImageBoundary": false,
+          "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+        },
+        "intentFocusWorldPoint": {
+          "x": -0.31628239154815674,
+          "y": -0.08968955278396606,
+          "z": -4.7093682289123535
+        },
+        "hasIntentFocus": true,
+        "navigationFocusAdjusted": false,
+        "trackingVisibility": "",
+        "trackingCaptureId": "",
+        "trackingFocusStatus": "",
+        "trackingFocusWorldPoint": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "trackingConfirmedImages": 0,
+        "trackingMovingConfirmedImages": 0,
+        "trackingLastSeenRealtime": -1.0,
+        "trackingFocusLastAppliedFrame": -1,
+        "trackingFocusAppliedDegrees": 0.0,
+        "measuredSurface": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "actualRoot": {
+          "x": -1.9886420965194702,
+          "y": -0.7200000286102295,
+          "z": -4.578516483306885
+        },
+        "requestedYaw": 0.0,
+        "requestedPitch": 0.0,
+        "actualViewChangeDegrees": 0.0,
+        "active": false,
+        "reached": false,
+        "canReobserveTarget": false,
+        "scope": "Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation."
+      },
+      "expectedKind": "control"
+    }
+  ]
+}

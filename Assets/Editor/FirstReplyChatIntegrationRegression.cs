@@ -230,6 +230,7 @@ public static class FirstReplyChatIntegrationRegression
                 (string)speechReview["humanInput"]?["fullInputEvidence"]==f.Prompt+fullAuditory,
                 "Independent speech review lost the question interpretation or replaced complete original input with it.");
             f.Model.RoomCallbacks[0](true,new JObject{["verdict"]="consistent",["reason"]="The sentence states only current evidence scope; no action claim.",
+                ["actualLanguage"]="en",
                 ["factScope"]="visual-observation",["resultReport"]="not-applicable",["requestDisposition"]="answer-only",
                 ["planningFailureReport"]="not-mentioned"}.ToString(),"received");
             f.Check(f.QueuedText()==evidenceAnswer&&(bool)Get(chat,"m_StreamComplete")&&!(bool)Get(chat,"m_FormalResponseInFlight"),
@@ -262,7 +263,8 @@ public static class FirstReplyChatIntegrationRegression
             Add("whitespace-only stream failure remains eligible for one fallback");
 
             f.Arm("解释刚才的失败。最后要求：现在向左转九十度。");p=f.Dispatch();
-            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools,RequestKind="mixed"});p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools,RequestKind="answer-only"});
+            var currentProof=new JObject{["answerQuote"]="解释刚才的失败。",["actionQuote"]="现在向左转九十度。"};
+            p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools,RequestKind="mixed",CurrentTurnEvidence=currentProof});p.Done(new FirstReplyCompletion{Disposition=FirstReplyDisposition.Tools,RequestKind="answer-only"});
             f.OneFallback("Tools selection falls back once, including duplicate provider completion.");
             var currentSemantics=(JObject)Call(chat,"ReadCurrentRequestSemantics",f.Generation);
             f.Check((string)currentSemantics?["requestKind"]=="mixed"&&(bool?)currentSemantics?["actionAuthorization"]==false&&
@@ -274,7 +276,7 @@ public static class FirstReplyChatIntegrationRegression
                 "Consumers must not be able to mutate a current semantic receipt or let duplicate callbacks overwrite it.");
             var compactSemantics=(JObject)Call(chat,"ReadCompactCurrentRequestSemantics",f.Generation);
             f.Check((string)compactSemantics?["requestKind"]=="mixed"&&compactSemantics["humanInput"]==null&&
-                compactSemantics["currentUserText"]==null&&compactSemantics.Count==8,
+                compactSemantics["currentUserText"]==null&&compactSemantics.Count==9&&JToken.DeepEquals(compactSemantics["currentTurnEvidence"],currentProof),
                 "Downstream semantics must carry the current typed requirement without duplicating whole ASR/history payloads.");
             Add("tools route preserves complete input, typed mixed request, clone isolation and single fallback");
 

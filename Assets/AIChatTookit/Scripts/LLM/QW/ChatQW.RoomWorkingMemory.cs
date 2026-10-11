@@ -76,6 +76,7 @@ public partial class ChatQW
         }
         foreach (string field in new[] { "pendingDeviceRequest", "pendingObservationGoal" })
             CollectRoomWorkingMemoryActiveBinding(result[field] as JObject, activeEntities);
+        ApplySceneAttention(new[] { result });
         var attended = SelectRoomWorkingMemoryObjects(result, activeEntities);
 
         // Each entry keeps its frozen point, capture/source, identity uncertainty,

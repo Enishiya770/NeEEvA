@@ -16,6 +16,8 @@ public static class SceneFactContextCompactor
     private const string Intro = "[Scene fact sharing v1] $sceneFactRef copies the EXACT earlier JSON value (object, array or scope-description string) at blockId#JSON-pointer (RFC6901). Read that earlier full value here too; this is NOT a new observation, action, permission or confirmation. Action/selection/device results appear in full at their first occurrence; an entirely identical later snapshot or objectContext may refer back. Different timestamps or state values are never merged.\n";
     private static readonly string[] Markers = {
         "[视觉关注与行动事实]",
+        "[只读场景问答]",
+        "[物件与自身方位的观察记录；回答当前对话可直接参考，无需先发起寻物]",
         "[本轮空间任务；由同一模型的结构化意图及Unity执行事实共同确定]",
         "[当前身体动作；程序事实]"
     };
@@ -31,13 +33,19 @@ public static class SceneFactContextCompactor
         public string id;
         public JObject original, compact;
     }
-    public static string Compact(string context, out Report report)
+    public static bool IsCompacted(string context)
+    {
+        int at = context?.IndexOf(Intro, StringComparison.Ordinal) ?? -1;
+        return at >= 0 && (at == 0 || context[at - 1] == '\n') &&
+            context.IndexOf("[Scene fact block ", at + Intro.Length, StringComparison.Ordinal) == at + Intro.Length;
+    }
+    public static string Compact(string context, out Report report, bool completeProducerContext = false)
     {
         report = new Report { beforeCharacters = context?.Length ?? 0, afterCharacters = context?.Length ?? 0 };
-        if (string.IsNullOrEmpty(context) || context.Length > 2000000 || context.Contains("[Scene fact sharing v1]")) return context;
+        if (string.IsNullOrEmpty(context) || context.Length > 2000000 || IsCompacted(context)) return context;
         try
         {
-            var blocks = ReadBlocks(context);
+            var blocks = ReadBlocks(context, completeProducerContext);
             report.blocks = blocks.Count;
             if (blocks.Count == 0) return context;
             var known = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -78,11 +86,11 @@ public static class SceneFactContextCompactor
         catch (OverflowException) { report.reason = "numeric-value-unchanged"; return context; }
     }
 
-    private static List<Block> ReadBlocks(string context)
+    private static List<Block> ReadBlocks(string context, bool completeProducerContext)
     {
         var result = new List<Block>();
         int userTail = context.IndexOf("(用户刚开口讲了下面这段话，请回应)", StringComparison.Ordinal);
-        int bound = userTail >= 0 ? userTail : context.Length;
+        int bound = !completeProducerContext && userTail >= 0 ? userTail : context.Length;
         for (int cursor = 0; cursor < bound && result.Count < 8;)
         {
             int next = context.IndexOf('\n', cursor);
@@ -125,7 +133,8 @@ public static class SceneFactContextCompactor
                 JObject scene = value["sceneActionFacts"] as JObject ?? value;
                 bool sceneFacts = scene["enabled"]?.Type == JTokenType.Boolean && scene["active"]?.Type == JTokenType.Boolean && scene["objectContext"] is JObject;
                 bool roomFacts = marker == "[当前身体动作；程序事实]" && (string)value["source"] == "Unity-room-runtime" && value["currentFacts"] is JObject;
-                if (!sceneFacts && !roomFacts) continue;
+                bool cognition = value["currentCaptureId"] != null && value["currentObjects"] is JArray && value["historicalObjects"] is JArray;
+                if (!sceneFacts && !roomFacts && !cognition) continue;
                 if (value.SelectTokens("$..['" + ReferenceKey + "']").GetEnumerator().MoveNext()) continue;
                 result.Add(new Block { markerStart = markerStart, start = start, end = end, id = "scene-facts-" + (result.Count + 1), original = value });
                 lineEnd = end; next = context.IndexOf('\n', end);
@@ -251,6 +260,7 @@ public static class SceneFactContextCompactor
     }
     private static string Escape(string key) => key.Replace("~", "~0").Replace("/", "~1");
     private static bool ShareableDetail(string name) => name == "recentObservations" || name == "knownObjectHistory" ||
+        name == "sceneSpatialMemory" || name == "currentObjects" || name == "historicalObjects" || name == "selfPose" ||
         name == "localStructure" || name == "assessment" || name == "currentAssessment" ||
         name == "currentUserSupport" || name == "support" || name == "sceneTargetObservation" ||
         name == "approachObservation" || name == "streamTelemetry" || name == "lastObservedRejection" || name == "lastSceneTargetResult";

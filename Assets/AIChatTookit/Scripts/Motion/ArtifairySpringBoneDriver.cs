@@ -17,6 +17,12 @@ public sealed class ArtifairySpringBoneDriver : MonoBehaviour
     [SerializeField] private Vrm10Instance target;
     [Tooltip("Only imported hair/skirt chains are processed, so NEVA's FoxTail component keeps ownership of its tail.")]
     [SerializeField] private bool hairAndSkirtOnly = true;
+    [Tooltip("Use a firm attachment and progressively softer cloth tips. Opt in per avatar.")]
+    [SerializeField] private bool naturalClothDynamics;
+    [Tooltip("Cloth support plane above this avatar's ground origin, in local meters. Used only by natural cloth dynamics.")]
+    [SerializeField, Min(0)] private float clothFloorHeight = .035f;
+    private Vector3 simulatedRootPosition;
+    private Quaternion simulatedRootRotation;
     private FastSpringBoneBuffer buffer;
     private FastSpringBoneBufferCombiner combiner;
     private FastSpringBoneScheduler scheduler;
@@ -77,32 +83,27 @@ public sealed class ArtifairySpringBoneDriver : MonoBehaviour
             var input = springs.Select(s => new FastSpringBoneSpring
             {
                 center = s.Center,
-                joints = s.Joints.Select(j =>
+                joints = s.Joints.Select((j, index) =>
                 {
                     if (j == null) throw new InvalidOperationException("Null spring joint");
                     if (!target.DefaultTransformStates.TryGetValue(j.transform, out var state))
                         throw new InvalidOperationException("No rest state for " + j.name);
                     restRotations[j.transform] = state.LocalRotation;
+                    bool cloth = naturalClothDynamics && (s.Name ?? "").StartsWith("Skirt", StringComparison.OrdinalIgnoreCase);
+                    float along = Mathf.Clamp01(index / (float)Mathf.Max(1, s.Joints.Count - 2));
                     return new FastSpringBoneJoint
                     {
                         Transform = j.transform,
                         DefaultLocalRotation = state.LocalRotation,
                         Joint = new BlittableJointMutable
                         {
-                            stiffnessForce = j.m_stiffnessForce, gravityDir = j.m_gravityDir,
-                            gravityPower = j.m_gravityPower, dragForce = j.m_dragForce, radius = j.m_jointRadius
+                            stiffnessForce = j.m_stiffnessForce * (cloth ? Mathf.Lerp(1.5f, .55f, along) : 1f), gravityDir = j.m_gravityDir,
+                            gravityPower = j.m_gravityPower * (cloth ? Mathf.Lerp(.5f, 1.1f, along) : 1f),
+                            dragForce = Mathf.Clamp01(j.m_dragForce * (cloth ? Mathf.Lerp(1.2f, .8f, along) : 1f)), radius = j.m_jointRadius
                         }
                     };
                 }).ToArray(),
-                colliders = s.ColliderGroups.SelectMany(g => g.Colliders).Select(c => new FastSpringBoneCollider
-                {
-                    Transform = c.transform,
-                    Collider = new BlittableCollider
-                    {
-                        colliderType = ConvertColliderType(c.ColliderType), offset = c.Offset,
-                        radius = c.Radius, tailOrNormal = c.TailOrNormal
-                    }
-                }).ToArray()
+                colliders = BuildColliders(s)
             }).ToArray();
             foreach (var spring in input)
                 if (spring.joints.Length < 2) throw new InvalidOperationException("A spring needs a head and tail");
@@ -113,6 +114,8 @@ public sealed class ArtifairySpringBoneDriver : MonoBehaviour
             combiner.Combined.SetModelLevel(target.transform, new BlittableModelLevel { SupportsScalingAtRuntime = true });
             scheduler = new FastSpringBoneScheduler(combiner);
             accumulator = 0;
+            simulatedRootPosition = target.transform.position;
+            simulatedRootRotation = target.transform.rotation;
             RememberRoot();
         }
         catch (Exception e) { StopSolver(false); Debug.LogException(e, this); enabled = false; }
@@ -141,17 +144,63 @@ public sealed class ArtifairySpringBoneDriver : MonoBehaviour
         }
         RememberRoot();
         accumulator += Mathf.Min(deltaTime, 4f * Step);
-        for (int steps = 0; steps < 4 && accumulator >= Step; steps++)
+        int count = Mathf.Min(4, Mathf.FloorToInt((accumulator + 0.000001f) / Step));
+        var finalPosition = root.position;
+        var finalRotation = root.rotation;
+        // World-space springs need the root pose at each fixed substep; a 30 Hz
+        // frame must not inject its whole displacement into the first 60 Hz step.
+        try
         {
-            scheduler.Schedule(Step).Complete();
-            accumulator -= Step;
+            for (int step = 1; step <= count; step++)
+            {
+                if (naturalClothDynamics)
+                {
+                    float t = step / (float)count;
+                    root.SetPositionAndRotation(Vector3.Lerp(simulatedRootPosition, finalPosition, t),
+                        Quaternion.Slerp(simulatedRootRotation, finalRotation, t));
+                }
+                scheduler.Schedule(Step).Complete();
+                accumulator = Mathf.Max(0, accumulator - Step);
+            }
         }
+        finally { root.SetPositionAndRotation(finalPosition, finalRotation); }
+        if (count > 0) { simulatedRootPosition = finalPosition; simulatedRootRotation = finalRotation; }
     }
     private void RememberRoot()
     {
         previousRootPosition = target.transform.position;
         previousRootRotation = target.transform.rotation;
         previousRootScale = target.transform.lossyScale;
+    }
+    private FastSpringBoneCollider[] BuildColliders(Vrm10InstanceSpringBone.Spring spring)
+    {
+        var colliders = spring.ColliderGroups.SelectMany(g => g.Colliders).Select(c => new FastSpringBoneCollider
+        {
+            Transform = c.transform,
+            Collider = new BlittableCollider { colliderType = ConvertColliderType(c.ColliderType),
+                offset = c.Offset, radius = c.Radius, tailOrNormal = c.TailOrNormal }
+        }).ToList();
+        if (!naturalClothDynamics || !(spring.Name ?? "").StartsWith("Skirt", StringComparison.OrdinalIgnoreCase))
+            return colliders.ToArray();
+        // Fill the gaps between the VRM 0 sphere samples along each shin/thigh.
+        // Preserve the source spheres and only bridge colliders on the same bone.
+        foreach (var group in spring.ColliderGroups)
+        {
+            var spheres = group.Colliders.Where(c => c.ColliderType == VRM10SpringBoneColliderTypes.Sphere &&
+                (c.transform.name.Contains("UpperLeg") || c.transform.name.Contains("LowerLeg"))).ToArray();
+            for (int i = 1; i < spheres.Length; i++)
+            {
+                var a = spheres[i - 1]; var b = spheres[i];
+                if (a.transform != b.transform) continue;
+                colliders.Add(new FastSpringBoneCollider { Transform = a.transform, Collider = new BlittableCollider
+                { colliderType = BlittableColliderType.Capsule, offset = a.Offset, tailOrNormal = b.Offset, radius = Mathf.Max(a.Radius, b.Radius) } });
+            }
+        }
+        // NeEEvA locomotion places the avatar origin on its support surface.
+        // This follows that support height; it is not arbitrary scene-mesh collision.
+        colliders.Add(new FastSpringBoneCollider { Transform = target.transform, Collider = new BlittableCollider
+        { colliderType = BlittableColliderType.Plane, offset = Vector3.up * clothFloorHeight, tailOrNormal = Vector3.up } });
+        return colliders.ToArray();
     }
     private static BlittableColliderType ConvertColliderType(VRM10SpringBoneColliderTypes kind)
     {

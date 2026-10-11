@@ -156,13 +156,15 @@ public partial class ChatQW
                 string responseDemand = null;
                 bool? candidateSufficient = null;
                 JObject questionUnderstanding = null;
+                JObject currentTurnEvidence = null;
                 double reviewStart = clock.Elapsed.TotalSeconds;
                 if (reviewWire == null) reviewStatus = "first-reply-review-input-budget";
                 else yield return RequestFirstReplyReview(reviewWire, generation,
-                    (route, understanding, kind, sufficient, demand, status) => { reviewedRoute = route; questionUnderstanding = understanding; requestKind = kind; candidateSufficient = sufficient; responseDemand = demand; reviewStatus = status; });
+                    (route, understanding, kind, sufficient, demand, status, proof) => { reviewedRoute = route; questionUnderstanding = understanding; requestKind = kind; candidateSufficient = sufficient; responseDemand = demand; reviewStatus = status; currentTurnEvidence = proof; });
                 reviewSeconds = clock.Elapsed.TotalSeconds - reviewStart;
                 if (!Current()) yield break;
                 completion = FirstReplyProtocol.ResolveReviewedCompletion(completion, reviewedRoute, reviewStatus, questionUnderstanding, requestKind, candidateSufficient, responseDemand);
+                completion.CurrentTurnEvidence = currentTurnEvidence;
                 if (completion.Disposition == FirstReplyDisposition.Ordinary)
                     foreach (var part in completion.Speech)
                     {
@@ -238,10 +240,16 @@ public partial class ChatQW
                 DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
         }
         catch (JsonException) { }
+        string utterance = runtimeContext is JObject runtime && runtime.SelectToken("humanInput.primaryUtterance")?.Type == JTokenType.String
+            ? (string)runtime.SelectToken("humanInput.primaryUtterance") : current.content ?? "";
+        // The producer-bound utterance is part of this exact current record. A
+        // stale or external context cannot swap the source used for quotations.
+        if (string.IsNullOrWhiteSpace(utterance) || (current.content ?? "").IndexOf(utterance, StringComparison.Ordinal) < 0)
+            utterance = current.content ?? "";
         string input = new JObject {
             ["latestUserText"] = current.content ?? "", ["recentDialogue"] = dialogue,
             ["recentDialogueIncomplete"] = incomplete, ["runtimeContext"] = runtimeContext,
-            ["candidateSpeech"] = speech
+            ["candidateSpeech"] = speech, ["currentUtterance"] = utterance
         }.ToString(Formatting.None);
         if (input.Length > FirstReplyProtocol.MaximumReviewInputCharacters) return null;
         var wire = new StringBuilder("{\"model\":"); AppendJsonString(wire, CurrentModelName);
@@ -255,7 +263,7 @@ public partial class ChatQW
         return wire.ToString();
     }
 
-    private IEnumerator RequestFirstReplyReview(string wire, int generation, Action<string, JObject, string, bool?, string, string> callback)
+    private IEnumerator RequestFirstReplyReview(string wire, int generation, Action<string, JObject, string, bool?, string, string, JObject> callback, int groundingAttempt = 0)
     {
         bool Current() => generation == m_StreamRequestGeneration;
         if (!Current()) yield break;
@@ -282,19 +290,29 @@ public partial class ChatQW
             string rawRoute = null;
             string responseDemand = null;
             bool? candidateSufficient = null;
+            JObject proof = null;
+            var wireObject = JObject.Parse(wire);
+            var reviewInput = JObject.Parse((string)wireObject["messages"][1]["content"]);
             bool received = !expired && request.responseCode == 200 && request.result == UnityWebRequest.Result.Success &&
                 TryReadRoomTaskCompletion(request.downloadHandler.text, out output, out status);
-            if (received && FirstReplyProtocol.TryCurrentReview(output, out route, out questionUnderstanding, out requestKind, out candidateSufficient, out responseDemand))
+            if (received && FirstReplyProtocol.TryGroundedReview(output, (string)reviewInput["currentUtterance"],
+                    out route, out questionUnderstanding, out requestKind, out candidateSufficient, out responseDemand, out proof))
             { status = "reviewed-" + route; rawRoute = (string)JObject.Parse(output)["route"]; }
-            else if (received) status = "first-reply-review-invalid-output";
+            else if (received) status = "first-reply-review-invalid-current-turn-evidence";
             Debug.Log("[LLM/FirstReplyReview] " + new JObject {
                 ["requestGeneration"] = generation, ["route"] = route, ["status"] = status,
                 ["requestKind"] = requestKind,
                 ["candidateSufficient"] = candidateSufficient, ["rawRoute"] = rawRoute,
                 ["responseDemand"] = responseDemand,
+                ["currentTurnEvidence"] = proof, ["groundingAttempt"] = groundingAttempt,
                 ["elapsed"] = Time.realtimeSinceStartup - started, ["rawResponse"] = output
             }.ToString(Formatting.None));
-            callback?.Invoke(route, questionUnderstanding, requestKind, candidateSufficient, responseDemand, status);
+            if (received && route == null && groundingAttempt == 0 && Current() && FirstReplyProtocol.CanRepairGrounding(output))
+            {
+                yield return RequestFirstReplyReview(FirstReplyProtocol.BuildGroundingRepairWire(wire, output), generation, callback, 1);
+                yield break;
+            }
+            callback?.Invoke(route, questionUnderstanding, requestKind, candidateSufficient, responseDemand, status, proof);
         }
     }
 

@@ -246,8 +246,14 @@ public static class FirstReplyTransportRegression
             structuredContext.ToString(Newtonsoft.Json.Formatting.None)));
         var structuredInput = JObject.Parse((string)structuredWire["messages"][1]["content"]);
         Check(JToken.DeepEquals(structuredInput["runtimeContext"], structuredContext) &&
-            structuredInput.Count == 5 && (string)structuredInput["runtimeContext"]["humanInput"]["primaryUtterance"] == primary,
+            structuredInput.Count == 6 && (string)structuredInput["currentUtterance"] == primary &&
+            (string)structuredInput["runtimeContext"]["humanInput"]["primaryUtterance"] == primary,
             "Structured context must preserve complete typed human input and null/false without adding a duplicated raw-context field.");
+        structuredContext["humanInput"]["primaryUtterance"] = "这属于另一个旧任务。";
+        var staleWire = JObject.Parse(CaptureReviewWire(model, primary, FirstReplyProtocolRegression.JapaneseReply,
+            structuredContext.ToString(Newtonsoft.Json.Formatting.None)));
+        Check((string)JObject.Parse((string)staleWire["messages"][1]["content"])["currentUtterance"] == primary,
+            "Stale contextual utterance cannot replace the exact accepted current user used to ground quotes.");
         if (directory != null) File.WriteAllText(Path.Combine(directory, "manifest.json"), new JObject {
             ["scope"] = "Frozen production review wires, synthetic factual fixtures; each requires one model pass, no retries or best-of selection.",
             ["cases"] = manifest }.ToString(), new UTF8Encoding(false));

@@ -100,15 +100,16 @@ public partial class ChatQW
     {
         if (generation != m_RoomTaskRequestGeneration) yield break;
         float start = Time.realtimeSinceStartup;
-        if (!review)
+        // Speech review has the same complete-payload ceiling as planning.
+        // Candidate speech, user words and execution receipts remain mandatory.
         {
             bool admitted = TryBudgetRoomDecisionRequest(json, false, out string bounded, out var budget);
             budget["generation"] = generation; budget["httpRequestSent"] = false;
-            Debug.Log("[Room/DecisionBudget] " + budget.ToString(Newtonsoft.Json.Formatting.None));
+            Debug.Log((review ? "[Room/ReviewBudget] " : "[Room/DecisionBudget] ") + budget.ToString(Newtonsoft.Json.Formatting.None));
             if (generation != m_RoomTaskRequestGeneration) yield break;
             if (!admitted)
             {
-                PublishRoomTaskFailure(generation, 0, false, start,
+                PublishRoomTaskFailure(generation, 0, review, start,
                     "room-task-http-context-budget;attempts=0;recovery=preflight-budget", callback);
                 yield break;
             }
@@ -206,12 +207,14 @@ public partial class ChatQW
         // Build the working set before serializing images/schema or sending HTTP.
         // The controller retains the complete task and observation records.
         if (!review) input = PrepareRoomPlanningWorkingMemory(input);
+        else input = ApplySceneAttentionToInput(input);
         string schema = review ? RoomTaskProtocol.BuildSpeechReviewSchemaForInput(input) : BuildRoomDecisionSchemaForInput(input);
+        if (review) input = RoomTaskProtocol.ProjectSpeechReviewInput(input);
         string contract = review ? RoomTaskProtocol.ReviewContract : RoomTaskProtocol.DecisionContract;
         var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
         sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":").Append(review ? 240 : 640);
         sb.Append(",\"response_format\":{\"type\":\"json_object\"");
-        if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(schema);
+        if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(review ? schema : RoomTaskProtocol.CompactNativeDecisionSchema(schema));
         sb.Append("},\"messages\":[");
         // The local transport already submits every intent branch as the native grammar.
         // Give the model each field definition once; cloud providers still need the full
@@ -309,10 +312,17 @@ public partial class ChatQW
                     if (field != "intent" && field != "origin" && field != "evidence") required.Add(field);
                 foreach (var field in properties.Properties())
                 {
-                    if (field.Name == "intent" || field.Name == "origin" || field.Name == "evidence") continue;
-                    allowed.Add(field.Name);
+                    if (field.Name == "intent") continue;
+                    if (field.Name != "origin" && field.Name != "evidence") allowed.Add(field.Name);
                     if (!JToken.DeepEquals(field.Value, guide["properties"][field.Name]))
-                        overrides[field.Name] = field.Value.DeepClone();
+                    {
+                        JToken definition = field.Value.DeepClone();
+                        if (field.Name == "deviceGoal" && guide["properties"][field.Name]["oneOf"] is JArray operations)
+                            for (int index = 0; index < operations.Count; index++)
+                                if (JToken.DeepEquals(operations[index], field.Value))
+                                    definition = new JObject { ["$ref"] = "#/properties/deviceGoal/oneOf/" + index };
+                        overrides[field.Name] = definition;
+                    }
                 }
                 var constraint = new JObject { ["intents"] = properties["intent"]["enum"].DeepClone(),
                     ["required"] = required, ["allowedAdditionalFields"] = allowed };

@@ -88,6 +88,9 @@ public partial class ChatSample
                 ["scope"] = "Model interpretation of the complete current input and actual prior dialogue, not original user words, a diagnostic/execution fact, or action authorization. Check it against primaryUtterance/fullInputEvidence and source-linked receipts; preserve unresolved ambiguity. It cannot create, resume, cancel or retry a task, establish a cause, or replace factual speech review."
             },
             ["previousPlanningFailure"] = ReadPreviousRoomPlanningFailure(),
+            ["previousReplyReceipt"] = understanding == null || (string)understanding["needsEvidence"] == "diagnostic" ||
+                (string)understanding["needsEvidence"] == "prior-dialogue" || (string)understanding["needsEvidence"] == "uncertain"
+                ? ReadPreviousFormalReplyReceipt() : null,
             ["scope"] = "Answer-only route selected from the complete current request. No new planning request, search, movement, device operation or goal update was submitted. Existing action and memory facts keep their own identities and times. This answer cannot resume or cancel an unfinished task."
         };
         bool consumed = false;

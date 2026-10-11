@@ -127,11 +127,15 @@ public static class FormalStreamRecoveryRegression
         LastReport["existingLatencyTransportPassed"] = true;
         LastReport["existingPublicBoundaryChecks"] = RoleOutputPublicBoundaryRegression.RunOrThrow();
         LastReport["existingDecisionTransportChecks"] = RoomDecisionTransportRegression.RunChecks();
+        LastReport["roomTaskProtocolChecks"] = RoomTaskProtocolRegression.RunChecks();
         checks += RoomDecisionRecoveryRegression.RunChecks();
         LastReport["decisionRecoveryPure"] = RoomDecisionRecoveryRegression.LastReport.DeepClone();
         checks += RoomDecisionBudgetRegression.RunChecks();
         LastReport["decisionBudgetPure"] = RoomDecisionBudgetRegression.LastReport.DeepClone();
         RoomDecisionBudgetRegression.ExportFixtures(Output);
+        yield return FirstReplySemanticGateRegression.RunChecks(Output);
+        LastReport["firstReplySemanticTransport"] = FirstReplySemanticGateRegression.LastReport.DeepClone();
+        checks += (int)FirstReplySemanticGateRegression.LastReport["checks"];
         using (var fixture = new Fixture())
         {
             BudgetChecks(fixture.Model);

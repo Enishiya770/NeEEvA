@@ -46,7 +46,7 @@ public static class SceneActiveViewRegression
             Check(RoomTaskProtocol.TryDecision(Decision("turn-in-place", "capture", yaw, 0).ToString(), "", true, out _), "Half turn is a bounded body request.");
         var branches = (JArray)JObject.Parse(RoomTaskProtocol.DecisionSchema)["oneOf"];
         JObject ViewBranch(string intent) => branches.OfType<JObject>().Single(branch =>
-            branch["properties"]["intent"]["enum"].Values<string>().Contains(intent));
+            branch["properties"]["deviceGoal"] == null && branch["properties"]["intent"]["enum"].Values<string>().Contains(intent));
         var head = ViewBranch("orient-view")["properties"]["viewChange"]["properties"];
         var body = ViewBranch("turn-in-place")["properties"]["viewChange"]["properties"];
         Check((int)head["yaw"]["minimum"] == -50 && (int)head["yaw"]["maximum"] == 50 &&

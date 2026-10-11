@@ -218,6 +218,39 @@ public static class FirstReplySemanticGateRegression
                     (newTurn ? "new-turn-held-review" : "cancel-held-review"), ["oldPublicDeltas"] = oldDeltas });
             }
 
+            foreach (string mode in new[] { "repaired", "exhausted", "cancelled" })
+            {
+                model.m_DataList.Clear(); int beforeRepair = server.Count, deltas = 0, done = 0; FirstReplyCompletion result = null;
+                const string user = "很好，然后来我身边。";
+                var bad = JObject.Parse(Verdict("tools", "mixed"));
+                bad["currentTurnEvidence"] = new JObject { ["answerQuote"] = "你刚才看到小灯了吗？", ["actionQuote"] = "来我身边" };
+                var good = JObject.Parse(Verdict("tools", "action"));
+                good["currentTurnEvidence"] = new JObject { ["answerQuote"] = null, ["actionQuote"] = "来我身边" };
+                var first = server.Serve(FirstReplyProtocol.ToolsHead, true, true);
+                model.PostFirstReplyStream(user, _ => ++deltas, value => { result = value; ++done; });
+                yield return Await(first.Received.Task, "grounding candidate");
+                var review = server.Serve(bad.ToString(Formatting.None), false, true); first.Release.TrySetResult(true);
+                yield return Await(review.Received.Task, "ungrounded review");
+                var repair = server.Serve((mode == "exhausted" ? bad : good).ToString(Formatting.None), false, true);
+                review.Release.TrySetResult(true);
+                yield return Await(repair.Received.Task, "single grounding repair");
+                var repairInput = JObject.Parse((string)JObject.Parse(repair.RequestJson)["messages"][1]["content"]);
+                Check((string)repairInput["currentUtterance"] == user && repairInput["groundingRepair"] is JObject &&
+                    deltas == 0 && done == 0 && !model.m_DataList.Exists(row => row.role == "assistant"),
+                    "Invalid historical quotes must trigger one private repair with the intact current user and no public or history release.");
+                if (mode == "cancelled") model.CancelActiveResponse();
+                repair.Release.TrySetResult(true); yield return Await(repair.Finished, "grounding repair socket");
+                if (mode != "cancelled") yield return WaitUntil(() => done != 0, "grounding result");
+                else { yield return new WaitForSecondsRealtime(.1f); }
+                Check(server.Count == beforeRepair + 3 && deltas == 0 && done == (mode == "cancelled" ? 0 : 1) &&
+                    (mode != "repaired" || result?.RequestKind == "action" && result.Disposition == FirstReplyDisposition.Tools && result.CurrentTurnEvidence != null) &&
+                    (mode != "exhausted" || result?.Disposition == FirstReplyDisposition.Failed) &&
+                    !model.m_DataList.Exists(row => row.role == "assistant"),
+                    "Grounding recovery must be bounded to one attempt, preserve verified intent, and respect cancellation: " + mode);
+                cases.Add(new JObject { ["id"] = "grounding-" + mode, ["requests"] = server.Count - beforeRepair,
+                    ["completions"] = done, ["publicDeltas"] = deltas });
+            }
+
             // Invalid generation output never gets semantic approval after an
             // apparently valid prefix; no review request is issued for it.
             model.m_DataList.Clear(); int failedDone = 0, failedSpeech = 0; FirstReplyCompletion failedResult = null;
@@ -274,6 +307,25 @@ public static class FirstReplySemanticGateRegression
             exchange.Finished = Task.Run(async () => {
                 var context = await listener.GetContextAsync(); ++Count;
                 using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8)) exchange.RequestJson = await reader.ReadToEndAsync();
+                // Legacy socket fixtures control semantic judgments; bind their
+                // synthetic proof to this supplied utterance. Grounding-specific
+                // cases provide literal proof themselves, including invalid ones.
+                if (!sse)
+                    try {
+                        var verdict = JObject.Parse(content);
+                        if ((string)verdict["reason"] == "Controlled fixture decision." && verdict["currentTurnEvidence"] == null) {
+                            var input = JObject.Parse((string)JObject.Parse(exchange.RequestJson)["messages"][1]["content"]);
+                            string utterance = (string)input["currentUtterance"];
+                            string kind = (string)verdict["requestKind"];
+                            int split = Math.Max(1, utterance.Length / 2);
+                            verdict["currentTurnEvidence"] = new JObject {
+                                ["answerQuote"] = kind == "mixed" ? utterance.Substring(0, split) : null,
+                                ["actionQuote"] = kind == "mixed" ? utterance.Substring(split) :
+                                    kind == "action" || kind == "control" ? utterance : null };
+                            content = verdict.ToString(Formatting.None);
+                        }
+                    } catch (JsonException) { }
+
                 context.Response.StatusCode = 200; context.Response.ContentType = sse ? "text/event-stream" : "application/json";
                 context.Response.SendChunked = sse;
                 try

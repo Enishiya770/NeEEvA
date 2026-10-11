@@ -201,7 +201,9 @@ public partial class ChatQW
                 try
                 {
                     var parsed = ReadRoomTaskRecoveryJson(text.Substring(start));
-                    if (parsed["currentUserText"]?.Type != JTokenType.String || parsed["autonomous"]?.Type != JTokenType.Boolean) continue;
+                    bool planningInput = parsed["currentUserText"]?.Type == JTokenType.String && parsed["autonomous"]?.Type == JTokenType.Boolean;
+                    bool reviewInput = parsed["requestedUserText"]?.Type == JTokenType.String && parsed["publicSpeech"]?.Type == JTokenType.String;
+                    if (!planningInput && !reviewInput) continue;
                     textToken = candidate; input = parsed; return true;
                 }
                 catch (JsonException) { }

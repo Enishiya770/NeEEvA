@@ -82,6 +82,7 @@ public partial class ChatSample
                 continuationCount = m_WorkContinuations, maximumContinuations = MaxWorkContinuations,
                 lastInspection = m_LastSelfInspection,
                 lastMotionExecution = m_LastMotionExecutionFeedback == null ? null : MotionFeedbackJson(m_LastMotionExecutionFeedback),
+                currentRoomTask = BuildWorkRoomCompletionObservation(),
                 toolInFlight = HasWorkToolInFlight()
             }) +
             m_WorkProgressFact +

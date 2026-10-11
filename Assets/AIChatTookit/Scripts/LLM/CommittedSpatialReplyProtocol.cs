@@ -46,9 +46,28 @@ public static class CommittedSpatialReplyProtocol
         "spoken ::= [^<>\\r\\n\\x00]+\n";
 
     public const string ReplyFactsMarker = "[Bound facts for this public reply]";
+    // Only the composer calls AppendReplyFacts. The complete producer context
+    // may contain a staged user-spoke frame followed by NEW observation blocks.
+    // Actual human utterances remain quoted JSON in humanInput / user messages.
+    public const string ProducerContextMarker = "[Committed reply producer context v1]";
+
+    public static bool IsPlanningFailureOnly(string context)
+    {
+        var facts = ReadReplyFacts(context);
+        if ((bool?)facts?["planningFailureOnly"] != true) return false;
+        var semantics = facts["currentRequestSemantics"] as JObject;
+        var failure = facts["decisionFailure"] as JObject;
+        var human = facts["humanInput"] as JObject;
+        string request = (string)semantics?["requestKind"];
+        string kind = (string)failure?["kind"];
+        return (bool?)human?["currentHumanTurnPresent"] == true &&
+            (request == "action" || request == "control") &&
+            (bool?)failure?["newActionSubmittedByThisDecision"] == false &&
+            (kind == "input-budget-exceeded" || kind == "service-request-failed" || kind == "decision-not-executable");
+    }
 
     public static string AppendReplyFacts(string context, JObject facts) =>
-        (context ?? "") + "\n" + ReplyFactsMarker + "\n" + (facts ?? new JObject()).ToString(Formatting.None);
+        ProducerContextMarker + "\n" + (context ?? "") + "\n" + ReplyFactsMarker + "\n" + (facts ?? new JObject()).ToString(Formatting.None);
 
     public static JObject ReadReplyFacts(string context)
     {
