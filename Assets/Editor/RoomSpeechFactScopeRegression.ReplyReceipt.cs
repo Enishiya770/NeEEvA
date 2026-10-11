@@ -130,6 +130,7 @@ public static partial class RoomSpeechFactScopeRegression
         }
         finally { UnityEngine.Object.DestroyImmediate(serializerHost); typeof(LLM).GetField("lan", Flags).SetValue(model, oldLanguage); }
         yield return RunMovementStateReviewChecks(chat, bridge, model, output);
+        yield return RunLatestMovementPacketChecks(chat, bridge, model, output);
         yield return RunMovementPlaybackChecks(chat, bridge, model);
         yield return RunLanguageReplyChecks(chat, bridge, model, output);
         LastDecisionFailureReport["replyReceiptsAndLoad"] = new JObject { ["status"] = "passed", ["turns"] = results,
@@ -164,6 +165,10 @@ public static partial class RoomSpeechFactScopeRegression
             repair.SpeechCompleteCallback(corrected);
             if (mode == "cancelled")
                 Require(model.m_DataList.Count == history, "Cancelled language rewrite cannot publish through late callbacks.");
+            else if (mode == "still-wrong")
+                Require(model.Decisions.Last() == first && model.m_DataList.Count == history + 1 &&
+                    model.m_DataList.Last().content != bad,
+                    "An identical rejected rewrite immediately uses the existing fallback without another factual-review request.");
             else
             {
                 yield return Wait(() => model.Decisions.Last() != first, "Rewritten language and facts reviewed again");
@@ -183,25 +188,29 @@ public static partial class RoomSpeechFactScopeRegression
     private static IEnumerator RunMovementStateReviewChecks(ChatSample chat, ArdyRoomDialogueBridge bridge,
         NevaSceneVisionIntegrationModel model, string output)
     {
-        string[] phases = { "preparing", "follow-recovering", "follow-waiting" };
-        string[] badSpeech = { "好，我准备好了。跟紧你了哦。", "我一直跟着你移动。", "我马上开始跟着你走。" };
+        string[] phases = { "preparing", "follow-recovering", "follow-waiting", "moving" };
+        string[] badSpeech = { "好，我准备好了。跟紧你了哦。", "我一直跟着你移动。", "我马上开始跟着你走。", "我正在跟着你移动。" };
         for (int i = 0; i < phases.Length; i++)
         {
-            yield return PrepareRoomPlanning(chat, bridge, "请继续跟着我，并说明现在的状态。");
+            yield return PrepareRoomPlanning(chat, bridge, i == 0 ? "来我身边。" : "请继续跟着我，并说明现在的状态。");
             int generation = (int)Get(chat, "m_FormalResponseGeneration");
             model.Decisions.Last().Complete(true, "{\"intent\":\"none\",\"origin\":\"none\",\"evidence\":\"\"}", "controlled-state-review-source");
             Call(chat, "RememberFirstReplyRequestSemantics", new FirstReplyCompletion {
-                Disposition = FirstReplyDisposition.Tools, RequestKind = "mixed" }, generation, model);
+                Disposition = FirstReplyDisposition.Tools, RequestKind = i == 0 ? "action" : "mixed" }, generation, model);
             object oldId = Get(bridge, "actionId"), oldPhase = Get(bridge, "phase"), oldReason = Get(bridge, "reason"),
-                oldDiagnostic = Get(bridge, "latestDiagnostic"), oldFollow = Get(bridge, "followActive");
+                oldDiagnostic = Get(bridge, "latestDiagnostic"), oldFollow = Get(bridge, "followActive"), oldActive = Get(bridge, "activeAction");
             string oldLanguage = model.DialogueLanguage;
+            string intent = i == 0 ? "approach" : "follow";
             try
             {
                 typeof(LLM).GetField("lan", Flags).SetValue(model, "中文");
                 string action = "state-review-" + i;
-                Set(bridge, "actionId", action); Set(bridge, "followActive", true); Call(bridge, "SetFact", phases[i], "controlled-state-review");
-                Set(chat, "m_RoomTaskIntent", "follow"); Set(chat, "m_RoomTaskActionId", action);
-                Set(chat, "m_RoomTaskDispatch", "follow-submitted");
+                // Hold a controlled pending approach receipt without starting
+                // live follow updates between the real HTTP callbacks.
+                if (i == 0) Set(bridge, "activeAction", false);
+                Set(bridge, "actionId", action); Set(bridge, "followActive", i != 0); Call(bridge, "SetFact", phases[i], "controlled-state-review");
+                Set(chat, "m_RoomTaskIntent", intent); Set(chat, "m_RoomTaskActionId", action);
+                Set(chat, "m_RoomTaskDispatch", intent + "-submitted");
                 Set(chat, "m_RoomTaskTargetRevision", bridge.ReadCurrentTargetEvidence().currentTargetRevision);
                 int count = model.Decisions.Count, operations = bridge.Controller.OperationRevision;
                 var speech = new SpeechTextBuffer(); speech.Append(new SpeechText(badSpeech[i], "zh", actionDependency: SpeechActionDependency.Independent));
@@ -210,27 +219,57 @@ public static partial class RoomSpeechFactScopeRegression
                 var review = model.Decisions.Last(); var input = JObject.Parse(review.Input);
                 var requirement = (JObject)input["movementReportRequirement"];
                 Require(review.Kind == "room-review" && (bool)requirement["required"], "Actual speech audit receives the owner-bound phase requirement.");
+                if (i == 0) Require(input["sceneActionFacts"]?.Type == JTokenType.Null && input["sceneSearchReportRequirement"]?.Type == JTokenType.Null,
+                    "Actual movement producer explicitly emits null unrelated fact branches through the HTTP regression.");
                 string directory = Path.Combine(output, "movement-state-review-" + i); Directory.CreateDirectory(directory);
                 File.WriteAllText(Path.Combine(directory, "bad.request.json"), review.Wire);
                 var room = (JObject)Call(chat, "ReadCompactRoomTaskFacts", bridge);
-                string good = RoomMovementResultPolicy.Fallback(room, "follow", action);
+                string good = RoomMovementResultPolicy.Fallback(room, intent, action);
                 input["publicSpeech"] = good;
                 var writer = (ChatQW)Get(model, "serializer");
                 string goodWire = (string)Call(writer, "BuildRoomTaskRequestJsonWithImage", input.ToString(Formatting.None), review.Image, true);
                 File.WriteAllText(Path.Combine(directory, "good.request.json"), goodWire);
                 string wrongState = (string)requirement["expectedReport"] == "moving" ? "waiting" : "moving";
-                review.Complete(true, new JObject { ["verdict"] = "consistent", ["reason"] = "controlled wrong spoken state",
-                    ["factScope"] = "user-target", ["resultReport"] = wrongState }.ToString(), "controlled-conflicting-phase");
+                int beforeRepair = model.Speech.Count, history = model.m_DataList.Count;
+                if (i == 3) { Call(bridge, "SetFact", "follow-waiting", "phase changed while review pending");
+                    room = (JObject)Call(chat, "ReadCompactRoomTaskFacts", bridge); good = RoomMovementResultPolicy.Fallback(room, intent, action); }
+                var rejected = new JObject { ["verdict"] = "consistent", ["reason"] = "controlled wrong spoken state",
+                    ["actualLanguage"] = "zh", ["factScope"] = "user-target", ["resultReport"] = i == 3 ? "moving" : wrongState };
+                if (i == 0)
+                    yield return RoomSpeechClaimRegression.ReviewProductionInput(writer, review.Input, review.Image,
+                        wrongState, badSpeech[i], "zh", null, (ok, result, status) => review.Complete(ok, result, status));
+                else review.Complete(true, rejected.ToString(), "controlled-conflicting-phase");
+                yield return Wait(() => model.Speech.Count == beforeRepair + 1, "Single movement wording repair");
+                Require(model.m_DataList.Count == history && bridge.Controller.OperationRevision == operations,
+                    "Incorrect or stale movement words stay private; repair does not submit any action.");
+                review.Complete(true, rejected.ToString(), "duplicate phase verdict");
+                var repair = model.Speech.Last();
+                if (i == 2) Call(chat, "InvalidateFormalResponse", "movement-rewrite-cancelled");
+                repair.SpeechCallback(new SpeechText(good, "zh", actionDependency: SpeechActionDependency.Independent));
+                repair.SpeechCompleteCallback(good);
+                if (i == 2) { Require(model.m_DataList.Count == history, "Cancelled movement repair has no history or late publication."); continue; }
+                yield return Wait(() => model.Decisions.Last() != review, "Rewritten movement is reviewed again");
+                string expectedState = (string)RoomMovementResultPolicy.Requirement(room, intent, action)["expectedReport"];
+                var approved = new JObject { ["verdict"] = "consistent", ["reason"] = "controlled corrected phase",
+                    ["actualLanguage"] = "zh", ["factScope"] = "user-target", ["resultReport"] = i == 1 ? wrongState : expectedState,
+                    ["targetComparison"] = "The current user remains the destination.", ["targetConsistency"] = "matched",
+                    ["otherClaimsComparison"] = "No additional clauses.", ["otherClaimsSupport"] = "none", ["conflict"] = "none", ["conflictQuote"] = "" };
+                var repairedReview = model.Decisions.Last();
+                if (i == 0)
+                    yield return RoomSpeechClaimRegression.ReviewProductionInput(writer, repairedReview.Input, repairedReview.Image,
+                        expectedState, good, "zh", approved.ToString(), (ok, result, status) => repairedReview.Complete(ok, result, status));
+                else repairedReview.Complete(true, approved.ToString(), "controlled-repair-reviewed");
                 string expected = (string)typeof(ChatSample).GetMethod("LocalizeRoomFallback", BindingFlags.Static | BindingFlags.NonPublic)
                     .Invoke(null, new object[] { good, "zh" });
-                Require(model.m_DataList.Last().content == expected && bridge.Controller.OperationRevision == operations,
-                    "A generic consistent verdict cannot release a wrong phase; final speech uses the localized actual state without another action.");
+                Require(model.m_DataList.Last().content == expected && model.Speech.Count == beforeRepair + 1 && bridge.Controller.OperationRevision == operations,
+                    "Corrected phase is released; a second mismatch falls back once. State change and repair never repeat the movement.");
             }
             finally
             {
                 Set(bridge, "actionId", oldId); Set(bridge, "phase", oldPhase); Set(bridge, "reason", oldReason);
                 Set(bridge, "latestDiagnostic", oldDiagnostic); Set(bridge, "followActive", oldFollow);
                 typeof(LLM).GetField("lan", Flags).SetValue(model, oldLanguage);
+                Set(bridge, "activeAction", oldActive);
             }
         }
     }

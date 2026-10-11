@@ -1,0 +1,101 @@
+using System;
+using System.Collections;
+using System.IO;
+using System.Linq;
+using NeEEvA.Perception;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+public static partial class RoomSpeechFactScopeRegression
+{
+    private static IEnumerator CheckContinuationReplyFeedback(ChatSample chat, ArdyRoomDialogueBridge bridge,
+        NevaSceneVisionIntegrationModel model, ChatQW serializer, string output)
+    {
+        var fixture=JObject.Parse(File.ReadAllText("Assets/Editor/Fixtures/ReplyContinuation.latest-1843-20261011.json"));
+        string original=fixture.ToString(); var reports=new JArray();
+        var savedNames=new[]{"m_SceneActionFact","m_SpatialDeviceGoal","m_PendingSelfInspection"};
+        var saved=savedNames.ToDictionary(n=>n,n=>Get(chat,n));
+        var oldHistory=serializer.m_DataList.ToList();
+        try {
+            foreach(JObject row in fixture["cases"])
+            {
+                string request=(string)row["originalRequest"];
+                yield return PrepareRoomPlanning(chat,bridge,request);
+                model.Decisions.Last().Complete(true,"{\"intent\":\"none\",\"origin\":\"none\",\"evidence\":\"\"}","continuation-source-fixture");
+                int generation=(int)Get(chat,"m_FormalResponseGeneration");
+                Call(chat,"RememberFirstReplyRequestSemantics",new FirstReplyCompletion {Disposition=FirstReplyDisposition.Tools,RequestKind="action"},generation,model);
+                var observed=(SceneVisionObservation)Call(chat,"GetFormalSceneObservation",generation);
+                var factType=typeof(ChatSample).GetNestedType("SceneActionFact",System.Reflection.BindingFlags.NonPublic);
+                Set(chat,"m_SceneActionFact",UnityEngine.JsonUtility.FromJson(row["scene"]["lastAction"].ToString(),factType));
+                Set(chat,"m_SpatialDeviceGoal",null);
+                Set(chat,"m_WorkReviewOpen",true);Set(chat,"m_WorkStatus","continue");
+                Set(chat,"m_WorkNoProgress",false);Set(chat,"m_WorkIntent","执行剩余步骤，回到用户身边。");
+                Set(chat,"m_WorkContinuations",1);Set(chat,"m_AgentCurrentRoundIsTick",true);
+                Set(chat,"m_FormalResponseGeneration",++generation);
+                Call(chat,"BindFormalSceneObservation",observed,generation);
+                object oldId=Get(bridge,"actionId"),oldPhase=Get(bridge,"phase"),oldReason=Get(bridge,"reason"),oldDiagnostic=Get(bridge,"latestDiagnostic");
+                try {
+                    string action="continuation-return-"+row["name"];
+                    Set(bridge,"actionId",action);Call(bridge,"SetFact","moving","controlled owner-bound return in progress");
+                    Set(chat,"m_RoomTaskIntent","approach");Set(chat,"m_RoomTaskActionId",action);
+                    Set(chat,"m_RoomTaskDispatch","attempt-submitted");
+                    Set(chat,"m_PendingSelfInspection","Unconsumed inspection: the secondary tool failed; do not repeat it.");
+                    Call(chat,"RecordWorkRoomTaskContext");
+                    serializer.m_DataList.Add(new LLM.SendData("user",request));
+                    foreach(bool stress in new[]{false,true})
+                    {
+                        var scene=(JObject)row["scene"].DeepClone();
+                        if(stress)
+                        {
+                            // Grow only real observed-memory detail; never pad
+                            // or truncate mandatory current outcomes/user input.
+                            var history=(JArray)scene["objectContext"]["knownObjectHistory"];
+                            if(history==null) scene["objectContext"]["knownObjectHistory"]=history=new JArray();
+                            var sample=history.OfType<JObject>().FirstOrDefault() ?? new JObject { ["entityId"]="historical-observed" };
+                            for(int i=0;i<80;i++) {var item=(JObject)sample.DeepClone();item["entityId"]="observed-growth-"+i;item["modelDescription"]=new string('旧',500);history.Add(item);}
+                        }
+                        string feedback=(string)Call(chat,"BuildWorkContinuationContext")+"\n"+(string)Call(chat,"BuildRoomTaskReplyFacts")+
+                            "\n[视觉关注与行动事实]\n"+scene.ToString(Formatting.None)+
+                            "\nUnknown custom constraint: keep all unrelated devices unchanged.";
+                        Call(chat,"StageFormalObservationFrame",(string)row["frame"],generation);
+                        int speech=model.Speech.Count, operations=bridge.Controller.OperationRevision;
+                        Call(chat,"DispatchPlannedWorkRoomReply",feedback,observed?.ImageDataUrl,generation);
+                        Require(model.Speech.Count==speech+1,"Actual planned-work reply producer dispatches exactly once.");
+                        var sent=model.Speech.Last();
+                        Require(sent.Stage==FormalResponseStage.CommittedSpatialReply && sent.Input.Contains("[视觉关注与行动事实]") &&
+                            sent.Input.Contains((string)row["scene"]["lastAction"]["actionId"]) && sent.Context.Contains(action),
+                            "Regression exercises BOTH compact movement context and full continuation execution feedback, including recorded device outcome.");
+                        var historyWire=typeof(ChatQW).GetMethod("CreateObservationRequestHistory",Flags | System.Reflection.BindingFlags.Static).Invoke(serializer,new object[]{serializer.m_DataList,sent.Image});
+                        string wire=(string)typeof(ChatQW).GetMethod("BuildStageRequestJsonForMessages",Flags).Invoke(serializer,
+                            new object[]{historyWire,true,sent.Context,sent.Input,sent.Stage});
+                        object[] admission={wire,null};
+                        Require((bool)typeof(ChatQW).GetMethod("AdmitSceneSpeechWire",Flags | System.Reflection.BindingFlags.Static).Invoke(null,admission),
+                            "Complete actual continuation serializer admits latest recorded feedback load and bounded memory growth: "+admission[1]);
+                        Require(wire.Contains(request) && wire.Contains(action) && wire.Contains("secondary tool failed") &&
+                            wire.Contains("keep all unrelated devices unchanged") && bridge.Controller.OperationRevision==operations,
+                            "Projection preserves full request, current action, pending non-spatial result and unknown constraints without submitting motion.");
+                        object[] projection={sent.Context,sent.Input,0,null};
+                        string projected=(string)typeof(ChatQW).GetMethod("ProjectReplyInputs",Flags | System.Reflection.BindingFlags.Static).Invoke(null,projection);
+                        Require((bool?)((JObject)projection[3])["feedbackIncludedInProjection"]==true && projected.Length<sent.Context.Length+sent.Input.Length,
+                            "Feedback participates in field-level projection instead of bypassing it as a raw system block.");
+                        string directory=Path.Combine(output,"continuation-"+row["name"]+(stress?"-growth":""));Directory.CreateDirectory(directory);
+                        File.WriteAllText(Path.Combine(directory,"context.txt"),sent.Context);File.WriteAllText(Path.Combine(directory,"feedback.txt"),sent.Input);
+                        File.WriteAllText(Path.Combine(directory,"request.json"),wire);
+                        reports.Add(new JObject { ["name"]=row["name"],["stressObservedMemory"]=stress,["budget"]=(JObject)admission[1],["projection"]=(JObject)projection[3] });
+                        // Unknown protected feedback cannot disappear in order
+                        // to force admission, including on a preprojected input.
+                        string protectedWire=(string)typeof(ChatQW).GetMethod("BuildStageRequestJsonForMessages",Flags).Invoke(serializer,
+                            new object[]{historyWire,true,projected,"Protected unknown outcome: "+new string('密',65000),sent.Stage});
+                        object[] rejected={protectedWire,null};
+                        Require(!(bool)typeof(ChatQW).GetMethod("AdmitSceneSpeechWire",Flags | System.Reflection.BindingFlags.Static).Invoke(null,rejected) && protectedWire.Contains(new string('密',65000)),
+                            "New protected feedback cannot hide behind an already-projected marker or be silently dropped.");
+                        Call(chat,"CancelRoomSpeechReview","continuation-budget-fixture-finished");
+                    }
+                } finally {Set(bridge,"actionId",oldId);Set(bridge,"phase",oldPhase);Set(bridge,"reason",oldReason);Set(bridge,"latestDiagnostic",oldDiagnostic);}
+                serializer.m_DataList.Add(new LLM.SendData("assistant",(string)row["priorReceipt"]["publicText"]));
+            }
+            Require(fixture.ToString()==original,"Request projection does not alter recorded memory or outcomes.");
+        } finally {foreach(var item in saved)Set(chat,item.Key,item.Value);serializer.m_DataList=oldHistory;}
+        LastDecisionFailureReport["latestContinuationFeedbackBudgets"]=reports;
+    }
+}

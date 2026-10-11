@@ -18,7 +18,11 @@ public partial class ChatSample
     private string m_LatestSingingOutcome = "none";
     private bool m_SingingRequestSubmittedSinceUserTurn;
 
-    private string BuildSingingExecutionSnapshot()
+    private string BuildSingingExecutionSnapshot() => BuildSingingExecutionState() + BuildSingingGoalContext();
+
+    // Consumers which already include the full goal document use just its
+    // execution state here, keeping the goal and user chronology single-copy.
+    private string BuildSingingExecutionState()
     {
         bool active = IsSingingRuntimeActivityActive();
         string state = m_HumBackPlaying ? "playing" : m_SongSingInFlight ? "locating_library_audio" :
@@ -29,7 +33,7 @@ public partial class ChatSample
         return $"\n[Sing/Execution] request_submitted_since_user_turn={m_SingingRequestSubmittedSinceUserTurn.ToString().ToLowerInvariant()} " +
             $"work_active={active.ToString().ToLowerInvariant()} state={state} " +
             $"continuations_without_work={m_NoSingingWorkContinuations}\n" +
-            "以上只表示程序执行状态；提交过不等于成功，idle不表示素材丢失。口头说准备好、look、continue都不会启动演唱。是否行动、询问或安静仍由你决定。\n" + BuildSingingGoalContext();
+            "以上只表示程序执行状态；提交过不等于成功，idle不表示素材丢失。口头说准备好、look、continue都不会启动演唱。是否行动、询问或安静仍由你决定。\n";
     }
 
     private string BuildSingingClipOverview(SenseVoiceSpeechToText sense)

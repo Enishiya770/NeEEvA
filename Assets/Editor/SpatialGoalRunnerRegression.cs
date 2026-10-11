@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using NeEEvA.Perception;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
@@ -68,6 +69,7 @@ public static class SpatialGoalRunnerRegression
             ["scope"] = "Actual StartStreaming entry and production parser/goal review; controlled semantic search/match replies over actual rendered RGB. No quiet RoomTask model continuation, invented arrival, power result or actor teleport. Native focus additionally requires measured approach and same-entity return after an actual body turn. Semantic model accuracy is outside this controlled fixture." };
         string[] fields = { "m_EnableSceneObjectTargetMatching", "m_EnableSceneObjectAwareness", "m_EnableFirstReplyRouting", "m_SceneDeviceDistance", "m_AgentEyesOpen", "m_SceneTimePaused", "m_ReviewedGoalAnswerObligation" };
         var saved = fields.ToDictionary(key => key, key => Get(chat, key));
+        bool previousSequences = model.TaskSequencesEnabled;
         SceneObjectLightSwitch lamp = null;
         var stack = new Stack<IEnumerator>();
         try
@@ -102,6 +104,7 @@ public static class SpatialGoalRunnerRegression
             Call(chat, "InvalidateFormalResponse", "unified-regression-cleanup"); Call(chat, "ClearScheduledAgentWake");
             Set(chat, "<IsAISpeaking>k__BackingField", false);
             foreach (var item in saved) Set(chat, item.Key, item.Value);
+            model.TaskSequencesEnabled = previousSequences;
             if (lamp != null) { LastReport["restoredLamp"] = lamp.RestoreOriginal(out string restore); LastReport["restoreReason"] = restore; }
             if ((string)LastReport["status"] == "running") LastReport["status"] = "failed";
             Save();
@@ -119,7 +122,8 @@ public static class SpatialGoalRunnerRegression
         Set(chat, "m_SceneDeviceDistance", operationLimit);
         LastReport["initialDistanceMeters"] = initialDistance; LastReport["operationLimitMeters"] = operationLimit;
         Run run = null;
-        yield return Begin(chat, bridge, model, lamp, "reviewed-first-write", OffRequest, "off", "set-object-state", value => run = value);
+        model.TaskSequencesEnabled = true;
+        yield return Begin(chat, bridge, model, lamp, "reviewed-first-write", OffRequest + "然后回到我身边。", "off", "set-object-state", value => run = value);
         heldPlayback = new HeldPlayback(chat);
         yield return Wait(() => chat.IsVoiceOutputPlaying, 3, "real playback gate held");
         Set(chat, "<IsAISpeaking>k__BackingField", true);
@@ -143,6 +147,7 @@ public static class SpatialGoalRunnerRegression
         else Require(bridge.Controller.OperationRevision == run.operation,
             "An already-near visible target requires no unnecessary body move.");
         yield return Audit(chat, model, lamp, run);
+        model.TaskSequencesEnabled = false;
         AddCase(run, "legacy-first-write-unified-search-to-readback", chat);
 
         JObject operated = ((JArray)Call(chat, "BuildSpatialGoalReferentSources")).OfType<JObject>()
@@ -296,6 +301,13 @@ public static class SpatialGoalRunnerRegression
             proposal["viewChange"] = new JObject { ["captureId"] = run.source.CaptureId, ["yaw"] = -30, ["pitch"] = 0 };
         }
         Require(RoomTaskProtocol.TryDecision(proposal.ToString(), text, false, out _), "Initial fixture proposal passes the production parser.");
+        if (model.TaskSequencesEnabled)
+        {
+            proposal["taskPlan"] = new JArray(
+                new JObject { ["id"] = "s1", ["quote"] = "把眼前那盏小灯关掉", ["kind"] = "device-state", ["desiredState"] = "off", ["after"] = new JArray() },
+                new JObject { ["id"] = "s2", ["quote"] = "回到我身边", ["kind"] = "approach", ["desiredState"] = null, ["after"] = new JArray("s1") });
+            proposal["taskStep"] = "s1";
+        }
         if (delayInitial) yield return Wait(() => Time.realtimeSinceStartup - run.source.CapturedAtRealtime > 12.1f, 15, "actual source expires before first planner callback");
         run.initial.Complete(true, proposal.ToString(), "controlled-unified-initial");
         yield return Wait(() => model.DeviceGoalReviews.Count == reviews + 1, 8, "independent original request authority review");
@@ -364,6 +376,39 @@ public static class SpatialGoalRunnerRegression
             RoomPlans(model) == run.rooms + 1, "One short terminal result replaces all intermediate planning/reply turns.");
         Require((string)Goal(chat)["status"] == "satisfied" && (bool?)Goal(chat)["completionEvidence"]?["actual"]?["on"] == (run.state == "on") &&
             lamp.ReadState().on == (run.state == "on"), "Completion requires the requested actual lamp state and immutable runtime proof.");
+        int completedGeneration = (int)Get(chat, "m_FormalResponseGeneration");
+        try
+        {
+            Set(chat, "m_FormalResponseGeneration", completedGeneration + 1);
+            var prior = (JObject)Call(chat, "BuildMovementPriorResults");
+            File.WriteAllText(Path.Combine(directory, run.name + "-next-generation-history.json"), prior?.ToString(Formatting.Indented) ?? "null");
+            Require((bool?)prior?["historicalResult"] == true && (string)prior?.SelectToken("goal.desiredState") == run.state &&
+                (string)prior?.SelectToken("lastAction.phase") == "performed" &&
+                (bool?)prior?.SelectToken("goal.operationSummary.operationAttempted") == true,
+                "An actually performed device operation remains reportable after the return step advances the speech generation.");
+            if (model.TaskSequencesEnabled)
+            {
+                var sequence = (JObject)Call(chat, "ReadRoomTaskSequence");
+                Require((string)sequence.SelectToken("steps[0].status") == "completed" &&
+                    ((JArray)sequence["readyStepIds"]).Values<string>().SequenceEqual(new[] { "s2" }),
+                    "Actual device completion unlocks only the return step in the production task ledger.");
+                string next = new JObject { ["intent"] = "approach", ["origin"] = "user", ["evidence"] = "回到我身边", ["taskStep"] = "s2" }.ToString();
+                Require(RoomTaskProtocol.TryDecision(RoomTaskSequenceProtocol.DecisionOnly(next), run.text, false, out var decision, out _),
+                    "Return retains the complete same-user authorization.");
+                object[] selection = { next, decision, null };
+                Require((bool)Call(chat, "ValidateRoomTaskSequence", selection),
+                    "The production submission guard now permits that return, without another device write.");
+                File.WriteAllText(Path.Combine(directory, "completed-sequence-ready-return.json"), sequence.ToString(Formatting.Indented));
+            }
+            prior["goal"]["operationSummary"]["operationAttempted"] = false;
+            Require((bool?)((JObject)Call(chat, "BuildMovementPriorResults")).SelectToken("goal.operationSummary.operationAttempted") == true,
+                "A consumer cannot mutate the stored historical result.");
+            int epoch = (int)Get(chat, "m_WorkEpoch"); Set(chat, "m_WorkEpoch", epoch + 1);
+            try { Require((bool?)((JObject)Call(chat, "BuildMovementPriorResults"))?["historicalResult"] != true,
+                "A replacement work owner cannot borrow the completed step as its own result."); }
+            finally { Set(chat, "m_WorkEpoch", epoch); }
+        }
+        finally { Set(chat, "m_FormalResponseGeneration", completedGeneration); }
     }
 
     private static string SearchChoice(NevaSceneVisionIntegrationModel.Request request, Run run, string entity)

@@ -170,7 +170,7 @@ public static class FirstReplyChatIntegrationRegression
             f.Arm("今天我们只聊聊普通的事情，不要移动。");var p=f.Dispatch();
             f.Check(p.Prompt==f.Prompt&&p.Image==null&&p.CommitHistory,"The first-reply request preserves original text/history intent and receives no current image.");
             f.Check(p.Context.Contains("fixture-transient-context")&&p.Context.Contains("currentImageDeliveredInThisRequest"),"The actual request carries compact runtime context and image absence.");
-            var firstRuntime=JObject.Parse(p.Context.Split('\n')[1]);
+            var firstRuntime=JObject.Parse(p.Context);
             f.Check((int?)firstRuntime["generation"]==f.Generation&&(int?)firstRuntime["workEpoch"]==f.Epoch&&
                 (int?)firstRuntime["userTurn"]==1&&(bool?)firstRuntime["humanInput"]?["currentHumanTurnPresent"]==true&&
                 (string)firstRuntime["humanInput"]?["primaryUtterance"]==f.Prompt,
@@ -387,6 +387,41 @@ public static class FirstReplyChatIntegrationRegression
             f.Check(Get(chat,"m_StagedFormalObservation")==null&&Get(chat,"m_ComposedObservationReceipt")==null,"Narrow completion discards its staged receipt without acknowledging pending content.");
             Add("ordinary completion preserves unread full observations");
 
+            foreach (string human in new[] { "再试一次来我身边。", "为什么没回来？只解释，不要移动。" })
+            {
+                f.Arm(human);
+                Set(chat, "m_SpatialDeviceGoal", null); Set(chat, "m_PendingDeviceClarification", null); Set(chat, "m_SceneObservationGoal", null);
+                Set(chat, "m_WorkReviewOpen", true); Set(chat, "m_WorkStatus", "continue"); Set(chat, "m_WorkNoProgress", false);
+                Set(chat, "m_WorkContinuations", 0); Set(chat, "m_WorkRoomTaskEpoch", -1); Set(chat, "m_WorkRoomTaskIntent", "none");
+                Call(chat, "RememberFirstReplyRequestSemantics", new FirstReplyCompletion {
+                    Disposition = FirstReplyDisposition.Evidence, RequestKind = "answer-only" }, f.Generation, f.Model);
+                var step = Call(chat, "CreateWorkRoomStepRequest");
+                f.Check(step != null, "A missed read-only route gets one independently planned recovery, not generic feedback.");
+                Set(chat, "m_WorkContinuations", 1); Set(chat, "m_AgentCurrentRoundIsTick", true);
+                int beforeOperation = bridge.Controller.OperationRevision;
+                f.Check((bool)Call(chat, "TryPlanRoomTaskCore", "private recovery tick", null, f.Generation, true, "", step, false),
+                    "The production recovery entry accepts the bound work step.");
+                float until = Time.realtimeSinceStartup + 5f;
+                while (f.Model.Room.Count == 0 && Time.realtimeSinceStartup < until) yield return null;
+                f.Check(f.Model.Room.Count == 1 && !f.Model.RoomReview[0] && f.Model.FormalCalls == 0 &&
+                    bridge.Controller.OperationRevision == beforeOperation, "Recovery reaches an actual planner request before any speech or movement.");
+                var recovery = JObject.Parse(f.Model.Room[0]);
+                f.Check((string)recovery["currentUserText"] == human && (bool?)recovery["autonomous"] == false &&
+                    (bool?)recovery["workContinuation"]?["reclassifyReadOnlyRequest"] == true,
+                    "Recovered planning sees the full current request and restrictions; the review suggestion grants no action authority.");
+                if (human.Contains("只解释"))
+                {
+                    f.Model.RoomCallbacks[0](true, "{\"intent\":\"none\",\"origin\":\"none\",\"evidence\":\"\",\"replyScope\":\"spatial\"}", "controlled-no-action");
+                    while (f.Model.FormalCalls == 0 && Time.realtimeSinceStartup < until) yield return null;
+                    f.Check(f.Model.FormalCalls == 1 && f.Model.FormalStage == FormalResponseStage.CommittedSpatialReply && bridge.Controller.OperationRevision == beforeOperation,
+                        "Independent no-action decision remains a grounded answer, never movement from the recovery proposal.");
+                }
+                Call(chat, "CancelRoomSpeechReview", "recovery-fixture-owner-cancelled");
+                f.Model.RoomCallbacks[0](true, "{\"intent\":\"approach\",\"origin\":\"user\",\"evidence\":\"" + human + "\"}", "late-cancelled");
+                f.Check(bridge.Controller.OperationRevision == beforeOperation, "Late recovery callback cannot execute after owner cancellation.");
+            }
+            Add("missed read-only action enters normal planner once; full negation and cancellation remain binding");
+
             foreach(string guard in new[]{"m_AgentCurrentRoundIsTick","m_HoldSpeechForSongMemoryResult","m_HoldSpeechForHumBackResult","m_UserSpeechActiveForAutonomy"})
             {
                 f.Arm("受保护的轮次。");Set(chat,guard,true);
@@ -443,6 +478,8 @@ public sealed class FirstReplyChatFixtureModel:LLM
     public override void PostRoomTaskMessage(string input,bool reviewSpeech,Action<bool,string,string> callback)=>RecordRoom(input,reviewSpeech,callback);
     public override void PostSpeechStreamForStage(string message,Action<SpeechText> onSpeech,Action<string> onComplete,string imageDataUrl,bool recordAssistantHistory,FormalResponseStage stage)
     {FormalCalls++;FormalStage=stage;FormalPrompt=message;FormalImage=imageDataUrl;FormalRecordHistory=recordAssistantHistory;FormalSpeech=onSpeech;FormalComplete=onComplete;}
+    public override void PostSpeechFeedbackStreamForStage(string context,string feedback,Action<SpeechText> onSpeech,Action<string> onComplete,string imageDataUrl,bool recordAssistantHistory,FormalResponseStage stage)
+    {FormalCalls++;FormalStage=stage;FormalPrompt=context+feedback;FormalImage=imageDataUrl;FormalRecordHistory=recordAssistantHistory;FormalSpeech=onSpeech;FormalComplete=onComplete;}
     public override void PostMsg(string message,Action<string> callback)=>UnexpectedCalls++;
     public override void PostMsgStream(string message,Action<string> onDelta,Action<string> onComplete,string imageDataUrl=null,bool recordAssistantHistory=true)=>UnexpectedCalls++;
     public override void PostSpeechContinuationStream(string context,Action<SpeechText> onSpeech,Action<string> onComplete,string imageDataUrl=null)=>UnexpectedCalls++;

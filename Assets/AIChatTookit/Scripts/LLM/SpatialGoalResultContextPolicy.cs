@@ -334,7 +334,7 @@ public static class SpatialGoalResultContextPolicy
         if (sourceGoal["targetKnowledge"] is JObject knowledge)
             goal["targetKnowledge"] = Scalars(knowledge, "identityKnown", "historicalPositionKnown", "currentVisibility");
         if (sourceGoal["operationSummary"] is JObject operation)
-            goal["operationSummary"] = Scalars(operation, "operationAttempted", "stateWriteObserved", "lastOperationPhase");
+            goal["operationSummary"] = Scalars(operation, "operationAttempted", "stateWriteObserved", "lastOperationPhase", "scope");
         var sourceProof = sourceGoal["completionEvidence"] as JObject;
         if (sourceProof != null)
         {
@@ -356,6 +356,7 @@ public static class SpatialGoalResultContextPolicy
         }
         var result = new JObject {
             ["goal"] = goal,
+            ["taskSequence"] = facts["taskSequence"]?.DeepClone(),
             ["lastAction"] = facts["lastAction"] is JObject action ? Scalars(action,
                 "actionId", "intent", "entityId", "requestedEntityId", "requestedState", "phase", "reason",
                 "captureId", "confirmedCaptureId", "resultCaptureId", "objectConfirmed", "semanticTargetConfirmed",

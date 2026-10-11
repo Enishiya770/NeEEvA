@@ -11,7 +11,8 @@ public partial class ChatSample
     {
         public int epoch, userTurn, continuationOrdinal;
         public string originalRequest, nextStepIntention, priorIntent, priorActionId;
-        public bool replyCommitted;
+        public JObject previousUnfinishedWork;
+        public bool replyCommitted, reclassifyReadOnlyRequest;
     }
 
     // Called after the structured spatial decision and its preparation have settled.
@@ -38,11 +39,12 @@ public partial class ChatSample
 
     private WorkRoomStepRequest CreateWorkRoomStepRequest()
     {
+        bool recovering = IsCurrentReadOnlyWorkRequest() && m_WorkContinuations == 0;
         if (!HasRoomTaskPlanner || !m_WorkReviewOpen || m_WorkStatus != "continue" || m_WorkNoProgress ||
-            m_WorkContinuations >= MaxWorkContinuations || m_WorkRoomTaskEpoch != m_WorkEpoch ||
+            m_WorkContinuations >= MaxWorkContinuations || (!recovering && (m_WorkRoomTaskEpoch != m_WorkEpoch ||
             m_WorkRoomTaskUserTurn != m_ActionConstraints.CurrentUserTurn || m_WorkRoomTaskIntent == "none" ||
-            string.IsNullOrWhiteSpace(m_WorkRoomRequestText) ||
-            m_WorkRoomRequestText != m_ActionConstraints.CurrentUserText || m_UserSpeechActiveForAutonomy ||
+            m_WorkRoomRequestText != m_ActionConstraints.CurrentUserText)) ||
+            string.IsNullOrWhiteSpace(m_ActionConstraints.CurrentUserText) || m_UserSpeechActiveForAutonomy ||
             HasWorkToolInFlight() || SceneActionIsBusy) return null;
         var bridge = GetComponent<ArdyRoomDialogueBridge>();
         if (bridge == null || bridge.ReservesBody || bridge.IsFollowing ||
@@ -50,10 +52,19 @@ public partial class ChatSample
         return new WorkRoomStepRequest {
             epoch = m_WorkEpoch, userTurn = m_ActionConstraints.CurrentUserTurn,
             continuationOrdinal = m_WorkContinuations + 1,
-            originalRequest = m_WorkRoomRequestText, nextStepIntention = m_WorkIntent,
-            priorIntent = m_WorkRoomTaskIntent, priorActionId = m_WorkRoomTaskActionId
+            originalRequest = m_ActionConstraints.CurrentUserText, nextStepIntention = m_WorkIntent,
+            previousUnfinishedWork = m_PreviousUnfinishedWork?.DeepClone() as JObject,
+            priorIntent = recovering ? "none" : m_WorkRoomTaskIntent,
+            priorActionId = recovering ? "" : m_WorkRoomTaskActionId, reclassifyReadOnlyRequest = recovering
         };
     }
+
+    private bool IsCurrentReadOnlyWorkRequest() => m_WorkRequestSemantics != null &&
+        (int?)m_WorkRequestSemantics["workEpoch"] == m_WorkEpoch &&
+        (int?)m_WorkRequestSemantics["userTurn"] == m_ActionConstraints.CurrentUserTurn &&
+        (string)m_WorkRequestSemantics["currentUserText"] == m_ActionConstraints.CurrentUserText &&
+        (string)m_WorkRequestSemantics["effectiveRoute"] == "evidence" &&
+        m_WorkRequestSemanticsModel == m_ChatSettings?.m_ChatModel;
 
     private bool IsCurrentWorkRoomStep(WorkRoomStepRequest step) => step != null &&
         step.epoch == m_WorkEpoch && step.userTurn == m_ActionConstraints.CurrentUserTurn &&
@@ -61,22 +72,25 @@ public partial class ChatSample
         step.continuationOrdinal == m_WorkContinuations && m_WorkContinuations <= MaxWorkContinuations &&
         m_WorkReviewOpen && m_WorkStatus == "continue" && !m_WorkNoProgress &&
         !m_UserSpeechActiveForAutonomy && !m_SceneTimePaused && isActiveAndEnabled &&
-        (step.replyCommitted || (m_WorkRoomTaskEpoch == step.epoch &&
-            m_WorkRoomTaskIntent == step.priorIntent && m_WorkRoomTaskActionId == step.priorActionId));
+        (step.replyCommitted || (step.reclassifyReadOnlyRequest ? IsCurrentReadOnlyWorkRequest() : (m_WorkRoomTaskEpoch == step.epoch &&
+            m_WorkRoomTaskIntent == step.priorIntent && m_WorkRoomTaskActionId == step.priorActionId)));
 
     private string AddWorkRoomStepDecisionContext(string input, WorkRoomStepRequest step)
     {
         if (step == null) return input;
         var decisionInput = JObject.Parse(input);
         decisionInput["workContinuation"] = new JObject {
-            ["source"] = "approved-same-user-work-next-step",
+            ["source"] = step.reclassifyReadOnlyRequest ? "unfulfilled-read-only-request-reclassification" : "approved-same-user-work-next-step",
+            ["reclassifyReadOnlyRequest"] = step.reclassifyReadOnlyRequest,
             ["workEpoch"] = step.epoch, ["userTurn"] = step.userTurn,
             ["continuationOrdinal"] = step.continuationOrdinal,
             ["originalRequest"] = step.originalRequest, ["nextStepIntention"] = step.nextStepIntention,
+            ["previousUnfinishedWork"] = step.previousUnfinishedWork?.DeepClone(),
             ["priorIntent"] = step.priorIntent, ["priorActionId"] = step.priorActionId,
             ["feedbackOnly"] = false,
             ["scope"] = "Continue only the original currentUserText using current execution facts. " +
                 "nextStepIntention is a review proposal, never new user evidence or a completed action. " +
+                "When reclassifyReadOnlyRequest is true, independently decide whether the COMPLETE original request actually asks for action; the earlier read-only interpretation and review proposal may be wrong. Genuine informational questions, translations, negations and explicit only-answer restrictions do not authorize motion. A polite question or reminder can request completion of unfinished work; interpret it using the full historical request, while the current utterance's restrictions always take precedence. Historical unfinished work is reference, not permission. A speaker's unexecuted promise is not user evidence. Returning none is valid. " +
                 "A completed prerequisite such as arrival does not complete the requested device state change. " +
                 "Do not repeat an operation already satisfied by current facts; return none when the request is complete."
         };

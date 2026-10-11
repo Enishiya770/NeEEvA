@@ -160,11 +160,25 @@ public partial class ChatQW
                 double reviewStart = clock.Elapsed.TotalSeconds;
                 if (reviewWire == null) reviewStatus = "first-reply-review-input-budget";
                 else yield return RequestFirstReplyReview(reviewWire, generation,
-                    (route, understanding, kind, sufficient, demand, status, proof) => { reviewedRoute = route; questionUnderstanding = understanding; requestKind = kind; candidateSufficient = sufficient; responseDemand = demand; reviewStatus = status; currentTurnEvidence = proof; });
+                    (route, understanding, kind, sufficient, demand, status, proof) => { reviewedRoute = route; questionUnderstanding = understanding; requestKind = kind; candidateSufficient = sufficient; responseDemand = demand; reviewStatus = status; currentTurnEvidence = proof; },
+                    reconsiderActionDowngrade: candidateRoute == FirstReplyDisposition.Tools);
                 reviewSeconds = clock.Elapsed.TotalSeconds - reviewStart;
                 if (!Current()) yield break;
                 completion = FirstReplyProtocol.ResolveReviewedCompletion(completion, reviewedRoute, reviewStatus, questionUnderstanding, requestKind, candidateSufficient, responseDemand);
                 completion.CurrentTurnEvidence = currentTurnEvidence;
+                if (completion.Disposition == FirstReplyDisposition.Ordinary)
+                {
+                    bool publicationAllowed = false;
+                    yield return ReviewFirstReplyPublication(completion, generation, ok => publicationAllowed = ok);
+                    if (!Current()) yield break;
+                    if (!publicationAllowed)
+                        completion = new FirstReplyCompletion {
+                            Disposition = FirstReplyDisposition.Evidence,
+                            Failure = "first-reply-publication-requires-factual-review",
+                            RequestKind = requestKind, CurrentTurnEvidence = currentTurnEvidence,
+                            ResponseDemand = "grounded-answer", CandidateSufficient = false
+                        };
+                }
                 if (completion.Disposition == FirstReplyDisposition.Ordinary)
                     foreach (var part in completion.Speech)
                     {
@@ -263,7 +277,8 @@ public partial class ChatQW
         return wire.ToString();
     }
 
-    private IEnumerator RequestFirstReplyReview(string wire, int generation, Action<string, JObject, string, bool?, string, string, JObject> callback, int groundingAttempt = 0)
+    private IEnumerator RequestFirstReplyReview(string wire, int generation, Action<string, JObject, string, bool?, string, string, JObject> callback,
+        int groundingAttempt = 0, bool reconsiderActionDowngrade = false)
     {
         bool Current() => generation == m_StreamRequestGeneration;
         if (!Current()) yield break;
@@ -307,6 +322,13 @@ public partial class ChatQW
                 ["currentTurnEvidence"] = proof, ["groundingAttempt"] = groundingAttempt,
                 ["elapsed"] = Time.realtimeSinceStartup - started, ["rawResponse"] = output
             }.ToString(Formatting.None));
+            if (received && route != null && route != "tools" && requestKind == "answer-only" &&
+                reconsiderActionDowngrade && groundingAttempt == 0 && Current())
+            {
+                Debug.Log("[LLM/FirstReplyRouteConflict] state=reclassifying maximumAttempts=1 actionAuthorized=false");
+                yield return RequestFirstReplyReview(FirstReplyProtocol.BuildRouteConflictReviewWire(wire, output), generation, callback, 1);
+                yield break;
+            }
             if (received && route == null && groundingAttempt == 0 && Current() && FirstReplyProtocol.CanRepairGrounding(output))
             {
                 yield return RequestFirstReplyReview(FirstReplyProtocol.BuildGroundingRepairWire(wire, output), generation, callback, 1);

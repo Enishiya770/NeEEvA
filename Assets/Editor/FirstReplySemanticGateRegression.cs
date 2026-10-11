@@ -12,7 +12,7 @@ using UnityEngine;
 
 // Actual provider requests and cancellation over local controlled HTTP. Semantic
 // accuracy is checked separately with the exported single-pass model cases.
-public static class FirstReplySemanticGateRegression
+public static partial class FirstReplySemanticGateRegression
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
     public static JObject LastReport { get; private set; }
@@ -58,8 +58,18 @@ public static class FirstReplySemanticGateRegression
                 Check((string)input["latestUserText"] == user && input["candidateSpeech"] is JArray &&
                     (bool?)wire["stream"] == false && (int?)wire["id_slot"] == 1,
                     "Actual second HTTP request carries the complete user independently of the private speech candidate.");
+                bool conflict = ((string)item["candidate"]).StartsWith(FirstReplyProtocol.ToolsHead, StringComparison.Ordinal) && expected != "tools";
+                Exchange reconsider = null;
+                if (conflict) reconsider = server.Serve(Verdict(expected), false, false);
+                if (expected == "ordinary") server.Serve(Publication("conversation", language: System.Text.RegularExpressions.Regex.Match((string)item["candidate"], "code=\"([^\"]+)").Groups[1].Value), false, false);
                 review.Release.TrySetResult(true); yield return WaitUntil(() => completions != 0, "reviewed completion");
-                Check(server.Count == caseRequests + 2 && completions == 1 && result != null &&
+                if (conflict) {
+                    yield return Await(reconsider.Finished, "route conflict socket");
+                    var second = JObject.Parse((string)JObject.Parse(reconsider.RequestJson)["messages"][1]["content"]);
+                    Check(second["routeConflictReview"] is JObject && ((JArray)second["candidateSpeech"]).Count == 0,
+                        "One conflict reclassification has no candidate speech/route authority.");
+                }
+                Check(server.Count == caseRequests + (conflict ? 3 : 2) + (expected == "ordinary" ? 1 : 0) && completions == 1 && result != null &&
                     result.Disposition == (expected == "ordinary" ? FirstReplyDisposition.Ordinary :
                         expected == "evidence" ? FirstReplyDisposition.Evidence : FirstReplyDisposition.Tools) &&
                     (deltas > 0) == (expected == "ordinary") && result.SpeechDelivered == (expected == "ordinary") &&
@@ -114,9 +124,12 @@ public static class FirstReplySemanticGateRegression
                 model.PostFirstReplyStream("完整当前请求由语义审核判定。", _ => ++deltas, value => { result = value; ++completions; });
                 yield return Await(first.Received.Task, "typed candidate publication");
                 var review = server.Serve(Verdict(rawRoute, kind, sufficient,
-                    mode == "full-tools-sufficient" ? "full-response" : "short-conversation"), false, false); first.Release.TrySetResult(true);
+                    mode == "full-tools-sufficient" ? "full-response" : "short-conversation"), false, false);
+                if (mode == "empty-tools-sufficient") server.Serve(Verdict(rawRoute, kind, sufficient, "short-conversation"), false, false);
+                if (expected == FirstReplyDisposition.Ordinary) server.Serve(Publication("conversation"), false, false);
+                first.Release.TrySetResult(true);
                 yield return WaitUntil(() => completions != 0, "typed candidate publication result");
-                Check(server.Count == publicationRequests + 2 && completions == 1 && result?.Disposition == expected &&
+                Check(server.Count == publicationRequests + (mode == "empty-tools-sufficient" ? 3 : 2) + (expected == FirstReplyDisposition.Ordinary ? 1 : 0) && completions == 1 && result?.Disposition == expected &&
                     result.CandidateSufficient == sufficient && (deltas > 0) == (expected == FirstReplyDisposition.Ordinary) &&
                     model.m_DataList.FindAll(row => row.role == "assistant").Count == (expected == FirstReplyDisposition.Ordinary ? 1 : 0),
                     "Real transport candidate sufficiency must respect actual public text, action requirements, full-response routing and unique history release: " + mode);
@@ -140,9 +153,11 @@ public static class FirstReplySemanticGateRegression
                 model.PostFirstReplyStream(user, _ => ++deltas, value => { result = value; ++completions; }, transientContext:
                     new JObject { ["body"] = new JObject { ["currentlyNearAndFacingUser"] = mode == "grounded-confirmed" } }.ToString(Formatting.None));
                 yield return Await(first.Received.Task, "typed response demand candidate");
-                var review = server.Serve(Verdict(rawRoute, kind, true, demand), false, false); first.Release.TrySetResult(true);
+                var review = server.Serve(Verdict(rawRoute, kind, true, demand), false, false);
+                if (expected == FirstReplyDisposition.Ordinary) server.Serve(Publication("conversation"), false, false);
+                first.Release.TrySetResult(true);
                 yield return WaitUntil(() => completions != 0, "typed response demand completion");
-                Check(server.Count == demandRequests + 2 && completions == 1 && result?.Disposition == expected &&
+                Check(server.Count == demandRequests + 2 + (expected == FirstReplyDisposition.Ordinary ? 1 : 0) && completions == 1 && result?.Disposition == expected &&
                     result.ResponseDemand == demand && (deltas > 0) == (expected == FirstReplyDisposition.Ordinary) &&
                     model.m_DataList.FindAll(row => row.role == "assistant").Count == (expected == FirstReplyDisposition.Ordinary ? 1 : 0),
                     "Response demand must route both proven and unproved factual questions through review, preserve full content and never erase actions: " + mode);
@@ -174,6 +189,7 @@ public static class FirstReplySemanticGateRegression
                 var review = server.Serve(response, false,
                     mode == "timeout", mode == "incomplete-review" ? "length" : "stop");
                 first.Release.TrySetResult(true); yield return Await(review.Received.Task, "failure review");
+                if (mode == "tools-with-empty-ordinary-verdict") server.Serve(Verdict("evidence"), false, false);
                 yield return WaitUntil(() => completions != 0, "failed gate completion");
                 Check(completions == 1 && result?.Disposition == (emptyOrdinary ? FirstReplyDisposition.Evidence : FirstReplyDisposition.Failed) && !result.SpeechDelivered &&
                     deltas == 0 && !model.m_DataList.Exists(row => row.role == "assistant") &&
@@ -181,6 +197,27 @@ public static class FirstReplySemanticGateRegression
                     "Malformed/incomplete/timed-out review transfers the intact turn; an ordinary verdict without candidate speech requires evidence rewrite, never empty public success or an action handoff.");
                 review.Release.TrySetResult(true); yield return Await(review.Finished, "failure socket");
                 cases.Add(new JObject { ["id"] = mode, ["failure"] = result.Failure, ["publicDeltas"] = deltas });
+            }
+
+            foreach (string mode in new[] { "recover-action", "cancel-conflict", "invalid-second-review" })
+            {
+                model.m_DataList.Clear(); int beforeConflict = server.Count, done = 0, deltas = 0; FirstReplyCompletion result = null;
+                const string human = "再试一次来我身边。";
+                var first = server.Serve(FirstReplyProtocol.ToolsHead, true, true);
+                model.PostFirstReplyStream(human, _ => ++deltas, value => { result = value; ++done; });
+                yield return Await(first.Received.Task, "conflict candidate");
+                var wrong = server.Serve(Verdict("evidence"), false, true); first.Release.TrySetResult(true);
+                yield return Await(wrong.Received.Task, "wrong action downgrade");
+                var corrected = server.Serve(mode == "invalid-second-review" ? "{}" : Verdict("tools"), false, true);
+                wrong.Release.TrySetResult(true); yield return Await(corrected.Received.Task, "one action reclassification");
+                if (mode == "cancel-conflict") model.CancelActiveResponse();
+                corrected.Release.TrySetResult(true); yield return Await(corrected.Finished, "conflict result");
+                if (mode != "cancel-conflict") yield return WaitUntil(() => done != 0, "bounded conflict completion");
+                for (int i = 0; i < 3; i++) yield return null;
+                Check(server.Count == beforeConflict + 3 && deltas == 0 && (mode == "cancel-conflict" ? done == 0 :
+                    done == 1 && result.Disposition == (mode == "recover-action" ? FirstReplyDisposition.Tools : FirstReplyDisposition.Failed)),
+                    "Conflict recovery is limited to one extra HTTP, never publishes, and cannot survive cancellation.");
+                cases.Add(new JObject { ["id"] = mode, ["requests"] = server.Count - beforeConflict, ["publicDeltas"] = deltas });
             }
 
             foreach (string candidateRoute in new[] { "ordinary", "evidence", "tools" })
@@ -250,6 +287,8 @@ public static class FirstReplySemanticGateRegression
                 cases.Add(new JObject { ["id"] = "grounding-" + mode, ["requests"] = server.Count - beforeRepair,
                     ["completions"] = done, ["publicDeltas"] = deltas });
             }
+
+            yield return RunPublicationChecks(model, server, directory, cases);
 
             // Invalid generation output never gets semantic approval after an
             // apparently valid prefix; no review request is issued for it.

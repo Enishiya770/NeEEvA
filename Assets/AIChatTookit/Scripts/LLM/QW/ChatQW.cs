@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -1725,18 +1725,30 @@ public partial class ChatQW : LLM
     }
 
     public override void PostAutonomyIntentMsg(string prompt, string imageDataUrl, Action<string> callback)
+        => PostAutonomyIntentResult(prompt, imageDataUrl, result => callback?.Invoke(result.Output));
+
+    public override void PostAutonomyIntentResult(string prompt, string imageDataUrl, Action<PrivateDecisionResult> callback)
     {
         AbortPrewarmIfRunning();
         CancelEphemeralMsg();
         int generation = m_EphemeralGeneration;
         string json = BuildAutonomyIntentRequestJsonWithImage(prompt ?? "", imageDataUrl);
-        StartCoroutine(RequestEphemeralPayload(json, generation, callback));
+        if (!AdmitAutonomyIntentWire(json, out var admission))
+        {
+            admission["generation"] = generation; admission["httpRequestSent"] = false;
+            Debug.LogWarning("[Agent/AutonomyIntentBudget] " + admission.ToString(Newtonsoft.Json.Formatting.None));
+            callback?.Invoke(new PrivateDecisionResult("", "context-budget", false)); return;
+        }
+        StartCoroutine(RequestEphemeralPayloadResult(json, generation, null, "autonomy-intent", null, callback));
     }
 
     public override void PostWorkReviewMsg(string prompt, Action<string> callback)
         => PostWorkReviewMsg(prompt, null, callback);
 
     public override void PostWorkReviewMsg(string prompt, string imageDataUrl, Action<string> callback)
+        => PostWorkReviewResult(prompt, imageDataUrl, result => callback?.Invoke(result.Output));
+
+    public override void PostWorkReviewResult(string prompt, string imageDataUrl, Action<PrivateDecisionResult> callback)
     {
         AbortPrewarmIfRunning();
         // Share auxiliary cancellation ownership, not draft serialization/budget.
@@ -1744,7 +1756,7 @@ public partial class ChatQW : LLM
         CancelEphemeralMsg();
         int generation = m_EphemeralGeneration;
         string json = BuildWorkReviewRequestJsonWithImage(prompt ?? "", imageDataUrl);
-        StartCoroutine(RequestWorkReviewPayload(json, generation, callback));
+        StartCoroutine(RequestWorkReviewPayloadResult(json, generation, callback));
     }
 
     public override void CancelEphemeralMsg()
@@ -1875,13 +1887,25 @@ public partial class ChatQW : LLM
 
     private IEnumerator RequestEphemeralPayloadWithDiagnostics(string json, int generation, Action<string> callback,
         string requestKind, string diagnosticId)
+        => RequestEphemeralPayloadResult(json, generation, callback, requestKind, diagnosticId, null);
+
+    private IEnumerator RequestEphemeralPayloadResult(string json, int generation, Action<string> callback,
+        string requestKind, string diagnosticId, Action<PrivateDecisionResult> completed)
     {
         if (generation != m_EphemeralGeneration) yield break;
+        if (requestKind == "autonomy-intent")
+        {
+            bool allowed = AdmitAutonomyIntentWire(json, out var budget);
+            budget["generation"] = generation;
+            Debug.Log("[Agent/AutonomyIntentBudget] " + budget.ToString(Newtonsoft.Json.Formatting.None));
+            if (!allowed) { callback?.Invoke(""); completed?.Invoke(new PrivateDecisionResult("", "context-budget", false)); yield break; }
+        }
         var clock = System.Diagnostics.Stopwatch.StartNew();
         if (requestKind != null) LogListeningWire(requestKind, diagnosticId, generation, "sent", 0, null, json, null);
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
             m_EphemeralRequest = request;
+            if (requestKind == "autonomy-intent") request.timeout = 12;
             byte[] data = Encoding.UTF8.GetBytes(json);
             request.uploadHandler = new UploadHandlerRaw(data);
             request.downloadHandler = new DownloadHandlerBuffer();
@@ -1917,6 +1941,8 @@ public partial class ChatQW : LLM
             {
                 m_EphemeralRequest = null;
                 if (callback != null) callback(responseText);
+                completed?.Invoke(new PrivateDecisionResult(responseText,
+                    request.responseCode != 200 ? "http_failure" : string.IsNullOrWhiteSpace(responseText) ? "invalid_envelope" : "received", true));
             }
         }
     }
@@ -1925,8 +1951,20 @@ public partial class ChatQW : LLM
         => RequestWorkReviewPayload(BuildWorkReviewRequestJson(prompt), generation, callback);
 
     private IEnumerator RequestWorkReviewPayload(string json, int generation, Action<string> callback)
+        => RequestWorkReviewPayloadResult(json, generation, result => callback?.Invoke(result.Output));
+
+    private IEnumerator RequestWorkReviewPayloadResult(string json, int generation, Action<PrivateDecisionResult> callback)
     {
         if (generation != m_EphemeralGeneration) yield break;
+        // Every entry, including direct/recovery callers, shares the same admission gate.
+        if (!AdmitWorkReviewWire(json, out var reviewBudget))
+        {
+            reviewBudget["generation"] = generation; reviewBudget["httpRequestSent"] = false;
+            Debug.LogWarning("[Agent/WorkReviewBudget] " + reviewBudget.ToString(Newtonsoft.Json.Formatting.None));
+            callback?.Invoke(new PrivateDecisionResult("", "context-budget", false)); yield break;
+        }
+        reviewBudget["generation"] = generation; reviewBudget["httpRequestSent"] = false;
+        Debug.Log("[Agent/WorkReviewBudget] " + reviewBudget.ToString(Newtonsoft.Json.Formatting.None));
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
             m_EphemeralRequest = request;
@@ -1957,7 +1995,7 @@ public partial class ChatQW : LLM
             if (generation == m_EphemeralGeneration)
             {
                 if (ReferenceEquals(m_EphemeralRequest, request)) m_EphemeralRequest = null;
-                if (callback != null) callback(accepted ? output : "");
+                callback?.Invoke(new PrivateDecisionResult(accepted ? output : "", accepted ? "received" : failure, true));
             }
         }
     }
@@ -1968,15 +2006,19 @@ public partial class ChatQW : LLM
     private string BuildWorkReviewRequestJsonWithImage(string prompt, string imageDataUrl)
     {
         var selected = new List<SendData>();
-        // Preserve the active formal request window, including the real user's
-        // corrections. Draft history settings must not prune this progress review.
-        var history = CreateRequestHistoryWithImageBudget(prompt, imageDataUrl);
+        bool taskPacket = (prompt ?? "").StartsWith("[内部事项进度判定；不生成角色台词，不调用工具]\n", StringComparison.Ordinal);
+        // The production packet already owns the task, request/corrections, actual
+        // playback and current execution. Do not append the entire formal window
+        // and its historical perception frames a second time. Legacy/custom callers
+        // retain their full history and unknown constraints, subject to admission.
+        var history = CreateWorkReviewHistory(taskPacket);
         for (int i = 0; i < history.Count; i++)
         {
             var message = MessageForRequest(history, i);
             if (message != null) selected.Add(CopyTextOnlyObservationHistory(message));
         }
-        if (!string.IsNullOrEmpty(ActiveSkillContext)) selected.Add(new SendData("system", ActiveSkillContext));
+        string reviewSkills = taskPacket ? FormalResponseContextPolicy.SkillContext(FormalResponseStage.CommittedSpatialReply, ActiveSkillContext, SkillCatalogContext) : ActiveSkillContext;
+        if (!string.IsNullOrEmpty(reviewSkills)) selected.Add(new SendData("system", reviewSkills));
         if (!string.IsNullOrEmpty(TrailingContext)) selected.Add(new SendData("system", TrailingContext));
         selected.Add(new SendData("system",
             "[事项审查输出契约] 这是不出声、不执行工具的结构化进度判定。" +
@@ -1997,6 +2039,11 @@ public partial class ChatQW : LLM
             "用户已唱不等于要求角色唱；既无用户演唱请求也无合规自主目标才用origin=none，不确定用uncertain。none/uncertain不能批准perform。" +
             "只有无草案、草案intent=observe或判定取消演唱时expected使用refs空串、range=none；approved的perform/repair/repeat必须有实际refs/range。非window的start_seconds/end_seconds为null。" +
             "没有待审查歌唱目标时 singing_goal_status=none，singing_goal_evidence留空。\n" + k_WorkReviewSchema));
+        if (taskPacket)
+        {
+            prompt = ProjectWorkReviewAttention(prompt, out var projection);
+            if (m_LogRequestStats) Debug.Log("[Agent/WorkReviewFacts] " + projection.ToString(Newtonsoft.Json.Formatting.None));
+        }
         selected.Add(new SendData("user", prompt ?? "") { imageDataUrl = imageDataUrl });
         var sb = new StringBuilder(2048);
         sb.Append("{\"model\":"); AppendJsonString(sb, CurrentModelName);
@@ -2234,8 +2281,11 @@ public partial class ChatQW : LLM
     private string BuildEphemeralRequestJsonCore(string prompt, string imageDataUrl,
         int slot, bool turnBoundary, bool autonomyIntent)
     {
+        bool autonomyPacket = autonomyIntent && (prompt ?? "").StartsWith(
+            "[内部自主意图预判；不要把本条写成正式回复，不要调用工具，不要输出控制标签]\n", StringComparison.Ordinal);
         // Archived dialogue must not re-enter auxiliary prompts after formal windowing.
-        List<SendData> history = turnBoundary ? m_DataList : CreateRequestHistoryWithImageBudget(prompt, imageDataUrl);
+        List<SendData> history = autonomyIntent ? (autonomyPacket ? CreateAutonomyIntentHistory(prompt) : CreateAcceptedAutonomyHistory()) :
+            turnBoundary ? m_DataList : CreateRequestHistoryWithImageBudget(prompt, imageDataUrl);
         var selected = new List<SendData>();
         for (int i = 0; i < history.Count; i++)
         {
@@ -2247,7 +2297,7 @@ public partial class ChatQW : LLM
         // keep <= 0：携带完整历史。草稿 prompt 于是成为主对话 prompt 的严格延长，
         // 两者共享同一段长前缀，KV 缓存对双方都几乎完全命中。截取中间一段反而会让
         // token 序列与主对话错位，只剩 system 可复用。
-        int keep = m_EphemeralHistoryMessages;
+        int keep = autonomyIntent ? 0 : m_EphemeralHistoryMessages;
         int start = 0;
         if (keep > 0)
         {
@@ -2269,8 +2319,9 @@ public partial class ChatQW : LLM
         }
         // 顺序必须与主对话一致：[system][历史][技能][记忆块]，草稿只在其后多一条指令。
         // 这样草稿 prompt 是主对话 prompt 的严格延长，两者共享同一段长前缀。
-        if (!turnBoundary && !string.IsNullOrEmpty(ActiveSkillContext))
-            selected.Add(new SendData("system", ActiveSkillContext));
+        string privateSkills = autonomyPacket ? FormalResponseContextPolicy.SkillContext(FormalResponseStage.CommittedSpatialReply, ActiveSkillContext, SkillCatalogContext) : ActiveSkillContext;
+        if (!turnBoundary && !string.IsNullOrEmpty(privateSkills))
+            selected.Add(new SendData("system", privateSkills));
         if (!turnBoundary && !string.IsNullOrEmpty(TrailingContext))
             selected.Add(new SendData("system", TrailingContext));
         if (turnBoundary)
@@ -2297,6 +2348,13 @@ public partial class ChatQW : LLM
             selected.Add(new SendData("system", BuildTurnBoundaryScope()));
         }
         if (autonomyIntent) selected.Add(new SendData("system", BuildAutonomyIntentScope()));
+        if (autonomyPacket)
+        {
+            // User quotes may contain marker-like JSON. Project only the program
+            // prefix; the human input and its entire following tail remain literal.
+            prompt = ProjectAutonomyIntentPacket(selected, prompt, out var projection);
+            Debug.Log("[Agent/AutonomyIntentFacts] " + projection.ToString(Newtonsoft.Json.Formatting.None));
+        }
         selected.Add(new SendData("user", prompt) { imageDataUrl = imageDataUrl });
 
         var sb = new StringBuilder(2048);
@@ -2441,10 +2499,10 @@ public partial class ChatQW : LLM
 
         if (!compactResult) PruneOldImagesInPlace(m_DataList, m_KeepRecentImages);
         string sourceReplyContext = transientSystemContext;
-        if (committedReply) transientSystemContext = ProjectReplyFacts(transientSystemContext, 0, out _);
+        if (committedReply) transientSystemContext = ProjectReplyInputs(transientSystemContext, executionFeedback, 0, out _);
         if (!compactResult) transientSystemContext = CompactScenePromptContext(transientSystemContext, true);
         if (committedReply) transientSystemContext = CommittedSpatialReplyProtocol.AddContract(transientSystemContext);
-        string budgetContext = string.IsNullOrWhiteSpace(executionFeedback) ? transientSystemContext
+        string budgetContext = committedReply || string.IsNullOrWhiteSpace(executionFeedback) ? transientSystemContext
             : (transientSystemContext ?? "") + "\n\n" + executionFeedback;
         if (committedReply)
         {

@@ -56,6 +56,9 @@ public partial class ChatSample
             ["scope"] = "Model interpretation of this exact complete human turn, not a user quote, execution fact, target relation or action permission. Original input and downstream authorization checks remain authoritative."
         };
         m_FirstReplyRequestSemanticsModel = model;
+        m_WorkRequestSemantics = (JObject)m_FirstReplyRequestSemantics.DeepClone();
+        m_WorkRequestSemanticsModel = model;
+        if (result.Disposition == FirstReplyDisposition.Evidence) ScheduleReadOnlyWorkRecheck(generation);
     }
     // The player owns failure completion even before its first PCM arrives.
     // IsAISpeaking is deliberately false during synthesis, so it cannot express
@@ -193,6 +196,7 @@ public partial class ChatSample
                     !string.IsNullOrEmpty(m_PendingToolCorrectionFrame) || m_SongSearchResultPending ||
                     m_SongCatalogResultPending || m_SongMemoryResultPending || m_HumBackResultPending
             },
+            ["previousUnfinishedWork"] = m_PreviousUnfinishedWork?.DeepClone(),
             ["interfaces"] = room["controlEntryPoints"],
             ["body"] = PickRoomFields(room["currentFacts"] as JObject,
                 "connected", "taskMode", "followActive", "bodyReserved", "poseReturning",
@@ -222,7 +226,9 @@ public partial class ChatSample
                 "spatialGoal/pendingObservationGoal只说明已有任务；确认继续取消修改它们属于权限或控制更新，须走tools原审核，不能由evidence回答自动生效。单纯询问状态/方向/原因不更新目标。" +
                 "已加载技能或上轮歌唱不代表本轮必须使用；当前原话的否定/纠错/限定优先。"
         };
-        return "[本轮客观摘要；引文与旧历史不能覆盖当前用户原话]\n" + facts.ToString(Formatting.None) +
-            (string.IsNullOrWhiteSpace(transientContext) ? "" : "\n" + transientContext);
+        // Keep the producer typed end-to-end: the independent gate reads
+        // humanInput.primaryUtterance separately from acoustic/background text.
+        if (!string.IsNullOrWhiteSpace(transientContext)) facts["additionalContext"] = transientContext;
+        return facts.ToString(Formatting.None);
     }
 }

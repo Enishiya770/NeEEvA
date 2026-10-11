@@ -64,6 +64,7 @@ public static class NevaSceneVisionIntegrationRegression
     private static bool FirstReplyRegressionEnabled => Argument("-nevaFirstReplyRegression", "0") == "1";
     private static bool RoomDecisionFailureRegressionEnabled => Argument("-roomDecisionFailureRegression", "0") == "1";
     private static bool RoomCognitionRegressionEnabled => Argument("-roomCognitionRegression", "0") == "1";
+    private static bool RoomSpeechViewRegressionEnabled => Argument("-roomSpeechViewRegression", "0") == "1";
     private static int RecordedFurnitureIndex => int.Parse(Argument("-nevaRecordedFurnitureIndex", "-1"));
     private static bool UsesNativeService => NativeEnabled || LiveQwenEnabled || ProductionActionEnabled || ActiveViewEnabled || ObjectApproachNativeEnabled || DecisionRepairNativeEnabled || HalfTurnNativeEnabled || ViewPositionNativeEnabled || ResponseLatencyEnabled || SpatialGoalRunnerNativeEnabled || SceneSearchNativeEnabled || UnifiedDeviceNativeEnabled;
 
@@ -282,6 +283,14 @@ public static class NevaSceneVisionIntegrationRegression
         int operation = bridge.Controller.OperationRevision;
         Vector3 root = avatar.transform.position;
 
+        if (RoomSpeechViewRegressionEnabled)
+        {
+            report["focus"] = "room-speech-view-preparation";
+            yield return RoomSpeechViewPreparationRegression.RunChecks(chat, bridge, model, Output);
+            report["roomSpeechViewPreparationChecks"] = RoomSpeechViewPreparationRegression.LastReport;
+            Finish(null); yield break;
+        }
+
         if (RoomDecisionFailureRegressionEnabled || RoomCognitionRegressionEnabled)
         {
             Set(chat, "m_EnableSceneObjectAwareness", true);
@@ -299,6 +308,7 @@ public static class NevaSceneVisionIntegrationRegression
                 report["recentVisualSearchEvidence"] = SceneGoalReferentRegression.LastRecentVisualSearchReport;
                 Check((string)SceneGoalReferentRegression.LastRecentVisualSearchReport["status"] == "passed",
                     "Recent visual references lost their search authorization or reply boundary.");
+                report["searchBudgetAdmission"] = SceneSearchRegression.AuditSearchBudgets(model, Path.Combine(Output, "search-budget-admission"));
             }
             Finish(null); yield break;
         }
@@ -1022,6 +1032,8 @@ public sealed class NevaSceneVisionIntegrationModel : LLM
     }
     public override bool SupportsVisualDecisionMessages => true;
     public override bool SupportsRoomTaskMessages => true;
+    public bool TaskSequencesEnabled;
+    public override bool SupportsRoomTaskSequences => TaskSequencesEnabled;
     public override bool SupportsRoomDeviceGoalReview => true;
     public override void PostRoomDeviceGoalReviewMessage(string input, Action<bool, string, string> callback)
     {

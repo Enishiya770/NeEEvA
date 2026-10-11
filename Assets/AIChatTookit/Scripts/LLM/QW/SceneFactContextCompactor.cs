@@ -27,6 +27,41 @@ public static class SceneFactContextCompactor
         public bool applied, roundTripVerified;
         public string reason = "no-sharing-benefit";
     }
+    public const string JsonSharingContract = "$sceneFactRef in the user JSON means the EXACT earlier JSON value at root#JSON-pointer (RFC6901). Read the referenced value in its place; it is not a new observation, identity, permission or confirmation. Coordinates, timestamps, current selections and differing states remain distinct.";
+
+    // Standalone search packets have no text block markers. Share identical
+    // subtrees only in this request and verify exact expansion before sending.
+    public static string CompactJson(string json, out Report report)
+    {
+        report = new Report { beforeCharacters = json?.Length ?? 0, afterCharacters = json?.Length ?? 0 };
+        if (string.IsNullOrEmpty(json) || json.Length > 2000000) return json;
+        try
+        {
+            JObject original;
+            using (var reader = new JsonTextReader(new StringReader(json)))
+            {
+                reader.DateParseHandling = DateParseHandling.None;
+                reader.FloatParseHandling = FloatParseHandling.Decimal; reader.MaxDepth = 96;
+                original = JObject.Load(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+                if (reader.Read()) throw new JsonException("Trailing content is not a standalone JSON packet.");
+            }
+            VerifyNumericValues(json, original.ToString(Formatting.None));
+            if (original.SelectTokens("$..['" + ReferenceKey + "']").GetEnumerator().MoveNext()) return json;
+            int references = 0, stored = 0;
+            var compact = (JObject)Share(original, "root#", true, new Dictionary<string, string>(StringComparer.Ordinal), ref references, ref stored);
+            var expanded = Expand(compact, new Dictionary<string, JObject> { ["root"] = compact }, 0);
+            if (!JToken.DeepEquals(original, expanded)) { report.reason = "round-trip-mismatch"; return json; }
+            VerifyNumericValues(json, expanded.ToString(Formatting.None));
+            report.roundTripVerified = true; report.blocks = 1;
+            string result = compact.ToString(Formatting.None);
+            if (references == 0 || result.Length + JsonSharingContract.Length + 128 >= json.Length) return json;
+            report.references = references; report.applied = true; report.afterCharacters = result.Length;
+            report.reason = "exact-json-subtrees-and-descriptions";
+            return result;
+        }
+        catch (Exception error) when (error is JsonException || error is ArgumentException || error is InvalidOperationException || error is OverflowException)
+        { report.reason = "unsafe-json-sharing-unchanged"; return json; }
+    }
     private sealed class Block
     {
         public int markerStart, start, end;

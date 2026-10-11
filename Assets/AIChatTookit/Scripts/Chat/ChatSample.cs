@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -8817,7 +8817,7 @@ public partial class ChatSample : MonoBehaviour
 
     private static bool IsPrioritySceneWake(string reason) =>
         (reason ?? "").StartsWith("scene-action-", StringComparison.Ordinal) ||
-        reason == "scene-resumed" || reason == "spike-pull-forward" || reason == "memory-surfaced" ||
+        reason == "scene-resumed" || reason == "spike-pull-forward" || reason == "memory-surfaced" || reason == "read-only-work-recheck" ||
         ShouldBypassAutonomyIntentProbe(reason) || reason == "singing-goal-review";
 
     private IEnumerator TickAfterCo(float sec)
@@ -8830,6 +8830,7 @@ public partial class ChatSample : MonoBehaviour
     private void StepUrge()
     {
         if (!m_AgentRunning || m_AgentGracefulShutdownPending || !isActiveAndEnabled || m_SceneTimePaused || Time.timeScale <= 0) return;
+        if (m_PrivateDecisionFailure != null) return;
         if (m_SceneTimeSuspended) BeginSceneTimeSession();
         ValidateSceneReviewQueue();
         double now = SceneMonotonicNow();
@@ -8986,6 +8987,11 @@ public partial class ChatSample : MonoBehaviour
     private string BuildAutonomyIntentProbePrompt(string triggerReason, string frame)
     {
         if (ShouldReviewUserWork()) return BuildDedicatedWorkReviewPrompt(frame);
+        return BuildOrdinaryAutonomyIntentProbePrompt(triggerReason, frame);
+    }
+
+    private string BuildOrdinaryAutonomyIntentProbePrompt(string triggerReason, string frame)
+    {
         string situation = m_UserSpeechActiveForAutonomy
             ? "用户此刻仍在表达。你可以在心里形成自己的观察或想法，但本次判断绝不会直接外放；" +
               "稍后必须结合用户完整发言，才能决定采用、修正或放弃。"
@@ -9123,11 +9129,11 @@ public partial class ChatSample : MonoBehaviour
             m_ChatSettings.m_ChatModel.SkillCatalogContext = BuildSkillCatalogContext();
             m_ChatSettings.m_ChatModel.SetActiveSkills();
         }
-        string frame = BuildPerceptionFrame(triggerReason);
+        bool reviewingWork = ShouldReviewUserWork();
+        string frame = reviewingWork ? BuildWorkReviewFrame(triggerReason) : BuildPerceptionFrame(triggerReason);
         if (!playbackReadOnly) HarvestSongIds(frame);
         int generation = ++m_AutonomyProbeGeneration;
         int workEpoch = m_WorkEpoch;
-        bool reviewingWork = ShouldReviewUserWork();
         bool reviewingAutonomousGoal = !m_WorkReviewOpen &&
             ((HasAutonomousSingingGoal() && HasPendingSingingGoalReview()) || HasReviewedRecoveredUserSingingGoal());
         m_AutonomyProbeInFlight = true;
@@ -9164,22 +9170,9 @@ public partial class ChatSample : MonoBehaviour
                 }
                 if (m_AgentRoundInFlight || IsAISpeaking || IsVoiceOutputPlaying)
                     return;
-                if (reviewingWork)
-                {
-                    if (m_LogAgentLoop)
-                        Debug.LogWarning("[Agent/事项进度] 结构化判定无效；使用有界恢复，未确认任务完成或目标已获准。");
-                    var recovery = new AutonomyIntentDecision { work_status = "continue",
-                        intent = "进度判定格式无效；核对原请求与真实结果，推进必要步骤或明确说明限制" };
-                    if (workEpoch != m_WorkEpoch || !(reviewingAutonomousGoal
-                        ? CanContinueAutonomousSingingGoal(recovery) : ApplyWorkReviewDecision(recovery))) return;
-                    PrepareActiveSkillsForRound(null, triggerReason);
-                    DispatchPreparedAgentTick(triggerReason, BuildPerceptionFrame(triggerReason), recovery, true, sceneObservation, true);
-                    return;
-                }
-                if (m_LogAgentLoop)
-                    Debug.LogWarning("[Agent/自主意图] 预判输出无法解析，保留角色自主性并放行正式轮次");
-                PrepareActiveSkillsForRound(null, triggerReason);
-                DispatchPreparedAgentTick(triggerReason, frame, sceneObservation: sceneObservation, useSceneObservation: true);
+                // Legacy providers still return strings. An invalid private
+                // decision cannot fabricate a continue intent on their behalf.
+                HandlePrivateDecisionFailure(new PrivateDecisionResult("", "invalid_decision", true));
                 return;
             }
 
@@ -9266,14 +9259,25 @@ public partial class ChatSample : MonoBehaviour
             if (playbackReadOnly && (!ScenePlaybackReviewCurrent(playbackReview) || observed?.HasImage != true))
             { m_AutonomyProbeInFlight = false; if (m_ScenePlaybackReview == playbackReview) ClearScenePlaybackReview("private-capture-unavailable-or-superseded"); return; }
             sceneObservation = observed;
-            frame = BuildPerceptionFrame(triggerReason);
+            frame = reviewingWork ? BuildWorkReviewFrame(triggerReason) : BuildPerceptionFrame(triggerReason);
             if (playbackReadOnly) playbackReview.factStamp = CaptureScenePlaybackFactStamp();
-            string prompt = BuildAutonomyIntentProbePrompt(triggerReason, frame) + BuildSceneObservationContext(observed);
+            string prompt = BuildAutonomyIntentProbePrompt(triggerReason, frame) +
+                (reviewingWork ? BuildWorkReviewObservationContext(observed) : BuildSceneObservationContext(observed));
             if (playbackReadOnly) prompt += "\n[本次是最后一段已生成语音播放期间的只读私人复查。公开回复已经生成，音频尚未全部播放；不可把未播部分说成已被用户听到。本次只形成待选意图，不会发声、执行动作/工具、写记忆或提交事项状态。音频结束后仍需当前图和正常决策核验，新用户、新动作或事件会使本次候选失效。]";
             string image = observed?.HasImage == true ? observed.ImageDataUrl : null;
             Debug.Log($"[Vision/Consumer] consumer=autonomy generation={generation} capture={observed?.CaptureId ?? "none"} image={!string.IsNullOrEmpty(image)}", this);
-            if (reviewingWork) m_ChatSettings.m_ChatModel.PostWorkReviewMsg(prompt, image, onDecision);
-            else m_ChatSettings.m_ChatModel.PostAutonomyIntentMsg(prompt, image, onDecision);
+            void OnResult(PrivateDecisionResult result)
+            {
+                if (generation != m_AutonomyProbeGeneration || workEpoch != m_WorkEpoch ||
+                    !m_AgentRunning || m_AgentGracefulShutdownPending || !isActiveAndEnabled) return;
+                if (result.Succeeded) { onDecision(result.Output); return; }
+                m_AutonomyProbeInFlight = false;
+                ClearScenePlaybackReview("private-decision-failed");
+                if (m_UserSpeechActiveForAutonomy) return;
+                HandlePrivateDecisionFailure(result);
+            }
+            if (reviewingWork) m_ChatSettings.m_ChatModel.PostWorkReviewResult(prompt, image, OnResult);
+            else m_ChatSettings.m_ChatModel.PostAutonomyIntentResult(prompt, image, OnResult);
         });
     }
 
@@ -9413,6 +9417,9 @@ public partial class ChatSample : MonoBehaviour
         m_AgentRoundInFlight = false;
         m_UserTurnSkillPins.Clear();
 
+        if (m_PrivateDecisionFailure != null)
+        { ClearScheduledAgentWake(); ClearRoundParsed(); return; }
+
         if (m_AgentGracefulShutdownPending)
         {
             ClearRoundParsed();
@@ -9483,6 +9490,19 @@ public partial class ChatSample : MonoBehaviour
             //原地结束并等用户，不再用短延时 fallback 把刚截断的 chain 重启。
             if (m_LogAgentLoop)
                 Debug.LogWarning("[Agent] 未消费的 <continue/> 到达收尾路径，已停止并等用户");
+        }
+        else if (m_WorkSubstepReviewPending && m_WorkReviewOpen && m_PrivateDecisionFailure == null)
+        {
+            // Do not change the event revision of a private candidate already
+            // computed during playback, nor restart its existing deadline.
+            if (m_ScenePlaybackReview == null && !m_AutonomyProbeInFlight && !m_SceneReviewClock.Pending)
+                ScheduleNextTick(2f, "scene-action-substep-result");
+        }
+        else if (m_ReadOnlyWorkRecheckScheduled && m_WorkReviewOpen && m_WorkContinuations == 0)
+        {
+            // Keep the first deadline: speaking must not turn this task review
+            // into the ordinary thirty-second idle poll. No action is approved here.
+            if (!m_SceneReviewClock.Pending) ScheduleNextTick(2f, "read-only-work-recheck");
         }
         else if (m_RoundNextInSec.HasValue)
         {

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$Output,
-    [ValidateSet('transport','room','cognition','xr-lifecycle')][string]$Focus='transport'
+    [ValidateSet('transport','feedback','room','cognition','speech-view','xr-lifecycle','device-sequence')][string]$Focus='transport'
 )
 $ErrorActionPreference='Stop'
 $taskSourceRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -37,11 +37,14 @@ $taskManifest=@(foreach($taskCode in $taskCodePaths) {
 })
 @{source=$taskSourceRoot;project=$taskValidationRoot;createdUtc=[DateTime]::UtcNow.ToString('o');focus=$Focus;files=$taskManifest} |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskOutput 'source-manifest.json') -Encoding utf8
-$taskMethod=if($Focus -eq 'transport'){'FormalStreamRecoveryRegression.RunBatch'}elseif($Focus -eq 'xr-lifecycle'){'ReloadSafeTrackedDeviceGraphicRaycasterRegression.RunBatch'}else{'NevaSceneVisionIntegrationRegression.RunBatch'}
+$taskMethod=if($Focus -eq 'transport'){'FormalStreamRecoveryRegression.RunBatch'}elseif($Focus -eq 'feedback'){'FeedbackStageHttpRegression.RunBatch'}elseif($Focus -eq 'xr-lifecycle'){'ReloadSafeTrackedDeviceGraphicRaycasterRegression.RunBatch'}else{'NevaSceneVisionIntegrationRegression.RunBatch'}
 $taskArguments=@('-batchmode','-projectPath',$taskValidationRoot,'-executeMethod',$taskMethod,'-logFile',(Join-Path $taskOutput 'unity.log'))
 if($Focus -eq 'transport') { $taskArguments+=@('-nographics','-formalStreamRecoveryOutput',$taskOutput) }
+elseif($Focus -eq 'feedback') { $taskArguments+=@('-nographics','-feedbackStageOutput',$taskOutput) }
 elseif($Focus -eq 'xr-lifecycle') { $taskArguments+=@('-nevaXRReloadOutput',$taskOutput) }
 elseif($Focus -eq 'cognition') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-roomCognitionRegression','1') }
+elseif($Focus -eq 'speech-view') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-roomSpeechViewRegression','1') }
+elseif($Focus -eq 'device-sequence') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-nevaUnifiedDevice','1') }
 else { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-roomDecisionFailureRegression','1') }
 $taskArgumentsQuoted=@($taskArguments | ForEach-Object { '"'+$_+'"' })
 $taskProcess=Start-Process -FilePath 'E:/Unity_Data/2022.3.22f1/Editor/Unity.exe' -ArgumentList $taskArgumentsQuoted -PassThru -WindowStyle Hidden

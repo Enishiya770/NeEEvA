@@ -43,13 +43,14 @@ public static class SceneVisionTransportRegression
                 CheckAuxiliary(model, "BuildWorkReviewRequestJsonWithImage", prompt, Image);
                 foreach (bool review in new[] { false, true })
                 {
-                    JObject request = Build(model, "BuildRoomTaskRequestJsonWithImage", prompt, Image, review);
-                    CheckImage(request, prompt, review ? -1 : 1);
+                    string roomInput = review ? new JObject { ["publicSpeech"] = prompt }.ToString(Newtonsoft.Json.Formatting.None) : prompt;
+                    JObject request = Build(model, "BuildRoomTaskRequestJsonWithImage", roomInput, Image, review);
+                    CheckImage(request, roomInput, review ? -1 : 1);
                     CheckSlot(request, backend, 1);
                     Check(((JArray)request["messages"]).Count == (review ? 2 : 3) && !request.ToString().Contains("PRIVATE_"),
                         "Spatial visual decision inherited private dialogue or shared mutable context.");
-                    Check(JToken.DeepEquals(Build(model, "BuildRoomTaskRequestJson", prompt, review),
-                        Build(model, "BuildRoomTaskRequestJsonWithImage", prompt, null, review)),
+                    Check(JToken.DeepEquals(Build(model, "BuildRoomTaskRequestJson", roomInput, review),
+                        Build(model, "BuildRoomTaskRequestJsonWithImage", roomInput, null, review)),
                         "Legacy text-only spatial serialization changed.");
                 }
                 Check(JToken.DeepEquals(Build(model, "BuildEphemeralRequestJson", prompt, 1, false),
@@ -106,8 +107,11 @@ public static class SceneVisionTransportRegression
                         Check(autonomy.ToString().Contains(retained), "Private autonomy dropped existing role/history/skill/memory: " + retained);
                 var normalized = (JObject)autonomy.DeepClone();
                 ((JArray)normalized["messages"]).RemoveAt(messages.Count - 2); normalized.Remove("response_format");
-                Check(JToken.DeepEquals(normalized, generic),
-                    "Autonomy changed original history selection, image budget, role content, slots or generation parameters beyond its explicit scope/schema.");
+                model.m_EphemeralHistoryMessages = 0;
+                var fullHistory = Build(model, "BuildEphemeralRequestJsonWithImage", prompt, Image, 1, false);
+                model.m_EphemeralHistoryMessages = keep;
+                Check(JToken.DeepEquals(normalized, fullHistory),
+                    "Unknown autonomy callers retain complete authored history under their separate admission gate; draft keep-N must not drop constraints.");
                 Check(generic["response_format"] == null && !generic.ToString().Contains("[私有自主意图输出契约]"),
                     "Generic speculative drafts inherited autonomy-only formatting.");
                 if (model.m_Backend == ChatQW.BackendType.Local)

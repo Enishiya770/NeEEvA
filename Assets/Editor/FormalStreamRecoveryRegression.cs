@@ -121,6 +121,7 @@ public static class FormalStreamRecoveryRegression
             ["scope"] = "Empty-scene Play Mode; production ChatQW public stage entrypoint and UnityWebRequest/SSE, synthetic loopback only. No real LLM, microphone, TTS, private prompt, avatar, navigation or device actions.",
             ["realModelRequests"] = 0, ["actionExecutorsCreated"] = 0 };
         PureChecks();
+        LastReport["taskSequenceChecks"] = RoomTaskSequenceRegression.RunChecks(Output);
         checks += CommittedSpatialReplyProtocolRegression.RunChecks(Output);
         LastReport["committedPublicProtocol"] = CommittedSpatialReplyProtocolRegression.LastReport.DeepClone();
         ChatLatencyTransportRegression.RunInteractive();
@@ -133,6 +134,9 @@ public static class FormalStreamRecoveryRegression
         checks += RoomDecisionBudgetRegression.RunChecks();
         LastReport["decisionBudgetPure"] = RoomDecisionBudgetRegression.LastReport.DeepClone();
         RoomDecisionBudgetRegression.ExportFixtures(Output);
+        yield return RoomSpeechClaimRegression.RunChecks(Output);
+        LastReport["speechClaimTransport"] = RoomSpeechClaimRegression.LastReport.DeepClone();
+        checks += (int)RoomSpeechClaimRegression.LastReport["checks"];
         yield return FirstReplySemanticGateRegression.RunChecks(Output);
         LastReport["firstReplySemanticTransport"] = FirstReplySemanticGateRegression.LastReport.DeepClone();
         checks += (int)FirstReplySemanticGateRegression.LastReport["checks"];

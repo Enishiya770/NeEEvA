@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 /// <summary>Public result wording only. It never interprets requests or authorizes an action.</summary>
 public static class CommittedSpatialReplyProtocol
 {
+    public const string ReadOnlyEvidenceMarker = "[只读场景问答]";
     public const int MaximumSpeechCharacters = 360;
     public const int MaximumOutputTokens = 768;
     public const string Marker = "[Committed spatial public reply protocol]";

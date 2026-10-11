@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -386,6 +387,36 @@ public static class ChatLatencyTransportRegression
                         ["entrypoint"] = sample == 0 ? "legacy-five-argument" : sample == 3 ? "legacy-six-argument" : "explicit-stage",
                         ["recordAssistantHistory"] = record, ["acceptedHistoryDelta"] = model.m_DataList.Count - acceptedBefore,
                         ["projectedSkillCharacters"] = skill.Length, ["passed"] = true });
+                }
+                var producer = JObject.Parse(File.ReadAllText("Assets/Editor/Fixtures/ReplyContinuation.producer-20261011.json"));
+                foreach (JObject row in producer["cases"])
+                {
+                    model.m_DataList.Clear();
+                    typeof(LLM).GetField("m_PromptFiles", Flags).SetValue(model,
+                        new[] { "persona", "language", "behavior" }.Select(name => UnityEditor.AssetDatabase.LoadAssetAtPath<TextAsset>(
+                            "Assets/AIChatTookit/Prompts/" + name + ".txt")).ToArray());
+                    model.InitSystemMessage();
+                    model.m_DataList.Add(new LLM.SendData("user",(string)row["originalRequest"]));
+                    model.m_DataList.Add(new LLM.SendData("assistant","小灯の操作は完了しました。"));
+                    int historyCount=model.m_DataList.Count; var parts=new List<SpeechText>(); string completed=null;
+                    var exchange=server.ServeOne("<lang code=\"ja\"/><speech mode=\"independent\"/><say>今、あなたのそばへ歩いているわ。</say>");
+                    model.PostSpeechFeedbackStreamForStage((string)row["context"],(string)row["feedback"],parts.Add,value=>completed=value,
+                        image,false,FormalResponseStage.CommittedSpatialReply);
+                    float deadline=Time.realtimeSinceStartup+12f;
+                    while(completed==null || !exchange.IsCompleted)
+                    {
+                        if(exchange.IsFaulted)throw exchange.Exception;
+                        if(Time.realtimeSinceStartup>deadline)throw new TimeoutException("Actual production continuation feedback HTTP: "+row["name"]);
+                        yield return null;
+                    }
+                    object[] admission={exchange.Result,null};
+                    Check((bool)typeof(ChatQW).GetMethod("AdmitSceneSpeechWire",Flags | BindingFlags.Static).Invoke(null,admission) &&
+                        parts.Count>0 && model.m_DataList.Count==historyCount && exchange.Result.Contains((string)row["originalRequest"]) &&
+                        exchange.Result.Contains("secondary tool failed") && exchange.Result.Contains("keep all unrelated devices unchanged"),
+                        "Actual public continuation entrypoint sends bounded complete producer feedback over HTTP without dropping protected facts or committing private candidates.");
+                    File.WriteAllText(Path.Combine(output,(string)row["name"]+".http.request.json"),exchange.Result);
+                    observations.Add(new JObject { ["case"]=row["name"],["stage"]="CommittedSpatialReply",["passed"]=true,
+                        ["entrypoint"]="production-producer-feedback-public-http",["budget"]=(JObject)admission[1] });
                 }
                 FeedbackStageHttpReport = new JObject { ["passed"] = true, ["checks"] = checks - before,
                     ["loopbackRequests"] = observations.Count, ["cases"] = observations,

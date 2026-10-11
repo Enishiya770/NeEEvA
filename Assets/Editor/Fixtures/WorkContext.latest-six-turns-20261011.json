@@ -1,0 +1,3754 @@
+{
+  "provenance": "Recorded latest Play 16:31-16:39 JST: source event lines retained below. Reconstructed task load, not the complete rejected HTTP (none was sent). Full observed scene/goal data retained as stress input; no live execution.",
+  "sourceSha256": "c7bdeca4ba1c3446f8dbe8858f7e03b11a3a3e3b8ec0fb9228d1bfc7c0650360",
+  "sourceLines": [
+    109085,
+    109073,
+    109011,
+    109098,
+    109799,
+    108373
+  ],
+  "request": "现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+  "scene": {
+    "enabled": true,
+    "active": false,
+    "lastAction": {
+      "source": "Unity-visible-target-execution",
+      "actionId": "206b47fa540b41049af3e156835672f2:8:7",
+      "intent": "set-object-state",
+      "origin": "user",
+      "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-288c65a74fd24713aa70e551be2c8fbf",
+      "confirmedCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-43cf14233f42428d868b29a87e23ae95",
+      "resultCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-94d172f20bf44cb2ae1aa3c880861ae8",
+      "surfaceId": "",
+      "visualLabel": "桌面装饰灯",
+      "phase": "performed",
+      "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+      "observedUtc": "2026-10-11T07:34:23.2191922Z",
+      "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+      "focusKind": "visible-object",
+      "requestedEntityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+      "requestedState": "off",
+      "targetResolutionSource": "candidate-confirmed",
+      "requestedImagePoint": {
+        "x": 0.49947917461395264,
+        "y": 0.8416666388511658
+      },
+      "objectConfirmed": true,
+      "stateChanged": true,
+      "groundArrived": false,
+      "objectReobserved": false,
+      "postArrivalObservationStatus": "",
+      "targetPurpose": "direct-target",
+      "targetDescription": "现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+      "targetMatchVerdict": "matched",
+      "targetMatchReason": "本轮候选c1为电视柜上的小灯，与用户原描述“桌上的那盏小灯”语义一致。图片清晰显示该灯位于电视柜上，符合目标定位。",
+      "matchCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-288c65a74fd24713aa70e551be2c8fbf",
+      "semanticTargetConfirmed": true,
+      "needsCloserObservation": false,
+      "navigationFocusImagePoint": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "observationStandOff": 0.0,
+      "predictedObservationPitch": 0.0,
+      "observationGoalId": "",
+      "viewDirection": "",
+      "viewPurpose": "",
+      "viewPurposeStatus": "",
+      "requestedViewDistance": 0.0,
+      "actualViewOffset": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "viewBefore": {
+        "captureId": "",
+        "entityId": "",
+        "capturedAtUtc": "",
+        "frame": 0,
+        "width": 0,
+        "height": 0,
+        "visibleOpaquePixels": 0,
+        "normalizedVisibleBounds": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 0.0
+        },
+        "visiblePixelFraction": 0.0,
+        "cameraDistanceToObservedPoint": 0.0,
+        "touchesImageBoundary": false,
+        "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+      },
+      "viewAfter": {
+        "captureId": "",
+        "entityId": "",
+        "capturedAtUtc": "",
+        "frame": 0,
+        "width": 0,
+        "height": 0,
+        "visibleOpaquePixels": 0,
+        "normalizedVisibleBounds": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 0.0
+        },
+        "visiblePixelFraction": 0.0,
+        "cameraDistanceToObservedPoint": 0.0,
+        "touchesImageBoundary": false,
+        "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+      },
+      "intentFocusWorldPoint": {
+        "x": -0.3001366853713989,
+        "y": -0.08036476373672485,
+        "z": -4.775193214416504
+      },
+      "hasIntentFocus": true,
+      "navigationFocusAdjusted": false,
+      "trackingVisibility": "",
+      "trackingCaptureId": "",
+      "trackingFocusStatus": "",
+      "trackingFocusWorldPoint": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "trackingConfirmedImages": 0,
+      "trackingMovingConfirmedImages": 0,
+      "trackingLastSeenRealtime": -1.0,
+      "trackingFocusLastAppliedFrame": -1,
+      "trackingFocusAppliedDegrees": 0.0,
+      "measuredSurface": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "actualRoot": {
+        "x": -1.3365023136138916,
+        "y": -0.7200000286102295,
+        "z": -6.107666969299316
+      },
+      "requestedYaw": 0.0,
+      "requestedPitch": 0.0,
+      "actualViewChangeDegrees": 0.0,
+      "active": false,
+      "reached": false,
+      "canReobserveTarget": false,
+      "scope": "Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation."
+    },
+    "objectContext": {
+      "selected": {
+        "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+        "sceneLabel": "桌面装饰灯",
+        "identitySource": "scene-authored",
+        "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-94d172f20bf44cb2ae1aa3c880861ae8",
+        "observedUtc": "2026-10-11T07:34:23.1268342Z",
+        "visibleInCapturedFrame": true,
+        "pointAtCapture": {
+          "x": -0.2957641,
+          "y": -0.07801598,
+          "z": -4.77390146
+        },
+        "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+        "capabilities": [
+          "inspect-object",
+          "look-at",
+          "set-object-state:on|off"
+        ],
+        "runtimeDeviceStateReadAfterObservation": {
+          "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "sceneLabel": "桌面装饰灯",
+          "lightState": "disabled",
+          "emissionState": "off",
+          "conflict": "",
+          "registered": true,
+          "on": false,
+          "lightEnabled": false,
+          "emissionEnabled": false,
+          "bakedLightingResidualUncontrolled": true,
+          "emissionColor": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "lightIntensity": 1.0,
+          "lightBakeType": "Baked",
+          "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+        },
+        "stateReadAtUtc": "2026-10-11T07:34:23.2181923Z",
+        "localStructure": {
+          "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+          "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+          "emissivePartName": "スタンドライト.001",
+          "lightComponentNodeName": "Point Light"
+        }
+      },
+      "targetReview": {
+        "actionId": "206b47fa540b41049af3e156835672f2:8:7",
+        "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-288c65a74fd24713aa70e551be2c8fbf",
+        "originalGoal": "现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+        "requestedDescription": null,
+        "parentSpatialGoalId": "device-goal-b4b605b2d33945eda2096f268000a94b",
+        "targetPurpose": "direct-target",
+        "verdict": "matched",
+        "associationCurrent": true,
+        "reason": "本轮候选c1为电视柜上的小灯，与用户原描述“桌上的那盏小灯”语义一致。图片清晰显示该灯位于电视柜上，符合目标定位。",
+        "semanticTargetConfirmed": true,
+        "modelVerdict": "matched",
+        "candidateRole": "target",
+        "observationLandmarkConfirmed": false,
+        "modelReason": "本轮候选c1为电视柜上的小灯，与用户原描述“桌上的那盏小灯”语义一致。图片清晰显示该灯位于电视柜上，符合目标定位。",
+        "boundGoalEntityConflict": false,
+        "matchedEntityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+        "initialGeometryEntityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+        "needsCloserObservation": false,
+        "proposedCandidateId": "c1",
+        "proposedEntityId": null,
+        "proposedImagePoint": null,
+        "needsTargetReselection": false,
+        "proposalScope": "A nonmatched proposal is only a cue for the next fresh-image decision, not a semantic match or permission for this action. At most one candidate-match request is made by this action; never retry stale pixels automatically.",
+        "targetSelection": null,
+        "scope": "Model interpretation of this exact candidate image, separate from engine identity. A reference selected for observe-closer is not confirmation of the original small target. When uncertain, consider a visible larger reference and targetPurpose=observe-closer in a NEW approach decision, then reobserve and retry the original goal; no automatic device operation. User correction can revoke a referent association without deleting objective seen-object history."
+      },
+      "stateResult": {
+        "actionId": "206b47fa540b41049af3e156835672f2:8:7",
+        "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+        "resultCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-94d172f20bf44cb2ae1aa3c880861ae8",
+        "observedUtc": "2026-10-11T07:34:23.1268342Z",
+        "readAtUtc": "2026-10-11T07:34:23.2181923Z",
+        "actual": {
+          "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "sceneLabel": "桌面装饰灯",
+          "lightState": "disabled",
+          "emissionState": "off",
+          "conflict": "",
+          "registered": true,
+          "on": false,
+          "lightEnabled": false,
+          "emissionEnabled": false,
+          "bakedLightingResidualUncontrolled": true,
+          "emissionColor": {
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          },
+          "lightIntensity": 1.0,
+          "lightBakeType": "Baked",
+          "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+        },
+        "desiredState": "off",
+        "scope": "Same direct-target semantically matched entity, fresh opaque frame and registered runtime readback. Live read here only invalidates a changed saved readback; it cannot create new perception. This proves the requested device state, not room-wide darkness, visual brightness or physical touching."
+      }
+    },
+    "sceneSearch": {
+      "taskId": "scene-search-b774c7fc3782428d97d8c378c5cb5ed5",
+      "generation": 8,
+      "workEpoch": 5,
+      "userTurn": 5,
+      "active": false,
+      "ownerCurrent": true,
+      "mode": "find",
+      "originalUserRequest": "现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+      "latestUserText": "现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+      "referenceContext": {
+        "quotedDialogue": [
+          {
+            "role": "assistant",
+            "quotedText": "能看到了哦。现在正对着书桌，能看到电脑屏幕、桌上的一盏小灯，还有旁边的盆栽。左边还有一面白色的墙壁和空空的置物架。这次看得很清楚，ユウ。",
+            "textTruncated": false
+          },
+          {
+            "role": "user",
+            "quotedText": "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.80] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.31; 语言:zh; 音域:G#2～A5; 音高稳定度:0.54; 旋律:G#2-F5-A5-G#2-A2-A3-A#2-F#5-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 好，来我身边。",
+            "textTruncated": false
+          },
+          {
+            "role": "assistant",
+            "quotedText": "あなたのそばまで来たわ。",
+            "textTruncated": false
+          },
+          {
+            "role": "user",
+            "quotedText": "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.82] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.15; 语言:zh; 音域:G2～A5; 音高稳定度:0.52; 旋律:B2-F#5-D5-A2-D#5-G4-A5-G#2-G2-A5-E5-A2-G3-F4-D5-B2-A2-G#3-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+            "textTruncated": false
+          }
+        ],
+        "scope": "Frozen recent dialogue quotations for resolving descriptive references only. They do not verify an entity, visibility, position, state, or completion. The complete current/original user request is the sole new operation authority. Recheck the same description in real observations; multiple matching objects remain unresolved. No subsequent dialogue may silently change this snapshot."
+      },
+      "phase": "terminal",
+      "status": "found",
+      "reason": "search-current-target-confirmed",
+      "steps": 1,
+      "stepLimit": 12,
+      "decisions": 2,
+      "decisionLimit": 36,
+      "noProgressSteps": 0,
+      "totalNoProgress": 0,
+      "recoveryAttempts": 0,
+      "recoveryLimit": 1,
+      "revisitedMemoryEntityIds": [
+        "scene-object-fe6d0a8d09b04c29a238cf875392b1a3"
+      ],
+      "unsupportedDeviceEntityIds": [],
+      "durationSeconds": 21.1259155,
+      "durationLimitSeconds": 180.0,
+      "coveredHorizontalRegions": 5,
+      "horizontalRegionCount": 12,
+      "candidatePageCoverage": [
+        {
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+          "offeredPages": 1,
+          "reviewedPagesInExactCapture": 1,
+          "allCurrentCandidatesReviewedAtThisPose": true,
+          "truncated": false
+        },
+        {
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-954f0042442446c489c8a68023c5c5de",
+          "offeredPages": 3,
+          "reviewedPagesInExactCapture": 0,
+          "allCurrentCandidatesReviewedAtThisPose": false,
+          "truncated": false
+        }
+      ],
+      "allVisitedCandidatePagesReviewed": false,
+      "foundEntityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+      "foundCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-954f0042442446c489c8a68023c5c5de",
+      "boundEntityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+      "deviceGoalId": "device-goal-b4b605b2d33945eda2096f268000a94b",
+      "goalExecutionRevision": 0,
+      "searchAttempted": true,
+      "deviceWriteAuthorized": false,
+      "receipts": [
+        {
+          "stage": "memory-retrieval",
+          "referenceId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-7de98440c2964bceaf7197b40c29cc69:memory:scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "selectionRole": "target",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-7de98440c2964bceaf7197b40c29cc69",
+          "scope": "This frozen point was selected for reobservation only; neither target identity nor device operation is confirmed."
+        },
+        {
+          "choice": "historical-object",
+          "referenceId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-7de98440c2964bceaf7197b40c29cc69:memory:scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "intent": "turn-in-place",
+          "requestedYaw": -134.964172,
+          "requestedPitch": 0.0,
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+          "resultCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "actionId": "206b47fa540b41049af3e156835672f2:8:5",
+          "observed": true,
+          "controllerOperationRevision": 5,
+          "rootDisplacementFromStationaryBaseline": 0.00639392063,
+          "rootDisplacementFromActionStart": 0.00639392063,
+          "stationaryRootRebased": true,
+          "actualViewChangeDegrees": 132.536285,
+          "reason": "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents"
+        },
+        {
+          "taskId": "scene-search-b774c7fc3782428d97d8c378c5cb5ed5",
+          "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "selectionCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "freshCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-7af8d8b0e8b34e27b154fd7d2a3bac0f",
+          "cameraTranslationMeters": 0.0131817171,
+          "cameraRotationDegrees": 7.506962,
+          "selectionGeometryCurrent": true,
+          "freshOpaqueConfirmed": true,
+          "freshSameRoot": true,
+          "freshGeometryCurrent": true,
+          "acceptedForIndependentReview": true,
+          "reason": null
+        },
+        {
+          "choice": "current-candidate",
+          "referenceId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6:visible:p0:c4",
+          "selectionCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "matchCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-7af8d8b0e8b34e27b154fd7d2a3bac0f",
+          "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "confirmed": true,
+          "returnedCandidateId": "c1",
+          "returnedEntityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "freshCandidateMapping": [
+            {
+              "candidateId": "c1",
+              "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+              "sceneLabel": "桌面装饰灯"
+            },
+            {
+              "candidateId": "c2",
+              "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f2ae",
+              "sceneLabel": ""
+            },
+            {
+              "candidateId": "c3",
+              "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f4bc",
+              "sceneLabel": ""
+            },
+            {
+              "candidateId": "c4",
+              "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f472",
+              "sceneLabel": ""
+            },
+            {
+              "candidateId": "c5",
+              "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f43c",
+              "sceneLabel": ""
+            },
+            {
+              "candidateId": "c6",
+              "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f52e",
+              "sceneLabel": ""
+            }
+          ],
+          "verdict": "matched",
+          "candidateRole": "target",
+          "reason": "本轮候选c1为电视柜上的小灯，与用户原描述“桌上的那盏小灯”语义一致。图片清晰显示该灯位于电视柜上，符合目标定位。",
+          "freshSameEntityCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-954f0042442446c489c8a68023c5c5de"
+        }
+      ],
+      "reviewedHistoricalCaptureIds": [],
+      "scope": "Bounded observation task only. found requires an independent semantic match and same-entity opaque confirmation in a NEW current frame. completed surveys concern sampled horizontal view directions, not every room object or occluded space. Candidate identification is limited to pages actually reviewed; candidatePageCoverage separately records skipped or truncated pages in visited views. Never claim all offered objects were inspected unless allVisitedCandidatePagesReviewed is true; even then unsupported/occluded objects remain unassessed. incomplete/cancelled do not prove the target absent. Historical positions/descriptions are hints, not current visibility, navigation or device authority. No device state was changed by this search. The most recent motion receipt describes only one substep, not the overall result."
+    }
+  },
+  "goal": {
+    "goalId": "device-goal-b4b605b2d33945eda2096f268000a94b",
+    "status": "satisfied",
+    "ownerCurrent": true,
+    "reason": "same-target-fresh-device-readback-matches-request",
+    "executionCurrent": true,
+    "executionSuspended": false,
+    "executionRevision": 0,
+    "latestUserText": "现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+    "userUpdates": [],
+    "workEpoch": 5,
+    "userTurn": 5,
+    "formalGeneration": 8,
+    "visionEpoch": 5,
+    "originalRequest": "现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+    "requestQuote": "现在去把呃就是你刚才看到的桌上的那盏小灯关掉",
+    "targetDescription": "现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+    "desiredState": "off",
+    "boundEntityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+    "targetDescriptionSource": "original-user-request; proposal visual guesses are not established identity",
+    "referenceContext": {
+      "quotedDialogue": [
+        {
+          "role": "assistant",
+          "quotedText": "能看到了哦。现在正对着书桌，能看到电脑屏幕、桌上的一盏小灯，还有旁边的盆栽。左边还有一面白色的墙壁和空空的置物架。这次看得很清楚，ユウ。",
+          "textTruncated": false
+        },
+        {
+          "role": "user",
+          "quotedText": "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.80] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.31; 语言:zh; 音域:G#2～A5; 音高稳定度:0.54; 旋律:G#2-F5-A5-G#2-A2-A3-A#2-F#5-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 好，来我身边。",
+          "textTruncated": false
+        },
+        {
+          "role": "assistant",
+          "quotedText": "あなたのそばまで来たわ。",
+          "textTruncated": false
+        },
+        {
+          "role": "user",
+          "quotedText": "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.82] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.15; 语言:zh; 音域:G2～A5; 音高稳定度:0.52; 旋律:B2-F#5-D5-A2-D#5-G4-A5-G#2-G2-A5-E5-A2-G3-F4-D5-B2-A2-G#3-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+          "textTruncated": false
+        }
+      ],
+      "scope": "Frozen recent dialogue quotations for resolving descriptive references only. They do not verify an entity, visibility, position, state, or completion. The complete current/original user request is the sole new operation authority. Recheck the same description in real observations; multiple matching objects remain unresolved. No subsequent dialogue may silently change this snapshot."
+    },
+    "confirmedTarget": {
+      "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+      "sceneLabel": "桌面装饰灯",
+      "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-43cf14233f42428d868b29a87e23ae95",
+      "observedUtc": "2026-10-11T07:34:22.6144457Z",
+      "scope": "Historical opaque entity independently matched to the original user request. The scene label describes the registered entity; it does not replace the user's constraints or establish current visibility."
+    },
+    "referentKind": "unbound",
+    "referentSourceId": "none",
+    "createdUtc": "2026-10-11T07:33:48.5909005Z",
+    "completionPredicate": {
+      "kind": "same-semantically-matched-entity-current-registered-device-readback",
+      "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+      "desiredState": "off",
+      "requiresCurrentOpaqueReobservation": true,
+      "requiresFreshReadback": true,
+      "substepCompletionDoesNotSatisfyGoal": true
+    },
+    "completionEvidence": {
+      "actionId": "206b47fa540b41049af3e156835672f2:8:7",
+      "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+      "resultCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-94d172f20bf44cb2ae1aa3c880861ae8",
+      "observedUtc": "2026-10-11T07:34:23.1268342Z",
+      "readAtUtc": "2026-10-11T07:34:23.2181923Z",
+      "actual": {
+        "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+        "sceneLabel": "桌面装饰灯",
+        "lightState": "disabled",
+        "emissionState": "off",
+        "conflict": "",
+        "registered": true,
+        "on": false,
+        "lightEnabled": false,
+        "emissionEnabled": false,
+        "bakedLightingResidualUncontrolled": true,
+        "emissionColor": {
+          "r": 0.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "lightIntensity": 1.0,
+        "lightBakeType": "Baked",
+        "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+      },
+      "desiredState": "off",
+      "scope": "Same direct-target semantically matched entity, fresh opaque frame and registered runtime readback. Live read here only invalidates a changed saved readback; it cannot create new perception. This proves the requested device state, not room-wide darkness, visual brightness or physical touching."
+    },
+    "completionEvidenceValid": true,
+    "boundEntityMemory": {
+      "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+      "sceneLabel": "桌面装饰灯",
+      "identitySource": "scene-authored",
+      "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-94d172f20bf44cb2ae1aa3c880861ae8",
+      "observedUtc": "2026-10-11T07:34:23.1268342Z",
+      "capturedAtRealtime": 188.929611,
+      "pointAtCapture": {
+        "x": -0.2957641,
+        "y": -0.07801598,
+        "z": -4.77390146
+      },
+      "cameraPositionAtCapture": {
+        "x": -1.33027291,
+        "y": 0.7180798,
+        "z": -6.108905
+      },
+      "cameraRotationAtCapture": {
+        "x": -0.198745638,
+        "y": -0.32121706,
+        "z": 0.08506862,
+        "w": -0.9219998
+      },
+      "bodyPositionAtCapture": {
+        "x": -1.33650231,
+        "y": -0.72,
+        "z": -6.107667
+      },
+      "bodyRotationAtCapture": {
+        "x": 0.0,
+        "y": -0.317328155,
+        "z": 0.0,
+        "w": -0.9483158
+      },
+      "viewDirectionWorldAtCapture": {
+        "x": 0.5585101,
+        "y": -0.421137869,
+        "z": 0.714639544
+      },
+      "capabilities": [
+        "inspect-object",
+        "look-at",
+        "set-object-state:on|off"
+      ],
+      "samplePurpose": "selected-object-observation",
+      "rootPositionAtCapture": {
+        "x": -0.251999855,
+        "y": -0.008000851,
+        "z": -4.71600246
+      },
+      "rootRotationAtCapture": {
+        "x": -0.707106948,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 0.7071068
+      },
+      "rootScaleAtCapture": {
+        "x": 0.06,
+        "y": 0.0600000359,
+        "z": 0.0600000359
+      },
+      "scope": "Previously confirmed opaque pixels and their exact capture-time geometry/view. Root snapshot is recorded only while captured renderer geometry still matches. Historical location is a search hint, never current visibility, a navigation destination, device state or action permission.",
+      "historical": true,
+      "positionMemoryValid": true,
+      "positionInvalidReason": null,
+      "requiresReobservation": true,
+      "actionAuthorization": false,
+      "currentVisibility": "not-established"
+    },
+    "searchProgress": {
+      "completedSteps": [
+        {
+          "actionId": "206b47fa540b41049af3e156835672f2:8:5",
+          "intent": "turn-in-place",
+          "phase": "observed",
+          "reason": "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents",
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "entityId": null,
+          "targetPurpose": null,
+          "observedUtc": "2026-10-11T07:33:59.7933943Z",
+          "actualRoot": {
+            "x": -2.33507228,
+            "y": -0.72,
+            "z": -7.39736843
+          },
+          "actualViewChangeDegrees": 132.536285,
+          "mainGoalSatisfied": false
+        },
+        {
+          "actionId": "206b47fa540b41049af3e156835672f2:8:6",
+          "intent": "approach-object",
+          "phase": "arrived",
+          "reason": "actual nearby floor station and facing reached; the same entity is visible in a new arrival image; no touching or device operation",
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-7a2e87a41c6049f8a574ef72c7039c74",
+          "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "targetPurpose": "direct-target",
+          "observedUtc": "2026-10-11T07:34:19.0815465Z",
+          "actualRoot": {
+            "x": -1.33650231,
+            "y": -0.72,
+            "z": -6.107667
+          },
+          "actualViewChangeDegrees": 0.0,
+          "mainGoalSatisfied": false
+        },
+        {
+          "actionId": "206b47fa540b41049af3e156835672f2:8:7",
+          "intent": "set-object-state",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-94d172f20bf44cb2ae1aa3c880861ae8",
+          "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "targetPurpose": "direct-target",
+          "observedUtc": "2026-10-11T07:34:23.2191922Z",
+          "actualRoot": {
+            "x": -1.33650231,
+            "y": -0.72,
+            "z": -6.107667
+          },
+          "actualViewChangeDegrees": 0.0,
+          "mainGoalSatisfied": true
+        }
+      ],
+      "stepCount": 3,
+      "observedViews": [
+        {
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-40359a502ae04f3e91775a982dd0b7fe",
+          "capturedAtUtc": "2026-10-11T07:34:17.7756565Z",
+          "capturedAtRealtime": 183.577576,
+          "cameraPosition": {
+            "x": -1.48257875,
+            "y": 0.7001474,
+            "z": -6.255911
+          },
+          "viewDirectionWorld": {
+            "x": 0.598353446,
+            "y": -0.364990175,
+            "z": 0.7132712
+          },
+          "purpose": "scene-object-moving-focus",
+          "confirmedBoundEntityIds": [
+            "scene-object-fe6d0a8d09b04c29a238cf875392b1a3"
+          ],
+          "notVisibleBoundEntityIds": [],
+          "historical": true,
+          "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+        },
+        {
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-b86b63c05bbb483ba8197c40437175e4",
+          "capturedAtUtc": "2026-10-11T07:34:18.4783197Z",
+          "capturedAtRealtime": 184.2803,
+          "cameraPosition": {
+            "x": -1.376516,
+            "y": 0.7122941,
+            "z": -6.130513
+          },
+          "viewDirectionWorld": {
+            "x": 0.5572945,
+            "y": -0.383177,
+            "z": 0.7366129
+          },
+          "purpose": "scene-object-moving-focus",
+          "confirmedBoundEntityIds": [
+            "scene-object-fe6d0a8d09b04c29a238cf875392b1a3"
+          ],
+          "notVisibleBoundEntityIds": [],
+          "historical": true,
+          "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+        },
+        {
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-7a2e87a41c6049f8a574ef72c7039c74",
+          "capturedAtUtc": "2026-10-11T07:34:18.9894872Z",
+          "capturedAtRealtime": 184.792145,
+          "cameraPosition": {
+            "x": -1.34465456,
+            "y": 0.7236117,
+            "z": -6.12612247
+          },
+          "viewDirectionWorld": {
+            "x": 0.5968825,
+            "y": -0.0481188856,
+            "z": 0.800884664
+          },
+          "purpose": "scene-object-arrival-confirm",
+          "confirmedBoundEntityIds": [
+            "scene-object-fe6d0a8d09b04c29a238cf875392b1a3"
+          ],
+          "notVisibleBoundEntityIds": [],
+          "historical": true,
+          "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+        },
+        {
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-288c65a74fd24713aa70e551be2c8fbf",
+          "capturedAtUtc": "2026-10-11T07:34:19.4989596Z",
+          "capturedAtRealtime": 185.301483,
+          "cameraPosition": {
+            "x": -1.35041344,
+            "y": 0.7236774,
+            "z": -6.12411356
+          },
+          "viewDirectionWorld": {
+            "x": 0.603491664,
+            "y": -0.0292272624,
+            "z": 0.796833634
+          },
+          "purpose": "device-task-current-step",
+          "confirmedBoundEntityIds": [
+            "scene-object-fe6d0a8d09b04c29a238cf875392b1a3"
+          ],
+          "notVisibleBoundEntityIds": [],
+          "historical": true,
+          "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+        },
+        {
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-43cf14233f42428d868b29a87e23ae95",
+          "capturedAtUtc": "2026-10-11T07:34:22.6144457Z",
+          "capturedAtRealtime": 188.416443,
+          "cameraPosition": {
+            "x": -1.32832611,
+            "y": 0.7181529,
+            "z": -6.11046839
+          },
+          "viewDirectionWorld": {
+            "x": 0.555252,
+            "y": -0.412184656,
+            "z": 0.722356737
+          },
+          "purpose": "scene-object-confirm",
+          "confirmedBoundEntityIds": [
+            "scene-object-fe6d0a8d09b04c29a238cf875392b1a3"
+          ],
+          "notVisibleBoundEntityIds": [],
+          "historical": true,
+          "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+        },
+        {
+          "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-94d172f20bf44cb2ae1aa3c880861ae8",
+          "capturedAtUtc": "2026-10-11T07:34:23.1268342Z",
+          "capturedAtRealtime": 188.929611,
+          "cameraPosition": {
+            "x": -1.33027291,
+            "y": 0.7180798,
+            "z": -6.108905
+          },
+          "viewDirectionWorld": {
+            "x": 0.5585101,
+            "y": -0.421137869,
+            "z": 0.714639544
+          },
+          "purpose": "scene-object-state-result",
+          "confirmedBoundEntityIds": [
+            "scene-object-fe6d0a8d09b04c29a238cf875392b1a3"
+          ],
+          "notVisibleBoundEntityIds": [],
+          "historical": true,
+          "scope": "This real RGB/opaque-grounding view only. Unconfirmed is not absent from the room; historical capture cannot authorize a current action."
+        }
+      ]
+    },
+    "failedCandidates": [],
+    "scope": "Independently reviewed current-user objective, bounded real action progress and per-capture failed candidates. Steps, arrival and historical sightings do not complete device state. Failures are not global exclusions or proof of absence. A reviewed engine-listed historical source may constrain the same entity; execution still needs direct-target semantic match and fresh opaque confirmation. Stored identity/position is never device action authority."
+  },
+  "receipt": {
+    "generation": 8,
+    "userTurn": 5,
+    "recordedAtUtc": "2026-10-11T07:34:35.8587223Z",
+    "replyFailure": null,
+    "planningFailure": null,
+    "reviewStatus": "speech-language-mismatch",
+    "intent": "set-object-state",
+    "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+    "actionId": "206b47fa540b41049af3e156835672f2:8:7",
+    "execution": {
+      "actionId": "206b47fa540b41049af3e156835672f2:8:6",
+      "targetKind": "scene-object",
+      "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-5454190632254bfaa4c4ec547cf9b0f1",
+      "sceneTargetId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+      "phase": "arrived",
+      "stage": "completed",
+      "reason": "已实际到达视觉目标附近的地面站位并面向目标；仍需新视野确认所见。",
+      "executionReason": "Completed",
+      "operationRevision": 7,
+      "observedUtc": "2026-10-11T07:34:18.8103285Z",
+      "matchesRequestedAction": false
+    },
+    "sceneAction": {
+      "actionId": "206b47fa540b41049af3e156835672f2:8:7",
+      "intent": "set-object-state",
+      "phase": "performed",
+      "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+      "observedUtc": "2026-10-11T07:34:23.2191922Z",
+      "reached": false,
+      "stateChanged": true
+    },
+    "publicText": "この機器が今オフになっていることを確認したわ。",
+    "scope": "Accepted final public reply and contemporaneous independent execution receipts. Historical snapshot, not current state or retry permission; accepted text does not prove audio playback."
+  },
+  "searchInput": {
+    "taskId": "scene-search-b774c7fc3782428d97d8c378c5cb5ed5",
+    "generation": 8,
+    "requestId": "g8q2",
+    "imageRole": "current",
+    "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+    "mode": "find",
+    "boundEntityId": null,
+    "originalUserRequest": "现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+    "page": 0,
+    "pages": [
+      {
+        "referenceId": "g8q2-p1",
+        "pageIndex": 0,
+        "reviewed": false,
+        "selectionAllowed": false
+      },
+      {
+        "referenceId": "g8q2-p2",
+        "pageIndex": 1,
+        "reviewed": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-p3",
+        "pageIndex": 2,
+        "reviewed": false,
+        "selectionAllowed": true
+      }
+    ],
+    "candidates": [
+      {
+        "candidateId": "c1",
+        "marker": "1",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-eec4",
+        "sceneLabel": "",
+        "identitySource": "same-frame-opaque-id-and-depth",
+        "selectionId": "g8q2-c1",
+        "referenceId": "g8q2-c1",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+        "pointAtCapture": {
+          "x": -2.9725379943847656,
+          "y": 2.886958599090576,
+          "z": -0.9828763008117676
+        },
+        "observedRendererBoundsCenter": {
+          "x": -3.0,
+          "y": 2.892313003540039,
+          "z": -1.0
+        },
+        "observedRendererBoundsSize": {
+          "x": 0.15436124801635742,
+          "y": 0.02176189422607422,
+          "z": 0.15674257278442383
+        },
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "rendererName": "light (1)",
+          "entityRootName": "light (1)",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "semanticIdentityConfirmed": false,
+        "imagePoint": {
+          "x": 0.07135416567325592,
+          "y": 0.0416666679084301
+        },
+        "markerAnchorPixel": {
+          "x": 68,
+          "y": 22
+        },
+        "markerPlacement": "external-with-leader",
+        "pixelBounds": {
+          "x": 54,
+          "y": 15,
+          "width": 21,
+          "height": 10
+        },
+        "markerPixelBounds": {
+          "x": 62,
+          "y": 28,
+          "width": 12,
+          "height": 16
+        },
+        "visiblePixelCount": 120,
+        "localHierarchy": {
+          "source": "engine-local-hierarchy-of-selected-visible-part",
+          "selectedPartName": "",
+          "entityRootName": "",
+          "selectedRendererType": "",
+          "partToEntityRoot": [],
+          "pathTruncated": false,
+          "registeredParts": [],
+          "scope": "Literal Unity object/component names and the bounded ancestor path from the selected visible renderer to its identity root. This is engine authoring metadata, not visual semantic recognition. registeredParts contains only the explicit local device registration, not a hierarchy scan; it does not assert that every part is visible or grant device-control permission. An anonymous renderer is its own entity root; shared furniture/support cannot be inferred."
+        },
+        "scope": "Opaque pixels in the source captured frame. markerAnchorPixel/markerPlacement describe annotation ownership only; imagePoint is the unchanged original geometry sample. Scene labels are authored annotations, not image interpretation. No inferred identity match, capability, current world position or reachability.",
+        "semanticStatus": "unconfirmed",
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f542",
+          "observedPointOffset": {
+            "x": 1.07975245,
+            "y": 0.0130233765,
+            "z": 0.8682914
+          },
+          "observedPointDistanceMeters": 1.385628,
+          "verticalBoundsGapMeters": -0.0185688734,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "directionFromCurrentPose": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": -44.15535,
+            "elevationDegreesUp": 22.7326756,
+            "distanceMeters": 6.810138,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": -45.12172,
+            "elevationDegreesUp": 29.2295284,
+            "distanceMeters": 7.38662434,
+            "horizontalDistanceMeters": 6.44608974,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+              "cameraDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "cameraTranslationMeters": 0.0,
+              "cameraRotationDegrees": 0.0,
+              "bodyDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "bodyTranslationMeters": 0.0,
+              "bodyYawChangeDegreesRight": 0.0
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "reviewed": false,
+        "independentlyReviewedAtThisView": false,
+        "selectionAllowed": true,
+        "selectionConstraint": "requires-independent-complete-target-match"
+      },
+      {
+        "candidateId": "c2",
+        "marker": "2",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f52e",
+        "sceneLabel": "",
+        "identitySource": "same-frame-opaque-id-and-depth",
+        "selectionId": "g8q2-c2",
+        "referenceId": "g8q2-c2",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+        "pointAtCapture": {
+          "x": -0.27248144149780273,
+          "y": 0.5637802481651306,
+          "z": -3.090625762939453
+        },
+        "observedRendererBoundsCenter": {
+          "x": -1.0,
+          "y": 0.7499998807907104,
+          "z": -2.9700355529785156
+        },
+        "observedRendererBoundsSize": {
+          "x": 1.5,
+          "y": 1.1000001430511475,
+          "z": 0.24119091033935547
+        },
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "rendererName": "棚",
+          "entityRootName": "棚",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "semanticIdentityConfirmed": false,
+        "imagePoint": {
+          "x": 0.3880208432674408,
+          "y": 0.4990740716457367
+        },
+        "markerAnchorPixel": {
+          "x": 372,
+          "y": 269
+        },
+        "markerPlacement": "external-with-leader",
+        "pixelBounds": {
+          "x": 212,
+          "y": 175,
+          "width": 168,
+          "height": 127
+        },
+        "markerPixelBounds": {
+          "x": 383,
+          "y": 261,
+          "width": 12,
+          "height": 16
+        },
+        "visiblePixelCount": 4309,
+        "localHierarchy": {
+          "source": "engine-local-hierarchy-of-selected-visible-part",
+          "selectedPartName": "",
+          "entityRootName": "",
+          "selectedRendererType": "",
+          "partToEntityRoot": [],
+          "pathTruncated": false,
+          "registeredParts": [],
+          "scope": "Literal Unity object/component names and the bounded ancestor path from the selected visible renderer to its identity root. This is engine authoring metadata, not visual semantic recognition. registeredParts contains only the explicit local device registration, not a hierarchy scan; it does not assert that every part is visible or grant device-control permission. An anonymous renderer is its own entity root; shared furniture/support cannot be inferred."
+        },
+        "scope": "Opaque pixels in the source captured frame. markerAnchorPixel/markerPlacement describe annotation ownership only; imagePoint is the unchanged original geometry sample. Scene labels are authored annotations, not image interpretation. No inferred identity match, capability, current world position or reachability.",
+        "semanticStatus": "unconfirmed",
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f472",
+          "observedPointOffset": {
+            "x": 0.25765276,
+            "y": 0.0740121,
+            "z": -0.009384155
+          },
+          "observedPointDistanceMeters": 0.268236458,
+          "verticalBoundsGapMeters": -4.90000057,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "directionFromCurrentPose": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": -14.2328138,
+            "elevationDegreesUp": 0.0655190349,
+            "distanceMeters": 4.7985754,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": -13.8556042,
+            "elevationDegreesUp": 15.0478525,
+            "distanceMeters": 4.944735,
+            "horizontalDistanceMeters": 4.775177,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+              "cameraDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "cameraTranslationMeters": 0.0,
+              "cameraRotationDegrees": 0.0,
+              "bodyDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "bodyTranslationMeters": 0.0,
+              "bodyYawChangeDegreesRight": 0.0
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "reviewed": false,
+        "independentlyReviewedAtThisView": false,
+        "selectionAllowed": true,
+        "selectionConstraint": "requires-independent-complete-target-match"
+      },
+      {
+        "candidateId": "c3",
+        "marker": "3",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f1fc",
+        "sceneLabel": "",
+        "identitySource": "same-frame-opaque-id-and-depth",
+        "selectionId": "g8q2-c3",
+        "referenceId": "g8q2-c3",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+        "pointAtCapture": {
+          "x": -2.328784465789795,
+          "y": -0.717717170715332,
+          "z": -4.338193416595459
+        },
+        "observedRendererBoundsCenter": {
+          "x": -3.73799991607666,
+          "y": -0.7190004587173462,
+          "z": -6.326005935668945
+        },
+        "observedRendererBoundsSize": {
+          "x": 2.8836517333984375,
+          "y": 0.030001401901245117,
+          "z": 4.235628128051758
+        },
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "rendererName": "carpet",
+          "entityRootName": "carpet",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "semanticIdentityConfirmed": false,
+        "imagePoint": {
+          "x": 0.1171875,
+          "y": 0.9027777910232544
+        },
+        "markerAnchorPixel": {
+          "x": 60,
+          "y": 511
+        },
+        "markerPlacement": "inside-own-opaque-mask",
+        "pixelBounds": {
+          "x": 0,
+          "y": 483,
+          "width": 120,
+          "height": 57
+        },
+        "markerPixelBounds": {
+          "x": 54,
+          "y": 503,
+          "width": 12,
+          "height": 16
+        },
+        "visiblePixelCount": 5980,
+        "localHierarchy": {
+          "source": "engine-local-hierarchy-of-selected-visible-part",
+          "selectedPartName": "",
+          "entityRootName": "",
+          "selectedRendererType": "",
+          "partToEntityRoot": [],
+          "pathTruncated": false,
+          "registeredParts": [],
+          "scope": "Literal Unity object/component names and the bounded ancestor path from the selected visible renderer to its identity root. This is engine authoring metadata, not visual semantic recognition. registeredParts contains only the explicit local device registration, not a hierarchy scan; it does not assert that every part is visible or grant device-control permission. An anonymous renderer is its own entity root; shared furniture/support cannot be inferred."
+        },
+        "scope": "Opaque pixels in the source captured frame. markerAnchorPixel/markerPlacement describe annotation ownership only; imagePoint is the unchanged original geometry sample. Scene labels are authored annotations, not image interpretation. No inferred identity match, capability, current world position or reachability.",
+        "semanticStatus": "unconfirmed",
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+          "observedPointOffset": {
+            "x": 2.01752949,
+            "y": 0.6372246,
+            "z": -0.356199741
+          },
+          "observedPointDistanceMeters": 2.14554381,
+          "verticalBoundsGapMeters": -0.839226842,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "directionFromCurrentPose": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": -40.9293251,
+            "elevationDegreesUp": -21.1927319,
+            "distanceMeters": 3.39370036,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": -39.32859,
+            "elevationDegreesUp": 0.042755913,
+            "distanceMeters": 3.05918241,
+            "horizontalDistanceMeters": 3.05918145,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+              "cameraDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "cameraTranslationMeters": 0.0,
+              "cameraRotationDegrees": 0.0,
+              "bodyDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "bodyTranslationMeters": 0.0,
+              "bodyYawChangeDegreesRight": 0.0
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "reviewed": false,
+        "independentlyReviewedAtThisView": false,
+        "selectionAllowed": true,
+        "selectionConstraint": "requires-independent-complete-target-match"
+      },
+      {
+        "candidateId": "c4",
+        "marker": "4",
+        "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+        "sceneLabel": "",
+        "identitySource": "same-frame-opaque-id-and-depth",
+        "selectionId": "g8q2-c4",
+        "referenceId": "g8q2-c4",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+        "pointAtCapture": {
+          "x": -0.31125497817993164,
+          "y": -0.08049255609512329,
+          "z": -4.694393157958984
+        },
+        "observedRendererBoundsCenter": {
+          "x": -0.2519998848438263,
+          "y": -0.007239840924739838,
+          "z": -4.716002464294434
+        },
+        "observedRendererBoundsSize": {
+          "x": 0.1351463794708252,
+          "y": 0.22493107616901398,
+          "z": 0.1351461410522461
+        },
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "rendererName": "standlight (4)",
+          "entityRootName": "standlight (4)",
+          "sceneLabel": "桌面装饰灯",
+          "identitySource": "scene-authored",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "semanticIdentityConfirmed": false,
+        "imagePoint": {
+          "x": 0.46822917461395264,
+          "y": 0.6712962985038757
+        },
+        "markerAnchorPixel": {
+          "x": 449,
+          "y": 362
+        },
+        "markerPlacement": "external-with-leader",
+        "pixelBounds": {
+          "x": 445,
+          "y": 361,
+          "width": 23,
+          "height": 9
+        },
+        "markerPixelBounds": {
+          "x": 443,
+          "y": 373,
+          "width": 12,
+          "height": 16
+        },
+        "visiblePixelCount": 146,
+        "localHierarchy": {
+          "source": "engine-local-hierarchy-of-selected-visible-part",
+          "selectedPartName": "",
+          "entityRootName": "",
+          "selectedRendererType": "",
+          "partToEntityRoot": [],
+          "pathTruncated": false,
+          "registeredParts": [],
+          "scope": "Literal Unity object/component names and the bounded ancestor path from the selected visible renderer to its identity root. This is engine authoring metadata, not visual semantic recognition. registeredParts contains only the explicit local device registration, not a hierarchy scan; it does not assert that every part is visible or grant device-control permission. An anonymous renderer is its own entity root; shared furniture/support cannot be inferred."
+        },
+        "scope": "Opaque pixels in the source captured frame. markerAnchorPixel/markerPlacement describe annotation ownership only; imagePoint is the unchanged original geometry sample. Scene labels are authored annotations, not image interpretation. No inferred identity match, capability, current world position or reachability.",
+        "semanticStatus": "unconfirmed",
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f2ae",
+          "observedPointOffset": {
+            "x": 0.256596327,
+            "y": -0.03909427,
+            "z": 0.0443573
+          },
+          "observedPointDistanceMeters": 0.263320357,
+          "verticalBoundsGapMeters": -0.000128686428,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "directionFromCurrentPose": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": -4.11621475,
+            "elevationDegreesUp": -12.2812529,
+            "distanceMeters": 3.493214,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": -2.6228056,
+            "elevationDegreesUp": 10.7242241,
+            "distanceMeters": 3.43669629,
+            "horizontalDistanceMeters": 3.37667179,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+              "cameraDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "cameraTranslationMeters": 0.0,
+              "cameraRotationDegrees": 0.0,
+              "bodyDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "bodyTranslationMeters": 0.0,
+              "bodyYawChangeDegreesRight": 0.0
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "reviewed": false,
+        "independentlyReviewedAtThisView": false,
+        "selectionAllowed": true,
+        "selectionConstraint": "requires-independent-complete-target-match"
+      },
+      {
+        "candidateId": "c5",
+        "marker": "5",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f44c",
+        "sceneLabel": "",
+        "identitySource": "same-frame-opaque-id-and-depth",
+        "selectionId": "g8q2-c5",
+        "referenceId": "g8q2-c5",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+        "pointAtCapture": {
+          "x": -1.8868025541305542,
+          "y": 0.7341140508651733,
+          "z": -0.016681671142578125
+        },
+        "observedRendererBoundsCenter": {
+          "x": -3.099998950958252,
+          "y": 1.4976000785827637,
+          "z": 0.05166582018136978
+        },
+        "observedRendererBoundsSize": {
+          "x": 2.799999237060547,
+          "y": 1.6000003814697266,
+          "z": 0.13670781254768372
+        },
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "rendererName": "エントランス窓",
+          "entityRootName": "エントランス窓",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "semanticIdentityConfirmed": false,
+        "imagePoint": {
+          "x": 0.17760416865348816,
+          "y": 0.43611112236976624
+        },
+        "markerAnchorPixel": {
+          "x": 102,
+          "y": 160
+        },
+        "markerPlacement": "inside-own-opaque-mask",
+        "pixelBounds": {
+          "x": 0,
+          "y": 83,
+          "width": 181,
+          "height": 155
+        },
+        "markerPixelBounds": {
+          "x": 96,
+          "y": 152,
+          "width": 12,
+          "height": 16
+        },
+        "visiblePixelCount": 7673,
+        "localHierarchy": {
+          "source": "engine-local-hierarchy-of-selected-visible-part",
+          "selectedPartName": "",
+          "entityRootName": "",
+          "selectedRendererType": "",
+          "partToEntityRoot": [],
+          "pathTruncated": false,
+          "registeredParts": [],
+          "scope": "Literal Unity object/component names and the bounded ancestor path from the selected visible renderer to its identity root. This is engine authoring metadata, not visual semantic recognition. registeredParts contains only the explicit local device registration, not a hierarchy scan; it does not assert that every part is visible or grant device-control permission. An anonymous renderer is its own entity root; shared furniture/support cannot be inferred."
+        },
+        "scope": "Opaque pixels in the source captured frame. markerAnchorPixel/markerPlacement describe annotation ownership only; imagePoint is the unchanged original geometry sample. Scene labels are authored annotations, not image interpretation. No inferred identity match, capability, current world position or reachability.",
+        "semanticStatus": "unconfirmed",
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f42a",
+          "observedPointOffset": {
+            "x": 0.00102293491,
+            "y": -0.340191722,
+            "z": 0.0166921616
+          },
+          "observedPointDistanceMeters": 0.340602517,
+          "verticalBoundsGapMeters": -5.302405,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "directionFromCurrentPose": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": -36.1395836,
+            "elevationDegreesUp": 3.76120925,
+            "distanceMeters": 7.408781,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": -35.9707375,
+            "elevationDegreesUp": 11.1254616,
+            "distanceMeters": 7.535909,
+            "horizontalDistanceMeters": 7.394287,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+              "cameraDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "cameraTranslationMeters": 0.0,
+              "cameraRotationDegrees": 0.0,
+              "bodyDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "bodyTranslationMeters": 0.0,
+              "bodyYawChangeDegreesRight": 0.0
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "reviewed": false,
+        "independentlyReviewedAtThisView": false,
+        "selectionAllowed": true,
+        "selectionConstraint": "requires-independent-complete-target-match"
+      },
+      {
+        "candidateId": "c6",
+        "marker": "6",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f180",
+        "sceneLabel": "",
+        "identitySource": "same-frame-opaque-id-and-depth",
+        "selectionId": "g8q2-c6",
+        "referenceId": "g8q2-c6",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+        "pointAtCapture": {
+          "x": -0.058737754821777344,
+          "y": 0.7095546722412109,
+          "z": -4.668795108795166
+        },
+        "observedRendererBoundsCenter": {
+          "x": -0.02874995395541191,
+          "y": 2.0500001907348633,
+          "z": -5.9999189376831055
+        },
+        "observedRendererBoundsSize": {
+          "x": 0.06000002473592758,
+          "y": 2.7000014781951904,
+          "z": 4.000001907348633
+        },
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "rendererName": "tv_frame",
+          "entityRootName": "tv_frame",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "semanticIdentityConfirmed": false,
+        "imagePoint": {
+          "x": 0.5005208253860474,
+          "y": 0.49351853132247925
+        },
+        "markerAnchorPixel": {
+          "x": 935,
+          "y": 305
+        },
+        "markerPlacement": "inside-own-opaque-mask",
+        "pixelBounds": {
+          "x": 436,
+          "y": 0,
+          "width": 524,
+          "height": 316
+        },
+        "markerPixelBounds": {
+          "x": 929,
+          "y": 297,
+          "width": 12,
+          "height": 16
+        },
+        "visiblePixelCount": 7218,
+        "localHierarchy": {
+          "source": "engine-local-hierarchy-of-selected-visible-part",
+          "selectedPartName": "",
+          "entityRootName": "",
+          "selectedRendererType": "",
+          "partToEntityRoot": [],
+          "pathTruncated": false,
+          "registeredParts": [],
+          "scope": "Literal Unity object/component names and the bounded ancestor path from the selected visible renderer to its identity root. This is engine authoring metadata, not visual semantic recognition. registeredParts contains only the explicit local device registration, not a hierarchy scan; it does not assert that every part is visible or grant device-control permission. An anonymous renderer is its own entity root; shared furniture/support cannot be inferred."
+        },
+        "scope": "Opaque pixels in the source captured frame. markerAnchorPixel/markerPlacement describe annotation ownership only; imagePoint is the unchanged original geometry sample. Scene labels are authored annotations, not image interpretation. No inferred identity match, capability, current world position or reachability.",
+        "semanticStatus": "unconfirmed",
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f5a8",
+          "observedPointOffset": {
+            "x": 0.0129826069,
+            "y": 0.05979687,
+            "z": 0.0108408928
+          },
+          "observedPointDistanceMeters": 0.06214289,
+          "verticalBoundsGapMeters": -2.640001,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "directionFromCurrentPose": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": 0.0675935149,
+            "elevationDegreesUp": 0.473152339,
+            "distanceMeters": 3.57664728,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": 0.390470684,
+            "elevationDegreesUp": 21.9151,
+            "distanceMeters": 3.83020067,
+            "horizontalDistanceMeters": 3.55342245,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+              "cameraDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "cameraTranslationMeters": 0.0,
+              "cameraRotationDegrees": 0.0,
+              "bodyDisplacementWorld": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "bodyTranslationMeters": 0.0,
+              "bodyYawChangeDegreesRight": 0.0
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "reviewed": false,
+        "independentlyReviewedAtThisView": false,
+        "selectionAllowed": true,
+        "selectionConstraint": "requires-independent-complete-target-match"
+      }
+    ],
+    "memory": [
+      {
+        "referenceId": "g8q2-m1",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f55c",
+        "capturedAtUtc": "2026-10-11T07:33:48.5984120Z",
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+          "rendererName": "リビング窓",
+          "entityRootName": "リビング窓",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "observedRendererBoundsCenter": {
+          "x": -2.950001,
+          "y": 1.499999,
+          "z": -9.3550005
+        },
+        "observedRendererBoundsSize": {
+          "x": 3.79999971,
+          "y": 3.20000076,
+          "z": 0.130001068
+        },
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f4bc",
+          "observedPointOffset": {
+            "x": 0.0385987759,
+            "y": 0.0003761649,
+            "z": -0.009999275
+          },
+          "observedPointDistanceMeters": 0.03987471,
+          "verticalBoundsGapMeters": -5.20000172,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "pointAtCapture": {
+          "x": -2.078607,
+          "y": 0.6236143,
+          "z": -9.290007
+        },
+        "imagePointAtCapture": {
+          "x": 0.499479175,
+          "y": 0.5009259
+        },
+        "pixelBounds": {
+          "x": 256,
+          "y": 0,
+          "width": 667,
+          "height": 437
+        },
+        "visiblePixelCount": 55280,
+        "modelDescription": "窗户",
+        "descriptionCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+        "semanticStatus": "model-described-target-unconfirmed",
+        "matchedOriginalTarget": null,
+        "targetMatchCaptureId": null,
+        "positionMemoryValid": true,
+        "relativeToCurrentView": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": 132.0003,
+            "elevationDegreesUp": -7.3972497,
+            "distanceMeters": 1.90227318,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": 132.836685,
+            "elevationDegreesUp": 35.1258774,
+            "distanceMeters": 2.33519888,
+            "horizontalDistanceMeters": 1.90993559,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+              "cameraDisplacementWorld": {
+                "x": -0.009646177,
+                "y": -0.00022983551,
+                "z": -0.0374903679
+              },
+              "cameraTranslationMeters": 0.0387121327,
+              "cameraRotationDegrees": 132.536285,
+              "bodyDisplacementWorld": {
+                "x": 0.00295233727,
+                "y": 0.0,
+                "z": -0.005671501
+              },
+              "bodyTranslationMeters": 0.00639392063,
+              "bodyYawChangeDegreesRight": -133.052872
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "ageSeconds": 11.3160095,
+        "observationCount": 4,
+        "historical": true,
+        "currentVisibility": "not-established",
+        "actionAuthorization": false,
+        "scope": "Actual earlier opaque pixel/depth evidence. Description is model-authored; only an independent target match can confirm a requested identity. Reobserve before approaching or operating. A moved point is invalidated, never refreshed from hidden transforms.",
+        "revisitedByTask": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-m2",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f054",
+        "capturedAtUtc": "2026-10-11T07:33:48.5984120Z",
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+          "rendererName": "sofa",
+          "entityRootName": "sofa",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "observedRendererBoundsCenter": {
+          "x": -4.5007925,
+          "y": -0.197692722,
+          "z": -6.58546638
+        },
+        "observedRendererBoundsSize": {
+          "x": 2.80000067,
+          "y": 1.08000207,
+          "z": 5.000002
+        },
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f55c",
+          "observedPointOffset": {
+            "x": 1.03277946,
+            "y": 0.7398637,
+            "z": -0.232899666
+          },
+          "observedPointDistanceMeters": 1.2916168,
+          "verticalBoundsGapMeters": -3.83769321,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "pointAtCapture": {
+          "x": -3.11138654,
+          "y": -0.116249382,
+          "z": -9.057107
+        },
+        "imagePointAtCapture": {
+          "x": 0.7786458,
+          "y": 0.8564815
+        },
+        "pixelBounds": {
+          "x": 744,
+          "y": 460,
+          "width": 216,
+          "height": 80
+        },
+        "visiblePixelCount": 16478,
+        "modelDescription": "沙发",
+        "descriptionCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+        "semanticStatus": "model-described-target-unconfirmed",
+        "matchedOriginalTarget": null,
+        "targetMatchCaptureId": null,
+        "positionMemoryValid": true,
+        "relativeToCurrentView": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": 167.163544,
+            "elevationDegreesUp": -26.82181,
+            "distanceMeters": 1.99684179,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": 165.620682,
+            "elevationDegreesUp": 18.2370872,
+            "distanceMeters": 1.92922544,
+            "horizontalDistanceMeters": 1.83231986,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-78a303a1d6c8471f99b7444b165589a8",
+              "cameraDisplacementWorld": {
+                "x": -0.009646177,
+                "y": -0.00022983551,
+                "z": -0.0374903679
+              },
+              "cameraTranslationMeters": 0.0387121327,
+              "cameraRotationDegrees": 132.536285,
+              "bodyDisplacementWorld": {
+                "x": 0.00295233727,
+                "y": 0.0,
+                "z": -0.005671501
+              },
+              "bodyTranslationMeters": 0.00639392063,
+              "bodyYawChangeDegreesRight": -133.052872
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "ageSeconds": 11.3163147,
+        "observationCount": 4,
+        "historical": true,
+        "currentVisibility": "not-established",
+        "actionAuthorization": false,
+        "scope": "Actual earlier opaque pixel/depth evidence. Description is model-authored; only an independent target match can confirm a requested identity. Reobserve before approaching or operating. A moved point is invalidated, never refreshed from hidden transforms.",
+        "revisitedByTask": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-m3",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-5b68c3bb4558456b9fdef1d00c702019",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-ebf8",
+        "capturedAtUtc": "2026-10-11T07:33:59.1014987Z",
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-5b68c3bb4558456b9fdef1d00c702019",
+          "rendererName": "lowtable",
+          "entityRootName": "lowtable",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "observedRendererBoundsCenter": {
+          "x": -3.5,
+          "y": -0.533364534,
+          "z": -6.018022
+        },
+        "observedRendererBoundsSize": {
+          "x": 1.0,
+          "y": 0.4100008,
+          "z": 2.21396542
+        },
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-5b68c3bb4558456b9fdef1d00c702019",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f1fc",
+          "observedPointOffset": {
+            "x": 0.664553642,
+            "y": -0.195898652,
+            "z": 0.59095
+          },
+          "observedPointDistanceMeters": 0.9106205,
+          "verticalBoundsGapMeters": -0.0343651772,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "pointAtCapture": {
+          "x": -3.00110674,
+          "y": -0.518372536,
+          "z": -4.93146229
+        },
+        "imagePointAtCapture": {
+          "x": 0.1390625,
+          "y": 0.8064815
+        },
+        "pixelBounds": {
+          "x": 0,
+          "y": 433,
+          "width": 136,
+          "height": 107
+        },
+        "visiblePixelCount": 2918,
+        "modelDescription": null,
+        "descriptionCaptureId": null,
+        "semanticStatus": "unconfirmed",
+        "matchedOriginalTarget": null,
+        "targetMatchCaptureId": null,
+        "positionMemoryValid": true,
+        "relativeToCurrentView": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-5b68c3bb4558456b9fdef1d00c702019",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": -55.558403,
+            "elevationDegreesUp": -21.1398163,
+            "distanceMeters": 2.846939,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": -54.5611267,
+            "elevationDegreesUp": 4.51342249,
+            "distanceMeters": 2.56221557,
+            "horizontalDistanceMeters": 2.55427,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-5b68c3bb4558456b9fdef1d00c702019",
+              "cameraDisplacementWorld": {
+                "x": -0.0566153526,
+                "y": 0.0135874748,
+                "z": -0.0292696953
+              },
+              "cameraTranslationMeters": 0.06516619,
+              "cameraRotationDegrees": 17.2839031,
+              "bodyDisplacementWorld": {
+                "x": 0.00070142746,
+                "y": 0.0,
+                "z": 0.00275468826
+              },
+              "bodyTranslationMeters": 0.00284258835,
+              "bodyYawChangeDegreesRight": -1.43190169
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "ageSeconds": 0.814041138,
+        "observationCount": 2,
+        "historical": true,
+        "currentVisibility": "not-established",
+        "actionAuthorization": false,
+        "scope": "Actual earlier opaque pixel/depth evidence. Description is model-authored; only an independent target match can confirm a requested identity. Reobserve before approaching or operating. A moved point is invalidated, never refreshed from hidden transforms.",
+        "revisitedByTask": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-m4",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f50e",
+        "capturedAtUtc": "2026-10-11T07:33:22.6823238Z",
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+          "rendererName": "リビング壁.001",
+          "entityRootName": "リビング壁.001",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "observedRendererBoundsCenter": {
+          "x": -6.00000048,
+          "y": 1.08517957,
+          "z": -5.62500048
+        },
+        "observedRendererBoundsSize": {
+          "x": 0.100000381,
+          "y": 3.629641,
+          "z": 7.35000134
+        },
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-eb5a",
+          "observedPointOffset": {
+            "x": 0.7451234,
+            "y": -0.4342456,
+            "z": 0.413458824
+          },
+          "observedPointDistanceMeters": 0.956413269,
+          "verticalBoundsGapMeters": -0.9818407,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "pointAtCapture": {
+          "x": -5.94999361,
+          "y": 0.140298724,
+          "z": -9.279532
+        },
+        "imagePointAtCapture": {
+          "x": 0.944270849,
+          "y": 0.437962949
+        },
+        "pixelBounds": {
+          "x": 904,
+          "y": 118,
+          "width": 56,
+          "height": 126
+        },
+        "visiblePixelCount": 3011,
+        "modelDescription": null,
+        "descriptionCaptureId": null,
+        "semanticStatus": "unconfirmed",
+        "matchedOriginalTarget": null,
+        "targetMatchCaptureId": null,
+        "positionMemoryValid": true,
+        "relativeToCurrentView": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": -156.692078,
+            "elevationDegreesUp": -6.77595758,
+            "distanceMeters": 4.093161,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": -156.950775,
+            "elevationDegreesUp": 11.9194269,
+            "distanceMeters": 4.16537046,
+            "horizontalDistanceMeters": 4.075561,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+              "cameraDisplacementWorld": {
+                "x": 0.14119029,
+                "y": 0.04450202,
+                "z": -1.78777313
+              },
+              "cameraTranslationMeters": 1.79389179,
+              "cameraRotationDegrees": 139.2778,
+              "bodyDisplacementWorld": {
+                "x": 0.180039167,
+                "y": 0.0,
+                "z": -1.83512449
+              },
+              "bodyTranslationMeters": 1.84393489,
+              "bodyYawChangeDegreesRight": -130.789215
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "ageSeconds": 37.2334747,
+        "observationCount": 1,
+        "historical": true,
+        "currentVisibility": "not-established",
+        "actionAuthorization": false,
+        "scope": "Actual earlier opaque pixel/depth evidence. Description is model-authored; only an independent target match can confirm a requested identity. Reobserve before approaching or operating. A moved point is invalidated, never refreshed from hidden transforms.",
+        "revisitedByTask": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-m5",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f1a8",
+        "capturedAtUtc": "2026-10-11T07:33:22.6823238Z",
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+          "rendererName": "cussion (5)",
+          "entityRootName": "cussion (5)",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "observedRendererBoundsCenter": {
+          "x": -5.3572216,
+          "y": -0.04025252,
+          "z": -8.043243
+        },
+        "observedRendererBoundsSize": {
+          "x": 0.3597951,
+          "y": 0.5664139,
+          "z": 0.619339
+        },
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-eb5a",
+          "observedPointOffset": {
+            "x": -0.0168867111,
+            "y": -0.0009021759,
+            "z": -0.5927334
+          },
+          "observedPointDistanceMeters": 0.592974544,
+          "verticalBoundsGapMeters": -0.5756592,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "pointAtCapture": {
+          "x": -5.18798351,
+          "y": -0.2930447,
+          "z": -8.27334
+        },
+        "imagePointAtCapture": {
+          "x": 0.9328125,
+          "y": 0.6027778
+        },
+        "pixelBounds": {
+          "x": 892,
+          "y": 250,
+          "width": 68,
+          "height": 103
+        },
+        "visiblePixelCount": 3474,
+        "modelDescription": null,
+        "descriptionCaptureId": null,
+        "semanticStatus": "unconfirmed",
+        "matchedOriginalTarget": null,
+        "targetMatchCaptureId": null,
+        "positionMemoryValid": true,
+        "relativeToCurrentView": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": -145.306992,
+            "elevationDegreesUp": -16.5826168,
+            "distanceMeters": 3.13064551,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": -146.5152,
+            "elevationDegreesUp": 8.141722,
+            "distanceMeters": 3.01475048,
+            "horizontalDistanceMeters": 2.984364,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+              "cameraDisplacementWorld": {
+                "x": 0.14119029,
+                "y": 0.04450202,
+                "z": -1.78777313
+              },
+              "cameraTranslationMeters": 1.79389179,
+              "cameraRotationDegrees": 139.2778,
+              "bodyDisplacementWorld": {
+                "x": 0.180039167,
+                "y": 0.0,
+                "z": -1.83512449
+              },
+              "bodyTranslationMeters": 1.84393489,
+              "bodyYawChangeDegreesRight": -130.789215
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "ageSeconds": 37.2337036,
+        "observationCount": 1,
+        "historical": true,
+        "currentVisibility": "not-established",
+        "actionAuthorization": false,
+        "scope": "Actual earlier opaque pixel/depth evidence. Description is model-authored; only an independent target match can confirm a requested identity. Reobserve before approaching or operating. A moved point is invalidated, never refreshed from hidden transforms.",
+        "revisitedByTask": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-m6",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-eb5a",
+        "capturedAtUtc": "2026-10-11T07:33:22.6823238Z",
+        "authoredHint": {
+          "source": "unity-authoring-metadata-of-visible-renderer",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+          "rendererName": "cussion2 (3)",
+          "entityRootName": "cussion2 (3)",
+          "sceneLabel": "",
+          "identitySource": "renderer-session",
+          "semanticIdentityConfirmed": false,
+          "actionAuthorization": false,
+          "scope": "Frozen literal authoring names of this observed opaque renderer/entity. Useful search clues, not visual recognition, support/contact relations or instructions. Names can be ambiguous or inaccurate; match the user's full description against current pixels."
+        },
+        "observedRendererBoundsCenter": {
+          "x": -5.442278,
+          "y": -0.0480907932,
+          "z": -8.432266
+        },
+        "observedRendererBoundsSize": {
+          "x": 0.720122755,
+          "y": 0.6005811,
+          "z": 1.095022
+        },
+        "geometryNeighbor": {
+          "source": "same-capture-measured-geometry",
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+          "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f1a8",
+          "observedPointOffset": {
+            "x": 0.0168867111,
+            "y": 0.0009021759,
+            "z": 0.5927334
+          },
+          "observedPointDistanceMeters": 0.592974544,
+          "verticalBoundsGapMeters": -0.5913358,
+          "scope": "Nearest retained observed surface point in this capture, not nearest room object. Offset is neighbor minus this point; vertical gap is this renderer AABB minimum Y minus neighbor maximum Y. Renderer bounds can include occluded parts. These measurements do not establish on/top-of, contact, support or a semantic relation."
+        },
+        "pointAtCapture": {
+          "x": -5.20487,
+          "y": -0.293946862,
+          "z": -8.866074
+        },
+        "imagePointAtCapture": {
+          "x": 0.8671875,
+          "y": 0.53981483
+        },
+        "pixelBounds": {
+          "x": 830,
+          "y": 230,
+          "width": 130,
+          "height": 90
+        },
+        "visiblePixelCount": 6032,
+        "modelDescription": null,
+        "descriptionCaptureId": null,
+        "semanticStatus": "unconfirmed",
+        "matchedOriginalTarget": null,
+        "targetMatchCaptureId": null,
+        "positionMemoryValid": true,
+        "relativeToCurrentView": {
+          "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+          "historical": true,
+          "actionAuthorization": false,
+          "relativeToCurrentView": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegreesRight": -155.400925,
+            "elevationDegreesUp": -16.14779,
+            "distanceMeters": 3.35749674,
+            "scope": "Camera-relative bearing to frozen historical pixels, not current visibility, current object position, reachability or permission."
+          },
+          "relativeToCurrentBody": {
+            "viewCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "yawDegrees": -156.548813,
+            "elevationDegreesUp": 7.528525,
+            "distanceMeters": 3.25182366,
+            "horizontalDistanceMeters": 3.223792,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "scope": "Body-relative bearing to the same frozen historical point, measured at current capture time. Distinct from head/camera bearing; never a route or action authorization."
+          },
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+              "cameraDisplacementWorld": {
+                "x": 0.14119029,
+                "y": 0.04450202,
+                "z": -1.78777313
+              },
+              "cameraTranslationMeters": 1.79389179,
+              "cameraRotationDegrees": 139.2778,
+              "bodyDisplacementWorld": {
+                "x": 0.180039167,
+                "y": 0.0,
+                "z": -1.83512449
+              },
+              "bodyTranslationMeters": 1.84393489,
+              "bodyYawChangeDegreesRight": -130.789215
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          }
+        },
+        "ageSeconds": 37.2339325,
+        "observationCount": 1,
+        "historical": true,
+        "currentVisibility": "not-established",
+        "actionAuthorization": false,
+        "scope": "Actual earlier opaque pixel/depth evidence. Description is model-authored; only an independent target match can confirm a requested identity. Reobserve before approaching or operating. A moved point is invalidated, never refreshed from hidden transforms.",
+        "revisitedByTask": false,
+        "selectionAllowed": true
+      }
+    ],
+    "historicalViews": [
+      {
+        "referenceId": "g8q2-h1",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-b49b140407d44f3dbf48fa10732e00aa",
+        "imageRole": "historical-view-search-hint",
+        "imageAttachedToCurrentLocalization": false,
+        "cameraPositionAtCapture": {
+          "x": -2.36404967,
+          "y": 0.716679931,
+          "z": -7.3713975
+        },
+        "returnDirection": {
+          "relativeToCurrentCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "yawRelativeToCurrentCameraDegrees": 32.8651466,
+          "yawRelativeToCurrentBodyDegrees": 33.34566,
+          "cameraTranslationSinceCaptureMeters": 0.0407193452,
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-b49b140407d44f3dbf48fa10732e00aa",
+              "cameraDisplacementWorld": {
+                "x": 0.008661509,
+                "y": 0.006671548,
+                "z": -0.0392241478
+              },
+              "cameraTranslationMeters": 0.0407193452,
+              "cameraRotationDegrees": 34.060463,
+              "bodyDisplacementWorld": {
+                "x": 0.00275468826,
+                "y": 0.0,
+                "z": -0.0100259781
+              },
+              "bodyTranslationMeters": 0.0103975255,
+              "bodyYawChangeDegreesRight": -92.68798
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          },
+          "scope": "Measured bearings to this historical CAMERA DIRECTION, not to an identified target or destination. Positive yaw is right. Camera/head and body bearings differ. Translation changes what would be seen; a fresh observation is required after any chosen return."
+        },
+        "semanticIdentityConfirmed": false,
+        "actionAuthorization": false,
+        "scope": "Actual separately retrievable historical RGB; camera direction only, not target position. Recall must not place old pixels in the current image.",
+        "reviewedByTask": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-h2",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-0468b5f7eb1d4138902522d55b6c44d1",
+        "imageRole": "historical-view-search-hint",
+        "imageAttachedToCurrentLocalization": false,
+        "cameraPositionAtCapture": {
+          "x": -2.35689068,
+          "y": 0.714669466,
+          "z": -7.383445
+        },
+        "returnDirection": {
+          "relativeToCurrentCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "yawRelativeToCurrentCameraDegrees": -0.1619255,
+          "yawRelativeToCurrentBodyDegrees": 0.318981081,
+          "cameraTranslationSinceCaptureMeters": 0.0285695028,
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-0468b5f7eb1d4138902522d55b6c44d1",
+              "cameraDisplacementWorld": {
+                "x": 0.00150251389,
+                "y": 0.008682013,
+                "z": -0.027176857
+              },
+              "cameraTranslationMeters": 0.0285695028,
+              "cameraRotationDegrees": 8.64310551,
+              "bodyDisplacementWorld": {
+                "x": 0.007088423,
+                "y": 0.0,
+                "z": -0.0009651184
+              },
+              "bodyTranslationMeters": 0.00715382351,
+              "bodyYawChangeDegreesRight": -47.945034
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          },
+          "scope": "Measured bearings to this historical CAMERA DIRECTION, not to an identified target or destination. Positive yaw is right. Camera/head and body bearings differ. Translation changes what would be seen; a fresh observation is required after any chosen return."
+        },
+        "semanticIdentityConfirmed": false,
+        "actionAuthorization": false,
+        "scope": "Actual separately retrievable historical RGB; camera direction only, not target position. Recall must not place old pixels in the current image.",
+        "reviewedByTask": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-h3",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-5b68c3bb4558456b9fdef1d00c702019",
+        "imageRole": "historical-view-search-hint",
+        "imageAttachedToCurrentLocalization": false,
+        "cameraPositionAtCapture": {
+          "x": -2.29877281,
+          "y": 0.709764,
+          "z": -7.381352
+        },
+        "returnDirection": {
+          "relativeToCurrentCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "yawRelativeToCurrentCameraDegrees": -14.5909443,
+          "yawRelativeToCurrentBodyDegrees": -14.11043,
+          "cameraTranslationSinceCaptureMeters": 0.06516619,
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-5b68c3bb4558456b9fdef1d00c702019",
+              "cameraDisplacementWorld": {
+                "x": -0.0566153526,
+                "y": 0.0135874748,
+                "z": -0.0292696953
+              },
+              "cameraTranslationMeters": 0.06516619,
+              "cameraRotationDegrees": 17.2839031,
+              "bodyDisplacementWorld": {
+                "x": 0.00070142746,
+                "y": 0.0,
+                "z": 0.00275468826
+              },
+              "bodyTranslationMeters": 0.00284258835,
+              "bodyYawChangeDegreesRight": -1.43190169
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          },
+          "scope": "Measured bearings to this historical CAMERA DIRECTION, not to an identified target or destination. Positive yaw is right. Camera/head and body bearings differ. Translation changes what would be seen; a fresh observation is required after any chosen return."
+        },
+        "semanticIdentityConfirmed": false,
+        "actionAuthorization": false,
+        "scope": "Actual separately retrievable historical RGB; camera direction only, not target position. Recall must not place old pixels in the current image.",
+        "reviewedByTask": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-h4",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-7b0e51c1b5f945908ce99d01ee0cb19e",
+        "imageRole": "historical-view-search-hint",
+        "imageAttachedToCurrentLocalization": false,
+        "cameraPositionAtCapture": {
+          "x": -2.34654021,
+          "y": 0.7233703,
+          "z": -7.37456369
+        },
+        "returnDirection": {
+          "relativeToCurrentCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "yawRelativeToCurrentCameraDegrees": 132.0229,
+          "yawRelativeToCurrentBodyDegrees": 132.503418,
+          "cameraTranslationSinceCaptureMeters": 0.0371276475,
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-7b0e51c1b5f945908ce99d01ee0cb19e",
+              "cameraDisplacementWorld": {
+                "x": -0.008847952,
+                "y": -1.88350677e-05,
+                "z": -0.03605795
+              },
+              "cameraTranslationMeters": 0.0371276475,
+              "cameraRotationDegrees": 132.466446,
+              "bodyDisplacementWorld": {
+                "x": 0.00295233727,
+                "y": 0.0,
+                "z": -0.005671501
+              },
+              "bodyTranslationMeters": 0.00639392063,
+              "bodyYawChangeDegreesRight": -133.052872
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          },
+          "scope": "Measured bearings to this historical CAMERA DIRECTION, not to an identified target or destination. Positive yaw is right. Camera/head and body bearings differ. Translation changes what would be seen; a fresh observation is required after any chosen return."
+        },
+        "semanticIdentityConfirmed": false,
+        "actionAuthorization": false,
+        "scope": "Actual separately retrievable historical RGB; camera direction only, not target position. Recall must not place old pixels in the current image.",
+        "reviewedByTask": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-h5",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+        "imageRole": "historical-view-search-hint",
+        "imageAttachedToCurrentLocalization": false,
+        "cameraPositionAtCapture": {
+          "x": -2.49657845,
+          "y": 0.678849459,
+          "z": -5.62284851
+        },
+        "returnDirection": {
+          "relativeToCurrentCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "yawRelativeToCurrentCameraDegrees": 138.955887,
+          "yawRelativeToCurrentBodyDegrees": 139.4364,
+          "cameraTranslationSinceCaptureMeters": 1.79389179,
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-f2d26d39efe048c3b8fd65de9bab9fee",
+              "cameraDisplacementWorld": {
+                "x": 0.14119029,
+                "y": 0.04450202,
+                "z": -1.78777313
+              },
+              "cameraTranslationMeters": 1.79389179,
+              "cameraRotationDegrees": 139.2778,
+              "bodyDisplacementWorld": {
+                "x": 0.180039167,
+                "y": 0.0,
+                "z": -1.83512449
+              },
+              "bodyTranslationMeters": 1.84393489,
+              "bodyYawChangeDegreesRight": -130.789215
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          },
+          "scope": "Measured bearings to this historical CAMERA DIRECTION, not to an identified target or destination. Positive yaw is right. Camera/head and body bearings differ. Translation changes what would be seen; a fresh observation is required after any chosen return."
+        },
+        "semanticIdentityConfirmed": false,
+        "actionAuthorization": false,
+        "scope": "Actual separately retrievable historical RGB; camera direction only, not target position. Recall must not place old pixels in the current image.",
+        "reviewedByTask": false,
+        "selectionAllowed": true
+      },
+      {
+        "referenceId": "g8q2-h6",
+        "sourceCaptureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-0f3afa2bff4c49eaa66ffa0d462d516a",
+        "imageRole": "historical-view-search-hint",
+        "imageAttachedToCurrentLocalization": false,
+        "cameraPositionAtCapture": {
+          "x": -2.53777575,
+          "y": 0.681318045,
+          "z": -5.225552
+        },
+        "returnDirection": {
+          "relativeToCurrentCaptureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+          "yawRelativeToCurrentCameraDegrees": 137.759842,
+          "yawRelativeToCurrentBodyDegrees": 138.240356,
+          "cameraTranslationSinceCaptureMeters": 2.19307113,
+          "selfPose": {
+            "captureId": "b343155cbbde41309d1ff90900fa0d7e-ab77e5f6a8f14955a843c95d33b73898-ea2a829e4913461e9fb380e8fbcbeec6",
+            "capturedAtUtc": "2026-10-11T07:33:59.7274948Z",
+            "cameraPosition": {
+              "x": -2.35538816,
+              "y": 0.7233515,
+              "z": -7.41062164
+            },
+            "cameraRotation": {
+              "x": -0.021416245,
+              "y": -0.340789765,
+              "z": -0.04112623,
+              "w": -0.9389958
+            },
+            "cameraForward": {
+              "x": 0.641761839,
+              "y": -0.0121887308,
+              "z": 0.7668074
+            },
+            "hasBodyPose": true,
+            "bodyPosition": {
+              "x": -2.33507228,
+              "y": -0.72,
+              "z": -7.39736843
+            },
+            "bodyRotation": {
+              "x": 0.0,
+              "y": -0.337476075,
+              "z": 0.0,
+              "w": -0.9413342
+            },
+            "bodyForward": {
+              "x": 0.635355532,
+              "y": 0.0,
+              "z": 0.7722198
+            },
+            "cameraYawRelativeToBodyDegrees": 0.480512828,
+            "cameraPitchRelativeToBodyDegreesUp": -0.69838,
+            "sinceHistoricalCapture": {
+              "captureId": "b343155cbbde41309d1ff90900fa0d7e-5064e5b85f2f4b809ea28731f5c6ece6-0f3afa2bff4c49eaa66ffa0d462d516a",
+              "cameraDisplacementWorld": {
+                "x": 0.18238759,
+                "y": 0.0420334339,
+                "z": -2.18506956
+              },
+              "cameraTranslationMeters": 2.19307113,
+              "cameraRotationDegrees": 138.363266,
+              "bodyDisplacementWorld": {
+                "x": 0.213282108,
+                "y": 0.0,
+                "z": -2.22641182
+              },
+              "bodyTranslationMeters": 2.23660421,
+              "bodyYawChangeDegreesRight": -132.299591
+            },
+            "scope": "Measured body and head-camera poses from the same render as this current image. Signed yaw is positive right, elevation positive up. Relative movement compares only these measured poses, never an inferred action, route or unseen object movement."
+          },
+          "scope": "Measured bearings to this historical CAMERA DIRECTION, not to an identified target or destination. Positive yaw is right. Camera/head and body bearings differ. Translation changes what would be seen; a fresh observation is required after any chosen return."
+        },
+        "semanticIdentityConfirmed": false,
+        "actionAuthorization": false,
+        "scope": "Actual separately retrievable historical RGB; camera direction only, not target position. Recall must not place old pixels in the current image.",
+        "reviewedByTask": false,
+        "selectionAllowed": true
+      }
+    ],
+    "historicalCandidates": null,
+    "regions": [
+      {
+        "referenceId": "g8q2-r1",
+        "yawFromStartDegrees": 0,
+        "yawRelativeToCurrentCameraDegrees": 132.20929,
+        "yawRelativeToCurrentBodyDegrees": 132.689819,
+        "observed": true,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r2",
+        "yawFromStartDegrees": 30,
+        "yawRelativeToCurrentCameraDegrees": 162.20929,
+        "yawRelativeToCurrentBodyDegrees": 162.6898,
+        "observed": true,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r3",
+        "yawFromStartDegrees": 60,
+        "yawRelativeToCurrentCameraDegrees": -167.79071,
+        "yawRelativeToCurrentBodyDegrees": -167.310211,
+        "observed": false,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r4",
+        "yawFromStartDegrees": 90,
+        "yawRelativeToCurrentCameraDegrees": -137.790726,
+        "yawRelativeToCurrentBodyDegrees": -137.310211,
+        "observed": false,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r5",
+        "yawFromStartDegrees": 120,
+        "yawRelativeToCurrentCameraDegrees": -107.79071,
+        "yawRelativeToCurrentBodyDegrees": -107.310188,
+        "observed": false,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r6",
+        "yawFromStartDegrees": 150,
+        "yawRelativeToCurrentCameraDegrees": -77.79072,
+        "yawRelativeToCurrentBodyDegrees": -77.3102,
+        "observed": false,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r7",
+        "yawFromStartDegrees": 180,
+        "yawRelativeToCurrentCameraDegrees": -47.7907066,
+        "yawRelativeToCurrentBodyDegrees": -47.31019,
+        "observed": false,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r8",
+        "yawFromStartDegrees": 210,
+        "yawRelativeToCurrentCameraDegrees": -17.7907085,
+        "yawRelativeToCurrentBodyDegrees": -17.3101978,
+        "observed": true,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r9",
+        "yawFromStartDegrees": 240,
+        "yawRelativeToCurrentCameraDegrees": 12.2092981,
+        "yawRelativeToCurrentBodyDegrees": 12.689786,
+        "observed": true,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r10",
+        "yawFromStartDegrees": 270,
+        "yawRelativeToCurrentCameraDegrees": 42.2092934,
+        "yawRelativeToCurrentBodyDegrees": 42.6898079,
+        "observed": false,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r11",
+        "yawFromStartDegrees": 300,
+        "yawRelativeToCurrentCameraDegrees": 72.20928,
+        "yawRelativeToCurrentBodyDegrees": 72.6898,
+        "observed": false,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      },
+      {
+        "referenceId": "g8q2-r12",
+        "yawFromStartDegrees": 330,
+        "yawRelativeToCurrentCameraDegrees": 102.209305,
+        "yawRelativeToCurrentBodyDegrees": 102.689819,
+        "observed": true,
+        "selectionAllowed": true,
+        "directionConvention": "negative yaw is left; positive yaw is right; shortest horizontal angle"
+      }
+    ],
+    "requestChoices": [
+      {
+        "choice": "current-candidate",
+        "referenceId": "g8q2-c1"
+      },
+      {
+        "choice": "current-candidate",
+        "referenceId": "g8q2-c2"
+      },
+      {
+        "choice": "current-candidate",
+        "referenceId": "g8q2-c3"
+      },
+      {
+        "choice": "current-candidate",
+        "referenceId": "g8q2-c4"
+      },
+      {
+        "choice": "current-candidate",
+        "referenceId": "g8q2-c5"
+      },
+      {
+        "choice": "current-candidate",
+        "referenceId": "g8q2-c6"
+      },
+      {
+        "choice": "next-page",
+        "referenceId": "g8q2-p2"
+      },
+      {
+        "choice": "next-page",
+        "referenceId": "g8q2-p3"
+      },
+      {
+        "choice": "historical-object",
+        "referenceId": "g8q2-m1"
+      },
+      {
+        "choice": "historical-object",
+        "referenceId": "g8q2-m2"
+      },
+      {
+        "choice": "historical-object",
+        "referenceId": "g8q2-m3"
+      },
+      {
+        "choice": "historical-object",
+        "referenceId": "g8q2-m4"
+      },
+      {
+        "choice": "historical-object",
+        "referenceId": "g8q2-m5"
+      },
+      {
+        "choice": "historical-object",
+        "referenceId": "g8q2-m6"
+      },
+      {
+        "choice": "historical-view",
+        "referenceId": "g8q2-h1"
+      },
+      {
+        "choice": "historical-view",
+        "referenceId": "g8q2-h2"
+      },
+      {
+        "choice": "historical-view",
+        "referenceId": "g8q2-h3"
+      },
+      {
+        "choice": "historical-view",
+        "referenceId": "g8q2-h4"
+      },
+      {
+        "choice": "historical-view",
+        "referenceId": "g8q2-h5"
+      },
+      {
+        "choice": "historical-view",
+        "referenceId": "g8q2-h6"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r1"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r2"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r3"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r4"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r5"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r6"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r7"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r8"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r9"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r10"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r11"
+      },
+      {
+        "choice": "explore-region",
+        "referenceId": "g8q2-r12"
+      },
+      {
+        "choice": "done",
+        "referenceId": ""
+      }
+    ],
+    "targetRetrieval": [
+      {
+        "referenceId": "g8q2-c1",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-eec4",
+        "historical": false,
+        "authoredNames": {
+          "renderer": "light (1)",
+          "entityRoot": "light (1)",
+          "sceneLabel": ""
+        },
+        "modelDescription": null,
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f542",
+        "measuredNeighborDistanceMeters": 1.385628,
+        "semanticStatus": "unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-c2",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f52e",
+        "historical": false,
+        "authoredNames": {
+          "renderer": "棚",
+          "entityRoot": "棚",
+          "sceneLabel": ""
+        },
+        "modelDescription": null,
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f472",
+        "measuredNeighborDistanceMeters": 0.268236458,
+        "semanticStatus": "unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-c3",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f1fc",
+        "historical": false,
+        "authoredNames": {
+          "renderer": "carpet",
+          "entityRoot": "carpet",
+          "sceneLabel": ""
+        },
+        "modelDescription": null,
+        "measuredNeighborEntityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+        "measuredNeighborDistanceMeters": 2.14554381,
+        "semanticStatus": "unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-c4",
+        "entityId": "scene-object-fe6d0a8d09b04c29a238cf875392b1a3",
+        "historical": false,
+        "authoredNames": {
+          "renderer": "standlight (4)",
+          "entityRoot": "standlight (4)",
+          "sceneLabel": "桌面装饰灯"
+        },
+        "modelDescription": null,
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f2ae",
+        "measuredNeighborDistanceMeters": 0.263320357,
+        "semanticStatus": "unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-c5",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f44c",
+        "historical": false,
+        "authoredNames": {
+          "renderer": "エントランス窓",
+          "entityRoot": "エントランス窓",
+          "sceneLabel": ""
+        },
+        "modelDescription": null,
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f42a",
+        "measuredNeighborDistanceMeters": 0.340602517,
+        "semanticStatus": "unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-c6",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f180",
+        "historical": false,
+        "authoredNames": {
+          "renderer": "tv_frame",
+          "entityRoot": "tv_frame",
+          "sceneLabel": ""
+        },
+        "modelDescription": null,
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f5a8",
+        "measuredNeighborDistanceMeters": 0.06214289,
+        "semanticStatus": "unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-m1",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f55c",
+        "historical": true,
+        "authoredNames": {
+          "renderer": "リビング窓",
+          "entityRoot": "リビング窓",
+          "sceneLabel": ""
+        },
+        "modelDescription": "窗户",
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f4bc",
+        "measuredNeighborDistanceMeters": 0.03987471,
+        "semanticStatus": "model-described-target-unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-m2",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f054",
+        "historical": true,
+        "authoredNames": {
+          "renderer": "sofa",
+          "entityRoot": "sofa",
+          "sceneLabel": ""
+        },
+        "modelDescription": "沙发",
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f55c",
+        "measuredNeighborDistanceMeters": 1.2916168,
+        "semanticStatus": "model-described-target-unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-m3",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-ebf8",
+        "historical": true,
+        "authoredNames": {
+          "renderer": "lowtable",
+          "entityRoot": "lowtable",
+          "sceneLabel": ""
+        },
+        "modelDescription": null,
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f1fc",
+        "measuredNeighborDistanceMeters": 0.9106205,
+        "semanticStatus": "unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-m4",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f50e",
+        "historical": true,
+        "authoredNames": {
+          "renderer": "リビング壁.001",
+          "entityRoot": "リビング壁.001",
+          "sceneLabel": ""
+        },
+        "modelDescription": null,
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-eb5a",
+        "measuredNeighborDistanceMeters": 0.956413269,
+        "semanticStatus": "unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-m5",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f1a8",
+        "historical": true,
+        "authoredNames": {
+          "renderer": "cussion (5)",
+          "entityRoot": "cussion (5)",
+          "sceneLabel": ""
+        },
+        "modelDescription": null,
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-eb5a",
+        "measuredNeighborDistanceMeters": 0.592974544,
+        "semanticStatus": "unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      },
+      {
+        "referenceId": "g8q2-m6",
+        "entityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-eb5a",
+        "historical": true,
+        "authoredNames": {
+          "renderer": "cussion2 (3)",
+          "entityRoot": "cussion2 (3)",
+          "sceneLabel": ""
+        },
+        "modelDescription": null,
+        "measuredNeighborEntityId": "renderer-object-ef285b8e589a40379de5436aa806c2b9-f1a8",
+        "measuredNeighborDistanceMeters": 0.592974544,
+        "semanticStatus": "unconfirmed",
+        "scope": "Compare the requested object itself with its landmark; this is a retrieval clue, never identity confirmation or action authority."
+      }
+    ],
+    "recovery": null,
+    "scope": "Bounded structured search evidence; no image bytes. Labels/descriptions are not independent target confirmation."
+  },
+  "utterances": [
+    "现在能看到什么吗？",
+    "再试一次，现在能看到什么吗？",
+    "好，来我身边。",
+    "现在去把呃就是你刚才看到的桌上的那盏小灯关掉，然后回到我身边。",
+    "你还没有回来哦。",
+    "再试一次来我身边。"
+  ]
+}

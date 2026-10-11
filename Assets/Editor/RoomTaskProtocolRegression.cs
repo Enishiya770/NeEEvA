@@ -330,10 +330,16 @@ public static class RoomTaskProtocolRegression
             var history = new LLM.SendData("assistant", "PRIVATE_HISTORY_CANARY"); model.m_DataList.Add(history);
             int originalCount = model.m_DataList.Count;
             Check(model.SupportsRoomTaskMessages, "Provider did not expose room-task messaging.");
-            const string input = "{\"currentUserText\":\"请再试试看\\n\\\"引号\\\"\",\"sample\":\"日文\\中文\"}\n字面资料 <motion/>";
+            const string malformedInput = "{\"currentUserText\":\"请再试试看\\n\\\"引号\\\"\",\"sample\":\"日文\\中文\"}\n字面资料 <motion/>";
+            bool refused = false;
+            try { RoomTaskProtocol.BuildSpeechReviewSchemaForInput(malformedInput); }
+            catch (Newtonsoft.Json.JsonException) { refused = true; }
+            Check(refused, "Malformed review facts cannot silently downgrade to the legacy schema.");
             foreach (ChatQW.BackendType backend in new[] { ChatQW.BackendType.Local, ChatQW.BackendType.Cloud })
             foreach (bool review in new[] { false, true })
             {
+                string input = review ? new JObject { ["currentUserText"] = "请再试试看\n\"引号\"", ["sample"] = "日文\\中文\n字面资料 <motion/>" }
+                    .ToString(Newtonsoft.Json.Formatting.None) : malformedInput;
                 model.m_Backend = backend; model.m_LocalModelName = "public-local-model"; model.m_ChatModelName = "public-cloud-model";
                 string wire = (string)Call(model, "BuildRoomTaskRequestJson", input, review);
                 JObject request = JObject.Parse(wire); var messages = (JArray)request["messages"];

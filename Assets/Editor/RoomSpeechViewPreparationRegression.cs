@@ -43,6 +43,22 @@ public static class RoomSpeechViewPreparationRegression
             Add("current-formal-image-no-extra-capture", original, original);
 
             yield return Prepare(chat, model);
+            original = Bound(chat); Set(chat, "m_SceneObservationMaxAgeSeconds", 2f);
+            yield return Wait(() => Time.realtimeSinceStartup - original.CapturedAtRealtime > 1.1f, "Still-fresh view nearing expiry");
+            Require(Fresh(chat, original), "Review-window fixture is still fresh; it has not expired yet.");
+            before = model.Decisions.Count; history = model.m_DataList.Count;
+            Complete(chat);
+            Require(model.Decisions.Count == before, "A likely-to-expire view is refreshed before paying for its first audit.");
+            yield return Wait(() => model.Decisions.Count > before, "Review with renewed validity window");
+            var renewed = Bound(chat);
+            Require(renewed.CaptureId != original.CaptureId && (int)JObject.Parse(Review(model).Input)["reviewAttempt"] == 0,
+                "Preparation refresh obtains real new pixels without spending a factual retry.");
+            Review(model).Complete(true, Verdict(), "controlled-review-window");
+            Require(model.Decisions.Count == before + 1 && model.m_DataList.Count == history + 1,
+                "A renewed view permits exactly one independently reviewed publication.");
+            Add("near-expiry-refresh-before-first-review", original, renewed);
+
+            yield return Prepare(chat, model);
             original = Bound(chat);
             yield return Expire(chat, original);
             SceneVisionObservation ready = null;

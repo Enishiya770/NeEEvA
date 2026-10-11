@@ -346,6 +346,7 @@ public partial class ChatSample
         lease.latestFailureReason = outcome == "satisfied" ? null : reason;
         m_SpatialGoalRunnerLastReport = BuildSpatialGoalRunnerContext(lease.generation);
         m_SpatialGoalRunnerLastReport["active"] = false;
+        RememberCompletedDeviceStep();
         lease.ending = true; m_SpatialGoalRunner = null;
         ReleaseSpatialGoalRunnerWork(lease, reason, true);
         Debug.Log($"[SpatialGoal/Runner] goal={lease.goalId} generation={lease.generation} controller=unified-device-task outcome={outcome} steps={lease.steps} reason={reason}", this);

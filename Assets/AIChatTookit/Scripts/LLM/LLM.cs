@@ -497,6 +497,12 @@ public class LLM:MonoBehaviour
     public virtual void PostAutonomyIntentMsg(string prompt, string imageDataUrl, Action<string> callback)
         => PostEphemeralMsg(prompt, imageDataUrl, callback);
 
+    public virtual void PostAutonomyIntentResult(string prompt, string imageDataUrl, Action<PrivateDecisionResult> callback)
+        => PostAutonomyIntentMsg(prompt, imageDataUrl, output => callback?.Invoke(PrivateDecisionResult.FromLegacy(output)));
+
+    public virtual void PostWorkReviewResult(string prompt, string imageDataUrl, Action<PrivateDecisionResult> callback)
+        => PostWorkReviewMsg(prompt, imageDataUrl, output => callback?.Invoke(PrivateDecisionResult.FromLegacy(output)));
+
     /// <summary>
     /// Review outstanding user work without writing dialogue history. Providers may use
     /// a separate structured-output budget; CancelEphemeralMsg also cancels this review.
@@ -557,6 +563,7 @@ public class LLM:MonoBehaviour
 
     /// <summary>Same-model, request-local spatial decision and speech consistency check. No history or side effects.</summary>
     public virtual bool SupportsRoomTaskMessages => false;
+    public virtual bool SupportsRoomTaskSequences => false;
     /// <summary>Cancel only the private room planner; keep a newly started public result stream intact.</summary>
     public virtual void CancelRoomTaskPlanningMessage() { }
     public virtual bool SupportsRoomDeviceGoalReview => false;

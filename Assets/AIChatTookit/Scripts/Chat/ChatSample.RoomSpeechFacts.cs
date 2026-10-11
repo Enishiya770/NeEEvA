@@ -42,6 +42,19 @@ public partial class ChatSample
         observation = bound; source = "formal-current"; return true;
     }
 
+    private bool TryGetPreparedRoomSpeechReviewObservation(int generation, out SceneVisionObservation observation, out string source)
+    {
+        if (!TryGetPreparedRoomSpeechObservation(generation, out observation, out source)) return false;
+        // Recent production extraction + factual review took about five seconds.
+        // Capture before paying for a review of pixels likely to expire while it
+        // runs. This is only a preparation hint; post-review freshness still wins.
+        float reserve = Mathf.Min(5f, Mathf.Max(0f, m_SceneObservationMaxAgeSeconds * 0.5f));
+        float remaining = m_SceneObservationMaxAgeSeconds - (Time.realtimeSinceStartup - observation.CapturedAtRealtime);
+        if (remaining >= reserve) return true;
+        Debug.Log($"[Room/SpeechReviewView] generation={generation} source=refresh-before-expiry remaining={remaining:F3}s reserve={reserve:F3}s", this);
+        observation = null; source = "capture-for-review-window"; return false;
+    }
+
     private RoomSpeechDependencies ResolveRoomSpeechDependencies(string intent, string reviewedScope)
     {
         // The model classifies the claims, but cannot drop the actual movement's

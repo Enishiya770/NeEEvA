@@ -10,6 +10,7 @@ public partial class ChatSample
     private ArdyRoomDialogueBridge m_LastFormalReplyBridge;
     private Object m_LastFormalReplyAvatar, m_LastFormalReplyEnvironment;
     private float m_LastFormalReplySession = -1;
+    private readonly System.Collections.Generic.Queue<JObject> m_RecentRoomReplies = new System.Collections.Generic.Queue<JObject>();
 
     private void HandleResponseGenerationFailure(string reason)
     {
@@ -48,6 +49,7 @@ public partial class ChatSample
 
     private void RecordFinalRoomReply(int generation, string text, string reviewStatus, ArdyRoomDialogueBridge bridge)
     {
+        if (ReadPreviousFormalReplyReceipt() == null) m_RecentRoomReplies.Clear();
         var room = ReadCompactRoomTaskFacts(bridge);
         m_LastFormalReplyReceipt = new JObject {
             ["generation"] = generation, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
@@ -61,6 +63,9 @@ public partial class ChatSample
             ["scope"] = "Accepted final public reply and contemporaneous independent execution receipts. Historical snapshot, not current state or retry permission; accepted text does not prove audio playback." };
         m_LastFormalReplyBridge = bridge; m_LastFormalReplyAvatar = bridge?.avatar;
         m_LastFormalReplyEnvironment = bridge?.environmentRoot; m_LastFormalReplySession = m_AgentSessionStartTime;
+        m_RecentRoomReplies.Enqueue(new JObject { ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
+            ["actionId"] = m_RoomTaskActionId, ["publicText"] = text });
+        while (m_RecentRoomReplies.Count > 4) m_RecentRoomReplies.Dequeue();
         Debug.Log("[Room/FinalReplyReceipt] " + m_LastFormalReplyReceipt.ToString(Formatting.None), this);
     }
 
@@ -82,4 +87,7 @@ public partial class ChatSample
         result["scope"] = "Previous reply's failure diagnostics only, not failures of this turn. They supply no current movement phase, result or retry authority.";
         return result;
     }
+
+    private JArray ReadRecentRoomReplies() => ReadPreviousFormalReplyReceipt() == null ? new JArray() :
+        new JArray(System.Linq.Enumerable.Select(m_RecentRoomReplies, r => r.DeepClone()));
 }

@@ -13,9 +13,10 @@ public partial class ChatQW
     private int m_RoomPreparationGeneration;
     private UnityWebRequest m_RoomPreparationRequest;
     public override bool SupportsRoomTaskMessages => true;
+    public override bool SupportsRoomTaskSequences => true;
     public override bool SupportsRoomPreparationMessages => true;
     public override bool SupportsRoomObservationHistory => true;
-    public override void CancelRoomTaskPlanningMessage() => CancelRoomTaskMessage();
+    public override void CancelRoomTaskPlanningMessage() { ClearSpeechClaimCache(); CancelRoomTaskMessage(); }
 
     public override void PostRoomPreparationMessage(string input, Action<bool, string, string> callback)
     {
@@ -69,8 +70,19 @@ public partial class ChatQW
     public override void PostRoomTaskMessage(string input, string imageDataUrl, bool reviewSpeech,
         Action<bool, string, string> callback)
     {
+        if (!reviewSpeech) ClearSpeechClaimCache();
         CancelRoomTaskMessage();
         int generation = m_RoomTaskRequestGeneration;
+        if (reviewSpeech)
+        {
+            try { RoomTaskProtocol.BuildSpeechReviewSchemaForInput(input); }
+            catch (Exception)
+            {
+                Debug.LogWarning("[Room/SpeechReview] invalid input; refused schema downgrade before HTTP.");
+                callback?.Invoke(false, "", "speech-review-input-invalid"); return;
+            }
+        }
+        if (reviewSpeech && TryStartIndependentSpeechReview(input, imageDataUrl, generation, callback)) return;
         // Capture a complete payload now; no shared image/context field survives this call.
         string json = BuildRoomTaskRequestJsonWithImage(input ?? "", imageDataUrl, reviewSpeech);
         StartCoroutine(RequestRoomTaskPayload(json, reviewSpeech, generation, callback));
@@ -210,9 +222,11 @@ public partial class ChatQW
         else input = ApplySceneAttentionToInput(input);
         string schema = review ? RoomTaskProtocol.BuildSpeechReviewSchemaForInput(input) : BuildRoomDecisionSchemaForInput(input);
         if (review) input = RoomTaskProtocol.ProjectSpeechReviewInput(input);
-        string contract = review ? RoomTaskProtocol.ReviewContract : RoomTaskProtocol.DecisionContract;
+        string contract = review ? RoomTaskProtocol.ReviewContract : RoomTaskProtocol.DecisionContract +
+            (schema.Contains("\"taskStep\"") ? RoomTaskSequenceProtocol.Contract : "");
         var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
-        sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":").Append(review ? 240 : 640);
+        sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":").Append(review ?
+            (schema.Contains("\"targetConsistency\"") ? 480 : 240) : 640);
         sb.Append(",\"response_format\":{\"type\":\"json_object\"");
         if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(review ? schema : RoomTaskProtocol.CompactNativeDecisionSchema(schema));
         sb.Append("},\"messages\":[");
@@ -222,6 +236,8 @@ public partial class ChatQW
         string schemaText = !review && m_Backend == BackendType.Local
             ? "[Native decision field guide]\n" + BuildRoomDecisionFieldGuide(schema) : schema;
         AppendMessage(sb, new SendData("system", contract + "\n" + schemaText)); sb.Append(',');
+        if (review && schema.Contains("\"targetComparison\""))
+        { AppendMessage(sb, new SendData("system", RoomTaskProtocol.SpeechTargetComparisonContract)); sb.Append(','); }
         // Snapshot-only turn evidence precedes the separately labelled current picture.
         // It never enters m_DataList and cannot be inherited by a later speech review.
         if (!review && !string.IsNullOrEmpty(imageDataUrl) && history != null)
@@ -363,7 +379,7 @@ public partial class ChatQW
         // current ownership/status after the reply; grammar is not an action authorization.
         string schema = RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(allowed);
         bool currentRequestOnly = (bool?)source?["currentRequestOnly"] == true;
-        if (!IsReviewedRoomGoalContinuation(source) && !currentRequestOnly) return schema;
+        if (!IsReviewedRoomGoalContinuation(source) && !currentRequestOnly) return RoomTaskSequenceProtocol.ExtendSchema(schema, source);
         var narrowed = JObject.Parse(schema);
         void RemoveProposal(JObject branch)
         {
@@ -388,7 +404,7 @@ public partial class ChatQW
                     }
         }
         RemoveProposal(narrowed);
-        return narrowed.ToString(Newtonsoft.Json.Formatting.None);
+        return RoomTaskSequenceProtocol.ExtendSchema(narrowed.ToString(Newtonsoft.Json.Formatting.None), source);
     }
 
     private static bool IsReviewedRoomGoalContinuation(JObject source)

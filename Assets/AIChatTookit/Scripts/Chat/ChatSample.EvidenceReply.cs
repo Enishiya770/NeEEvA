@@ -5,6 +5,15 @@ using UnityEngine;
 
 public partial class ChatSample
 {
+    // Initial writing and a bounded rewrite use the same producer contract.
+    private string BuildReadOnlyReplyEvidenceContext(SceneVisionObservation observation, int generation) =>
+        "\n" + CommittedSpatialReplyProtocol.ReadOnlyEvidenceMarker + "\n" + new JObject {
+            ["reply"] = ReadRoomEvidenceReplyFacts(generation),
+            ["spatialReplyFacts"] = BuildSpatialAnswerFacts(observation),
+            ["roomFacts"] = ReadCompactRoomTaskFacts(GetComponent<ArdyRoomDialogueBridge>()),
+            ["sceneActionFacts"] = ReadRoomSceneActionFacts()
+        }.ToString(Formatting.None);
+
     private int m_RoomEvidenceReplyGeneration = -1;
     private JObject m_RoomEvidenceReplyFacts;
     private JObject m_LastRoomPlanningFailure;
@@ -121,12 +130,7 @@ public partial class ChatSample
             consumed = true;
             m_PendingSceneFormalCaptureGeneration = -1;
             BindFormalSceneObservation(observation, generation);
-            string context = (transientContext ?? "") + "\n[只读场景问答]\n" + new JObject {
-                ["reply"] = ReadRoomEvidenceReplyFacts(generation),
-                ["spatialReplyFacts"] = BuildSpatialAnswerFacts(observation),
-                ["roomFacts"] = ReadCompactRoomTaskFacts(bridge),
-                ["sceneActionFacts"] = ReadRoomSceneActionFacts()
-            }.ToString(Formatting.None) +
+            string context = (transientContext ?? "") + BuildReadOnlyReplyEvidenceContext(observation, generation) +
                 "\n直接回答用户完整问题。当前画面、历史记忆、身体朝向与相机视向要区分；没有画面或证据时如实保留未知。" +
                 "本轮没有调用动作规划，不把之前的失败当成本轮失败，不输出工具、不承诺或声称新动作，也不自动续行旧任务。" +
                 "只有用户在追问故障时才引用previousPlanningFailure的原始原因和所属轮次；普通看图聊天不重复故障提示。";

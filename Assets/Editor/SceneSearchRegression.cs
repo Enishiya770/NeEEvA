@@ -63,6 +63,7 @@ public static class SceneSearchRegression
                 catch (Exception error) { LastReport["status"] = "failed"; LastReport["error"] = error.ToString(); throw; }
                 if (stack.Count > 0) yield return next;
             }
+            LastReport["budgetAdmission"] = AuditSearchBudgets(model, directory);
             LastReport["status"] = "passed";
         }
         finally
@@ -83,6 +84,44 @@ public static class SceneSearchRegression
                 ["scope"] = "Captured production inputs/wires and matching actual Unity images; expectations are sidecar only. Controlled choices do not measure model accuracy.",
                 ["cases"] = exports.DeepClone() }.ToString());
         }
+    }
+
+    public static JObject AuditSearchBudgets(NevaSceneVisionIntegrationModel model, string directory)
+    {
+        Directory.CreateDirectory(directory);
+        var audit = new JObject();
+        var serializer = (ChatQW)Get(model, "serializer");
+        var budgets = new JArray();
+        foreach (var request in model.SceneSearchRequests)
+        {
+            string wire = (string)typeof(ChatQW).GetMethod("BuildSceneSearchRequestJson", Flags).Invoke(serializer, new object[] { request.Input, request.Image });
+            object[] admission = { wire, null };
+            Check((bool)typeof(ChatQW).GetMethod("AdmitSceneSearchWire", Flags).Invoke(serializer, admission), "Complete production search packet fits admission.");
+            budgets.Add((JObject)admission[1]);
+        }
+        audit["searchBudgets"] = budgets;
+        var recorded = JObject.Parse(File.ReadAllText("Assets/Editor/Fixtures/SceneSearch.latest-20261011.json"));
+        var currentRequest = model.SceneSearchRequests.First(r => (string)JObject.Parse(r.Input)["imageRole"] == "current");
+        var loadBudgets = new JArray();
+        foreach (var row in recorded["cases"].OfType<JObject>())
+        {
+            var input = JObject.Parse(currentRequest.Input); var load = (JObject)row["input"];
+            input["visibleCatalog"]["current"]["candidates"] = load["candidates"].DeepClone();
+            input["visibleCatalog"]["memory"] = load["memory"].DeepClone();
+            input["visibleCatalog"]["historicalViews"] = load["historicalViews"].DeepClone();
+            foreach (string key in new[] { "requestChoices", "targetRetrieval", "recovery" }) input[key] = load[key].DeepClone();
+            input["explorationRegions"] = load["regions"].DeepClone();
+            string wire = (string)typeof(ChatQW).GetMethod("BuildSceneSearchRequestJson", Flags).Invoke(serializer,
+                new object[] { input.ToString(Newtonsoft.Json.Formatting.None), currentRequest.Image });
+            object[] admission = { wire, null };
+            bool allowed = (bool)typeof(ChatQW).GetMethod("AdmitSceneSearchWire", Flags).Invoke(serializer, admission);
+            loadBudgets.Add(new JObject { ["sourceLine"] = row["sourceLine"], ["budget"] = (JObject)admission[1] });
+            File.WriteAllText(Path.Combine(directory, "recorded-load-" + row["sourceLine"] + ".request.json"), wire);
+            File.WriteAllText(Path.Combine(directory, "recorded-load-budgets.json"), loadBudgets.ToString());
+            Check(allowed, "Production task/pose/observation envelope plus exact latest logged evidence load fits admission; composition tests size only, not identity/action semantics.");
+        }
+        audit["recordedLoadBudgets"] = loadBudgets;
+        return audit;
     }
 
     private static IEnumerator Exercise(ChatSample chat, ArdyRoomDialogueBridge bridge,

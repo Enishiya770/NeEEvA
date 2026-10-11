@@ -133,10 +133,12 @@ public partial class ChatSample
         string goalStatus = (string)facts["goal"]?["status"];
         if (goalStatus == "satisfied" || goalStatus == "blocked" || goalStatus == "cancelled" || goalStatus == "waiting_clarification" || goalStatus == "rejected")
         {
-            m_WorkStatus = goalStatus == "satisfied" ? "closed" : goalStatus == "waiting_clarification" ? "waiting_user" : goalStatus;
-            m_WorkReviewOpen = false;
+            // This is one device outcome, not a verdict on the complete human
+            // request. A following movement/question may still be outstanding.
+            QueueWorkSubstepReview(generation, goalStatus);
         }
         facts["runner"] = BuildSpatialGoalRunnerContext(generation);
+        facts["taskSequence"] = ReadRoomTaskSequence();
         facts["visualObservation"] = observation == null ? null : JObject.Parse(observation.MetadataJson);
         facts["scope"] = "One result for the original device request. State success requires actual same-device proof; blocked/cancelled/unknown remain explicit. Clarification is reserved for a genuinely unresolved request detail, not a known object's unsuccessful reobservation. Known identity and historical position must not be described as forgotten. A rejected proposal is not pending clarification. registered=false alone establishes no missing human permission. Only cancellationApplied proves an applied cancellation. searchAttempted=false forbids claiming a failed search; page review counts as a search attempt without proving movement or absence. No new action is submitted by this report.";
         var reportFacts = SpatialGoalResultContextPolicy.ProjectResultFacts(facts);
