@@ -152,11 +152,28 @@ public static class RoomControlReviewRegression
                 ["expectedRoute"] = "tools", ["context"] = "{}" });
             routeCases.Add(new JObject { ["id"] = "latest-long-stop-replacement", ["user"] = "嗯，那我再说的详细一点哦，你现在应该先停止跟随，停止跟随我，然后呢去把那盏你刚才关掉的小灯重新打开，然后回到我身边。",
                 ["expectedRoute"] = "tools", ["context"] = "{}" });
+            foreach (var focusCase in new[] {
+                new[] { "body-follow", "接下来跟着我走。", "current-user-body" },
+                new[] { "body-distance", "跟着我，保持两米距离。", "current-user-body" },
+                new[] { "body-stop", "现在停下，别再走了。", "current-user-body" },
+                new[] { "body-follow-ja", "これから私について歩いて。", "current-user-body" },
+                new[] { "body-follow-en", "Follow me, keeping two metres behind.", "current-user-body" },
+                new[] { "conditional-movement", "等门打开了再走到我身边。", "general" },
+                new[] { "object-constrained-follow", "跟着我，绕开地上的杯子。", "general" },
+                new[] { "history-ellipsis", "继续刚才那件事。", "general" },
+                new[] { "follow-and-answer", "跟着我走，并告诉我电视柜在哪边。", "general" }
+            }) routeCases.Add(new JObject { ["id"] = focusCase[0], ["user"] = focusCase[1],
+                ["expectedRoute"] = "tools", ["expectedPlanningFocus"] = focusCase[2], ["context"] = "{}" });
             foreach (JObject item in routeCases) {
                 string user = (string)item["user"];
                 string request = (string)preflightBuilder.Invoke(model, new object[] { new LLM.SendData("user", user), (string)item["context"] });
                 Check(request != null && request.Length < 22000 && !request.Contains("image_url"), "Bounded initial route: " + item["id"]);
-                preflightRows.Add(new JObject { ["id"] = item["id"], ["user"] = user, ["expectedRoute"] = item["expectedRoute"], ["request"] = JObject.Parse(request) });
+                preflightRows.Add(new JObject { ["id"] = item["id"], ["user"] = user, ["expectedRoute"] = item["expectedRoute"],
+                    // This reminder names the complete body action and current user.
+                    // Both conservative full attention and body attention are safe.
+                    ["expectedPlanningFocus"] = (string)item["id"] == "latest-return-reminder" ? new JArray("general", "current-user-body") : item["expectedPlanningFocus"] ?? new JValue(
+                        new[] { "logged-come", "come-en", "retry-come-near-ja" }.Contains((string)item["id"]) ? "current-user-body" : "general"),
+                    ["request"] = JObject.Parse(request) });
             }
             File.WriteAllText(Path.Combine(output, "preflight-model-cases.json"), preflightRows.ToString());
             File.WriteAllText(Path.Combine(output, "control-model-cases.json"), rows.ToString(Formatting.Indented));

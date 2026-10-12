@@ -29,6 +29,9 @@ public static partial class RoomStepContextRegression
             string original = input.ToString(Formatting.None);
             var wire = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", original, "data:image/png;base64,AA==", false));
             var schema = (JObject)wire["response_format"]["schema"];
+            Require(((JObject)schema["properties"]).Properties().Take(2).Select(p => p.Name)
+                .SequenceEqual(new[] { "taskPlan", "taskCoverage" }),
+                "Native decoding resolves final actions before mapping every original clause, including later corrections.");
             string expanded = (string)Call(null, "BuildRoomDecisionSchemaForInput", original);
             Require(JToken.DeepEquals(ExpandNative(schema, (JObject)schema["$defs"]), JObject.Parse(expanded)),
                 "Native sharing preserves every field, branch, limit and complete-coverage requirement.");
@@ -44,6 +47,25 @@ public static partial class RoomStepContextRegression
                         .SetEquals(((JObject)branch["properties"]).Properties().Select(p => p.Name)), "Field guide reconstructs exactly the allowed branch fields.");
                 Require(((JArray)guide["required"]).Values<string>().Concat(((JArray)rule["required"]).Values<string>()).ToHashSet()
                     .SetEquals(((JArray)branch["required"]).Values<string>()), "Field guide reconstructs every branch's required fields.");
+                if (rule["fieldOverrides"] is JObject overrides)
+                    foreach (var field in overrides.Properties())
+                    {
+                        var value = field.Value;
+                        if (value["$ref"]?.Type == JTokenType.String)
+                        {
+                            string[] path = ((string)value["$ref"]).Substring(2).Split('/');
+                            value = guide;
+                            foreach (string part in path) value = value is JArray ? value[int.Parse(part)] : value[part];
+                        }
+                        if (value["allOf"] is JArray parts)
+                        {
+                            Require((string)parts[0]["$ref"] == "#/properties/taskPlan" && parts.Count == 2 &&
+                                ((JObject)parts[1]).Count == 1 && parts[1]["minItems"] != null, "Only the proved shared plan minimum is intersected.");
+                            var merged = (JObject)guide["properties"]["taskPlan"].DeepClone(); merged["minItems"] = parts[1]["minItems"].DeepClone();
+                            value = merged;
+                        }
+                        Require(JToken.DeepEquals(value, branch["properties"][field.Name]), "Every shared guide override expands to the exact native branch definition.");
+                    }
             }
             object[] budgetArgs = { wire.ToString(Formatting.None), false, null, null };
             bool admitted = (bool)Call(null, "TryBudgetRoomDecisionRequest", budgetArgs);
@@ -61,11 +83,12 @@ public static partial class RoomStepContextRegression
                 (long)budget["final"]["effectiveTextUnitBudget"] == Math.Min(49152, 61440 - (long)budget["final"]["nonTextReserve"]),
                 "Actual schema, image, output and framing costs reduce available text under the original limits.");
             Require(input.ToString(Formatting.None) == original, "Request-only serialization leaves runtime memory intact.");
-            // Compare unchanged prior fixed costs on the same reconstruction.
-            // Original rejected bytes were not logged: this is not byte replay.
+            // Compare expanded versus shared representations of this SAME new
+            // contract. Original rejected bytes were not logged: not byte replay.
             var before = (JObject)wire.DeepClone();
-            before["messages"][0]["content"] = fixture["baselineSystemMessage"].DeepClone();
-            before["response_format"]["schema"] = fixture["baselineNativeSchema"].DeepClone();
+            string currentSystem = (string)wire["messages"][0]["content"];
+            before["messages"][0]["content"] = currentSystem.Substring(0, currentSystem.IndexOf("[Native decision field guide]", System.StringComparison.Ordinal)) + expanded;
+            before["response_format"]["schema"] = expandedSchema.DeepClone();
             Require(JToken.DeepEquals(ExpandNative((JObject)before["response_format"]["schema"], (JObject)before["response_format"]["schema"]["$defs"]),
                 ExpandNative(schema, (JObject)schema["$defs"])), "Negative control uses the exact same expanded decision contract.");
             object[] oldBudget = { before.ToString(Formatting.None), false, null, null };
@@ -85,6 +108,32 @@ public static partial class RoomStepContextRegression
             modelCases.Add(new JObject { ["name"] = row["name"], ["utterance"] = request,
                 ["expectedKinds"] = ((string)row["name"] == "gen11" || (string)row["name"] == "gen13") ? new JArray("follow") : new JArray("device-state", "approach"),
                 ["request"] = JObject.Parse((string)textBudget[2]) });
+            if ((string)row["name"] == "gen11" || (string)row["name"] == "gen13")
+            {
+                var focused = (JObject)input.DeepClone();
+                focused["currentRequestSemantics"] = new JObject { ["source"] = "independent-first-reply-current-request-review",
+                    ["requestKind"] = "action", ["actionAuthorization"] = false,
+                    ["planningFocus"] = new JObject { ["kind"] = "current-user-body", ["currentUserText"] = request } };
+                object[] focusedBudget = { (string)Call(model, "BuildRoomTaskRequestJsonWithImage", focused.ToString(Formatting.None), null, false), false, null, null };
+                Require((bool)Call(null, "TryBudgetRoomDecisionRequest", focusedBudget), "Pure body attention is admitted with the same production menu.");
+                modelCases.Add(new JObject { ["name"] = row["name"] + "-body-attention", ["utterance"] = request,
+                    ["expectedKinds"] = new JArray("follow"), ["request"] = JObject.Parse((string)focusedBudget[2]) });
+            }
+            if ((string)row["name"] == "gen15")
+                foreach (var correction in new[] {
+                    new[] { "correction-zh", "先来我身边。不，改成先关掉那盏灯，再过来。" },
+                    new[] { "correction-en", "Come here. Actually, switch off that lamp before coming over." },
+                    new[] { "correction-ja", "先にこちらへ来て。やっぱり、その前にランプを消してから来て。" }
+                })
+                {
+                    var corrected = (JObject)input.DeepClone();
+                    corrected["currentUserText"] = corrected["latestUserText"] = correction[1];
+                    corrected["currentRequestSemantics"] = new JObject { ["requestKind"] = "action", ["actionAuthorization"] = false };
+                    object[] correctionBudget = { (string)Call(model, "BuildRoomTaskRequestJsonWithImage", corrected.ToString(Formatting.None), null, false), false, null, null };
+                    Require((bool)Call(null, "TryBudgetRoomDecisionRequest", correctionBudget), "Multilingual correction retains full task context within budget.");
+                    modelCases.Add(new JObject { ["name"] = correction[0], ["utterance"] = correction[1],
+                        ["expectedKinds"] = new JArray("device-state", "approach"), ["request"] = JObject.Parse((string)correctionBudget[2]) });
+                }
             input["unknownMandatoryConstraint"] = new string('证', 65000);
             object[] reject = { (string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(Formatting.None), null, false), false, null, null };
             Require(!(bool)Call(null, "TryBudgetRoomDecisionRequest", reject), "Unknown mandatory information still fails closed intact.");

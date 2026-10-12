@@ -603,6 +603,7 @@ public partial class ChatSample
                     ["rejectionReason"] = validationFailure,
                     ["violatedConstraint"] = RoomTaskProtocol.DecisionRepairConstraint(validationFailure),
                     ["sequenceQuoteFeedback"] = sequenceRequired ? RoomTaskSequenceProtocol.LiteralQuoteFeedback(rejected, sourceText) : null,
+                    ["sequenceStructureFeedback"] = sequenceRequired && ReadRoomTaskSequence() == null ? RoomTaskSequenceProtocol.StructureFeedback(rejected) : null,
                     ["rejectedDecision"] = rejected.Substring(0, Math.Min(1800, rejected.Length)),
                     ["preserveNoAction"] = preserveAutonomousNoAction,
                     ["scope"] = preserveAutonomousNoAction ?
@@ -1390,6 +1391,8 @@ public partial class ChatSample
                 text += ConcurrentBodyFailureNotice(ReadConcurrentBodyFailure(generation), language);
             if (!coherent && !quietFallback && CurrentFormalGenerationFailed(generation))
                 text += (language == "en" ? " " : "") + FormalGenerationFailureNotice(language);
+            string resultText = text;
+            if (!quietFallback) text = AppendRoomRequestProgress(text, language, generation);
             RecordFinalRoomReply(generation, text, reviewStatus, bridge);
             // Only the audited public reply enters history and the action parser.
             // Raw candidates remain diagnostics; no discarded promises become memory.
@@ -1398,7 +1401,7 @@ public partial class ChatSample
             BindRoomSpeechPlayback(generation, language, bridge, model, historyReceipt);
             BindReviewedGoalAnswerSpeech(generation, text);
             if (quietFallback) OnStreamDelta("<silent/>");
-            else if (coherent)
+            else if (coherent && text == resultText)
                 foreach (var part in buffer.Snapshot()) OnSpeechStreamDelta(part);
             else OnSpeechStreamDelta(new SpeechText(text, language, "room-task-fallback", SpeechActionDependency.Independent));
             AcknowledgeObservations(observations, generation, text);
@@ -1553,6 +1556,7 @@ public partial class ChatSample
             }
             var snapshot = CaptureRoomSpeechSnapshot(bridge, observation);
             bool movementPacket = UseMovementReplyPacket(generation);
+            bool terminalPacket = UseTerminalResultReviewPacket(generation);
             Debug.Log($"[Room/SpeechReviewView] generation={generation} attempt={attempt} source={observationSource} capture={observation?.CaptureId ?? "none"} age={(observation == null ? -1f : Time.realtimeSinceStartup - observation.CapturedAtRealtime):F3}s", this);
             string input = JsonConvert.SerializeObject(new {
                 intendedAction = m_RoomTaskIntent, dispatch = m_RoomTaskDispatch, actionId = m_RoomTaskActionId,
@@ -1565,23 +1569,26 @@ public partial class ChatSample
                 publicSpeech = candidate, publicSpeechLanguage = buffer.LanguageCode,
                 speechClaimOwner = new { instance = GetInstanceID(), generation, epoch, ownerRevision },
                 requestedUserText = m_ActionConstraints.CurrentUserText,
-                recentPublicReplies = ReadRecentRoomReplies(),
+                recentPublicReplies = terminalPacket ? null : ReadRecentRoomReplies(),
                 taskSequence = ReadRoomTaskSequence(),
                 declaredMotion = ExtractRoomReviewMotion(candidateExecutable),
-                historicalDeviceEvents = ReadHistoricalDeviceEvents(),
+                historicalDeviceEvents = terminalPacket ? null : ReadHistoricalDeviceEvents(),
                 currentRoomFacts = generation == m_SpatialGoalTerminalReplyGeneration ?
                     PickRoomFields(ReadCompactRoomTaskFacts(bridge)["currentFacts"] as JObject,
                         "connected", "bodyReserved", "activeActionId", "observedAtRealtime", "actualRoot") : ReadCompactRoomTaskFacts(bridge),
                 movementReportRequirement = RoomMovementResultPolicy.Requirement(ReadCompactRoomTaskFacts(bridge), m_RoomTaskIntent, m_RoomTaskActionId),
-                sceneActionFacts = movementPacket ? BuildMovementPriorResults() : generation == m_SpatialGoalTerminalReplyGeneration ? BuildSpatialGoalExecutionFacts() : BuildSceneActionFacts(),
-                spatialReplyFacts = movementPacket ? null : BuildSpatialAnswerFacts(observation),
-                sceneSearchReportRequirement = movementPacket ? null : BuildRoomSearchReportRequirement(),
-                deviceGoalFacts = movementPacket ? null : BuildIndependentSpatialReplyFacts(),
-                turnSweep = movementPacket ? null : ReadRoomSweepReplyFacts(observation),
+                sceneActionFacts = movementPacket ? BuildMovementPriorResults() : generation == m_SpatialGoalTerminalReplyGeneration ?
+                    (terminalPacket ? SpatialGoalResultContextPolicy.ProjectResultFacts(BuildSpatialGoalExecutionFacts()) : BuildSpatialGoalExecutionFacts()) : BuildSceneActionFacts(),
+                spatialReplyFacts = movementPacket || terminalPacket ? null : BuildSpatialAnswerFacts(observation),
+                sceneSearchReportRequirement = movementPacket || terminalPacket ? null : BuildRoomSearchReportRequirement(),
+                deviceGoalFacts = movementPacket || terminalPacket ? null : BuildIndependentSpatialReplyFacts(),
+                turnSweep = movementPacket || terminalPacket ? null : ReadRoomSweepReplyFacts(observation),
                 visualObservation = observation != null ? JObject.Parse(observation.MetadataJson) : null,
-                visualEvidence = BuildSceneObservationContext(observation),
+                visualEvidence = terminalPacket ? BuildWorkReviewObservationContext(observation) : BuildSceneObservationContext(observation),
                 reviewAttempt = attempt, repairAttempts,
-                scope = "Classify dependencies of the actual public claim. A user route assessment is not a verdict on image contents or another scene target."
+                reviewAttention = terminalPacket ? "owned-device-result-and-current-request" : "full-required-evidence",
+                scope = "Classify dependencies of the actual public claim. A user route assessment is not a verdict on image contents or another scene target." +
+                    (terminalPacket ? " publicSpeech is the device-result segment. The runtime appends other requested steps' current progress from owned execution receipts at release/playback. This segment's device success never establishes completion of the whole task. Independent questions still require their answers." : "")
             });
             int revision = ++reviewRevision;
             Action<bool, string, string> OnReview = (ok, output, status) => {
@@ -1620,6 +1627,8 @@ public partial class ChatSample
                     ["targetConsistency"] = verdict["targetConsistency"],
                     ["targetComparison"] = verdict["targetComparison"],
                     ["otherClaimsSupport"] = verdict["otherClaimsSupport"],
+                    ["taskRelation"] = verdict["taskRelation"],
+                    ["taskRelationComparison"] = verdict["taskRelationComparison"],
                     ["otherClaimsComparison"] = verdict["otherClaimsComparison"],
                     ["requestDisposition"] = reviewedRequestDisposition,
                     ["planningFailureReport"] = reviewedPlanningFailureReport,

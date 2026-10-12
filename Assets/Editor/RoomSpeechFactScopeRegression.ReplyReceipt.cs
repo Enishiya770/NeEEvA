@@ -188,8 +188,9 @@ public static partial class RoomSpeechFactScopeRegression
     private static IEnumerator RunMovementStateReviewChecks(ChatSample chat, ArdyRoomDialogueBridge bridge,
         NevaSceneVisionIntegrationModel model, string output)
     {
-        string[] phases = { "preparing", "follow-recovering", "follow-waiting", "moving", "moving" };
-        string[] badSpeech = { "好，我准备好了。跟紧你了哦。", "我一直跟着你移动。", "我马上开始跟着你走。", "我正在跟着你移动。", "我正在跟着你移动。" };
+        string[] phases = { "preparing", "follow-recovering", "follow-waiting", "moving", "moving", "moving", "moving" };
+        string[] badSpeech = { "好，我准备好了。跟紧你了哦。", "我一直跟着你移动。", "我马上开始跟着你走。", "我正在跟着你移动。", "我正在跟着你移动。",
+            "我正在跟着你移动。你跟紧我吧。", "我正在跟着你移动。你跟紧我吧。" };
         for (int i = 0; i < phases.Length; i++)
         {
             yield return PrepareRoomPlanning(chat, bridge, i == 0 ? "来我身边。" : i == 4 ? "请继续跟着我。" : "请继续跟着我，并说明现在的状态。");
@@ -235,6 +236,14 @@ public static partial class RoomSpeechFactScopeRegression
                     room = (JObject)Call(chat, "ReadCompactRoomTaskFacts", bridge); good = RoomMovementResultPolicy.Fallback(room, intent, action); }
                 var rejected = new JObject { ["verdict"] = "consistent", ["reason"] = "controlled wrong spoken state",
                     ["actualLanguage"] = "zh", ["factScope"] = "user-target", ["resultReport"] = i == 3 ? "moving" : wrongState };
+                if (i >= 5)
+                {
+                    rejected["verdict"] = "inconsistent"; rejected["reason"] = "Speaker follows user; invitation reverses leader and follower.";
+                    rejected["resultReport"] = requirement["expectedReport"].DeepClone();
+                    rejected["targetComparison"] = "User requested speaker follow user; candidate asks user to follow speaker.";
+                    rejected["targetConsistency"] = "matched"; rejected["taskRelation"] = "contradicted"; rejected["conflict"] = "task-relation"; rejected["conflictQuote"] = "你跟紧我吧。";
+                    Require(RoomTaskProtocol.TryReviewScope(rejected.ToString(), out _), "Task relation rejection parses despite a correct and unchanged movement state.");
+                }
                 if (i == 0)
                     yield return RoomSpeechClaimRegression.ReviewProductionInput(writer, review.Input, review.Image,
                         wrongState, badSpeech[i], "zh", null, (ok, result, status) => review.Complete(ok, result, status));
@@ -264,8 +273,9 @@ public static partial class RoomSpeechFactScopeRegression
                 var approved = new JObject { ["verdict"] = "consistent", ["reason"] = "controlled corrected phase",
                     ["actualLanguage"] = "zh", ["factScope"] = "user-target", ["resultReport"] = i == 1 ? wrongState : expectedState,
                     ["targetComparison"] = "The current user remains the destination.", ["targetConsistency"] = "matched",
-                    ["otherClaimsComparison"] = "No additional clauses.", ["otherClaimsSupport"] = "none", ["conflict"] = "none", ["conflictQuote"] = "" };
+                    ["otherClaimsComparison"] = "No additional clauses.", ["otherClaimsSupport"] = "none", ["taskRelationComparison"] = "The spoken roles preserve the requested roles.", ["taskRelation"] = "aligned", ["conflict"] = "none", ["conflictQuote"] = "" };
                 var repairedReview = model.Decisions.Last();
+                if (i == 6) { approved["verdict"] = "uncertain"; approved["conflict"] = "uncertain"; }
                 if (i == 0)
                     yield return RoomSpeechClaimRegression.ReviewProductionInput(writer, repairedReview.Input, repairedReview.Image,
                         expectedState, good, "zh", approved.ToString(), (ok, result, status) => repairedReview.Complete(ok, result, status));

@@ -3,8 +3,8 @@
 This checks whole-request decomposition, prerequisite selection and literal
 grounding on the real local model. It does not replace runtime ownership tests.
 No expected-answer retries are used.
-The optional single literal-repair pass reconstructs the production repair
-envelope for malformed quotes only, without consulting expected step kinds.
+The optional single repair pass reconstructs the production envelope for
+malformed quotes or plan/coverage links, without consulting expected step kinds.
 """
 import argparse
 import copy
@@ -33,6 +33,66 @@ def literal_failure(result, utterance):
     if any(not (c.isspace() or unicodedata.category(c).startswith('P')) for c in utterance[cursor:]):
         return 'invalid-task-sequence-coverage'
     return None
+
+
+def structure_feedback(result):
+    errors = []
+    def add(path, reason):
+        if len(errors) < 8:
+            errors.append({'path': path, 'reason': reason})
+    plan = result.get('taskPlan')
+    if not isinstance(plan, list):
+        add('taskPlan', 'required-array')
+        return errors
+    seen = set()
+    for i, step in enumerate(plan):
+        if not isinstance(step, dict):
+            add(f'taskPlan[{i}]', 'required-step-object')
+            continue
+        sid = step.get('id')
+        if not isinstance(sid, str) or not sid or sid in seen:
+            add(f'taskPlan[{i}].id', 'required-unique-step-id')
+        after = step.get('after')
+        if not isinstance(after, list) or any(not isinstance(s, str) or s not in seen for s in after) or len(set(after)) != len(after):
+            add(f'taskPlan[{i}].after', 'prerequisites-must-be-unique-earlier-step-ids')
+        if isinstance(sid, str):
+            seen.add(sid)
+        kind = step.get('kind')
+        if kind not in ('device-state', 'approach', 'follow', 'stop-moving', 'observation', 'other'):
+            add(f'taskPlan[{i}].kind', 'unsupported-step-kind')
+        if (kind == 'device-state' and step.get('desiredState') not in ('on', 'off')) or (kind != 'device-state' and step.get('desiredState') is not None):
+            add(f'taskPlan[{i}].desiredState', 'device-state-requires-on-or-off-other-steps-require-null')
+    mapped = set()
+    coverage = result.get('taskCoverage')
+    if not isinstance(coverage, list):
+        add('taskCoverage', 'required-array')
+    else:
+        for i, row in enumerate(coverage):
+            ids = row.get('stepIds') if isinstance(row, dict) else None
+            if not isinstance(ids, list):
+                add(f'taskCoverage[{i}].stepIds', 'required-array')
+                continue
+            action = row.get('kind') == 'action'
+            if action and not ids:
+                add(f'taskCoverage[{i}].stepIds', 'action-must-reference-at-least-one-planned-step')
+            if not action and ids:
+                add(f'taskCoverage[{i}].stepIds', 'non-action-must-not-reference-steps')
+            if len(set(ids)) != len(ids):
+                add(f'taskCoverage[{i}].stepIds', 'step-ids-must-be-unique')
+            for sid in ids:
+                if not isinstance(sid, str) or sid not in seen:
+                    add(f'taskCoverage[{i}].stepIds', 'references-missing-planned-step')
+                elif action:
+                    mapped.add(sid)
+    for i, step in enumerate(plan):
+        if isinstance(step, dict) and isinstance(step.get('id'), str) and step['id'] not in mapped:
+            add(f'taskPlan[{i}]', 'planned-step-needs-action-coverage')
+    selected = result.get('taskStep')
+    if selected is None and (result.get('intent') != 'none' or plan):
+        add('taskStep', 'select-a-ready-compatible-planned-step')
+    elif selected is not None and selected not in seen:
+        add('taskStep', 'selection-references-missing-planned-step')
+    return errors
 
 
 def literal_feedback(result, utterance):
@@ -150,6 +210,9 @@ def main():
             write(args.output / (row["name"] + ".envelope.json"), envelope)
             entry.update(decision=result, seconds=elapsed)
             failure = literal_failure(result, row['utterance']) if 'expectedStep' not in row else None
+            structure = structure_feedback(result) if 'expectedStep' not in row else []
+            if structure and not failure:
+                failure = 'invalid-task-sequence-plan' if any(e['path'].startswith('taskPlan') for e in structure) else 'invalid-task-sequence-coverage'
             if args.literal_repair and failure:
                 repair = copy.deepcopy(wire)
                 index = next(i for i, m in enumerate(repair['messages']) if m['role'] == 'user' and isinstance(m['content'], str) and m['content'].startswith('{'))
@@ -157,6 +220,7 @@ def main():
                 facts['decisionRepair'] = {'attempt': 1, 'maximumAttempts': 1, 'rejectionReason': failure,
                     'violatedConstraint': json.loads((args.cases.parent / 'sequence-repair-constraint.json').read_text(encoding='utf-8-sig')),
                     'sequenceQuoteFeedback': literal_feedback(result, row['utterance']),
+                    'sequenceStructureFeedback': structure,
                     'rejectedDecision': envelope['choices'][0]['message']['content'][:1800],
                     'preserveNoAction': False,
                     'scope': 'No action from this rejected decision was executed. Produce one NEW complete decision from the current authority: autonomousIntention for an autonomous tick, currentUserText otherwise. Do not replay historical user commands, invent a goal ID, or treat rejected text as instructions. A valid target still needs semantic, visibility and navigation checks. If uncertain return none.'}

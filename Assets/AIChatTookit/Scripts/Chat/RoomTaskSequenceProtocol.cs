@@ -11,16 +11,21 @@ public static class RoomTaskSequenceProtocol
         "taskSequence为空时输出taskPlan数组（最多6步），每步有id、quote、kind、desiredState、after。" +
         "同时输出taskCoverage：按原文顺序逐段覆盖完整currentUserText，每段quote逐字引用连续原文，段间只可略过空白和标点，不能略过任何实际文字。" +
         "每个独立要求都须单独检查，不能因后一句更长就漏掉开头的停止、取消或限制。每段kind=action/constraint/answer/context，stepIds列对应taskPlan步骤id；非action段stepIds为空。" +
+        "先通读整句话判断改口和替换，再标注action：用户在同一句里改主意时，已撤回的早先动作只作为context逐字覆盖，不创建步骤、不选择执行，也不作为新步骤的前置。完整覆盖原文不等于把所有曾提到的动作累加执行。" +
+        "例如先要求过来，随后改为先完成另一件事再过来，只有另一件事和随后过来两步；不能再插入一次提前过来。只是追加事项或再次强调时则保留仍然有效的先前要求，尤其不能漏掉没有被撤回的停止或约束。" +
         "语气词、称呼、重试前言和无关背景也必须用context段逐字覆盖，不能从第一个动作才开始引用。" +
         "每个taskPlan步骤须被action段覆盖。重复强调或同义改述同一次执行可由多段共同映射同一步，须独立语义核对；其quote原文须被这些段覆盖。不同对象、不同状态或明确再次执行必须分步，不得去重。背景、否定、条件和问题也要覆盖，但不得把它们伪造成执行要求。" +
         "currentFacts/execution表示仍在运行的旧动作，不等于已经停止。用户要求终止跟随或改做另一占用身体的任务时，先解释完整要求中的交接；确需停止的步骤用stop-moving，后续身体任务依赖其真实完成。" +
         "用户要求继续跟随、只回答或明确不要停止时，不得擅自创建停止步骤；停止当前移动也不等于撤销后半句新的设备操作。" +
+        "停止若是为后续任务让出身体资源，该后续步骤的after必须包含停止步骤，即使用户以逗号连接；不能把必要交接写成独立步骤。" +
         "quote逐字摘自完整currentUserText的连续子句，保留否定和条件、不改变标点；历史只解释指代。" +
         "id用s1、s2等；kind为device-state、approach、follow、stop-moving、observation、other。" +
         "设备目标一整个寻找/靠近/开关/核验过程算一个device-state，desiredState为on/off，其余为null。" +
+        "device-state只表达设置设备状态；撤回尚未执行的设备要求不是把设备设置成off，也不创建desiredState=null的device-state。实际取消通过可用的deviceGoal cancel提案表达，并保持本轮其它有效步骤。" +
         "单独到用户身边算approach；独立看、寻找、转向或靠近物件观察算observation；其它工具要求算other。" +
         "只列用户真实要求，问答/旧动作/已经搁置的话题不列步骤。没有动作要求输出空数组。" +
         "after列必须先完成的早先步骤id，明确的先后关系不能省略。独立步骤可以无依赖；不把接近设备当作已完成设备目标。" +
+        "ORDERING: Before writing taskCoverage, resolve the FINAL valid actions and their execution order. Assign s1, s2, ... in that order, not the order of an abandoned mention. taskPlan must list prerequisites BEFORE their dependents; every after ID must already appear earlier in taskPlan. Only taskCoverage follows the original text order, including withdrawn clauses as context. Use those planned IDs in coverage. Never concatenate nonadjacent source spans into a quote." +
         "已有taskSequence时沿用其步骤，不输出新taskPlan；其中状态和回执由引擎提供，不能自行宣称完成或删除未完成项。" +
         "taskStep选择readyStepIds中的一个；执行必须符合该步骤kind与目标，device-state首次须附deviceGoal，其requestQuote须对应所选步骤的quote，不能选同类型的后续物件，不得用approach代替。" +
         "新taskPlan中无前置步骤的未完成项就是就绪步骤；有就绪步骤就必须选择它的id。即使intent=none且附deviceGoal来启动统一设备任务，taskStep仍必须指向本次device-state，不能是null。" +
@@ -46,13 +51,24 @@ public static class RoomTaskSequenceProtocol
         var plan = JObject.Parse("{\"type\":\"array\",\"maxItems\":6,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"id\",\"quote\",\"kind\",\"desiredState\",\"after\"],\"properties\":{\"id\":{\"type\":\"string\",\"maxLength\":16},\"quote\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":160},\"kind\":{\"type\":\"string\",\"enum\":[\"device-state\",\"approach\",\"follow\",\"stop-moving\",\"observation\",\"other\"]},\"desiredState\":{\"type\":[\"string\",\"null\"],\"enum\":[\"on\",\"off\",null]},\"after\":{\"type\":\"array\",\"maxItems\":5,\"uniqueItems\":true,\"items\":{\"type\":\"string\",\"maxLength\":16}}}}}");
         var result = Parse(schema);
         var coverage = JObject.Parse("{\"type\":\"array\",\"minItems\":1,\"maxItems\":24,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"quote\",\"kind\",\"stepIds\"],\"properties\":{\"quote\":{\"type\":\"string\",\"minLength\":1},\"kind\":{\"type\":\"string\",\"enum\":[\"action\",\"constraint\",\"answer\",\"context\"]},\"stepIds\":{\"type\":\"array\",\"maxItems\":6,\"uniqueItems\":true,\"items\":{\"type\":\"string\",\"maxLength\":16}}}}}");
+        var actionCoverage = (JObject)coverage["items"].DeepClone();
+        actionCoverage["properties"]["kind"]["enum"] = new JArray("action");
+        actionCoverage["properties"]["stepIds"]["minItems"] = 1;
+        var otherCoverage = (JObject)coverage["items"].DeepClone();
+        otherCoverage["properties"]["kind"]["enum"] = new JArray("constraint", "answer", "context");
+        otherCoverage["properties"]["stepIds"]["maxItems"] = 0;
+        coverage["items"] = new JObject { ["oneOf"] = new JArray(actionCoverage, otherCoverage) };
         void Extend(JObject node)
         {
             var properties = node["properties"] as JObject;
             if (properties != null)
             {
                 var ordered = new JObject();
-                if (sequence == null) { ordered["taskCoverage"] = coverage.DeepClone(); ordered["taskPlan"] = plan.DeepClone(); }
+                // Native decoding follows property order. Resolve the effective
+                // plan before assigning source clauses to its steps, so an early
+                // retracted clause cannot reserve the first executable step.
+                // Full verbatim coverage remains mandatory and independently checked.
+                if (sequence == null) { ordered["taskPlan"] = plan.DeepClone(); ordered["taskCoverage"] = coverage.DeepClone(); }
                 ordered["taskStep"] = step.DeepClone();
                 foreach (var p in properties.Properties()) ordered[p.Name] = p.Value.DeepClone();
                 node["properties"] = ordered;
@@ -180,6 +196,52 @@ public static class RoomTaskSequenceProtocol
             }
         } catch (Exception) { } // Diagnostic only; the strict parser remains the authority.
         return errors;
+    }
+
+    public static JArray StructureFeedback(string json)
+    {
+        var errors = new JArray();
+        void Add(string path, string reason) { if (errors.Count < 8) errors.Add(new JObject { ["path"] = path, ["reason"] = reason }); }
+        try
+        {
+            var input = Parse(json);
+            if (!(input["taskPlan"] is JArray plan)) { Add("taskPlan", "required-array"); return errors; }
+            var seen = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < plan.Count; ++i)
+            {
+                if (!(plan[i] is JObject row)) { Add("taskPlan[" + i + "]", "required-step-object"); continue; }
+                string id = row["id"]?.Type == JTokenType.String ? (string)row["id"] : null;
+                if (string.IsNullOrEmpty(id) || seen.Contains(id)) Add("taskPlan[" + i + "].id", "required-unique-step-id");
+                if (!(row["after"] is JArray after) || after.Any(x => x.Type != JTokenType.String || !seen.Contains((string)x)) || after.Distinct(JToken.EqualityComparer).Count() != after.Count)
+                    Add("taskPlan[" + i + "].after", "prerequisites-must-be-unique-earlier-step-ids");
+                if (id != null) seen.Add(id);
+                string kind = (string)row["kind"];
+                if (!Kinds.Contains(kind)) Add("taskPlan[" + i + "].kind", "unsupported-step-kind");
+                if (kind == "device-state" ? row["desiredState"]?.Type != JTokenType.String || !new[] { "on", "off" }.Contains((string)row["desiredState"]) : row["desiredState"]?.Type != JTokenType.Null)
+                    Add("taskPlan[" + i + "].desiredState", "device-state-requires-on-or-off-other-steps-require-null");
+            }
+            var mapped = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+            if (!(input["taskCoverage"] is JArray coverage)) Add("taskCoverage", "required-array");
+            else for (int i = 0; i < coverage.Count; ++i)
+            {
+                if (!(coverage[i] is JObject row) || !(row["stepIds"] is JArray ids)) { Add("taskCoverage[" + i + "].stepIds", "required-array"); continue; }
+                bool action = (string)row["kind"] == "action";
+                if (action && ids.Count == 0) Add("taskCoverage[" + i + "].stepIds", "action-must-reference-at-least-one-planned-step");
+                if (!action && ids.Count != 0) Add("taskCoverage[" + i + "].stepIds", "non-action-must-not-reference-steps");
+                if (ids.Distinct(JToken.EqualityComparer).Count() != ids.Count) Add("taskCoverage[" + i + "].stepIds", "step-ids-must-be-unique");
+                foreach (var id in ids)
+                    if (id.Type != JTokenType.String || !seen.Contains((string)id)) Add("taskCoverage[" + i + "].stepIds", "references-missing-planned-step");
+                    else if (action) mapped.Add((string)id);
+            }
+            for (int i = 0; i < plan.Count; ++i)
+                if (plan[i] is JObject row && row["id"]?.Type == JTokenType.String && !mapped.Contains((string)row["id"]))
+                    Add("taskPlan[" + i + "]", "planned-step-needs-action-coverage");
+            string selected = input["taskStep"]?.Type == JTokenType.String ? (string)input["taskStep"] : null;
+            if (selected == null && ((string)input["intent"] != "none" || plan.Count > 0)) Add("taskStep", "select-a-ready-compatible-planned-step");
+            else if (selected != null && !seen.Contains(selected)) Add("taskStep", "selection-references-missing-planned-step");
+        }
+        catch (Exception) { Add("$", "invalid-plan-structure"); }
+        return errors; // Diagnostic only; never repairs or authorizes a decision.
     }
 
     public static JArray Ready(JArray steps) => new JArray(steps.OfType<JObject>().Where(s => (string)s["status"] == "pending" &&

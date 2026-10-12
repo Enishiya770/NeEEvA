@@ -503,6 +503,14 @@ public static partial class SpatialGoalRunnerRegression
 
     private static IEnumerator Audit(ChatSample chat, NevaSceneVisionIntegrationModel model, SceneObjectLightSwitch lamp, Run run)
     {
+        Call(chat, "RememberFirstReplyRequestSemantics", new FirstReplyCompletion {
+            RequestKind = "action", Disposition = FirstReplyDisposition.Tools, PlanningFocus = "general"
+        }, run.generation, model);
+        Require((bool)Call(chat, "UseTerminalResultReviewPacket", run.generation), "Owned action-only result uses the terminal review packet.");
+        var semanticState = (JObject)Get(chat, "m_FirstReplyRequestSemantics");
+        semanticState["requestKind"] = "mixed";
+        Require(!(bool)Call(chat, "UseTerminalResultReviewPacket", run.generation), "Independent questions retain the full factual review context.");
+        semanticState["requestKind"] = "action";
         var terminal = model.Speech.Last(); int history = model.m_DataList.Count;
         Require(SpatialGoalResultContextPolicy.TryReadContext(terminal.Context, out string original, out var facts) && original == run.text &&
             (string)facts["goal"]?["status"] == "satisfied" && !terminal.RecordAssistantHistory, "Terminal generation receives proof and the original task.");
@@ -516,6 +524,13 @@ public static partial class SpatialGoalRunnerRegression
         yield return Wait(() => model.Decisions.Count(request => request.Kind == "room-review") == reviews + 1, 8, "terminal result consistency audit");
         heldPlayback?.Dispose(); heldPlayback = null; Set(chat, "<IsAISpeaking>k__BackingField", false);
         var reviewer = model.Decisions.Last(request => request.Kind == "room-review");
+        var reviewInput = JObject.Parse(reviewer.Input);
+        Require((string)reviewInput["reviewAttention"] == "owned-device-result-and-current-request" &&
+            reviewInput["spatialReplyFacts"].Type == JTokenType.Null && reviewInput["historicalDeviceEvents"].Type == JTokenType.Null &&
+            (bool?)reviewInput.SelectToken("sceneActionFacts.goal.completionEvidenceValid") == true &&
+            (string)reviewInput["requestedUserText"] == run.text && reviewInput["taskSequence"] != null,
+            "Real terminal reviewer receives current proof and intact request/sequence, without repeated global spatial/history records.");
+        Export(run.name + "-terminal-review", reviewer);
         if (testRepair)
         {
             string proofBefore = Goal(chat)["completionEvidence"].ToString(); int writers = model.Speech.Count;
@@ -576,6 +591,7 @@ public static partial class SpatialGoalRunnerRegression
             LastReport["terminalLanguageRepair"] = new JObject { ["boundedAttempts"] = 1, ["actualCallback"] = true,
                 ["resultProofUnchanged"] = true, ["request"] = "terminal-language-repair-request.json" };
         }
+        ExportTerminalReviewProbe(model, reviewer, run);
         reviewer.Complete(true, new JObject { ["verdict"] = "consistent", ["factScope"] = "scene-action", ["resultReport"] = run.state,
             ["reason"] = "Controlled exact runtime readback supports the public result." }.ToString(), "controlled-unified-result-audit");
         Require(model.m_DataList.Count == history + 1 && !(bool)Get(chat, "m_FormalResponseInFlight"), "Only the one audited terminal is committed.");
@@ -584,6 +600,29 @@ public static partial class SpatialGoalRunnerRegression
         yield return null; yield return null;
         Require(model.Speech.Count == speech && Goal(chat)["completionEvidence"].ToString() == proof && lamp.ReadState().on == (run.state == "on"),
             "Late duplicate goal/review callbacks cannot reenter or mutate a completed device task.");
+    }
+
+    private static void ExportTerminalReviewProbe(NevaSceneVisionIntegrationModel model,
+        NevaSceneVisionIntegrationModel.Request reviewer, Run run)
+    {
+        var serializer = Get(model, "serializer");
+        var facts = JObject.Parse(reviewer.Input);
+        string language = (string)facts["publicSpeechLanguage"];
+        // Seed only output-state/language schema fields; the replay replaces this
+        // with an independent words-only extraction before factual review.
+        facts["independentSpeechClaim"] = new JObject { ["pendingSameResultQuote"] = "", ["resultReport"] = run.state,
+            ["evidence"] = facts["publicSpeech"].DeepClone(), ["actualLanguage"] = language, ["targetQuote"] = "", ["otherClaims"] = new JArray() };
+        string input = facts.ToString(Formatting.None);
+        string wire = (string)Call(serializer, "BuildRoomTaskRequestJsonWithImage", input, reviewer.Image, true);
+        object[] budget = { wire, false, null, null };
+        Require((bool)typeof(ChatQW).GetMethod("TryBudgetRoomDecisionRequest", Flags).Invoke(null, budget),
+            "Actual full terminal review including independent claim and current RGB fits unchanged limits.");
+        var row = new JObject { ["name"] = run.name, ["input"] = facts, ["expectedSpokenState"] = run.state,
+            ["expectedLanguage"] = language, ["expectedAdmission"] = true, ["expectedFactualApproval"] = true,
+            ["claimRequest"] = JObject.Parse((string)Call(serializer, "BuildSpeechClaimRequestJson", input)),
+            ["reviewRequest"] = JObject.Parse((string)budget[2]), ["budget"] = (JObject)budget[3],
+            ["scope"] = "Actual isolated scene producer, current RGB and verified device result; controlled candidate/semantic approvals. Replay executes no actions." };
+        File.WriteAllText(Path.Combine(directory, run.name + "-terminal-model-case.json"), row.ToString());
     }
 
     private static IEnumerator RejectedAuthority(ChatSample chat, ArdyRoomDialogueBridge bridge, NevaSceneVisionIntegrationModel model, SceneObjectLightSwitch lamp)

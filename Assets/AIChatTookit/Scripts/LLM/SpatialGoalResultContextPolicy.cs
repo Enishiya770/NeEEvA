@@ -51,11 +51,13 @@ public static class SpatialGoalResultContextPolicy
         "root ::= \"<lang code=\\\"\" (\"ja\" | \"zh\" | \"en\") \"\\\"/><speech mode=\\\"independent\\\"/><say>\" spoken \"</say>\"\n" +
         "spoken ::= [^<>\\r\\n\\x00]+\n";
     public const string OutputContract =
-        "[Authorized spatial goal result]\nOnly report the latest actual outcome in one brief sentence (at most 180 characters). " +
+        "[Authorized spatial goal result]\nReport the latest device outcome in one brief sentence (at most 180 characters). " +
         "A requested or attempted action is not success. If blocked, failed, cancelled or unresolved, say that accurately. " +
         "latestFacts.resultReportRequirement is mandatory: explicitly report its actual on/off result or incomplete outcome and specific observed failure. A greeting, reassurance, finding the target, readiness or a future promise cannot replace that result. " +
         "If the required expectedReport is clarification, ask one concise, specific question about the review's actual uncertainty. Otherwise do not turn an execution failure or rejected proposal into a new clarification request. When targetKnowledge.identityKnown=true, the same object is known: failed reobservation is not forgotten identity or room. Never invent a wall switch, alternate control, power fault or a different target. registered=false alone does not mean the user withheld permission; pendingRetained and requestAssessment distinguish real uncertainty from a discarded proposal. Empty referent sources are missing identity evidence. Do not ask for internal IDs, invent appearance, or treat authored labels as visual recognition. " +
         "When discussing a search with searchAttempted=false, say it has not started, never that you searched but could not find the target. A captured picture or missing identity evidence does not prove a search occurred or that the target is absent. Cancellation requires an applied engine cancellation, not a review's proposed relation. " +
+        "Other task steps are reported separately by the runtime from their current execution receipts at playback; do not describe or promise those steps in this device sentence. " +
+        "Keep the user's actor/destination relationship in every clause, including courtesy: never invite the user to take over movement assigned to the character. " +
         "Do not propose or execute another action. Follow the supplied dialogue language policy and persona, including an explicit user language choice. " +
         "Choose the spoken language before composing the sentence; its ordinary vocabulary and grammar must match the lang code. Translate quoted Chinese facts into natural Japanese when speaking Japanese; a ja label does not translate Chinese prose. " +
         "Output exactly <lang code=\"ja|zh|en\"/><speech mode=\"independent\"/><say>spoken result</say> " +

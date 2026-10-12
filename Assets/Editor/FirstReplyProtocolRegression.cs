@@ -298,7 +298,14 @@ public static class FirstReplyProtocolRegression
             "A previous-turn question cannot justify mixed, even with a valid tools verdict; one provenance correction is allowed.");
         value["requestKind"] = "action"; value["currentTurnEvidence"]["answerQuote"] = null;
         Check(Valid(current), "A current movement request binds to its literal current clause.");
+        value["planningFocus"] = "current-user-body";
+        Check(Valid(current), "A valid body attention hint does not change grounding or grant execution.");
+        value["planningFocus"] = "invented-scope";
+        Check(!Valid(current), "An unknown attention scope cannot be accepted as body-only.");
+        value["planningFocus"] = "current-user-body";
         value["requestKind"] = "mixed"; value["currentTurnEvidence"]["answerQuote"] = "为什么停下了？";
+        Check(!Valid("为什么停下了？然后来我身边。"), "A mixed question cannot claim body-only attention.");
+        value["planningFocus"] = "general";
         Check(Valid("为什么停下了？然后来我身边。"), "A real question plus action retains both requirements.");
         value["currentTurnEvidence"]["answerQuote"] = "来我身边";
         Check(!Valid(current), "Repeating one action quote cannot manufacture an independent question.");

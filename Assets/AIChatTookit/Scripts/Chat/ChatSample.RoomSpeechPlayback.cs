@@ -13,9 +13,9 @@ public partial class ChatSample
     // A version also invalidates already synthesized clips and late callbacks.
     private sealed class RoomSpeechPlaybackLease
     {
-        public int generation, userTurn, workEpoch, roundId, version, refreshes, heardStart;
-        public string actionId, intent, language, failureNotice, played = "";
-        public bool neutral, cancelled;
+        public int generation, userTurn, workEpoch, roundId, version, refreshes, heardStart, prefixCursor;
+        public string actionId, intent, language, failureNotice, prefix = "", played = "";
+        public bool neutral, cancelled, compound, progressHeard;
         public ArdyRoomDialogueBridge bridge;
         public UnityEngine.Object avatar, environment;
         public JObject state;
@@ -43,7 +43,8 @@ public partial class ChatSample
             ["actionId"] = actionId, ["phase"] = execution["phase"]?.DeepClone(),
             ["operationRevision"] = execution["operationRevision"]?.DeepClone(),
             ["reportText"] = RoomMovementResultPolicy.Fallback(room, intent, actionId),
-            ["expectedReport"] = RoomMovementResultPolicy.Requirement(room, intent, actionId)["expectedReport"]?.DeepClone()
+            ["expectedReport"] = intent == "stop-moving" && new[] { "stopped", "cancelled", "idle" }.Contains((string)execution["phase"])
+                ? new JValue("stopped") : RoomMovementResultPolicy.Requirement(room, intent, actionId)["expectedReport"]?.DeepClone()
         };
     }
 
@@ -51,13 +52,19 @@ public partial class ChatSample
         LLM model, LLM.SendData history)
     {
         m_RoomSpeechPlayback = null;
-        if (m_RoomTaskIntent != "approach" && m_RoomTaskIntent != "follow" || bridge == null) return;
-        var state = MovementPlaybackStamp(ReadMovementPlaybackFacts(bridge), m_RoomTaskIntent, m_RoomTaskActionId);
+        if (bridge == null) return;
+        bool compound = m_RequestProgressSpeechGeneration == generation && m_RequestProgressSpeechPrefix != null;
+        var body = compound ? BuildRoomRequestProgress()?["body"] as JObject : null;
+        string intent = compound ? (string)body?["intent"] : m_RoomTaskIntent;
+        string action = compound ? (string)body?["actionId"] : m_RoomTaskActionId;
+        if (intent != "approach" && intent != "follow" && (!compound || intent != "stop-moving")) return;
+        var state = compound ? m_RequestProgressSpeechState : MovementPlaybackStamp(ReadMovementPlaybackFacts(bridge), intent, action);
         if (state == null) return;
         language = SpatialGoalReportLanguage(language);
         m_RoomSpeechPlayback = new RoomSpeechPlaybackLease {
             generation = generation, userTurn = m_ActionConstraints.CurrentUserTurn, workEpoch = m_WorkEpoch,
-            roundId = m_CurrentSpeechRoundId, actionId = m_RoomTaskActionId, intent = m_RoomTaskIntent,
+            roundId = m_CurrentSpeechRoundId, actionId = action, intent = intent, compound = compound,
+            prefix = compound ? m_RequestProgressSpeechPrefix : "",
             language = language, bridge = bridge, avatar = bridge.avatar, environment = bridge.environmentRoot,
             state = state, model = model, history = history, heardStart = m_AssistantHeardText.Length,
             failureNotice = CurrentFormalGenerationFailed(generation) ? FormalGenerationFailureNotice(language) : ""
@@ -87,6 +94,9 @@ public partial class ChatSample
         if (lease == null) return RoomPlaybackCheck.Current;
         if (!RoomSpeechLeaseCurrent(lease, generation) || chunk.RoomStateVersion != lease.version)
             return RoomPlaybackCheck.Drop;
+        if (lease.compound && (!ValidateSpatialGoalTerminalProof(generation) ||
+            !RoomRequestProgressOwnerCurrent(lease.actionId, generation)))
+        { lease.cancelled = true; RemoveQueuedRoomSpeech(lease); return RoomPlaybackCheck.Drop; }
         var room = ReadMovementPlaybackFacts(lease.bridge);
         var state = MovementPlaybackStamp(room, lease.intent, lease.actionId);
         if (state == null || new[] { "replaced", "disconnected" }.Contains((string)state["phase"]))
@@ -112,12 +122,12 @@ public partial class ChatSample
                 "移动请求已受理，状态还在变化，我暂时不能确认最终结果。";
         else
         {
-            string local = (string)state["expectedReport"] == "arrived" ? "我已经走到你身边了。" :
-                RoomMovementResultPolicy.Fallback(room, lease.intent, lease.actionId);
-            text = local != null ? LocalizeRoomFallback(local, lease.language) :
-                lease.language == "ja" ? "今の位置では、あなたのそばに到着したとはまだ確認できないわ。" :
-                lease.language == "en" ? "I can't confirm that I'm currently beside you. " : "我还不能确认现在已经到你身边。";
+            text = MovementProgressText(room, lease.intent, lease.actionId, lease.language, lease.progressHeard);
         }
+        // Keep every unplayed word of the audited result/answer. A changed body
+        // phase replaces only its progress segment, never an independent answer.
+        string pendingPrefix = lease.prefix.Substring(lease.prefixCursor).TrimStart();
+        if (pendingPrefix.Length > 0) text = pendingPrefix + (lease.language == "en" ? " " : "") + text;
         if (!string.IsNullOrEmpty(lease.failureNotice) && !lease.played.Contains(lease.failureNotice)) text += (lease.language == "en" ? " " : "") + lease.failureNotice;
         RemoveQueuedRoomSpeech(lease);
         chunk.Text = text; chunk.LanguageCode = lease.language; chunk.RoomStateVersion = lease.version;
@@ -147,6 +157,16 @@ public partial class ChatSample
     private void RecordRoomSpeechPlayed(RoomSpeechPlaybackLease lease, string text)
     {
         if (lease == null) return;
+        // The sentence queue trims inter-sentence whitespace. Track the exact
+        // remaining prefix independently of concatenated played chunk lengths.
+        foreach (char character in text)
+        {
+            if (char.IsWhiteSpace(character)) continue;
+            while (lease.prefixCursor < lease.prefix.Length && char.IsWhiteSpace(lease.prefix[lease.prefixCursor])) ++lease.prefixCursor;
+            if (lease.prefixCursor >= lease.prefix.Length) lease.progressHeard = true;
+            else if (lease.prefix[lease.prefixCursor] == character) ++lease.prefixCursor;
+            else break; // An unexpected transform cannot silently discard unplayed answer text.
+        }
         lease.played += text;
         if ((int?)m_LastFormalReplyReceipt?["generation"] == lease.generation)
             m_LastFormalReplyReceipt["completedPlaybackText"] = lease.played;

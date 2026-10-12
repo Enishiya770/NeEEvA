@@ -68,6 +68,21 @@ public static partial class RoomSpeechFactScopeRegression
                 "Even a phase-neutral receipt is revoked when another action owns the body.");
             Call(chat, "FinishRoomSpeechPlaybackHistory", "");
 
+            foreach (string language in new[] { "zh", "ja", "en" })
+            {
+                Bind(); Phase("follow-waiting"); Set(chat, "m_RoomTaskIntent", "follow");
+                var history = new LLM.SendData("assistant", "already heard waiting statement"); model.m_DataList.Add(history);
+                Call(chat, "BindRoomSpeechPlayback", generation, language, bridge, model, history);
+                var lease = Get(chat, "m_RoomSpeechPlayback");
+                Call(chat, "RecordRoomSpeechPlayed", lease, "already heard waiting statement");
+                var chunk = Chunk(lease, "obsolete remaining waiting statement"); Phase("moving");
+                Require(Call(chat, "RefreshRoomSpeechForPlayback", chunk, generation).ToString() == "Replaced" &&
+                    ((string)Get(chunk, "Text")).Contains(language == "zh" ? "现在已经开始" : language == "ja" ? "今は" : "now"),
+                    "Heard waiting followed by movement has an explicit temporal transition: " + language);
+                rows.Add(new JObject { ["transitionLanguage"] = language, ["text"] = Get(chunk, "Text").ToString() });
+                Call(chat, "FinishRoomSpeechPlaybackHistory", "");
+            }
+
             // Exercise the production streaming player. The controlled TTS holds
             // PCM before Play, then asks the actual gate after Unity state changes.
             settings.m_TextToSpeech = tts;

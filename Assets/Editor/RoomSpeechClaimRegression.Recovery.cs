@@ -44,7 +44,7 @@ public static partial class RoomSpeechClaimRegression
         done=false; var fresh=server.Serve(new JObject {
             ["verdict"]="consistent",["reason"]="Current moving receipt supports current speech.", ["factScope"]="scene-action",
             ["resultReport"]="moving",["actualLanguage"]="zh",["targetComparison"]="Same current user.",["targetConsistency"]="matched",
-            ["otherClaimsComparison"]="No extra claims.",["otherClaimsSupport"]="none",["conflict"]="none",["conflictQuote"]="" }.ToString());
+            ["otherClaimsComparison"]="No extra claims.",["otherClaimsSupport"]="none",["taskRelationComparison"]="No relevant task relation.",["taskRelation"]="not-applicable",["conflict"]="none",["conflictQuote"]="" }.ToString());
         model.PostRoomTaskMessage(input.ToString(),true,receive);
         yield return Until(() => done,"fresh facts with reused words");
         Check(ok && RoomTaskProtocol.ReviewAllows(result) && server.Count==before+1 && fresh.Request.Contains("fresh-view-after-refresh") &&

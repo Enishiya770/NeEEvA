@@ -177,7 +177,7 @@ public partial class ChatQW
                 var result = ReadRoomTaskRecoveryJson(output);
                 string quote = (string)result["conflictQuote"];
                 if (result["conflict"] == null || result["targetComparison"] == null || result["targetConsistency"] == null ||
-                    result["otherClaimsComparison"] == null || result["otherClaimsSupport"] == null ||
+                    result["otherClaimsComparison"] == null || result["otherClaimsSupport"] == null || result["taskRelation"] == null || result["taskRelationComparison"] == null ||
                     quote == null ||
                     (quote.Length > 0 && ((string)input["publicSpeech"] ?? "").IndexOf(quote, StringComparison.Ordinal) < 0))
                 { callback?.Invoke(false, "", "speech-review-conflict-evidence-invalid"); return; }

@@ -129,11 +129,11 @@ public partial class ChatQW
         string preflight = BuildFirstReplyPreflightWire(current, context);
         if (preflight != null)
         {
-            string route = null, kind = null, demand = null, status = null;
+            string route = null, kind = null, demand = null, status = null, focus = null;
             bool? sufficient = null; JObject understanding = null, proof = null;
             float started = Time.realtimeSinceStartup;
-            yield return RequestFirstReplyReview(preflight, generation, (r, u, k, s, d, state, p) => {
-                route = r; understanding = u; kind = k; sufficient = s; demand = d; status = state; proof = p;
+            yield return RequestFirstReplyReview(preflight, generation, (r, u, k, s, d, state, p, f) => {
+                route = r; understanding = u; kind = k; sufficient = s; demand = d; status = state; proof = p; focus = f;
             });
             if (!Current()) yield break;
             bool handoff = route != null && !(kind == "answer-only" && demand == "short-conversation");
@@ -144,7 +144,7 @@ public partial class ChatQW
             if (handoff)
             {
                 var completion = FirstReplyProtocol.ResolveReviewedCompletion(null, route, status, understanding, kind, sufficient, demand);
-                completion.CurrentTurnEvidence = proof;
+                completion.CurrentTurnEvidence = proof; completion.PlanningFocus = focus;
                 SettleFirstReplyUserLease(userLease, completion, new List<SendData>(m_DataList));
                 if (m_FirstReplyOwnedGeneration == generation) m_FirstReplyOwnedGeneration = -1;
                 onComplete?.Invoke(completion);
@@ -202,16 +202,16 @@ public partial class ChatQW
                 string responseDemand = null;
                 bool? candidateSufficient = null;
                 JObject questionUnderstanding = null;
-                JObject currentTurnEvidence = null;
+                JObject currentTurnEvidence = null; string planningFocus = null;
                 double reviewStart = clock.Elapsed.TotalSeconds;
                 if (reviewWire == null) reviewStatus = "first-reply-review-input-budget";
                 else yield return RequestFirstReplyReview(reviewWire, generation,
-                    (route, understanding, kind, sufficient, demand, status, proof) => { reviewedRoute = route; questionUnderstanding = understanding; requestKind = kind; candidateSufficient = sufficient; responseDemand = demand; reviewStatus = status; currentTurnEvidence = proof; },
+                    (route, understanding, kind, sufficient, demand, status, proof, focus) => { reviewedRoute = route; questionUnderstanding = understanding; requestKind = kind; candidateSufficient = sufficient; responseDemand = demand; reviewStatus = status; currentTurnEvidence = proof; planningFocus = focus; },
                     reconsiderActionDowngrade: candidateRoute == FirstReplyDisposition.Tools);
                 reviewSeconds = clock.Elapsed.TotalSeconds - reviewStart;
                 if (!Current()) yield break;
                 completion = FirstReplyProtocol.ResolveReviewedCompletion(completion, reviewedRoute, reviewStatus, questionUnderstanding, requestKind, candidateSufficient, responseDemand);
-                completion.CurrentTurnEvidence = currentTurnEvidence;
+                completion.CurrentTurnEvidence = currentTurnEvidence; completion.PlanningFocus = planningFocus;
                 if (completion.Disposition == FirstReplyDisposition.Ordinary)
                 {
                     bool publicationAllowed = false;
@@ -336,7 +336,7 @@ public partial class ChatQW
         return wire.ToString();
     }
 
-    private IEnumerator RequestFirstReplyReview(string wire, int generation, Action<string, JObject, string, bool?, string, string, JObject> callback,
+    private IEnumerator RequestFirstReplyReview(string wire, int generation, Action<string, JObject, string, bool?, string, string, JObject, string> callback,
         int groundingAttempt = 0, bool reconsiderActionDowngrade = false)
     {
         bool Current() => generation == m_StreamRequestGeneration;
@@ -393,7 +393,7 @@ public partial class ChatQW
                 yield return RequestFirstReplyReview(FirstReplyProtocol.BuildGroundingRepairWire(wire, output), generation, callback, 1);
                 yield break;
             }
-            callback?.Invoke(route, questionUnderstanding, requestKind, candidateSufficient, responseDemand, status, proof);
+            callback?.Invoke(route, questionUnderstanding, requestKind, candidateSufficient, responseDemand, status, proof, route == null ? null : (string)JObject.Parse(output)["planningFocus"]);
         }
     }
 

@@ -67,6 +67,33 @@ public static partial class RoomSpeechClaimRegression
         Check(RoomTaskProtocol.TryReviewScope(directionConflict.ToString(), out _), "Concrete direction denial remains eligible for repair despite overlapping conflict categories.");
         directionConflict["verdict"] = "consistent"; directionConflict["conflict"] = "none"; directionConflict["conflictQuote"] = "";
         Check(!RoomTaskProtocol.TryReviewScope(directionConflict.ToString(), out _), "Contradicted target can never be approved.");
+        directionConflict["verdict"] = "inconsistent"; directionConflict["conflict"] = "task-relation";
+        directionConflict["conflictQuote"] = "follow me"; directionConflict["taskRelation"] = "contradicted";
+        Check(RoomTaskProtocol.TryReviewScope(directionConflict.ToString(), out _) && !RoomTaskProtocol.ReviewAllows(directionConflict.ToString()),
+            "Reversed listener invitation is an explicit relation denial eligible for existing bounded repair.");
+        directionConflict["taskRelation"] = "aligned";
+        Check(!RoomTaskProtocol.TryReviewScope(directionConflict.ToString(), out _), "Contradictory task relation classifications fail closed.");
+        var roles = Input("I'm following you now. Follow me closely.", "moving", "movement", "en");
+        roles["intendedAction"] = "follow";
+        var roleView = JObject.Parse(RoomTaskProtocol.ProjectSpeechReviewInput(roles.ToString()));
+        Check((string)roleView.SelectToken("reviewParticipants.movementRelation") == "USER leads; CHARACTER follows USER" && roles["reviewParticipants"] == null,
+            "Review receives engine-owned actor/target roles without changing the original record or words-only classifier.");
+        roles["actionId"] = "another-owner";
+        Check(JObject.Parse(RoomTaskProtocol.ProjectSpeechReviewInput(roles.ToString()))["reviewParticipants"] == null,
+            "An old execution cannot supply the current request's actor binding.");
+        roles["independentSpeechClaim"] = Claim("moving", "I'm following you now.", "en");
+        var quoteSchema = JObject.Parse(RoomTaskProtocol.BuildSpeechReviewSchemaForInput(roles.ToString()));
+        Check(quoteSchema.SelectToken("properties.taskRelationComparison.pattern") == null,
+            "A stale owner cannot pin the requested relation in native generation.");
+        roles["actionId"] = "owned";
+        var relationSchema = JObject.Parse(RoomTaskProtocol.BuildSpeechReviewSchemaForInput(roles.ToString()));
+        string relationPattern = (string)relationSchema.SelectToken("properties.taskRelationComparison.pattern");
+        Check(System.Text.RegularExpressions.Regex.IsMatch("USER leads; CHARACTER follows USER; speech preserves this.", relationPattern) &&
+            !System.Text.RegularExpressions.Regex.IsMatch("USER follows CHARACTER; invented role reversal.", relationPattern),
+            "Native review must preserve the known requested roles while leaving speech classification independent.");
+        Check(((JArray)quoteSchema.SelectToken("properties.conflictQuote.enum")).Values<string>().All(q => ((string)roles["publicSpeech"]).Contains(q)) &&
+            ((JArray)quoteSchema.SelectToken("properties.conflictQuote.enum")).Values<string>().Contains((string)roles["publicSpeech"]),
+            "Short-reply native grammar always permits a full verbatim denial and forbids fabricated comparison quotes.");
         var host = new GameObject("SpeechClaimLoopback"); host.SetActive(false);
         var model = host.AddComponent<ChatQW>(); model.enabled = false;
         model.m_Backend = ChatQW.BackendType.Local; model.m_PrewarmPrefixOnStart = false; model.m_LogRequestStats = false;
@@ -100,7 +127,7 @@ public static partial class RoomSpeechClaimRegression
             model.PostRoomTaskMessage(source.ToString(), true, (a,b,c) => { done = true; ok = a; result = b; });
             yield return Until(() => first.Finished.IsCompleted, "first phase delivered");
             var full = server.Serve(new JObject { ["verdict"] = "consistent", ["reason"] = "Current arrival reported.", ["factScope"] = "scene-action",
-                ["resultReport"] = "moving", ["actualLanguage"] = "zh", ["targetComparison"] = "The destination is the current user.", ["targetConsistency"] = "matched", ["otherClaimsComparison"] = "The additional quote is conventional thanks, not a factual event assertion.", ["otherClaimsSupport"] = "none", ["conflict"] = "none", ["conflictQuote"] = "" }.ToString());
+                ["resultReport"] = "moving", ["actualLanguage"] = "zh", ["targetComparison"] = "The destination is the current user.", ["targetConsistency"] = "matched", ["otherClaimsComparison"] = "The additional quote is conventional thanks, not a factual event assertion.", ["otherClaimsSupport"] = "none", ["taskRelationComparison"] = "The spoken roles preserve the requested roles.", ["taskRelation"] = "aligned", ["conflict"] = "none", ["conflictQuote"] = "" }.ToString());
             yield return Until(() => done, "full review");
             Check(ok && RoomTaskProtocol.ReviewAllows(result) && (string)JObject.Parse(result)["resultReport"] == "arrived" &&
                 (string)JObject.Parse(result)["actualLanguage"] == "ja", "Factual response cannot overwrite words-only state or language, even without grammar enforcement.");
@@ -179,7 +206,7 @@ public static partial class RoomSpeechClaimRegression
                 ["factScope"] = "visual-observation", ["resultReport"] = "omitted", ["actualLanguage"] = "mixed",
                 ["targetComparison"] = "No action target asserted.", ["targetConsistency"] = "not-applicable",
                 ["otherClaimsComparison"] = "Shelves on the left match the current observation; the question is not a claim.",
-                ["otherClaimsSupport"] = "supported", ["conflict"] = "none", ["conflictQuote"] = "" }.ToString());
+                ["otherClaimsSupport"] = "supported", ["taskRelationComparison"] = "No relevant task relation.", ["taskRelation"] = "not-applicable", ["conflict"] = "none", ["conflictQuote"] = "" }.ToString());
             yield return Until(() => done, "conversation factual review");
             Check(ok && RoomTaskProtocol.ReviewAllows(result) && (string)JObject.Parse(result)["actualLanguage"] == "ja" && server.Count == 8,
                 "Normal visual questions use independent language and assertions; factual review cannot overwrite them with mixed.");
@@ -459,6 +486,40 @@ public static partial class RoomSpeechClaimRegression
             facts["lastAction"] = new JObject { ["phase"] = "blocked", ["reason"] = "device-task-start-unavailable", ["stateChanged"] = false };
             facts["scope"] = "Controlled failed start: device state was not changed and the requested operation is incomplete.";
             row["claimRequest"] = JObject.Parse((string)Call(model, "BuildSpeechClaimRequestJson", input.ToString()));
+            row["reviewRequest"] = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(), null, true));
+        }
+        foreach (var sample in new[] {
+            new[] { "relation-latest-off-ja", "テレビ台のランプ、無事に消しましたよ。さあ、こちらへどうぞ。", "ja", "off", "device", "false", "你刚才有在电视柜上看到一盏发光的灯吗？能去把它关掉吗？关掉后回来来我身边。" },
+            new[] { "relation-off-zh", "电视柜上的灯已经关好了。你过来我这里吧。", "zh", "off", "device", "false", "关掉电视柜上的灯，然后回来找我。" },
+            new[] { "relation-off-en", "The lamp is off. Come over to me now.", "en", "off", "device", "false", "Turn off the lamp, then come back to me." },
+            new[] { "relation-follow-ja", "あなたについて移動しているわ。私についてきてね。", "ja", "moving", "movement", "false", "好，接下来跟着我走。" },
+            new[] { "relation-follow-zh", "我正在跟着你走，你跟紧我。", "zh", "moving", "movement", "false", "接下来跟着我走。" },
+            new[] { "relation-follow-en", "I'm following you now. Follow me closely.", "en", "moving", "movement", "false", "Please follow me." },
+            new[] { "relation-arrived-zh", "我已经到你身边了，你现在过来找我吧。", "zh", "arrived", "movement", "false", "你过来找我。" },
+            new[] { "relation-latest-played-ja", "さあ、こちらへどうぞ。あなたのそばに着いたわ。", "ja", "arrived", "movement", "false", "你刚才有在电视柜上看到一盏发光的灯吗？能去把它关掉吗？关掉后回来来我身边。" },
+            new[] { "relation-courtesy-ja", "テレビ台のランプは消えているわ。少し待っていてね。", "ja", "off", "device", "true", "关掉电视柜上的灯，然后回来找我。" },
+            new[] { "relation-lead-user-en", "I'm following you now. Please go ahead.", "en", "moving", "movement", "true", "Please follow me." },
+            new[] { "relation-lead-user-zh", "我正在跟着你走，你先走吧。", "zh", "moving", "movement", "true", "跟着我。" },
+            new[] { "relation-lead-user-ja", "あなたについて移動しているわ。先にどうぞ。", "ja", "moving", "movement", "true", "私についてきて。" },
+            new[] { "relation-independent-invitation", "I'm here beside you. Would you like to chat?", "en", "arrived", "movement", "true", "Come to me." },
+            new[] { "relation-authorized-invitation", "The lamp is off. Come over to me now.", "en", "off", "device", "true", "Turn off the lamp and invite me to come over to you. Stay there." },
+            new[] { "relation-negated-invitation", "我已经到你身边了，不用你过来找我。", "zh", "arrived", "movement", "true", "来我身边。" }
+        })
+        {
+            Add(sample[0], sample[1], sample[3], sample[4], sample[2], sample[3], sample[5] == "true");
+            var row = (JObject)rows.Last(); var input = (JObject)row["input"];
+            input["requestedUserText"] = sample[6];
+            if (sample[0].Contains("follow") || sample[0].Contains("lead-user"))
+            { input["intendedAction"] = "follow"; input["currentRoomFacts"]["execution"]["phase"] = "follow-moving"; }
+            if (sample[4] == "device") input["sceneActionFacts"]["goal"]["originalRequest"] = sample[6];
+            if (sample[4] == "device" && sample[0] != "relation-authorized-invitation")
+            {
+                input["taskSequence"] = new JObject { ["request"] = sample[6], ["steps"] = new JArray(
+                    new JObject { ["id"] = "s1", ["kind"] = "device-state", ["desiredState"] = "off", ["status"] = "completed", ["after"] = new JArray() },
+                    new JObject { ["id"] = "s2", ["kind"] = "approach", ["status"] = "pending", ["after"] = new JArray("s1") }) };
+                input["scope"] = "publicSpeech is the device-result segment. The runtime appends other requested steps' current progress from owned execution receipts at release/playback. This segment's device success never establishes completion of the whole task.";
+            }
+            row["expectedTaskRelationConflict"] = sample[5] == "false";
             row["reviewRequest"] = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(), null, true));
         }
         foreach (JObject row in rows)

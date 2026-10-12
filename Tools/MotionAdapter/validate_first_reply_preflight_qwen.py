@@ -44,7 +44,12 @@ for row in json.loads(a.cases.read_text(encoding='utf-8-sig')):
         kinds = {'latest-device-return': ['action'], 'generic-compound-action': ['action'],
                  'control-and-action': ['action', 'control'], 'mixed-answer-and-movement': ['mixed'],
                  'mixed-answer-and-device': ['mixed']}.get(name)
-        item['passed'] = result['valid'] and result['route'] == row['expectedRoute'] and (
+        item['planningFocus'] = json.loads(choice['message']['content']).get('planningFocus')
+        item['expectedPlanningFocus'] = row.get('expectedPlanningFocus')
+        expected_focus = row.get('expectedPlanningFocus')
+        focus_ok = expected_focus is None or item['planningFocus'] == expected_focus or (
+            isinstance(expected_focus, list) and item['planningFocus'] in expected_focus)
+        item['passed'] = focus_ok and result['valid'] and result['route'] == row['expectedRoute'] and (
             kinds is None or result['requestKind'] in kinds) and all(t['seconds'] < 6 for t in item['attempts'])
     except Exception as exc:
         item['error'] = str(exc)

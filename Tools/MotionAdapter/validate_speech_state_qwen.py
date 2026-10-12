@@ -8,6 +8,8 @@ import argparse
 import copy
 import hashlib
 import json
+import re
+import sys
 from pathlib import Path
 import time
 import urllib.request
@@ -69,6 +71,7 @@ def extraction_failure(claim, speech, conversation):
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser()
     parser.add_argument("--cases", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -140,23 +143,48 @@ def main():
                 wire = copy.deepcopy(row["reviewRequest"]); wire["model"] = args.model
                 # Replace only the already-exported grounded classification. Full
                 # facts, contract and schema are from the production serializer.
-                input_data = json.loads(wire["messages"][-1]["content"])
+                content = wire["messages"][-1]["content"]
+                text_part = next((part for part in content if part.get("type") == "text"), None) if isinstance(content, list) else None
+                input_text = text_part["text"] if text_part is not None else content
+                # Multimodal production requests prefix their JSON with the
+                # image provenance instruction. Keep that instruction intact.
+                json_start = input_text.index("{")
+                input_data = json.loads(input_text[json_start:])
                 input_data["independentSpeechClaim"] = claim
-                wire["messages"][-1]["content"] = json.dumps(input_data, ensure_ascii=False, separators=(",", ":"))
+                schema = wire["response_format"]["schema"]
+                for key in ("resultReport", "actualLanguage"):
+                    schema["properties"][key]["enum"] = [claim[key]]
+                speech = input_data["publicSpeech"]
+                if "enum" in schema["properties"]["conflictQuote"]:
+                    quotes = ["", speech, claim["evidence"], claim["targetQuote"], claim["pendingSameResultQuote"], *claim["otherClaims"]]
+                    schema["properties"]["conflictQuote"]["enum"] = list(dict.fromkeys(q for q in quotes if
+                        len(q.encode('utf-16-le')) // 2 <= 160 and q in speech))
+                wire["messages"][0]["content"] = wire["messages"][0]["content"].rsplit('\n', 1)[0] + '\n' + json.dumps(schema, ensure_ascii=False, separators=(',', ':'))
+                updated_input = input_text[:json_start] + json.dumps(input_data, ensure_ascii=False, separators=(",", ":"))
+                if text_part is not None:
+                    text_part["text"] = updated_input
+                else:
+                    wire["messages"][-1]["content"] = updated_input
                 write(args.output / (row["name"] + ".review.request.json"), wire)
                 verdict, envelope, elapsed = request(args.url, wire)
                 write(args.output / (row["name"] + ".review.envelope.json"), envelope)
                 entry.update(review=verdict, reviewSeconds=elapsed)
                 assert isinstance(verdict.get("targetComparison"), str) and 0 < len(verdict["targetComparison"]) <= 160, verdict
                 assert isinstance(verdict.get("otherClaimsComparison"), str) and 0 < len(verdict["otherClaimsComparison"]) <= 200, verdict
+                assert isinstance(verdict.get("taskRelationComparison"), str) and 0 < len(verdict["taskRelationComparison"]) <= 160, verdict
+                relation_pattern = wire["response_format"]["schema"]["properties"]["taskRelationComparison"].get("pattern")
+                assert not relation_pattern or re.fullmatch(relation_pattern, verdict["taskRelationComparison"]), verdict
                 if row.get("expectedFactualApproval", True):
                     assert verdict["verdict"] == "consistent" and verdict["conflict"] == "none", verdict
                     assert verdict["targetConsistency"] in ("matched", "unspecified", "not-applicable"), verdict
                     assert verdict["otherClaimsSupport"] in ("none", "supported"), verdict
+                    assert verdict["taskRelation"] in ("aligned", "not-applicable"), verdict
                 else:
                     assert verdict["verdict"] == "inconsistent" and verdict["conflict"] not in ("none", "uncertain"), verdict
                     assert verdict["conflictQuote"] and verdict["conflictQuote"] in row["input"]["publicSpeech"], verdict
                 assert verdict["resultReport"] == claim["resultReport"] and verdict["actualLanguage"] == claim["actualLanguage"], verdict
+                if row.get("expectedTaskRelationConflict"):
+                    assert verdict["conflict"] == "task-relation" and verdict["taskRelation"] == "contradicted", verdict
                 if row.get("expectedFactScope"):
                     assert verdict["factScope"] == row["expectedFactScope"], verdict
                 # The grounded quote list can include requests or courtesy.
@@ -164,7 +192,7 @@ def main():
             entry["passed"] = True
         except Exception as error:
             entry["error"] = str(error)
-        print(json.dumps(entry, ensure_ascii=False), flush=True)
+        print(json.dumps({k: v for k, v in entry.items() if k not in ('claim', 'review', 'error')}, ensure_ascii=False), flush=True)
         write(args.output / "report.json", report)
     report["passed"] = all(row["passed"] for row in results)
     report["passedCount"] = sum(row["passed"] for row in results)

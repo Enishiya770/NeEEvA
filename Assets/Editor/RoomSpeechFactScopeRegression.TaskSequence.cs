@@ -17,6 +17,7 @@ public static partial class RoomSpeechFactScopeRegression
         model.TaskSequencesEnabled = true;
         try
         {
+            yield return CheckEmptyFollowPlanRepair(chat, bridge, model);
             yield return PrepareRoomPlanning(chat, bridge, request);
             var initial = model.Decisions.Last(); int decisions = model.Decisions.Count, revision = bridge.Controller.OperationRevision;
             var wrong = new JObject { ["intent"] = "approach", ["origin"] = "user", ["evidence"] = "走到我身边来", ["taskStep"] = "s2",
@@ -70,6 +71,29 @@ public static partial class RoomSpeechFactScopeRegression
             yield return CheckStopAndPlanningFailure(chat, bridge, model);
         }
         finally { model.TaskSequencesEnabled = old; }
+    }
+
+    private static IEnumerator CheckEmptyFollowPlanRepair(ChatSample chat, ArdyRoomDialogueBridge bridge,
+        NevaSceneVisionIntegrationModel model)
+    {
+        const string request = "好，接下来跟着我走。";
+        yield return PrepareRoomPlanning(chat, bridge, request);
+        var broken = new JObject { ["taskPlan"] = new JArray(), ["taskCoverage"] = new JArray(new JObject {
+            ["quote"] = request, ["kind"] = "action", ["stepIds"] = new JArray() }),
+            ["taskStep"] = null, ["intent"] = "follow", ["origin"] = "user", ["evidence"] = request };
+        int decisions = model.Decisions.Count, operations = bridge.Controller.OperationRevision;
+        model.Decisions.Last().Complete(true, broken.ToString(Formatting.None), "recorded-empty-follow-plan");
+        yield return Wait(() => model.Decisions.Count == decisions + 1, "Latest empty plan gets one structural repair");
+        var repair = JObject.Parse(model.Decisions.Last().Input)["decisionRepair"];
+        Require(((JArray)repair["sequenceQuoteFeedback"]).Count == 0 &&
+            ((JArray)repair["sequenceStructureFeedback"]).Any(row => (string)row["path"] == "taskCoverage[0].stepIds") &&
+            (int)repair["maximumAttempts"] == 1 && bridge.Controller.OperationRevision == operations && Call(chat, "ReadRoomTaskSequence") == null,
+            "Actual callback diagnoses the structural defect despite perfect quotes, before any plan adoption or motion.");
+        model.Decisions.Last().Complete(true, broken.ToString(Formatting.None), "repeated-empty-follow-plan");
+        Require(model.Decisions.Count == decisions + 1 && bridge.Controller.OperationRevision == operations &&
+            (string)((JObject)Call(chat, "ReadRoomTaskDecisionFailure"))?["validationReason"] == "invalid-task-sequence-coverage",
+            "Repeated malformed plan settles explicitly without a third planner request or motion.");
+        Call(chat, "InvalidateFormalResponse", "empty-follow-plan-regression-complete");
     }
 
     private static IEnumerator CheckStopAndPlanningFailure(ChatSample chat, ArdyRoomDialogueBridge bridge,

@@ -276,7 +276,9 @@ public static class FirstReplyChatIntegrationRegression
                 "Consumers must not be able to mutate a current semantic receipt or let duplicate callbacks overwrite it.");
             var compactSemantics=(JObject)Call(chat,"ReadCompactCurrentRequestSemantics",f.Generation);
             f.Check((string)compactSemantics?["requestKind"]=="mixed"&&compactSemantics["humanInput"]==null&&
-                compactSemantics["currentUserText"]==null&&compactSemantics.Count==9&&JToken.DeepEquals(compactSemantics["currentTurnEvidence"],currentProof),
+                compactSemantics["currentUserText"]==null&&compactSemantics.Count==10&&
+                compactSemantics.SelectToken("planningFocus.currentUserText")?.Type==JTokenType.Null&&
+                JToken.DeepEquals(compactSemantics["currentTurnEvidence"],currentProof),
                 "Downstream semantics must carry the current typed requirement without duplicating whole ASR/history payloads.");
             Add("tools route preserves complete input, typed mixed request, clone isolation and single fallback");
 

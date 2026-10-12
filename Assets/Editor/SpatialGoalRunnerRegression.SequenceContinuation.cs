@@ -53,6 +53,7 @@ public static partial class SpatialGoalRunnerRegression
                         "Approved successor submits actual current-target approach while result speech is still held.");
                     Require((string)Get(chat, "m_RoomTaskActionId") == reportAction && (bool?)Goal(chat)["completionEvidenceValid"] == true && !lamp.ReadState().on,
                         "Concurrent body action does not steal device report ownership or invalidate actual completion proof.");
+                    CheckRequestProgressPlayback(chat, bridge, model, generation, submitted);
                     review.Complete(true, approval, "controlled-duplicate");
                     Require(bridge.ActionId == submitted && reports == 1, "Duplicate approval cannot resubmit or duplicate report continuation.");
                 } else Require(bridge.ActionId == expectedAction && reports == (changedField == null ? 1 : 0),
@@ -74,5 +75,51 @@ public static partial class SpatialGoalRunnerRegression
         finally { model.ControlReviewsEnabled = previous; Call(chat, "CancelSequenceContinuation", "fixture-complete"); }
         LastReport["sequenceContinuation"] = new JObject { ["cases"] = cases,
             ["scope"] = "Real device readback and production bounded continuation, controlled semantic judgments and boundaries; actual bridge submission. No live-model or played-speech timing claim." };
+    }
+
+    private static void CheckRequestProgressPlayback(ChatSample chat, ArdyRoomDialogueBridge bridge,
+        NevaSceneVisionIntegrationModel model, int generation, string action)
+    {
+        string prefix = "The device is off. Your separate answer is retained. Its final sentence survives too.";
+        var progress = (JObject)Call(chat, "BuildRoomRequestProgress");
+        Require((string)progress?.SelectToken("body.actionId") == action &&
+            (string)progress.SelectToken("steps[0].status") == "completed", "Compound progress binds real predecessor and current successor receipts.");
+        string combined = (string)Call(chat, "AppendRoomRequestProgress", prefix, "en", generation);
+        Require(combined.StartsWith(prefix) && combined.Length > prefix.Length,
+            "Current movement progress is appended to the audited outcome/answer without dropping it.");
+        var history = new LLM.SendData("assistant", combined); model.m_DataList.Add(history);
+        Call(chat, "BindRoomSpeechPlayback", generation, "en", bridge, model, history);
+        var lease = Get(chat, "m_RoomSpeechPlayback");
+        Require(lease != null && (bool)Get(lease, "compound"), "The compound result installs the same playback gate as movement replies.");
+        var type = typeof(ChatSample).GetNestedType("PendingSpeechChunk", Flags);
+        var chunk = Activator.CreateInstance(type, true);
+        Set(chunk, "RoomState", lease); Set(chunk, "RoomStateVersion", (int)Get(lease, "version"));
+        Set(chunk, "Text", combined); Set(chunk, "LanguageCode", "en"); Set(chunk, "RoundId", (int)Get(chat, "m_CurrentSpeechRoundId"));
+        object phase = Get(bridge, "phase"), reason = Get(bridge, "reason"), diagnostic = Get(bridge, "latestDiagnostic");
+        int revision = bridge.Controller.OperationRevision;
+        int assessments = (int)Get(bridge, "assessmentBuildCount");
+        try {
+            Call(bridge, "SetFact", "follow-paused", "Controlled successor pause before playback");
+            Require(Call(chat, "RefreshRoomSpeechForPlayback", chunk, generation).ToString() == "Replaced" &&
+                ((string)Get(chunk, "Text")).StartsWith(prefix) && ((string)Get(chunk, "Text")).Contains("paused"),
+                "A paused successor refreshes only its progress; unplayed device result and independent answer survive.");
+            Call(chat, "RecordRoomSpeechPlayed", lease, "The device is off.");
+            Call(chat, "RecordRoomSpeechPlayed", lease, "Your separate answer is retained.");
+            Call(bridge, "SetFact", "moving", "Controlled successor resumed");
+            Require(Call(chat, "RefreshRoomSpeechForPlayback", chunk, generation).ToString() == "Replaced" &&
+                ((string)Get(chunk, "Text")).StartsWith("Its final sentence survives too.") &&
+                !((string)Get(chunk, "Text")).Contains("The device is off.") &&
+                bridge.Controller.OperationRevision == revision && (int)Get(bridge, "assessmentBuildCount") == assessments &&
+                (bool?)Goal(chat)["completionEvidenceValid"] == true,
+                "Trimmed sentence boundaries retain the unplayed independent answer; refresh cannot resubmit a body/device operation.");
+            LastReport["requestProgressPlayback"] = new JObject { ["status"] = "passed", ["published"] = combined,
+                ["afterResume"] = history.content, ["scope"] = "Real owned goal/sequence and actual playback gate; controlled body phases, no audible playback claim." };
+        }
+        finally {
+            Set(bridge, "phase", phase); Set(bridge, "reason", reason); Set(bridge, "latestDiagnostic", diagnostic);
+            Call(chat, "FinishRoomSpeechPlaybackHistory", "");
+            Set(chat, "m_RequestProgressSpeechPrefix", null); Set(chat, "m_RequestProgressSpeechState", null);
+            Set(chat, "m_RequestProgressSpeechGeneration", -1);
+        }
     }
 }

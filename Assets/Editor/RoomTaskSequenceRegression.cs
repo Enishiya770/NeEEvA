@@ -54,6 +54,23 @@ public static class RoomTaskSequenceRegression
         Require(!RoomTaskSequenceProtocol.TryPlan(bad.ToString(), request, out _, out _), "A background clause cannot authorize a mapped action.");
         bad = (JObject)wrong.DeepClone(); bad["taskCoverage"][1]["quote"] = "再来我过去的位置。";
         Require(!RoomTaskSequenceProtocol.TryPlan(bad.ToString(), request, out _, out _), "Coverage cannot rewrite a target or constraint.");
+        const string latestFollow = "好，接下来跟着我走。";
+        var emptyFollow = new JObject { ["taskPlan"] = new JArray(), ["taskCoverage"] = new JArray(new JObject {
+            ["quote"] = latestFollow, ["kind"] = "action", ["stepIds"] = new JArray() }), ["taskStep"] = null, ["intent"] = "follow", ["origin"] = "user", ["evidence"] = latestFollow };
+        Require(!RoomTaskSequenceProtocol.TryPlan(emptyFollow.ToString(), latestFollow, out _, out _) &&
+            RoomTaskSequenceProtocol.LiteralQuoteFeedback(emptyFollow.ToString(), latestFollow).Count == 0,
+            "Latest Play failure is structural even with fully verbatim coverage.");
+        var structure = RoomTaskSequenceProtocol.StructureFeedback(emptyFollow.ToString());
+        Require(structure.Any(e => (string)e["path"] == "taskCoverage[0].stepIds") && structure.Any(e => (string)e["path"] == "taskStep"),
+            "Repair locates missing action mappings and selected step without inventing user intent.");
+        var structuralSchema = JObject.Parse(RoomTaskSequenceProtocol.ExtendSchema(RoomTaskProtocol.DecisionSchema, new JObject { ["taskSequenceRequired"] = true }));
+        var coverageBranches = (JArray)structuralSchema.SelectToken("properties.taskCoverage.items.oneOf");
+        Require((int)coverageBranches[0].SelectToken("properties.stepIds.minItems") == 1 &&
+            (int)coverageBranches[1].SelectToken("properties.stepIds.maxItems") == 0,
+            "Native grammar prevents empty action links and non-action authorizations.");
+        Require(RoomTaskProtocol.TryDecision(RoomTaskSequenceProtocol.DecisionOnly(emptyFollow.ToString()), latestFollow, false, out var follow, out _) &&
+            !RoomTaskSequenceProtocol.TrySelect(emptyFollow.ToString(), follow, new JArray(), out _, out _),
+            "Even a positive action with an empty plan can never execute through the runtime selection guard.");
         var input = new JObject { ["taskSequenceRequired"] = true, ["taskSequence"] = new JObject { ["readyStepIds"] = new JArray("s2") } };
         var schema = JObject.Parse(RoomTaskSequenceProtocol.ExtendSchema(RoomTaskProtocol.DecisionSchema, input));
         Require(schema["properties"]["taskPlan"] == null && schema["properties"]["taskStep"]["enum"].Values<string>().Contains("s2"), "Continuation grammar preserves the existing plan and restricts step selection.");
@@ -82,6 +99,7 @@ public static class RoomTaskSequenceRegression
                 new[] { "negation", "不用去开灯，只走到我身边。", "approach" },
                 new[] { "read-only", "为什么没有先开灯？只解释，不要再行动。" },
                 new[] { "single-movement", "请到我旁边来。", "approach" },
+                new[] { "latest-2123-follow", latestFollow, "follow" },
                 new[] { "two-devices", "先打开门旁的落地灯，再关闭书架上的台灯，最后来我身边。", "device-state", "device-state", "approach" }
                 ,new[] { "latest-follow-stop-on-return", "现在可以停下来了哦，对了，那个你可以去把那盏灯，就是你刚才关掉的那盏灯打开，然后再回到我身边吗？", "stop-moving", "device-state", "approach" }
                 ,new[] { "latest-explicit-stop-off-return", "呃，那再试一次，你先停下跟着我的步伐，然后去把灯关掉，然后回到我身边来。", "stop-moving", "device-state", "approach" }
