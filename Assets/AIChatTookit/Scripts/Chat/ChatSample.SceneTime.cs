@@ -100,6 +100,7 @@ public partial class ChatSample
     {
         double now = SceneMonotonicNow();
         if (!m_AgentRunning || m_SceneTimeSuspended || m_SceneTimePaused || Time.timeScale <= 0) return;
+        ObserveRoomTaskSequenceProgress();
         var avatar = m_SceneVisionCapture != null ? m_SceneVisionCapture.Target : null;
         if (avatar == null) { m_ScenePoseKnown = false; return; }
         var eyes = avatar.GetComponent<NevaEyeTracking>();

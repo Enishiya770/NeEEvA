@@ -26,8 +26,11 @@ public static class SceneVisionStopPreparationRegression
                 Call(chat, "BeginSceneVisionStopPreparation", f.Generation);
                 Check(f.Model.PendingRequests.Count == initialRequests, "Repeated same-generation entry launched a duplicate preparation.");
                 object camera = Get(chat, "m_SceneVisionCapture");
-                Check(pending.Input.Contains("本次没有可用图像附件") && !pending.Input.Contains("data:image"),
-                    "Stop-only preparation depends on image pixels or falsely declares a new observation.");
+                var smallInput = JObject.Parse(pending.Input);
+                Check(smallInput.Count == 3 && (string)smallInput["roomControlReview"] == RoomControlReviewProtocol.BodyStop &&
+                    (string)smallInput["currentUserText"] == "停一下。" &&
+                    (string)smallInput["activeBody"]["actionId"] == bridge.ActiveTaskId && !pending.Input.Contains("data:image"),
+                    "Stop preparation retains exact current words and body identity without scene/history payloads.");
                 pending.Deliver("stop-moving");
                 Check(!bridge.ReservesBody && bridge.Phase == "stopped" && f.CancelRevision == revision + 1 &&
                     ReferenceEquals(camera, Get(chat, "m_SceneVisionCapture")),
@@ -73,6 +76,17 @@ public static class SceneVisionStopPreparationRegression
                 Set(bridge.Controller, "<OperationRevision>k__BackingField", operation + 1); pending.Deliver("stop-moving");
                 Check(bridge.ReservesBody && f.CancelRevision == revision && !f.HasPreparedStop(), "Changed operation was stopped by a stale result.");
                 Set(bridge.Controller, "<OperationRevision>k__BackingField", operation);
+
+                f.Prepare(); Set(bridge, "followActive", true); Set(bridge, "hasControllerOperation", true);
+                Set(bridge, "operationRevision", bridge.Controller.OperationRevision);
+                Call(chat, "BeginSceneVisionStopPreparation", f.Generation);
+                pending = f.Model.PendingRequests[f.Model.PendingRequests.Count - 1];
+                int followOperation = bridge.Controller.OperationRevision;
+                Set(bridge.Controller, "<OperationRevision>k__BackingField", followOperation + 1);
+                Set(bridge, "operationRevision", followOperation + 1);
+                pending.Deliver("stop-moving");
+                Check(!bridge.IsFollowing && bridge.Phase == "stopped" && f.HasPreparedStop(),
+                    "A new leg of the same owned follow does not invalidate the user's stop; unrelated task replacements remain fenced.");
 
                 pending = f.Begin(); revision = f.CancelRevision;
                 Set(bridge, "actionId", "replacement-task"); pending.Deliver("stop-moving");

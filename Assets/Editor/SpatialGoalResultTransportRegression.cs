@@ -132,9 +132,13 @@ public static class SpatialGoalResultTransportRegression
                         ["typedSpeechCount"] = speech.Count, ["textEstimate"] = Estimate(wire), ["httpRequest"] = "result-" + index + "-request.json" });
                 }
                 bool noHttpDone = false; int sent = server.Count;
+                var buildFailures = new List<string>();
+                Action<string> captureBuildFailure = buildFailures.Add;
+                model.OnResponseGenerationFailure += captureBuildFailure;
                 model.PostSpeechFeedbackStreamForStage(SpatialGoalResultContextPolicy.BuildContext(new string('原', 7000), facts.ToString()), "", _ => { throw new Exception("Oversize speech"); },
-                    value => { Require(value == "", "Oversized mandatory context completes safely empty.", ref checks); noHttpDone = true; }, Image, false, FormalResponseStage.SpatialGoalResult);
+                    value => { Require(value == "" && buildFailures.SequenceEqual(new[] { "context-budget" }), "Budget failure reaches the owner before the empty completion.", ref checks); noHttpDone = true; }, Image, false, FormalResponseStage.SpatialGoalResult);
                 yield return null;
+                model.OnResponseGenerationFailure -= captureBuildFailure;
                 Require(noHttpDone && server.Count == sent && model.m_DataList.SequenceEqual(history), "Mandatory budget rejection does not send HTTP or mutate history.", ref checks);
 
                 bool localFailureDone = false;

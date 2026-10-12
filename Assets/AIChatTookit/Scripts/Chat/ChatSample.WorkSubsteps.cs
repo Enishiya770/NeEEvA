@@ -27,6 +27,7 @@ public partial class ChatSample
         m_WorkDeviceResult["recordedGeneration"] = m_FormalResponseGeneration;
         m_WorkDeviceResult["recordedAtUtc"] = System.DateTime.UtcNow.ToString("o");
         m_WorkDeviceResult["scope"] = "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.";
+        ArchiveDeviceEvent(m_WorkDeviceResult);
         Debug.Log("[Work/CompletedDeviceStep] " + m_WorkDeviceResult.ToString(Newtonsoft.Json.Formatting.None), this);
     }
 
@@ -75,6 +76,7 @@ public partial class ChatSample
         // A failed prerequisite also needs review; it does not authorize its sequel.
         m_WorkStatus = "substep-result-pending";
         m_WorkSubstepReviewPending = true;
+        MarkSettledRoomStepsReviewQueued();
         RecordWorkRoomTaskContext();
         m_SceneActionReviewUserTurn = m_ActionConstraints.CurrentUserTurn;
         ScheduleNextTick(2f, "scene-action-substep-result");

@@ -11,7 +11,7 @@ public partial class ChatSample
         public int generation, workEpoch, userTurn, operation;
         public string text, taskId, actionId, dispatch;
         public float deadline;
-        public bool completed, ownsTransport;
+        public bool completed, ownsTransport, following;
         public LLM provider;
         public ArdyRoomDialogueBridge bridge;
     }
@@ -37,7 +37,7 @@ public partial class ChatSample
             string.IsNullOrWhiteSpace(bridge.ActiveTaskId) || string.IsNullOrWhiteSpace(text)) return;
         var prepared = new SceneVisionStopPreparation {
             generation = generation, workEpoch = m_WorkEpoch, userTurn = m_ActionConstraints.CurrentUserTurn,
-            operation = bridge.Controller.OperationRevision, taskId = bridge.ActiveTaskId,
+            operation = bridge.Controller.OperationRevision, taskId = bridge.ActiveTaskId, following = bridge.IsFollowing,
             provider = provider, bridge = bridge, text = text,
             deadline = Time.realtimeSinceStartup + 2.75f, ownsTransport = true
         };
@@ -45,17 +45,19 @@ public partial class ChatSample
         try
         {
             // No image, no scene-capture dependency, no dialogue history mutation.
-            string input = BuildRoomDecisionInput(text, false, "", bridge);
+            string input = RoomControlReviewProtocol.BodyInput(text, prepared.taskId, prepared.operation,
+                bridge.Phase, bridge.IsFollowing, false).ToString(Newtonsoft.Json.Formatting.None);
             provider.PostRoomPreparationMessage(input, (ok, json, status) => {
                 if (!ReferenceEquals(m_SceneVisionStopPreparation, prepared) || prepared.completed) return;
                 CheckSceneVisionStopDeadline(prepared, Time.realtimeSinceStartup);
                 if (!ReferenceEquals(m_SceneVisionStopPreparation, prepared) || prepared.completed) return;
                 prepared.completed = true; prepared.ownsTransport = false;
                 if (!SceneVisionStopScopeIsCurrent(prepared) ||
-                    prepared.bridge.ActiveTaskId != prepared.taskId || prepared.bridge.Controller.OperationRevision != prepared.operation ||
+                    prepared.bridge.ActiveTaskId != prepared.taskId ||
+                    !prepared.following && prepared.bridge.Controller.OperationRevision != prepared.operation ||
                     !ok || !RoomTaskProtocol.TryDecision(json, prepared.text, false, out var decision) || decision.intent != "stop-moving") return;
                 string id = m_MotionIdentityPrefix + ":vision-stop:" + generation + ":" + (++m_SceneVisionStopSequence);
-                bool stopped = prepared.bridge.StopForTaskIfCurrent(id, prepared.taskId, prepared.operation, out string failure);
+                bool stopped = prepared.bridge.StopForTaskIfCurrent(id, prepared.taskId, prepared.operation, out string failure, prepared.following);
                 if (stopped) { prepared.actionId = id; prepared.dispatch = "stop-submitted"; }
                 Debug.Log($"[Room/VisionQuickStop] generation={generation} task={prepared.taskId} operation={prepared.operation} committed={stopped}", this);
             });

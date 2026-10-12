@@ -152,7 +152,7 @@ public static partial class RoomSpeechFactScopeRegression
             "Review starts from actual formal dispatch without claiming a performed movement.");
     }
 
-    private static IEnumerator PrepareRoomPlanning(ChatSample chat, ArdyRoomDialogueBridge bridge, string request = "请看看当前情况。", string evidence = null)
+    private static IEnumerator PrepareRoomPlanning(ChatSample chat, ArdyRoomDialogueBridge bridge, string request = "请看看当前情况。", string evidence = null, Action beforePlanner = null)
     {
         Call(chat, "InvalidateFormalResponse", "scope-review-fixture-next"); chat.StopAllCoroutines(); Call(chat, "ClearScheduledAgentWake");
         Set(chat, "m_AgentRunning", true); Set(chat, "m_AgentCurrentRoundIsTick", false);
@@ -173,6 +173,7 @@ public static partial class RoomSpeechFactScopeRegression
         SceneVisionObservation observation = null;
         Call(chat, "RequestSceneObservation", "scope-review-source", new Action<SceneVisionObservation>(x => observation = x));
         yield return Wait(() => observation != null, "Real scoped review source");
+        beforePlanner?.Invoke();
         Call(chat, "StartStreaming", fullInput, false, null, false, false, false, null, false, observation, true);
     }
 
@@ -457,7 +458,7 @@ public static partial class RoomSpeechFactScopeRegression
             }
             finally { typeof(LLM).GetField("lan", Flags).SetValue(model, previousLanguage); }
             ((JArray)LastDecisionFailureReport["cases"]).Add("empty-timeout-keeps-role-language-and-action-facts");
-            foreach (string incomplete in new[] { "http-failure", "incomplete-output" })
+            foreach (string incomplete in new[] { "http-failure", "incomplete-output", "context-budget", "invalid-result-context" })
             {
                 yield return PrepareRoomPlanning(chat, bridge);
                 model.Decisions.Last().Complete(false, "", "room-task-http-invalid-request;attempts=1;recovery=not-eligible");
@@ -466,8 +467,11 @@ public static partial class RoomSpeechFactScopeRegression
                 Call(chat, "HandleResponseGenerationFailure", incomplete);
                 Call(chat, "CompleteRoomSpeech", Buffer("すぐに行くわ。"), "", incompleteGeneration, true, null);
                 Require(model.Decisions.Count == reviewCount && bridge.Controller.OperationRevision == operationCount &&
-                    model.m_DataList.Last().content == "動作を計画するサービスへのリクエストが失敗したので、新しい動作は始めていないわ。" + (incomplete == "http-failure" ? "返事を生成するサービスへのリクエストが失敗したわ。" : "返事を最後まで生成できなかったわ。"),
+                    model.m_DataList.Last().content == "動作を計画するサービスへのリクエストが失敗したので、新しい動作は始めていないわ。" + (incomplete == "http-failure" ? "返事を生成するサービスへのリクエストが失敗したわ。" : incomplete == "context-budget" ? "情報量が返事の処理枠を超えたわ。" : "返事を最後まで生成できなかったわ。"),
                     "A broken/truncated stream discards its buffered promise without a semantic review or new action.");
+                var replyFailure = ((JObject)Call(chat, "ReadPreviousFormalReplyReceipt"))["replyFailure"];
+                Require((string)replyFailure["reason"] == incomplete && (bool?)replyFailure["httpRequestSent"] ==
+                    (incomplete != "context-budget" && incomplete != "invalid-result-context"), "Final receipt retains typed local versus HTTP reply failures independently of planning.");
                 ((JArray)LastDecisionFailureReport["cases"]).Add(incomplete + "-discards-buffered-candidate");
             }
             yield return Prepare(chat, bridge, model, "none");

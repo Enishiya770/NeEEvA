@@ -41,6 +41,8 @@ public partial class ChatQW
         int output = wire["max_tokens"]?.Type == JTokenType.Integer ? (int)wire["max_tokens"] : 640;
         long estimate = textUnits + schemaReserve + images * (long)RoomDecisionImageReserve + output + 2048;
         int totalCeiling = ceiling + RoomDecisionNonTextHeadroom;
+        long nonTextReserve = schemaReserve + images * (long)RoomDecisionImageReserve + output + 2048;
+        long effectiveTextBudget = Math.Min(ceiling, totalCeiling - nonTextReserve);
         int bytes = Encoding.UTF8.GetByteCount(json);
         var fields = new JObject();
         var collections = new JObject();
@@ -70,6 +72,8 @@ public partial class ChatQW
             ["imageReservePerImage"] = RoomDecisionImageReserve, ["completionReserve"] = output,
             ["templateAndSafetyReserve"] = 2048, ["estimatedUnits"] = estimate, ["unitBudget"] = totalCeiling,
             ["textUnitBudget"] = ceiling, ["totalUnitBudget"] = totalCeiling, ["previousSingleTotalUnitBudget"] = ceiling,
+            ["nonTextReserve"] = nonTextReserve, ["effectiveTextUnitBudget"] = effectiveTextBudget,
+            ["remainingTextUnits"] = effectiveTextBudget - textUnits,
             ["textWithinBudget"] = textUnits <= ceiling, ["totalWithinBudget"] = estimate <= totalCeiling,
             ["wireUtf8Bytes"] = bytes, ["maximumWireUtf8Bytes"] = RoomDecisionMaximumWireBytes,
             ["allowed"] = textUnits <= ceiling && estimate <= totalCeiling && images <= 5 && bytes <= RoomDecisionMaximumWireBytes && output >= 0 && output <= 640,
@@ -121,7 +125,8 @@ public partial class ChatQW
         "sceneActionPrerequisites", "sceneSpatialMemory", "visibleObjectCatalog", "sceneSearch", "turnSweep", "spatialGoal", "verifiedDeviceHistory",
         "verifiedObservedDeviceHistory", "referentSources", "objectTargetReview", "pendingObservationGoal", "decisionContractFacts", "sceneTime",
         "autonomousIntention", "autonomousContext", "sceneCognitionSummary", "decisionEvidenceProjection", "requestEvidenceTable", "requestEvidenceEncoding",
-        "standingGoal", "pendingDeviceRequest", "latestGoalUpdate", "currentRequestSemantics", "workingMemory", "planningHistoryImageCaptureIds" };
+        "standingGoal", "pendingDeviceRequest", "latestGoalUpdate", "currentRequestSemantics", "workingMemory", "planningHistoryImageCaptureIds",
+        "taskSequence", "taskSequenceRequired", "workContinuation", "stepAttention" };
 
     private static bool TryBudgetRoomDecisionRequest(string json, bool recovery, out string admitted, out JObject diagnostic)
     {

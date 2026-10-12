@@ -17,9 +17,10 @@ public partial class ChatQW
         try
         {
             var source = ReadRoomTaskRecoveryJson(input ?? "{}");
-            if ((string)source["planningContextVersion"] != RoomWorkingMemoryVersion ||
-                source["workingMemory"] != null) return input;
-            return ProjectRoomWorkingMemory(source).ToString(Formatting.None);
+            if ((string)source["planningContextVersion"] == RoomWorkingMemoryVersion && source["workingMemory"] == null)
+                source = ProjectRoomWorkingMemory(source);
+            FocusRoomStepContext(source);
+            return source.ToString(Formatting.None);
         }
         catch (JsonException) { return input; }
     }

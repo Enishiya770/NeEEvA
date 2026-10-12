@@ -36,7 +36,7 @@ public partial class ChatQW
     {
         if (generation != m_RoomPreparationGeneration) yield break;
         float startedAt = Time.realtimeSinceStartup;
-        bool admitted = TryBudgetRoomDecisionRequest(BuildRoomTaskRequestJson(input, false), false, out string bounded, out var budget);
+        bool admitted = TryBudgetRoomDecisionRequest(BuildRoomPreparationRequestJson(input), false, out string bounded, out var budget);
         budget["generation"] = generation; budget["kind"] = "preparation"; budget["httpRequestSent"] = false;
         Debug.Log("[Room/DecisionBudget] " + budget.ToString(Newtonsoft.Json.Formatting.None));
         if (generation != m_RoomPreparationGeneration) yield break;
@@ -59,9 +59,26 @@ public partial class ChatQW
             string output = "", status = "preparation-http-failure";
             bool accepted = request.result == UnityWebRequest.Result.Success && request.responseCode == 200 &&
                 TryReadRoomTaskCompletion(request.downloadHandler.text, out output, out status);
-            Debug.Log($"[Room/PreparationWire] code={request.responseCode} accepted={accepted} elapsed={Time.realtimeSinceStartup-startedAt:F3}s status={status}");
+            Debug.Log($"[Room/PreparationWire] kind={RoomControlReviewProtocol.Kind(input) ?? "legacy"} code={request.responseCode} accepted={accepted} elapsed={Time.realtimeSinceStartup-startedAt:F3}s status={status} transport={request.result} error={request.error}");
             callback?.Invoke(accepted, output, status);
         }
+    }
+
+    private string BuildRoomPreparationRequestJson(string input)
+    {
+        string kind = RoomControlReviewProtocol.Kind(input);
+        if (kind == null) return BuildRoomTaskRequestJson(input, false);
+        string schema = RoomControlReviewProtocol.Schema(kind);
+        var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
+        sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":256,\"response_format\":{\"type\":\"json_object\"");
+        if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(schema);
+        sb.Append("},\"messages\":[");
+        bool allowReplacement = (bool?)JObject.Parse(input).SelectToken("activeBody.allowReplacement") == true;
+        AppendMessage(sb, new SendData("system", RoomControlReviewProtocol.Contract(kind, allowReplacement) + "\n" + schema)); sb.Append(',');
+        AppendMessage(sb, new SendData("user", input)); sb.Append(']');
+        if (m_Backend == BackendType.Local) sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+        AppendSlot(sb, k_SlotAuxiliary); sb.Append('}');
+        return sb.ToString();
     }
 
     public override void PostRoomTaskMessage(string input, bool reviewSpeech, Action<bool, string, string> callback)
@@ -315,6 +332,7 @@ public partial class ChatQW
     private static string BuildRoomDecisionFieldGuide(string schema)
     {
         var guide = JObject.Parse(schema);
+        var commonRequired = new System.Collections.Generic.HashSet<string>(((JArray)guide["required"]).Values<string>());
         // Keep branch-specific required/allowed fields and numeric overrides. The
         // runtime parser rejects invalid combinations; the text guide also teaches
         // the model which exact branch expresses its planned turn before generation.
@@ -325,11 +343,11 @@ public partial class ChatQW
                 var properties = (JObject)branch["properties"];
                 var required = new JArray(); var allowed = new JArray(); var overrides = new JObject();
                 foreach (string field in (JArray)branch["required"])
-                    if (field != "intent" && field != "origin" && field != "evidence") required.Add(field);
+                    if (!commonRequired.Contains(field)) required.Add(field);
                 foreach (var field in properties.Properties())
                 {
                     if (field.Name == "intent") continue;
-                    if (field.Name != "origin" && field.Name != "evidence") allowed.Add(field.Name);
+                    if (!commonRequired.Contains(field.Name)) allowed.Add(field.Name);
                     if (!JToken.DeepEquals(field.Value, guide["properties"][field.Name]))
                     {
                         JToken definition = field.Value.DeepClone();
@@ -346,6 +364,7 @@ public partial class ChatQW
                 constraints.Add(constraint);
             }
         guide.Remove("oneOf");
+        guide["intentConstraintEncoding"] = "Every branch includes all root required fields. Branch required and allowedAdditionalFields list only additions to those common fields; fieldOverrides still override their definitions. No root requirement is optional.";
         guide["intentConstraints"] = constraints;
         guide["directionConvention"] = "Actor-relative yaw: left negative, right positive. Pitch: up positive, down negative. orient-view is head/gaze yaw [-50,50], pitch [-25,25]; turn-in-place is body yaw [-180,180], pitch 0. A larger required yaw needs a body-turn decision; never clamp, wrap, reverse, or silently replace the requested angle.";
         guide["noActionReply"] = "none requires replyScope=spatial for a visual, remembered-location, direction or action-reason answer; ordinary is non-spatial conversation/other tools. Missing replyScope is conservatively guarded as spatial. A question is not a request to move or search.";
@@ -378,7 +397,9 @@ public partial class ChatQW
         // A request can reference only engine-listed continuations. Execution still checks
         // current ownership/status after the reply; grammar is not an action authorization.
         string schema = RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(allowed);
+        schema = RoomTaskContextPolicy.AvailableDeviceGoalSchema(schema, source);
         bool currentRequestOnly = (bool?)source?["currentRequestOnly"] == true;
+        schema = RoomTaskContextPolicy.FocusSchema(schema, source);
         if (!IsReviewedRoomGoalContinuation(source) && !currentRequestOnly) return RoomTaskSequenceProtocol.ExtendSchema(schema, source);
         var narrowed = JObject.Parse(schema);
         void RemoveProposal(JObject branch)
@@ -449,7 +470,7 @@ public partial class ChatQW
             ["answerRequired"] = valid && !autonomous && (bool?)source?["answerRequired"] == true,
             ["answerBeforeDeviceResume"] = valid && !autonomous && (bool?)source?["answerBeforeDeviceResume"] == true,
             ["proposalDiscarded"] = !autonomous && (bool?)(source?["latestGoalUpdate"] as JObject)?["proposalDiscarded"] == true,
-            ["requestAssessment"] = !autonomous ? (string)source?["latestGoalUpdate"]?["requestAssessment"] : null,
+            ["requestAssessment"] = !autonomous ? (string)(source?["latestGoalUpdate"] as JObject)?["requestAssessment"] : null,
             ["proposalInterpretationCorrection"] = !autonomous ? source?["proposalInterpretationCorrection"]?.DeepClone() : null,
             ["cancellationApplied"] = !autonomous && currentRequestOnly && (bool?)(source?["latestGoalUpdate"] as JObject)?["cancellationApplied"] == true,
             ["standingGoalOriginalRequest"] = quietGoalStep ? (string)source["spatialGoal"]?["originalRequest"] : null,

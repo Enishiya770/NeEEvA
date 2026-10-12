@@ -7,6 +7,31 @@ public partial class ChatSample
     private int m_ResponseFailureGeneration = -1, m_ResponseFailureUserTurn = -1;
     private string m_ResponseFailureReason, m_ResponseFailureKind;
     private JObject m_LastFormalReplyReceipt;
+    private JObject m_RoomPlanningBodyLease;
+
+    private JObject ReadConcurrentBodyFailure(int generation)
+    {
+        if ((int?)m_RoomPlanningBodyLease?["generation"] != generation || generation != m_FormalResponseGeneration ||
+            (int?)m_RoomPlanningBodyLease?["userTurn"] != m_ActionConstraints.CurrentUserTurn) return null;
+        var bridge = GetComponent<ArdyRoomDialogueBridge>();
+        var execution = ReadCompactRoomTaskFacts(bridge)["execution"] as JObject;
+        if (bridge == null || bridge.IsFollowing || bridge.ReservesBody ||
+            string.IsNullOrEmpty((string)m_RoomPlanningBodyLease["actionId"]) ||
+            bridge.ActionId != (string)m_RoomPlanningBodyLease["actionId"] ||
+            (string)execution?["actionId"] != (string)m_RoomPlanningBodyLease["actionId"] ||
+            (string)execution?["phase"] != "failed") return null;
+        return new JObject { ["execution"] = execution.DeepClone(),
+            ["wasFollowing"] = m_RoomPlanningBodyLease["following"]?.DeepClone(),
+            ["scope"] = "The identified previous body task failed while this turn was being planned. This is not a successful stop command or a failure of a newly dispatched action." };
+    }
+
+    private static string ConcurrentBodyFailureNotice(JObject failure, string language)
+    {
+        if (failure == null) return "";
+        return language == "ja" ? "それとは別に、それまでの移動は実行エラーで終わったわ。今回の停止指示が成功したという意味ではないの。" :
+            language == "en" ? " Separately, the previous movement ended with an execution failure; that does not mean this stop command succeeded." :
+            "另外，之前的移动已因执行失败结束，并非这次停止指令执行成功。";
+    }
     private ArdyRoomDialogueBridge m_LastFormalReplyBridge;
     private Object m_LastFormalReplyAvatar, m_LastFormalReplyEnvironment;
     private float m_LastFormalReplySession = -1;
@@ -44,7 +69,8 @@ public partial class ChatSample
     private JObject CurrentReplyFailure(int generation) => !CurrentFormalGenerationFailed(generation) ? null : new JObject {
         ["kind"] = m_ResponseFailureKind, ["reason"] = m_ResponseFailureReason,
         ["generation"] = generation, ["userTurn"] = m_ResponseFailureUserTurn,
-        ["httpRequestSent"] = m_ResponseFailureKind != "reply-budget-exceeded",
+        ["httpRequestSent"] = m_ResponseFailureKind != "reply-budget-exceeded" &&
+            m_ResponseFailureReason != "invalid-result-context" && m_ResponseFailureReason != "invalid-result-facts",
         ["scope"] = "Formal reply generation only; this does not change planning or execution outcomes." };
 
     private void RecordFinalRoomReply(int generation, string text, string reviewStatus, ArdyRoomDialogueBridge bridge)
@@ -55,6 +81,7 @@ public partial class ChatSample
             ["generation"] = generation, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
             ["recordedAtUtc"] = System.DateTime.UtcNow.ToString("o"), ["replyFailure"] = CurrentReplyFailure(generation),
             ["planningFailure"] = ReadRoomTaskDecisionFailure(), ["reviewStatus"] = reviewStatus,
+            ["concurrentBodyFailure"] = ReadConcurrentBodyFailure(generation),
             ["intent"] = m_RoomTaskIntent, ["dispatch"] = m_RoomTaskDispatch, ["actionId"] = m_RoomTaskActionId,
             ["execution"] = room["execution"]?.DeepClone(),
             ["sceneAction"] = PickRoomFields(BuildSceneActionFacts()["lastAction"] as JObject,

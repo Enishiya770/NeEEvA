@@ -9,6 +9,42 @@ public static class SpatialGoalResultContextPolicy
 {
     public const int TextTokenEstimateBudget = 6000;
     public const int MaximumSpeechCharacters = 180;
+    // A terminal correction has one source of result/human evidence: BuildContext.
+    // Keep the independent verdict verbatim, including future/custom constraints.
+    public static string BuildRepairFeedback(string rejectedSpeech, JObject review, string guardReason, string language) =>
+        new JObject {
+            ["kind"] = "terminal-result-speech-repair", ["attempt"] = 1, ["maximumAttempts"] = 1,
+            ["rejectedPublicSpeech"] = rejectedSpeech, ["actualReview"] = review?.DeepClone(),
+            ["guardRejectedReason"] = guardReason, ["requiredOutputLanguage"] = language,
+            ["evidenceSource"] = "spatialGoalResult.originalUserRequest and latestFacts in this request",
+            ["scope"] = "Rewrite this unreleased result once. Use the current result evidence, not the rejected candidate, as fact. Match both lang tag and actual sentence to requiredOutputLanguage. Preserve the reported outcome and uncertainty. No new action or promise. The new candidate remains private pending independent review."
+        }.ToString(Formatting.None);
+    public static string RepairLanguage(string feedback)
+    {
+        if (string.IsNullOrWhiteSpace(feedback)) return null;
+        try
+        {
+            var packet = JObject.Parse(feedback, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+            if (packet["kind"]?.Type != JTokenType.String || (string)packet["kind"] != "terminal-result-speech-repair" ||
+                packet["attempt"]?.Type != JTokenType.Integer || (int)packet["attempt"] != 1 ||
+                packet["maximumAttempts"]?.Type != JTokenType.Integer || (int)packet["maximumAttempts"] != 1 ||
+                packet["requiredOutputLanguage"]?.Type != JTokenType.String) return null;
+            string language = (string)packet["requiredOutputLanguage"];
+            return language == "ja" || language == "zh" || language == "en" ? language : null;
+        }
+        catch (JsonException) { return null; }
+    }
+
+    public static string RepairWritingInstruction(string language)
+    {
+        string instruction = language == "ja" ? "日本語で書き直してください。中国語の被却下文をコピーせず、日本語の助詞・活用を使った自然な一文に翻訳してください。lang は ja です。" :
+            language == "zh" ? "请用自然中文重新写出实际结果，lang 必须为 zh。" :
+            language == "en" ? "Rewrite the actual outcome in natural English; lang must be en." : null;
+        return instruction == null ? "" : "\n[Required terminal correction]\n" + instruction +
+            " This is the single repair of rejectedPublicSpeech. Its language tag did not establish the language of its words. " +
+            "The correction language above applies to BOTH the tag and the sentence. Compose a new sentence; do not copy the rejected sentence unchanged. " +
+            "Use current latestFacts and actualReview to correct the result; preserve uncertainty and the same object. Output only the closed result envelope, no action or promise.";
+    }
     // Constrains only the transport envelope. The complete-output parser and
     // owner-bound semantic review still decide whether any speech is released.
     public const string OutputGrammar =
@@ -180,6 +216,8 @@ public static class SpatialGoalResultContextPolicy
         if ((string)facts?["goal"]?["status"] == "rejected")
             return "The proposed operation was rejected, not left pending. State that it was not executed using the recorded review reason. Do not ask the user to identify an object or room to revive this proposal, and do not claim refusal merely because historical sources are empty.";
         string expected = RequiredReport(facts);
+        if (FailureReason(facts) == "device-task-body-owned-by-follow")
+            operation += "The previous follow task still owns movement; handing control to this device task did not complete. Describe that specific conflict naturally, not as an unavailable capability or a forgotten object. Do not claim following stopped. ";
         if ((bool?)facts?["goal"]?["targetKnowledge"]?["identityKnown"] == true &&
             expected != "on" && expected != "off" && expected != "cancelled")
             operation += "The target identity is already known. A valid historical position is a direction hint, not current visibility or state. Do not claim you forgot which object or ask which room/object it is. If searching was attempted, never claim it had not started. Do not invent wall controls, hardware faults, absence, or a different target. ";
@@ -356,7 +394,7 @@ public static class SpatialGoalResultContextPolicy
         }
         var result = new JObject {
             ["goal"] = goal,
-            ["taskSequence"] = facts["taskSequence"]?.DeepClone(),
+            ["taskSequence"] = RoomTaskContextPolicy.Sequence(facts["taskSequence"] as JObject),
             ["lastAction"] = facts["lastAction"] is JObject action ? Scalars(action,
                 "actionId", "intent", "entityId", "requestedEntityId", "requestedState", "phase", "reason",
                 "captureId", "confirmedCaptureId", "resultCaptureId", "objectConfirmed", "semanticTargetConfirmed",

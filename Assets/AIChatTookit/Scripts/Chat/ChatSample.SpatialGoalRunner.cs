@@ -74,6 +74,26 @@ public partial class ChatSample
     private bool TryBeginSpatialGoalRunner(string goalId, int generation)
         => TryBeginSpatialGoalRunnerWithObservation(goalId, generation, null);
 
+    private string SpatialGoalStartUnavailableReason(ArdyRoomDialogueBridge bridge, SceneVisionObservation observation)
+    {
+        string reason = bridge == null || !bridge.IsConnected ? "device-task-room-disconnected" :
+            bridge.IsFollowing ? "device-task-body-owned-by-follow" :
+            bridge.ReservesBody || bridge.Controller != null && (bridge.Controller.IsBusy || bridge.Controller.IsMoving)
+                ? "device-task-body-owned-by-movement" :
+            observation?.HasImage != true || m_SceneVisionCapture == null || !m_SceneVisionCapture.IsObservationBindingCurrent(observation)
+                ? "device-task-current-image-unavailable" :
+            m_SceneTimePaused ? "device-task-scene-paused" : !SceneEyesOpen ? "device-task-eyes-closed" :
+            m_SceneSearch != null || m_SceneActionActive ? "device-task-scene-action-busy" : "device-task-start-unavailable";
+        Debug.Log("[SpatialGoal/StartBlocked] " + new JObject {
+            ["generation"] = m_FormalResponseGeneration, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
+            ["goalId"] = GetActiveSpatialGoalId(), ["reason"] = reason,
+            ["occupyingActionId"] = bridge?.ActiveTaskId, ["phase"] = bridge?.Phase,
+            ["following"] = bridge?.IsFollowing, ["reservesBody"] = bridge?.ReservesBody,
+            ["recovery"] = "At most one independently reviewed body handoff; no device write on denial or stale ownership."
+        }.ToString(Newtonsoft.Json.Formatting.None), this);
+        return reason;
+    }
+
     private bool TryBeginSpatialGoalRunnerWithObservation(string goalId, int generation, RoomTaskProtocol.Decision userObservation)
     {
         if (SpatialGoalRunnerOwnsGeneration(generation)) return m_SpatialGoalRunner.goalId == goalId;

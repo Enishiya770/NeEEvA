@@ -376,14 +376,22 @@ public partial class ChatSample
     private void DispatchPlannedWorkRoomReply(string feedback, string imageUrl, int generation)
         => DispatchWorkFeedbackCore(feedback, imageUrl, generation, true);
 
-    private void DispatchWorkFeedbackCore(string feedback, string imageUrl, int generation, bool plannedRoomStep)
+    private void DispatchPlannedMovementRoomReply(string imageUrl, int generation)
+        => DispatchWorkFeedbackCore("", imageUrl, generation, true, true);
+
+    private void DispatchWorkFeedbackCore(string feedback, string imageUrl, int generation, bool plannedRoomStep, bool movementFactsOnly = false)
     {
         imageUrl = ResolveFormalSceneImage(generation);
         bool terminalDeviceResult = generation == m_SpatialGoalTerminalReplyGeneration;
         bool guardSceneFeedback = plannedRoomStep || ShouldGuardWorkSceneFeedback(generation);
-        string latest = terminalDeviceResult ? feedback : BuildFormalObservationContext(feedback) +
+        bool movementResult = movementFactsOnly && plannedRoomStep && !terminalDeviceResult && UseMovementReplyPacket(generation);
+        // A committed movement already has its request, constraints, step ledger and
+        // live execution receipt. Do not append the planner's perception frame again.
+        // Unsent observations remain pending; this narrow report cannot acknowledge them.
+        if (movementResult) ClearStagedFormalObservation();
+        string latest = movementResult ? "" : terminalDeviceResult ? feedback : BuildFormalObservationContext(feedback) +
             (guardSceneFeedback && !plannedRoomStep ? BuildWorkSceneFeedbackContext() : "");
-        ObservationReceipt observations = CaptureObservationReceipt();
+        ObservationReceipt observations = movementResult ? null : CaptureObservationReceipt();
         bool consumed = false;
         var sceneSpeech = guardSceneFeedback ? new SpeechTextBuffer() : null;
         if (guardSceneFeedback)
@@ -395,7 +403,7 @@ public partial class ChatSample
             m_PendingSceneFormalCaptureGeneration = generation;
             m_RoomTaskFormatError = false;
         }
-        if (!string.IsNullOrEmpty(m_PendingSelfInspection)) ++m_SelfInspectionDeliveryAttempts;
+        if (!movementResult && !string.IsNullOrEmpty(m_PendingSelfInspection)) ++m_SelfInspectionDeliveryAttempts;
         m_FormalResponseInFlight = true;
         Debug.Log($"[Work/SceneFeedback] generation={generation} guarded={guardSceneFeedback} plannedStep={plannedRoomStep} workEpoch={m_WorkEpoch} intent={m_RoomTaskIntent} action={m_RoomTaskActionId}", this);
         void OnPart(SpeechText part)

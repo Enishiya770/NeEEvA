@@ -82,32 +82,30 @@ public static class RoomTaskProtocol
     public static string CompactNativeDecisionSchema(string source)
     {
         var schema = JObject.Parse(source);
-        var repeated = schema.Descendants().OfType<JProperty>().Where(p => p.Name == "properties")
-            .SelectMany(p => ((JObject)p.Value).Properties()).Select(p => p.Value)
-            .OfType<JObject>().Select(v => v.ToString(Newtonsoft.Json.Formatting.None))
-            .Where(v => v.Length >= 120).GroupBy(v => v, StringComparer.Ordinal)
-            .Where(g => g.Count() > 1).Select(g => g.Key).ToArray();
-        if (repeated.Length == 0) return source;
-        var definitions = new JObject(); var references = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string value in repeated)
+        // Already compiled or externally supplied references are left intact.
+        if (schema["$defs"] != null || schema.Descendants().OfType<JProperty>().Any(p => p.Name == "$ref")) return source;
+        var definitions = new JObject();
+        while (true)
         {
-            string id = "field" + definitions.Count;
-            definitions[id] = JObject.Parse(value); references[value] = "#/$defs/" + id;
+            string id = "f" + definitions.Count;
+            var reference = new JObject { ["$ref"] = "#/$defs/" + id };
+            int referenceCost = reference.ToString(Newtonsoft.Json.Formatting.None).Length;
+            // Charge the definition AND each reference. Recount after each fold:
+            // nested copies removed with their parent must not leave unused defs.
+            var best = new[] { schema, definitions }.SelectMany(root => root.Descendants().OfType<JProperty>())
+                .Where(p => p.Name == "properties" && p.Value is JObject)
+                .SelectMany(p => ((JObject)p.Value).Properties())
+                .Where(p => p.Value is JObject value && value["$ref"] == null)
+                .GroupBy(p => p.Value.ToString(Newtonsoft.Json.Formatting.None), StringComparer.Ordinal)
+                .Where(g => g.Count() > 1)
+                .Select(g => new { Copies = g.ToArray(), Saving = g.Count() * (g.Key.Length - referenceCost) - g.Key.Length - id.Length - 4 })
+                .Where(g => g.Saving > 0).OrderByDescending(g => g.Saving).FirstOrDefault();
+            if (best == null) break;
+            definitions[id] = best.Copies[0].Value.DeepClone();
+            foreach (var property in best.Copies) property.Value = reference.DeepClone();
         }
-        void Share(JObject node)
-        {
-            if (node["properties"] is JObject properties)
-                foreach (var property in properties.Properties().ToArray())
-                    if (property.Value is JObject child)
-                    {
-                        if (references.TryGetValue(child.ToString(Newtonsoft.Json.Formatting.None), out string reference))
-                            property.Value = new JObject { ["$ref"] = reference };
-                        else Share(child);
-                    }
-            if (node["oneOf"] is JArray branches)
-                foreach (var branch in branches.OfType<JObject>()) Share(branch);
-        }
-        Share(schema); schema["$defs"] = definitions;
+        if (definitions.Count == 0) return source;
+        schema["$defs"] = definitions;
         return schema.ToString(Newtonsoft.Json.Formatting.None);
     }
 
@@ -115,6 +113,9 @@ public static class RoomTaskProtocol
         ? new JObject {
             ["field"] = "deviceGoal", ["kind"] = "intent-operation-origin-conflict",
             ["constraint"] = "approach/follow cannot contain deviceGoal; stop-moving permits only cancel; other intents permit only set except none, which permits set or cancel. A deviceGoal requires origin=user and explicit current-user device authority. An independent movement request does not cancel a completed device task. Return one new complete decision; do not repeat the rejected extra field or invent a cancellation quote." }
+        : reason == "invalid-task-sequence-plan" || reason == "invalid-task-sequence-coverage"
+        ? new JObject { ["field"] = "taskPlan/taskCoverage", ["kind"] = "verbatim-whole-request-coverage",
+            ["constraint"] = "Copy every quote exactly from currentUserText, including the original connectives and particles. sequenceQuoteFeedback identifies invalid quotes or uncovered ORIGINAL words, not replacement instructions. Correct those fields instead of copying the rejected draft again. Cover filler/background as context; do not delete it. Each step remains one real requested action, with original conditions, target and order preserved." }
         : null;
 
     /// <summary>Request-local grammar narrowing only. Runtime goal ownership/currentness is still checked at dispatch.</summary>
@@ -539,6 +540,7 @@ public static class RoomTaskProtocol
         "independentSpeechClaim已独立解析台词主状态，保留它，再与匹配的执行phase比较。currentlyNearAndFacingUser是到达完成条件，false在moving/preparing/recovering期间正常，不能用于否定正在靠近。进行时提到目的地不等于声称已经到达；额外的目标与行进方向仍须分别核对。" +
         "先核对整句各分句的主体、目标、步骤与时间关系。已经完成某一步，却又要求等待同一步稍后完成，属于内部矛盾；‘能马上到’不能仅凭路线可达来洗掉‘已经到了’与未来到达的矛盾。主结果状态正确也必须拒绝整句矛盾。已完成第一步、接下来做不同的第二步可以相容；只有请求等候而未断言未来完成不自动构成矛盾。时间承诺需要实际依据，可达或距离近不证明很快能完成。" +
         "factScope描述真正依赖的事实：移动结果与历史设备回执的合并仍用scene-action，程序保留移动依赖；仅当台词另外断言当前图像内容时用combined。历史设备操作不能仅因当前图像过期而重审。" +
+        "额外断言须先分过去事件、现在状态、未来承诺。过去操作按historicalDeviceEvents中的实体、时间、operationAttempted与performed回执核对；即使本轮sceneActionFacts=null或generation不同，历史事件仍可支持过去时陈述。historicalOnly只限制把旧状态当现在状态，不否认事件。多个先后操作逐一匹配，后一次反向操作不否定前一次发生过。比较说明引用事件序号、时间和状态即可，不抄写长entityId/captureId；身份仍须按输入中的完整ID核对。" +
         "targetComparison必须先用一句话并列说明台词targetQuote所指对象/位置与当前任务执行对象/位置，保留双方全部修饰关系，再判断targetConsistency；对象不一致时即使状态相同也必须拒绝。无明确对象时说明由本轮哪一目标承接。只比较身份，不用状态一致替代身份依据。" +
         "otherClaimsComparison必须完成每个额外引句的核对：先说明主语与语气，再为每项事实断言或自身行动承诺列出已提供的对应证据字段及实际值；找不到对应证据必须明确写缺失，不能只写‘需核对’。主结果的moving/arrived/on/off不证明额外的障碍、避让方法、耗时、其他动作或物件状态，不能用主状态一致替代这些证据。请求听者、邀请和纯礼貌表达不证明任一方已经执行动作，不需要虚构执行回执。然后填写otherClaimsSupport：既无额外事实断言也无自身行动承诺才用none；每项硬事实有具体证据、合理视觉推测有上述可见线索、每个未来承诺有同一步已批准计划或已提交动作才supported；任一缺失必须unsupported；拿不准用uncertain。未来行动的承诺不能归入无需证据的纯意图或礼貌。不能只因引句被提取进列表就假定它是事实断言，也不能把‘没有矛盾’当作事实已获支持。";
 
@@ -548,6 +550,7 @@ public static class RoomTaskProtocol
         "推测仍不能凭空增加没有线索的实体、不可辨认的精确文字或确定个人状态；单加‘似乎’不能代替依据。移动情境本身不是障碍物存在或正在避让的证据。自身动作是否执行/完成以及执行方法、目标身份、设备实际状态及故障原因继续按对应事实和回执严格核验，不能靠推测补出成功或新的行动授权。";
 
     public const string ReviewContract = VisualInferenceReviewContract +
+        "historicalDeviceEvents是跨用户轮次保留的实际事件，原请求、实体、时间和状态回读都带来源。不能因本轮没有重新开关而否认此前实际操作；可以报告‘刚才关过’，但不能仅凭历史回执断言‘现在仍关闭’。多条事件须按实体和时间分别核对，后来反向操作覆盖旧状态而不抹去旧事件；它们不提供本轮行动授权。" +
         "historicalResult=true的sceneActionFacts或priorTaskResults是已完成前一步的不可变回执：operationSummary/lastAction可证明当时实际执行，后续generation不同不否定历史事件；它不证明现在仍可见或当前状态未改变。operationAttempted=null只表示该范围未知，不是未执行；不得用null推翻明确performed历史回执。" +
         "若提供taskSequence，completed步骤的实际回执可以汇报，pending/running/failed的后续步骤不能说已经完成。recentPublicReplies只是旧公开台词，不能作为事实来源；当前回复应交付本轮结果，不能用无关旧段落复读代替。合理的简短惯用表达或用户要求重述本身不违规。" +
         "区分硬事实与主观语气：纯粹的心情、审美或氛围感想、礼貌表达不要求执行回执，不应据此否决本来正确的回答。若把感想用作具体故障归因、声称实际位置/事件/设备状态或承诺行动，仍须核验。角色向用户提出的真正问题不产生一个必须由角色自己回答的新任务；只评原用户请求。" +

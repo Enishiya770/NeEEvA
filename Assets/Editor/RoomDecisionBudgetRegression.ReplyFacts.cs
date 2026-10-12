@@ -115,8 +115,9 @@ public static partial class RoomDecisionBudgetRegression
                     messages[0]["content"].ToString().Contains("Closed public reply behavior") &&
                     ReferenceEquals(model.m_DataList[0], resident), "Only the request's exact resident planning block is scoped; human, unknown constraints and full engine history remain.");
                 var writing = messages.Last()["content"].ToString();
-                Require(writing.Contains((string)receipt["actionId"] ?? "") && writing.Contains(human),
-                    "Closed writing retains the current action identity and exact current request.");
+                Require(writing.Contains(human) && writing.Contains(CommittedSpatialReplyProtocol.ReplyFactsMarker) &&
+                    messages.OfType<JObject>().Any(m => (string)m["role"] == "system" && ((string)m["content"]).Contains((string)receipt["actionId"] ?? "")),
+                    "Closed writing references the existing bound action facts without copying them and retains the exact current request.");
                 results.Add(new JObject { ["utterance"] = human, ["sourceCharacters"] = context.Length, ["budget"] = (JObject)budget[1] });
                 model.m_DataList.Add(new LLM.SendData("assistant", (string)receipt["publicText"]));
             }

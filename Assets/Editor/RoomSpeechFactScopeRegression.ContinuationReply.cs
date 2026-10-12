@@ -97,5 +97,79 @@ public static partial class RoomSpeechFactScopeRegression
             Require(fixture.ToString()==original,"Request projection does not alter recorded memory or outcomes.");
         } finally {foreach(var item in saved)Set(chat,item.Key,item.Value);serializer.m_DataList=oldHistory;}
         LastDecisionFailureReport["latestContinuationFeedbackBudgets"]=reports;
+        yield return CheckNarrowMovementContinuation(chat, bridge, model, serializer, output);
+    }
+
+    private static IEnumerator CheckNarrowMovementContinuation(ChatSample chat, ArdyRoomDialogueBridge bridge,
+        NevaSceneVisionIntegrationModel model, ChatQW serializer, string output)
+    {
+        var fixture = JObject.Parse(File.ReadAllText("Assets/Editor/Fixtures/ReplyContinuation.latest-20261012.json"));
+        var reports = new JArray(); var history = serializer.m_DataList.ToList();
+        string[] names = { "m_SpatialDeviceGoal", "m_RoomTaskSequence", "m_RoomTaskSequenceModel", "m_RoomTaskSequenceBridge",
+            "m_RoomTaskSequenceAvatar", "m_RoomTaskSequenceEnvironment", "m_PendingSelfInspection" };
+        var saved = names.ToDictionary(n => n, n => Get(chat, n));
+        try
+        {
+            foreach (JObject row in fixture["cases"])
+            {
+                string request = (string)row["originalRequest"];
+                yield return PrepareRoomPlanning(chat, bridge, request);
+                model.Decisions.Last().Complete(true, "{\"intent\":\"none\",\"origin\":\"none\",\"evidence\":\"\"}", "narrow-movement-fixture");
+                int generation = (int)Get(chat, "m_FormalResponseGeneration");
+                Call(chat, "RememberFirstReplyRequestSemantics", new FirstReplyCompletion { Disposition = FirstReplyDisposition.Tools, RequestKind = "action" }, generation, model);
+                var observed = (SceneVisionObservation)Call(chat, "GetFormalSceneObservation", generation);
+                Set(chat, "m_SpatialDeviceGoal", null); Set(chat, "m_WorkReviewOpen", true); Set(chat, "m_WorkNoProgress", false);
+                Set(chat, "m_AgentCurrentRoundIsTick", true); Set(chat, "m_FormalResponseGeneration", ++generation);
+                Call(chat, "BindFormalSceneObservation", observed, generation);
+                string action = "latest-return-" + row["name"];
+                object oldId = Get(bridge, "actionId"), oldPhase = Get(bridge, "phase"), oldReason = Get(bridge, "reason"), oldDiagnostic = Get(bridge, "latestDiagnostic");
+                try
+                {
+                    Set(bridge, "actionId", action); Call(bridge, "SetFact", "moving", "owner-bound return in progress");
+                    Set(chat, "m_RoomTaskIntent", "approach"); Set(chat, "m_RoomTaskActionId", action); Set(chat, "m_RoomTaskDispatch", "attempt-submitted");
+                    Call(chat, "RecordWorkRoomTaskContext");
+                    var sequence = (JObject)row["taskSequence"].DeepClone();
+                    sequence["workEpoch"] = (int)Get(chat, "m_WorkEpoch"); sequence["userTurn"] = ((JObject)Call(chat, "ReadMovementReplySemantics", generation))["userTurn"];
+                    sequence["request"] = request;
+                    sequence["steps"][0]["status"] = "completed"; sequence["steps"][0]["receipt"] = row["resultFacts"].DeepClone();
+                    sequence["steps"][1]["status"] = "running"; sequence["steps"][1]["actionId"] = action;
+                    Set(chat, "m_RoomTaskSequence", sequence); Set(chat, "m_RoomTaskSequenceModel", model); Set(chat, "m_RoomTaskSequenceBridge", bridge);
+                    Set(chat, "m_RoomTaskSequenceAvatar", bridge.avatar); Set(chat, "m_RoomTaskSequenceEnvironment", bridge.environmentRoot);
+                    Call(chat, "ArchiveDeviceEvent", (JObject)row["resultFacts"]);
+                    serializer.m_DataList = history.ToList();
+                    foreach (JObject message in row["history"]) serializer.m_DataList.Add(new LLM.SendData((string)message["role"], (string)message["content"]));
+                    Set(chat, "m_PendingSelfInspection", "Pending non-movement result must remain unread.");
+                    Call(chat, "StageFormalObservationFrame", (string)row["frame"], generation);
+                    int before = model.Speech.Count, operations = bridge.Controller.OperationRevision;
+                    Call(chat, "DispatchPlannedMovementRoomReply", observed?.ImageDataUrl, generation);
+                    var sent = model.Speech.Last();
+                    Require(model.Speech.Count == before + 1 && sent.Stage == FormalResponseStage.CommittedSpatialReply && sent.Input == "",
+                        "Typed continuation producer adds no duplicate perception/feedback document.");
+                    Require(sent.Context.Contains(action) && sent.Context.Contains(request) && sent.Context.Contains((string)row.SelectToken("resultFacts.lastAction.actionId")),
+                        "Latest whole request, same-action live receipt and earlier actual device result survive.");
+                    Require(!sent.Context.Contains("knownObjectHistory") && !sent.Context.Contains("sceneSearch") && Get(chat, "m_StagedFormalObservation") == null,
+                        "Observed object/search details are not rebuilt as a movement report and staged frame is consumed without acknowledgement.");
+                    var wireHistory = typeof(ChatQW).GetMethod("CreateObservationRequestHistory", Flags | System.Reflection.BindingFlags.Static).Invoke(serializer, new object[] { serializer.m_DataList, sent.Image });
+                    string wire = (string)typeof(ChatQW).GetMethod("BuildStageRequestJsonForMessages", Flags).Invoke(serializer,
+                        new object[] { wireHistory, true, sent.Context, sent.Input, sent.Stage });
+                    object[] admission = { wire, null };
+                    Require((bool)typeof(ChatQW).GetMethod("AdmitSceneSpeechWire", Flags | System.Reflection.BindingFlags.Static).Invoke(null, admission), "Latest complete movement wire fits unchanged admission ceilings.");
+                    var messages = (JArray)JObject.Parse(wire)["messages"];
+                    Require(!((string)messages.Last["content"]).Contains("\"replyFacts\"") && bridge.Controller.OperationRevision == operations,
+                        "Final writing instruction does not duplicate bound facts or execute movement.");
+                    Require((string)Get(chat, "m_PendingSelfInspection") == "Pending non-movement result must remain unread.", "Narrow report does not acknowledge unsent unrelated observations.");
+                    string directory = Path.Combine(output, "latest-movement-" + row["name"]); Directory.CreateDirectory(directory);
+                    File.WriteAllText(Path.Combine(directory, "request.json"), wire); File.WriteAllText(Path.Combine(directory, "context.txt"), sent.Context);
+                    reports.Add(new JObject { ["name"] = row["name"], ["sourceLine"] = row["sourceLine"], ["budget"] = (JObject)admission[1],
+                        ["sourceFrameCharacters"] = ((string)row["frame"]).Length, ["recordedHistoryMessages"] = ((JArray)row["history"]).Count,
+                        ["recordedHistoryCharacters"] = row["history"].Sum(m => ((string)m["content"]).Length),
+                        ["contextCharacters"] = sent.Context.Length, ["feedbackCharacters"] = sent.Input.Length });
+                    Call(chat, "CancelRoomSpeechReview", "latest-narrow-regression-complete");
+                }
+                finally { Set(bridge, "actionId", oldId); Set(bridge, "phase", oldPhase); Set(bridge, "reason", oldReason); Set(bridge, "latestDiagnostic", oldDiagnostic); }
+            }
+        }
+        finally { foreach (var item in saved) Set(chat, item.Key, item.Value); serializer.m_DataList = history; }
+        LastDecisionFailureReport["latestMovementProducerBudgets"] = reports;
     }
 }

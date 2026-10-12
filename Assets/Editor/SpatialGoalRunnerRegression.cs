@@ -11,7 +11,7 @@ using UnityEngine;
 
 /// <summary>Real user entry, reviewed authority, bounded search, native approach and device readback.
 /// The fixture controls semantic replies only; no follow-up RoomTask decision supplies substeps.</summary>
-public static class SpatialGoalRunnerRegression
+public static partial class SpatialGoalRunnerRegression
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
     private const string OffRequest = "请把眼前那盏小灯关掉，如果需要就先靠近。";
@@ -227,6 +227,7 @@ public static class SpatialGoalRunnerRegression
         yield return AnswerThenResumePlayback(chat, bridge, model, lamp, false, true);
         yield return LatestHumanPreface(chat, bridge, model, lamp, native);
         yield return InitialHumanPreface(chat, bridge, model, lamp);
+        yield return BodyHandoff(chat, bridge, model, lamp);
         yield return SceneGoalReferentRegression.RunDialogueRoutingChecks(chat, bridge, model, Path.GetDirectoryName(directory));
     }
 
@@ -276,6 +277,16 @@ public static class SpatialGoalRunnerRegression
         JObject referent = null, bool delayInitial = false, bool holdApproval = false, bool spokenInput = false)
     {
         yield return Prepare(chat, bridge, lamp, text, state, spokenInput);
+        if (name == "same-entity-reopen")
+        {
+            var history = (JArray)Call(chat, "ReadHistoricalDeviceEvents");
+            Require(history.OfType<JObject>().Any(e => (string)e.SelectToken("goal.boundEntityId") == lamp.EntityId &&
+                (string)e.SelectToken("goal.desiredState") == "off" && (string)e.SelectToken("lastAction.phase") == "performed" &&
+                (int?)e["sourceUserTurn"] < CurrentTurn(chat)), "Actual off event survives the real new-user-turn/reset boundary.");
+            Require((bool?)((JObject)Call(chat, "BuildMovementPriorResults"))?["historicalResult"] != true,
+                "Past evidence does not become the new work's own completed prerequisite.");
+            File.WriteAllText(Path.Combine(directory, "cross-user-device-history.json"), history.ToString(Formatting.Indented));
+        }
         var run = new Run { name = name, text = text, state = state, rooms = RoomPlans(model), searches = model.SceneSearchRequests.Count,
             matches = model.Matches.Count, speech = model.Speech.Count, probes = model.Probes.Count,
             operation = bridge.Controller.OperationRevision, sequence = (int)Get(chat, "m_MotionSequence"),
@@ -307,6 +318,7 @@ public static class SpatialGoalRunnerRegression
                 new JObject { ["id"] = "s1", ["quote"] = "把眼前那盏小灯关掉", ["kind"] = "device-state", ["desiredState"] = "off", ["after"] = new JArray() },
                 new JObject { ["id"] = "s2", ["quote"] = "回到我身边", ["kind"] = "approach", ["desiredState"] = null, ["after"] = new JArray("s1") });
             proposal["taskStep"] = "s1";
+            proposal["taskCoverage"] = new JArray(new JObject { ["quote"] = text, ["kind"] = "action", ["stepIds"] = new JArray("s1", "s2") });
         }
         if (delayInitial) yield return Wait(() => Time.realtimeSinceStartup - run.source.CapturedAtRealtime > 12.1f, 15, "actual source expires before first planner callback");
         run.initial.Complete(true, proposal.ToString(), "controlled-unified-initial");
@@ -377,6 +389,16 @@ public static class SpatialGoalRunnerRegression
         Require((string)Goal(chat)["status"] == "satisfied" && (bool?)Goal(chat)["completionEvidence"]?["actual"]?["on"] == (run.state == "on") &&
             lamp.ReadState().on == (run.state == "on"), "Completion requires the requested actual lamp state and immutable runtime proof.");
         int completedGeneration = (int)Get(chat, "m_FormalResponseGeneration");
+        var events = (JArray)Call(chat, "ReadHistoricalDeviceEvents");
+        Require(events.Count > 0 && (string)events.Last().SelectToken("goal.boundEntityId") == lamp.EntityId &&
+            (string)events.Last().SelectToken("lastAction.phase") == "performed", "Actual operation archived independently of work ownership.");
+        events.Last()["goal"]["desiredState"] = "tampered";
+        Require((string)((JArray)Call(chat, "ReadHistoricalDeviceEvents")).Last().SelectToken("goal.desiredState") == run.state,
+            "Historical reporting cannot mutate the archive.");
+        float eventSession = (float)Get(chat, "m_AgentSessionStartTime");
+        Set(chat, "m_AgentSessionStartTime", eventSession + 1);
+        try { Require(((JArray)Call(chat, "ReadHistoricalDeviceEvents")).Count == 0, "Session replacement cannot borrow device history."); }
+        finally { Set(chat, "m_AgentSessionStartTime", eventSession); }
         try
         {
             Set(chat, "m_FormalResponseGeneration", completedGeneration + 1);
@@ -462,14 +484,76 @@ public static class SpatialGoalRunnerRegression
         var terminal = model.Speech.Last(); int history = model.m_DataList.Count;
         Require(SpatialGoalResultContextPolicy.TryReadContext(terminal.Context, out string original, out var facts) && original == run.text &&
             (string)facts["goal"]?["status"] == "satisfied" && !terminal.RecordAssistantHistory, "Terminal generation receives proof and the original task.");
-        string text = run.state == "on" ? "The requested lamp is now on." : "The requested lamp is now off.";
-        terminal.SpeechCallback(new SpeechText(text, "en", actionDependency: SpeechActionDependency.Independent));
+        bool noProgressRepair = run.name == "expired-first-room-frame";
+        bool testRepair = run.name == "reviewed-first-write" || noProgressRepair;
+        string text = testRepair ? "桌上的小灯已成功关闭。" : run.state == "on" ? "The requested lamp is now on." : "The requested lamp is now off.";
+        terminal.SpeechCallback(new SpeechText(text, testRepair ? "ja" : "en", actionDependency: SpeechActionDependency.Independent));
         Require(model.m_DataList.Count == history && ((SpeechTextBuffer)Get(chat, "m_SentenceBuffer")).Length == 0,
             "Unaudited terminal speech is neither published nor queued.");
         int reviews = model.Decisions.Count(request => request.Kind == "room-review"); terminal.SpeechCompleteCallback(text);
         yield return Wait(() => model.Decisions.Count(request => request.Kind == "room-review") == reviews + 1, 8, "terminal result consistency audit");
         heldPlayback?.Dispose(); heldPlayback = null; Set(chat, "<IsAISpeaking>k__BackingField", false);
         var reviewer = model.Decisions.Last(request => request.Kind == "room-review");
+        if (testRepair)
+        {
+            string proofBefore = Goal(chat)["completionEvidence"].ToString(); int writers = model.Speech.Count;
+            string rejection = new JObject { ["verdict"] = "inconsistent", ["factScope"] = "scene-action", ["resultReport"] = run.state,
+                ["actualLanguage"] = "zh", ["reason"] = "Chinese result was incorrectly tagged as Japanese." }.ToString();
+            reviewer.Complete(true, rejection, "language-test:terminal-mismatch");
+            yield return Wait(() => model.Speech.Count == writers + 1, 8, "one terminal language correction");
+            var repair = model.Speech.Last(); var packet = JObject.Parse(repair.Input);
+            Require(repair.Stage == FormalResponseStage.SpatialGoalResult && !repair.RecordAssistantHistory &&
+                (string)packet["kind"] == "terminal-result-speech-repair" && (string)packet["requiredOutputLanguage"] == "ja" &&
+                (string)packet["rejectedPublicSpeech"] == text && packet["humanInput"] == null && packet["boundReplyFacts"] == null,
+                "Actual rejection callback dispatches the typed terminal correction without duplicating generic human/result context.");
+            Require(SpatialGoalResultContextPolicy.TryReadContext(repair.Context, out string repairOriginal, out var repairFacts) &&
+                repairOriginal == run.text && JToken.DeepEquals(SpatialGoalResultContextPolicy.ProjectResultFacts(repairFacts)?["goal"]?["completionEvidence"], facts["goal"]["completionEvidence"]),
+                "Correction retains the complete user task and identical successful device proof.");
+            var host = new GameObject("TerminalCorrectionSerializer"); host.SetActive(false);
+            var assets = new[] { "persona", "language", "behavior" }.Select(name =>
+                new TextAsset(File.ReadAllText("Assets/AIChatTookit/Prompts/" + name + ".txt")) { name = name }).ToArray();
+            try
+            {
+                var provider = host.AddComponent<ChatQW>(); provider.m_Backend = ChatQW.BackendType.Local;
+                typeof(LLM).GetField("m_PromptFiles", Flags).SetValue(provider, assets);
+                string wire = (string)typeof(ChatQW).GetMethod("BuildSpatialGoalResultRequestJsonForMessages", Flags).Invoke(provider,
+                    new object[] { model.m_DataList, true, repair.Context, repair.Input, repair.Image });
+                Require(wire != null, "Actual runtime terminal repair context and current RGB fit the unchanged 6000 budget.");
+                File.WriteAllText(Path.Combine(directory, "terminal-language-" + (noProgressRepair ? "no-progress" : "repair") + "-request.json"), wire);
+                File.WriteAllText(Path.Combine(directory, "terminal-language-" + (noProgressRepair ? "no-progress" : "repair") + "-feedback.json"), repair.Input);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(host); foreach (var asset in assets) UnityEngine.Object.DestroyImmediate(asset); }
+            reviewer.Complete(true, rejection, "language-test:duplicate-terminal-mismatch");
+            Require(model.Speech.Count == writers + 1 && model.m_DataList.Count == history &&
+                Goal(chat)["completionEvidence"].ToString() == proofBefore && !lamp.ReadState().on,
+                "Duplicate rejection cannot retry, release old speech, replay an action or change the actual device state.");
+            if (noProgressRepair)
+            {
+                // Actual live-model failure: same Chinese words tagged ja.
+                // One failed correction must settle truthfully, without another
+                // generation or an invented context-budget/device failure.
+                repair.SpeechCallback(new SpeechText(text, "ja", actionDependency: SpeechActionDependency.Independent));
+                repair.SpeechCompleteCallback(text);
+                string trusted = SpatialGoalResultContextPolicy.BuildTrustedReport(repairFacts, "ja");
+                Require(model.m_DataList.Count == history + 1 && model.m_DataList.Last().content.Contains(trusted) &&
+                    !model.m_DataList.Last().content.Contains(text) && !(bool)Get(chat, "m_FormalResponseInFlight") &&
+                    model.Speech.Count == writers + 1 && model.Decisions.Count(request => request.Kind == "room-review") == reviews + 1,
+                    "Identical wrong-language repair settles once with the verified Japanese result, without another model request.");
+                Require(!(bool)Call(chat, "CurrentFormalGenerationFailed", (int)Get(chat, "m_FormalResponseGeneration")) &&
+                    Goal(chat)["completionEvidence"].ToString() == proofBefore && !lamp.ReadState().on,
+                    "A failed language rewrite creates neither a fake response-budget failure nor a failed/repeated device operation.");
+                LastReport["terminalLanguageNoProgress"] = new JObject { ["boundedAttempts"] = 1,
+                    ["actualCallback"] = true, ["published"] = model.m_DataList.Last().content, ["trustedResult"] = trusted };
+                yield break;
+            }
+            string corrected = "テーブルの小さなランプを消しました。";
+            repair.SpeechCallback(new SpeechText(corrected, "ja", actionDependency: SpeechActionDependency.Independent));
+            repair.SpeechCompleteCallback(corrected);
+            yield return Wait(() => model.Decisions.Count(request => request.Kind == "room-review") == reviews + 2, 8, "repaired terminal independently reviewed");
+            reviewer = model.Decisions.Last(request => request.Kind == "room-review");
+            LastReport["terminalLanguageRepair"] = new JObject { ["boundedAttempts"] = 1, ["actualCallback"] = true,
+                ["resultProofUnchanged"] = true, ["request"] = "terminal-language-repair-request.json" };
+        }
         reviewer.Complete(true, new JObject { ["verdict"] = "consistent", ["factScope"] = "scene-action", ["resultReport"] = run.state,
             ["reason"] = "Controlled exact runtime readback supports the public result." }.ToString(), "controlled-unified-result-audit");
         Require(model.m_DataList.Count == history + 1 && !(bool)Get(chat, "m_FormalResponseInFlight"), "Only the one audited terminal is committed.");

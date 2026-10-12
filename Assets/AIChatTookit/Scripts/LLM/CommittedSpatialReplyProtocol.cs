@@ -97,7 +97,9 @@ public static class CommittedSpatialReplyProtocol
         // ASR or treating an old command as new authority during a result reply.
         var reference = new JObject {
             ["quotedHumanTurn"] = currentHumanTurn ?? "",
-            ["replyFacts"] = ReadReplyFacts(context),
+            // The bound document already appears in the system context. Copying
+            // it here doubles receipts and bypasses joint context projection.
+            ["replyFactsSource"] = ReadReplyFacts(context) == null ? null : ReplyFactsMarker,
             ["scope"] = "Exact existing user record for this reply, not another utterance or new action authorization. " +
                 "Use its complete meaning and the actual prior dialogue to identify the question being answered. " +
                 "On autonomous or execution-feedback replies, the runtime facts still determine whether any new human turn exists; " +

@@ -227,6 +227,7 @@ public static class RoomDecisionTransportRegression
         var guide = SceneObjectProtocolRegression.ExpandNativeSchema(JObject.Parse(actual.Substring(prefix.Length)));
         var expected = (JObject)schema.DeepClone(); expected.Remove("oneOf");
         var definitions = (JObject)guide.DeepClone(); definitions.Remove("intentConstraints"); definitions.Remove("directionConvention"); definitions.Remove("noActionReply");
+        definitions.Remove("intentConstraintEncoding");
         Require(((string)guide["noActionReply"] ?? "").Contains("replyScope=spatial"), "The actual wire teaches no-action spatial answers.");
         Require(JToken.DeepEquals(definitions, expected) && JToken.DeepEquals(guide["properties"], schema["properties"]) &&
             JToken.DeepEquals(guide["required"], schema["required"]) && guide["oneOf"] == null &&

@@ -521,14 +521,14 @@ public static class NevaSceneVisionIntegrationRegression
         var staleRoom = model.Decisions.Last(); int staleCount = model.Decisions.Count;
         Set(chat, "m_SceneObservationMaxAgeSeconds", .001f); yield return null;
         staleRoom.Complete(true, "{\"intent\":\"approach\",\"origin\":\"user\",\"evidence\":\"请走到我身边。\"}", "controlled-expired-approach");
-        Check(bridge.Controller.OperationRevision == operation && !bridge.ReservesBody, "Expired room action was dispatched before a fresh decision.");
+        Check(bridge.Controller.OperationRevision == operation && !bridge.ReservesBody, "Expired room action was dispatched before a fresh capture.");
         Set(chat, "m_SceneObservationMaxAgeSeconds", 12f);
-        yield return Wait(() => model.Decisions.Count == staleCount + 1, "Bounded room refresh");
-        var refreshed = model.Decisions.Last();
-        Check(refreshed.Image != staleRoom.Image || !refreshed.Input.Contains(roomObservation.CaptureId), "Room refresh reused the obsolete capture identity.");
-        refreshed.Complete(true, None, "controlled-none-after-refresh");
-        Check(bridge.Controller.OperationRevision == operation, "Fresh none decision unexpectedly generated motion.");
-        Case("expired-room-approach-requires-fresh-image-and-new-decision");
+        yield return Wait(() => (string)Get(chat, "m_RoomTaskDispatch") != "not-submitted", "Bounded room refresh and current user-target check");
+        Check(model.Decisions.Count == staleCount && chat.SceneVisionCapture.LatestObservation.CaptureId != roomObservation.CaptureId,
+            "Fresh user-target check reuses the reviewed intention without another full planning request.");
+        bridge.StopMovement("expiry-regression-end", "End controlled movement refresh");
+        operation = bridge.Controller.OperationRevision;
+        Case("expired-room-approach-fresh-image-without-duplicate-planning");
 
         // Cancel through the actual formal-start lifecycle while the real capture
         // request is queued or awaiting GPU readback, before any model dispatch.
@@ -1034,6 +1034,17 @@ public sealed class NevaSceneVisionIntegrationModel : LLM
     public override bool SupportsRoomTaskMessages => true;
     public bool TaskSequencesEnabled;
     public override bool SupportsRoomTaskSequences => TaskSequencesEnabled;
+    public bool ControlReviewsEnabled;
+    public readonly List<Request> ControlReviews = new List<Request>();
+    public override bool SupportsRoomPreparationMessages => ControlReviewsEnabled;
+    public override void PostRoomPreparationMessage(string input, Action<bool, string, string> callback)
+    {
+        if (!ControlReviewsEnabled) { callback(false, "", "controlled-preparation-disabled"); return; }
+        var request = new Request { Kind = "control-review", Input = input, RoomCallback = callback };
+        request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildRoomPreparationRequestJson", input);
+        ControlReviews.Add(request); Save(request);
+    }
+    public override void CancelRoomPreparationMessage() { }
     public override bool SupportsRoomDeviceGoalReview => true;
     public override void PostRoomDeviceGoalReviewMessage(string input, Action<bool, string, string> callback)
     {

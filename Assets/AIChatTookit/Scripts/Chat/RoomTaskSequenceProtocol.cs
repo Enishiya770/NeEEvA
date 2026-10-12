@@ -9,6 +9,12 @@ public static class RoomTaskSequenceProtocol
     public const string Contract =
         "当taskSequenceRequired=true，先完整拆解本轮实际请求，再选本次可执行步骤，不能只处理最后一句。" +
         "taskSequence为空时输出taskPlan数组（最多6步），每步有id、quote、kind、desiredState、after。" +
+        "同时输出taskCoverage：按原文顺序逐段覆盖完整currentUserText，每段quote逐字引用连续原文，段间只可略过空白和标点，不能略过任何实际文字。" +
+        "每个独立要求都须单独检查，不能因后一句更长就漏掉开头的停止、取消或限制。每段kind=action/constraint/answer/context，stepIds列对应taskPlan步骤id；非action段stepIds为空。" +
+        "语气词、称呼、重试前言和无关背景也必须用context段逐字覆盖，不能从第一个动作才开始引用。" +
+        "每个taskPlan步骤须被action段覆盖。重复强调或同义改述同一次执行可由多段共同映射同一步，须独立语义核对；其quote原文须被这些段覆盖。不同对象、不同状态或明确再次执行必须分步，不得去重。背景、否定、条件和问题也要覆盖，但不得把它们伪造成执行要求。" +
+        "currentFacts/execution表示仍在运行的旧动作，不等于已经停止。用户要求终止跟随或改做另一占用身体的任务时，先解释完整要求中的交接；确需停止的步骤用stop-moving，后续身体任务依赖其真实完成。" +
+        "用户要求继续跟随、只回答或明确不要停止时，不得擅自创建停止步骤；停止当前移动也不等于撤销后半句新的设备操作。" +
         "quote逐字摘自完整currentUserText的连续子句，保留否定和条件、不改变标点；历史只解释指代。" +
         "id用s1、s2等；kind为device-state、approach、follow、stop-moving、observation、other。" +
         "设备目标一整个寻找/靠近/开关/核验过程算一个device-state，desiredState为on/off，其余为null。" +
@@ -17,6 +23,7 @@ public static class RoomTaskSequenceProtocol
         "after列必须先完成的早先步骤id，明确的先后关系不能省略。独立步骤可以无依赖；不把接近设备当作已完成设备目标。" +
         "已有taskSequence时沿用其步骤，不输出新taskPlan；其中状态和回执由引擎提供，不能自行宣称完成或删除未完成项。" +
         "taskStep选择readyStepIds中的一个；执行必须符合该步骤kind与目标，device-state首次须附deviceGoal，其requestQuote须对应所选步骤的quote，不能选同类型的后续物件，不得用approach代替。" +
+        "新taskPlan中无前置步骤的未完成项就是就绪步骤；有就绪步骤就必须选择它的id。即使intent=none且附deviceGoal来启动统一设备任务，taskStep仍必须指向本次device-state，不能是null。" +
         "完整原话、条件和对象仍约束本次决定，taskStep本身不授权动作。没有可执行步骤时taskStep=null、intent=none；" +
         "other只可交给正常工具通道，不能通过房间移动冒充完成。用户新取消/限制优先于旧任务。";
 
@@ -25,7 +32,7 @@ public static class RoomTaskSequenceProtocol
 
     public static string DecisionOnly(string json)
     {
-        try { var value = Parse(json); value.Remove("taskPlan"); value.Remove("taskStep"); return value.ToString(Formatting.None); }
+        try { var value = Parse(json); value.Remove("taskPlan"); value.Remove("taskCoverage"); value.Remove("taskStep"); return value.ToString(Formatting.None); }
         catch (Exception) { return json; }
     }
 
@@ -38,18 +45,19 @@ public static class RoomTaskSequenceProtocol
         if (ready != null) step["enum"] = new JArray(ready.Select(x => x.DeepClone()).Concat(new[] { JValue.CreateNull() }));
         var plan = JObject.Parse("{\"type\":\"array\",\"maxItems\":6,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"id\",\"quote\",\"kind\",\"desiredState\",\"after\"],\"properties\":{\"id\":{\"type\":\"string\",\"maxLength\":16},\"quote\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":160},\"kind\":{\"type\":\"string\",\"enum\":[\"device-state\",\"approach\",\"follow\",\"stop-moving\",\"observation\",\"other\"]},\"desiredState\":{\"type\":[\"string\",\"null\"],\"enum\":[\"on\",\"off\",null]},\"after\":{\"type\":\"array\",\"maxItems\":5,\"uniqueItems\":true,\"items\":{\"type\":\"string\",\"maxLength\":16}}}}}");
         var result = Parse(schema);
+        var coverage = JObject.Parse("{\"type\":\"array\",\"minItems\":1,\"maxItems\":24,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"quote\",\"kind\",\"stepIds\"],\"properties\":{\"quote\":{\"type\":\"string\",\"minLength\":1},\"kind\":{\"type\":\"string\",\"enum\":[\"action\",\"constraint\",\"answer\",\"context\"]},\"stepIds\":{\"type\":\"array\",\"maxItems\":6,\"uniqueItems\":true,\"items\":{\"type\":\"string\",\"maxLength\":16}}}}}");
         void Extend(JObject node)
         {
             var properties = node["properties"] as JObject;
             if (properties != null)
             {
                 var ordered = new JObject();
-                if (sequence == null) ordered["taskPlan"] = plan.DeepClone();
+                if (sequence == null) { ordered["taskCoverage"] = coverage.DeepClone(); ordered["taskPlan"] = plan.DeepClone(); }
                 ordered["taskStep"] = step.DeepClone();
                 foreach (var p in properties.Properties()) ordered[p.Name] = p.Value.DeepClone();
                 node["properties"] = ordered;
                 if (!(node["required"] is JArray required)) node["required"] = required = new JArray();
-                if (sequence == null) required.Add("taskPlan");
+                if (sequence == null) { required.Add("taskCoverage"); required.Add("taskPlan"); }
                 required.Add("taskStep");
             }
             if (node["oneOf"] is JArray children) foreach (var child in children.OfType<JObject>()) Extend(child);
@@ -77,9 +85,101 @@ public static class RoomTaskSequenceProtocol
                     s["desiredState"]?.Type != JTokenType.Null) return false;
                 seen.Add(id);
             }
+            if (!TryCoverage(Parse(json)["taskCoverage"] as JArray, rows, currentRequest, out reason)) return false;
             plan = (JArray)rows.DeepClone(); reason = null; return true;
         }
         catch (Exception) { return false; }
+    }
+
+    public static bool TryCoverage(JArray coverage, JArray steps, string request, out string reason)
+    {
+        reason = "invalid-task-sequence-coverage";
+        if (coverage == null || coverage.Count == 0 || coverage.Count > 24) return false;
+        request = request ?? "";
+        int cursor = 0;
+        var mapped = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+        var spans = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<Tuple<int, int>>>();
+        foreach (var item in coverage)
+        {
+            if (!(item is JObject row) || row.Count != 3 || row["quote"]?.Type != JTokenType.String ||
+                row["kind"]?.Type != JTokenType.String || !(row["stepIds"] is JArray ids)) return false;
+            string quote = (string)row["quote"], kind = (string)row["kind"];
+            if (string.IsNullOrWhiteSpace(quote) || !(new[] { "action", "constraint", "answer", "context" }).Contains(kind) ||
+                (kind == "action" ? ids.Count == 0 : ids.Count != 0)) return false;
+            int start = request.IndexOf(quote, cursor, StringComparison.Ordinal);
+            if (start < cursor || !request.Substring(cursor, start - cursor).All(c => char.IsWhiteSpace(c) || char.IsPunctuation(c))) return false;
+            cursor = start + quote.Length;
+            if (ids.Values<string>().Distinct().Count() != ids.Count) return false;
+            foreach (var id in ids)
+            {
+                if (id.Type != JTokenType.String) return false;
+                var step = steps.OfType<JObject>().FirstOrDefault(s => (string)s["id"] == (string)id);
+                if (step == null) return false;
+                mapped.Add((string)id);
+                if (!spans.TryGetValue((string)id, out var list)) spans[(string)id] = list = new System.Collections.Generic.List<Tuple<int, int>>();
+                list.Add(Tuple.Create(start, cursor));
+            }
+        }
+        if (mapped.Count != steps.Count || !request.Substring(cursor).All(c => char.IsWhiteSpace(c) || char.IsPunctuation(c))) return false;
+        foreach (var step in steps.OfType<JObject>())
+        {
+            string quote = (string)step["quote"];
+            var list = spans[(string)step["id"]];
+            int start = request.IndexOf(quote, StringComparison.Ordinal);
+            bool covered = false;
+            while (start >= 0)
+            {
+                covered = Enumerable.Range(start, quote.Length).All(i => char.IsWhiteSpace(request[i]) ||
+                    char.IsPunctuation(request[i]) || list.Any(s => i >= s.Item1 && i < s.Item2));
+                if (covered) break;
+                start = request.IndexOf(quote, start + 1, StringComparison.Ordinal);
+            }
+            if (!covered) return false;
+        }
+        reason = null; return true;
+    }
+
+    public static bool RequiresEquivalenceReview(string json)
+    {
+        try {
+            var ids = ((JArray)Parse(json)["taskCoverage"]).OfType<JObject>()
+                .SelectMany(row => ((JArray)row["stepIds"]).Values<string>());
+            return ids.GroupBy(id => id).Any(group => group.Count() > 1);
+        } catch (Exception) { return false; }
+    }
+
+    public static JArray LiteralQuoteFeedback(string json, string request)
+    {
+        var errors = new JArray(); request = request ?? "";
+        void Add(string path, string reason, string quote) {
+            if (errors.Count < 8) errors.Add(new JObject { ["path"] = path, ["reason"] = reason,
+                ["quote"] = quote == null ? null : quote.Substring(0, Math.Min(160, quote.Length)) });
+        }
+        try {
+            var input = Parse(json);
+            var plan = input["taskPlan"] as JArray;
+            if (plan != null) for (int i = 0; i < plan.Count; ++i) {
+                string quote = plan[i]?["quote"]?.Type == JTokenType.String ? (string)plan[i]["quote"] : null;
+                if (string.IsNullOrEmpty(quote) || request.IndexOf(quote, StringComparison.Ordinal) < 0)
+                    Add("taskPlan[" + i + "].quote", "not-verbatim-current-user-text", quote);
+            }
+            var coverage = input["taskCoverage"] as JArray;
+            if (coverage != null) {
+                int cursor = 0;
+                for (int i = 0; i < coverage.Count; ++i) {
+                    string quote = coverage[i]?["quote"]?.Type == JTokenType.String ? (string)coverage[i]["quote"] : null;
+                    int start = string.IsNullOrEmpty(quote) ? -1 : request.IndexOf(quote, cursor, StringComparison.Ordinal);
+                    if (start < 0) { Add("taskCoverage[" + i + "].quote", "not-verbatim-in-remaining-source", quote); continue; }
+                    string gap = request.Substring(cursor, start - cursor);
+                    if (gap.Any(c => !char.IsWhiteSpace(c) && !char.IsPunctuation(c)))
+                        Add("taskCoverage[" + i + "]", "uncovered-original-text-before-this-row", gap);
+                    cursor = start + quote.Length;
+                }
+                string rest = request.Substring(cursor);
+                if (rest.Any(c => !char.IsWhiteSpace(c) && !char.IsPunctuation(c))) Add("taskCoverage", "uncovered-original-text-at-end", rest);
+            }
+        } catch (Exception) { } // Diagnostic only; the strict parser remains the authority.
+        return errors;
     }
 
     public static JArray Ready(JArray steps) => new JArray(steps.OfType<JObject>().Where(s => (string)s["status"] == "pending" &&

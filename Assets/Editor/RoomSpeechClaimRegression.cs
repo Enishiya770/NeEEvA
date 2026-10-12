@@ -424,6 +424,43 @@ public static partial class RoomSpeechClaimRegression
                 ["reviewRequest"] = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(), null, true)),
                 ["scope"] = "Latest candidate or multilingual counterfactual, controlled observation facts; no image recognition or action execution claimed." });
         }
+        var deviceHistory = JArray.Parse(File.ReadAllText("Assets/Editor/Fixtures/RoomStepContext.latest-20261012.json"));
+        foreach (string scenario in new[] { "past-event", "superseded-current-state", "wrong-object", "ordered-events", "ordered-events-en", "ordered-events-ja" })
+        {
+            string speech = scenario == "past-event" ? "我已经到你身边了。刚才我把植物旁边的小灯关掉过。" :
+                scenario == "superseded-current-state" ? "我已经到你身边了。植物旁边的小灯现在仍然关着。" :
+                scenario == "wrong-object" ? "我已经到你身边了。刚才我关闭了卧室的吊灯。" :
+                scenario == "ordered-events-en" ? "I'm here beside you now. Earlier I turned off the little lamp by the plant, then turned the same lamp back on." :
+                scenario == "ordered-events-ja" ? "もう隣にいるよ。さっき植物のそばの小さなランプを消して、その後、同じランプをまたつけたわ。" :
+                "我已经到你身边了。刚才我先关掉了植物旁边的小灯，后来又把同一盏灯打开了。";
+            string language = scenario.EndsWith("-en") ? "en" : scenario.EndsWith("-ja") ? "ja" : "zh";
+            Add("device-history-" + scenario, speech, "arrived", "movement", language, "arrived", scenario == "past-event" || scenario.StartsWith("ordered-events"));
+            var row = (JObject)rows.Last(); var input = (JObject)row["input"];
+            input["historicalDeviceEvents"] = new JArray(deviceHistory.Take(scenario == "past-event" || scenario == "wrong-object" ? 1 : 2)
+                .Select(f => RoomTaskContextPolicy.DeviceEvent((JObject)f["resultFacts"])));
+            row["reviewRequest"] = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(), null, true));
+        }
+        foreach (var sample in new[] {
+            new[] { "latest-ja-negated-completion", "ご命令の通り、灯りを点灯して戻ってくるという動作は完了しておりません。システム側でタスクの開始がブロックされたため、実行に至っておりません。", "ja", "on" },
+            new[] { "zh-negated-on", "开灯并返回这件事还没完成，我还没能执行。", "zh", "on" },
+            new[] { "en-negated-on", "I have not completed turning on the lamp and returning to you. I could not start the task.", "en", "on" },
+            new[] { "ja-negated-off", "ランプを消す作業はまだ完了していないわ。", "ja", "off" },
+            new[] { "zh-negated-off", "关掉那盏灯的任务还没完成。", "zh", "off" }
+        })
+        {
+            Add(sample[0], sample[1], "incomplete", "device", sample[2], "incomplete");
+            var row = (JObject)rows.Last(); var input = (JObject)row["input"];
+            input["requestedUserText"] = sample[3] == "on" ? "开灯然后回来。" : "关掉那盏灯。";
+            input["dispatch"] = "device-task-start-unavailable";
+            var facts = (JObject)input["sceneActionFacts"];
+            facts["goal"] = new JObject { ["status"] = "blocked", ["ownerCurrent"] = true,
+                ["desiredState"] = sample[3], ["originalRequest"] = input["requestedUserText"].DeepClone(),
+                ["targetDescription"] = "lamp", ["completionEvidenceValid"] = false };
+            facts["lastAction"] = new JObject { ["phase"] = "blocked", ["reason"] = "device-task-start-unavailable", ["stateChanged"] = false };
+            facts["scope"] = "Controlled failed start: device state was not changed and the requested operation is incomplete.";
+            row["claimRequest"] = JObject.Parse((string)Call(model, "BuildSpeechClaimRequestJson", input.ToString()));
+            row["reviewRequest"] = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(), null, true));
+        }
         foreach (JObject row in rows)
         {
             row["languageRecheckRequest"] = JObject.Parse((string)Call(model,"BuildSpeechClaimRequest",row["input"].ToString(),

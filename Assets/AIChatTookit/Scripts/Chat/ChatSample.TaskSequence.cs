@@ -11,6 +11,8 @@ public partial class ChatSample
     private LLM m_RoomTaskSequenceModel;
     private ArdyRoomDialogueBridge m_RoomTaskSequenceBridge;
     private UnityEngine.Object m_RoomTaskSequenceAvatar, m_RoomTaskSequenceEnvironment;
+    private readonly System.Collections.Generic.HashSet<string> m_RoomTaskSequenceReviewedSteps = new System.Collections.Generic.HashSet<string>();
+    private float m_RoomTaskSequenceProgressCheckAt;
 
     private bool RoomTaskSequenceCurrent()
     {
@@ -67,7 +69,7 @@ public partial class ChatSample
         var result = (JObject)m_RoomTaskSequence.DeepClone();
         result["readyStepIds"] = RoomTaskSequenceProtocol.Ready((JArray)result["steps"]);
         result["scope"] = "Whole current request with engine-recorded progress. Pending predecessors forbid their successors. Receipts are historical events, not fresh state or permission; speech alone never completes a step. Each next action still needs current target, semantic and execution checks.";
-        return result;
+        return RoomTaskContextPolicy.Sequence(result);
     }
 
     private bool ValidateRoomTaskSequence(string json, RoomTaskProtocol.Decision decision, out string reason)
@@ -80,14 +82,39 @@ public partial class ChatSample
                 return RoomTaskSequenceProtocol.TrySelect(json, decision, plan, out m_RoomTaskSequenceSelection, out reason);
             foreach (var step in plan.OfType<JObject>()) step["status"] = "pending";
             m_RoomTaskSequence = new JObject { ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
-                ["request"] = m_ActionConstraints.CurrentUserText, ["steps"] = plan };
+                ["request"] = m_ActionConstraints.CurrentUserText, ["steps"] = plan,
+                ["coverage"] = JObject.Parse(json)["taskCoverage"]?.DeepClone() };
+            m_RoomTaskSequenceReviewedSteps.Clear(); m_RoomTaskSequenceProgressCheckAt = 0;
             m_RoomTaskSequenceModel = m_ChatSettings.m_ChatModel;
             m_RoomTaskSequenceBridge = GetComponent<ArdyRoomDialogueBridge>();
             m_RoomTaskSequenceAvatar = m_RoomTaskSequenceBridge.avatar; m_RoomTaskSequenceEnvironment = m_RoomTaskSequenceBridge.environmentRoot;
             Debug.Log("[Work/TaskSequence] " + m_RoomTaskSequence.ToString(Formatting.None), this);
             state = ReadRoomTaskSequence();
         }
-        return RoomTaskSequenceProtocol.TrySelect(json, decision, (JArray)state["steps"], out m_RoomTaskSequenceSelection, out reason);
+        if (!RoomTaskSequenceProtocol.TrySelect(json, decision, (JArray)state["steps"], out m_RoomTaskSequenceSelection, out reason)) return false;
+        // Do not skip an explicit ready stop while the old body task still owns
+        // execution, even if a draft incorrectly omitted its dependency edge.
+        if (m_RoomTaskSequenceBridge.IsFollowing || m_RoomTaskSequenceBridge.ReservesBody)
+        {
+            var steps = (JArray)state["steps"];
+            bool stopReady = steps.OfType<JObject>().Any(s => (string)s["kind"] == "stop-moving" &&
+                RoomTaskSequenceProtocol.Ready(steps).Values<string>().Contains((string)s["id"]));
+            if (stopReady && decision.intent != "stop-moving" &&
+                (decision.deviceGoal?.operation == "set" || decision.intent == "approach" || decision.intent == "follow" || decision.IsVisual))
+            { reason = "invalid-task-sequence-body-handoff"; return false; }
+        }
+        return true;
+    }
+
+    private bool RoomTaskSequenceUnfinished() => (ReadRoomTaskSequence()?["steps"] as JArray)?.OfType<JObject>()
+        .Any(step => (string)step["status"] != "completed") == true;
+
+    private bool SelectedRoomTaskSequenceIsDevice()
+    {
+        var state = ReadRoomTaskSequence();
+        return state?["steps"] is JArray steps && steps.OfType<JObject>().Any(step =>
+            (string)step["id"] == m_RoomTaskSequenceSelection && (string)step["kind"] == "device-state" &&
+            new[] { "pending", "running" }.Contains((string)step["status"]));
     }
 
     private void BindRoomTaskSequenceStep(string goalId = null)
@@ -100,11 +127,70 @@ public partial class ChatSample
             step["status"] = "completed";
             step["receipt"] = new JObject { ["intent"] = "inspect", ["dispatch"] = "read-only-checked", ["generation"] = m_FormalResponseGeneration,
                 ["scope"] = "Actual current target evidence was read; no movement, recognition or device operation was performed." };
+            ObserveRoomTaskSequenceProgress(true);
             return;
         }
         if (string.IsNullOrEmpty(goalId) && string.IsNullOrEmpty(m_RoomTaskActionId)) return;
         step["status"] = "running"; step["goalId"] = goalId; step["actionId"] = m_RoomTaskActionId;
         step["intent"] = m_RoomTaskIntent;
         step["generation"] = m_FormalResponseGeneration;
+        ObserveRoomTaskSequenceProgress(true);
+    }
+
+    private void AdoptPreparedStopSequence(string json)
+    {
+        // The stop already has its own current execution proof. Attach it to a
+        // ready matching obligation without executing the planner's later action.
+        try
+        {
+            var state = ReadRoomTaskSequence();
+            JArray steps;
+            if (state != null) steps = (JArray)state["steps"];
+            else
+            {
+                if (!RoomTaskSequenceProtocol.TryPlan(json, m_ActionConstraints.CurrentUserText, out steps, out _)) return;
+                foreach (var step in steps.OfType<JObject>()) step["status"] = "pending";
+            }
+            var ready = RoomTaskSequenceProtocol.Ready(steps).Values<string>().ToArray();
+            var stop = steps.OfType<JObject>().FirstOrDefault(s => (string)s["kind"] == "stop-moving" && ready.Contains((string)s["id"]));
+            if (stop == null) return;
+            var source = JObject.Parse(json); source["taskStep"] = stop["id"].DeepClone();
+            ValidateRoomTaskSequence(source.ToString(Formatting.None), new RoomTaskProtocol.Decision { intent = "stop-moving" }, out _);
+        }
+        catch (JsonException) { } // Full-request review remains owed even if the later plan was malformed.
+    }
+
+    private void ObserveRoomTaskSequenceProgress(bool immediate = false)
+    {
+        if (!m_WorkReviewOpen || m_WorkNoProgress || !RoomTaskSequenceCurrent() ||
+            m_UserSpeechActiveForAutonomy || m_SceneTimePaused || !isActiveAndEnabled ||
+            (!immediate && Time.realtimeSinceStartup < m_RoomTaskSequenceProgressCheckAt)) return;
+        m_RoomTaskSequenceProgressCheckAt = Time.realtimeSinceStartup + .5f;
+        var sourceSteps = (JArray)m_RoomTaskSequence["steps"];
+        if (!sourceSteps.OfType<JObject>().Any(s => !m_RoomTaskSequenceReviewedSteps.Contains((string)s["id"]) &&
+            new[] { "running", "completed", "failed" }.Contains((string)s["status"]))) return;
+        var state = ReadRoomTaskSequence();
+        foreach (var step in ((JArray)state["steps"]).OfType<JObject>())
+        {
+            if (!new[] { "completed", "failed" }.Contains((string)step["status"]) ||
+                !m_RoomTaskSequenceReviewedSteps.Add((string)step["id"])) continue;
+            // Queue once per real terminal receipt, including synchronous stops.
+            // A pending or running step and generated speech never unlock a sequel.
+            if (!m_WorkSubstepReviewPending) QueueWorkSubstepReview(m_FormalResponseGeneration, (string)step["status"]);
+            Debug.Log("[Work/StepSettled] " + new JObject {
+                ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
+                ["stepId"] = step["id"], ["status"] = step["status"], ["actionId"] = step["actionId"],
+                ["readyStepIds"] = state["readyStepIds"], ["newActionSubmitted"] = false
+            }.ToString(Formatting.None), this);
+        }
+    }
+
+    private void MarkSettledRoomStepsReviewQueued()
+    {
+        var state = ReadRoomTaskSequence();
+        if (!(state?["steps"] is JArray steps)) return;
+        foreach (var step in steps.OfType<JObject>())
+            if (new[] { "completed", "failed" }.Contains((string)step["status"]))
+                m_RoomTaskSequenceReviewedSteps.Add((string)step["id"]);
     }
 }

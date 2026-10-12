@@ -10,10 +10,10 @@ public partial class ChatSample
     {
         string kind = (string)ReadMovementReplySemantics(generation)?["requestKind"];
         return (kind == "action" || kind == "control") &&
-            (m_RoomTaskIntent == "approach" || m_RoomTaskIntent == "follow") &&
+            (m_RoomTaskIntent == "approach" || m_RoomTaskIntent == "follow" || m_RoomTaskIntent == "stop-moving") &&
             !string.IsNullOrEmpty(m_RoomTaskActionId) && ReadRoomEvidenceReplyFacts(generation) == null &&
             generation != m_SpatialGoalTerminalReplyGeneration && (bool?)BuildRoomSearchReportRequirement()["required"] != true &&
-            !SpatialGoalUnfinished(m_SpatialDeviceGoal) && !HasWorkToolInFlight();
+            (!SpatialGoalUnfinished(m_SpatialDeviceGoal) || RoomTaskSequenceCurrent() && !SelectedRoomTaskSequenceIsDevice()) && !HasWorkToolInFlight();
     }
 
     private string BuildMovementReplyContext(int generation)
@@ -27,11 +27,15 @@ public partial class ChatSample
             ["originalUserRequest"] = m_ActionConstraints.CurrentUserText,
             ["currentRequestSemantics"] = ReadMovementReplySemantics(generation),
             ["priorTaskResults"] = BuildMovementPriorResults(),
+            ["historicalDeviceEvents"] = ReadHistoricalDeviceEvents(),
             ["taskSequence"] = ReadRoomTaskSequence(),
             ["recentPublicReplies"] = ReadRecentRoomReplies(),
             ["currentActionReceipt"] = BuildCurrentReplyActionReceipt(),
             ["currentRoomFacts"] = room,
             ["decisionFailure"] = ReadRoomTaskDecisionFailure(),
+            ["deviceProposalReview"] = (int?)m_SpatialGoalLatestReview?["generation"] != generation ||
+                (int?)m_SpatialGoalLatestReview?["userTurn"] != m_ActionConstraints.CurrentUserTurn ? null : PickRoomFields(m_SpatialGoalLatestReview,
+                "generation", "userTurn", "workEpoch", "registered", "requestAssessment", "proposalDiscarded", "reason", "validationFailure"),
             ["previousReplyFailureReceipt"] = ReadPreviousReplyFailureReceipt(),
             ["scope"] = "Reply to the complete current movement request using this action's latest execution. Preserve conditions, failure causes and unmet requirements. " +
                 "No current visual description is requested; object catalogs and old search traces are not needed for this movement report. " +

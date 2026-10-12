@@ -2528,6 +2528,7 @@ public partial class ChatQW : LLM
             {
                 if (ReferenceEquals(m_ActiveStreamRequest, request)) m_ActiveStreamRequest = null;
                 Debug.LogWarning($"[LLM/SpatialGoalResult] generation={generation} rejected=invalid-context-or-text-budget budget={SpatialGoalResultContextPolicy.TextTokenEstimateBudget} noHttp=true");
+                RaiseResponseGenerationFailure(m_SpatialResultBuildFailure ?? "invalid-result-context");
                 _onComplete?.Invoke(""); yield break;
             }
             bool admitted = AdmitSceneSpeechWire(_jsonText, out var speechBudget);

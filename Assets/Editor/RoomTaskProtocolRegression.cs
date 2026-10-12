@@ -445,12 +445,13 @@ public static class RoomTaskProtocolRegression
             "Local field guide omits repeated oneOf arms while retaining every exact field definition.");
         var expectedBase = (JObject)schema.DeepClone(); expectedBase.Remove("oneOf");
         var actualBase = (JObject)guide.DeepClone(); actualBase.Remove("intentConstraints"); actualBase.Remove("directionConvention"); actualBase.Remove("noActionReply");
+        actualBase.Remove("intentConstraintEncoding");
         Check(((string)guide["noActionReply"] ?? "").Contains("replyScope=spatial"), "The guide teaches the no-action spatial answer classification.");
         Check(JToken.DeepEquals(actualBase, expectedBase), "Field-guide compaction changes no other schema root constraints or fields.");
         var branches = (JArray)schema["oneOf"]; var constraints = guide["intentConstraints"] as JArray;
         Check(branches != null && constraints != null && constraints.Count == branches.Count,
             "Every original intent/target alternative retains its own field constraint record.");
-        var common = new[] { "intent", "origin", "evidence" };
+        var common = ((JArray)guide["required"]).Values<string>().ToArray();
         for (int index = 0; index < branches.Count; index++)
         {
             var branch = (JObject)branches[index]; var properties = (JObject)branch["properties"];
