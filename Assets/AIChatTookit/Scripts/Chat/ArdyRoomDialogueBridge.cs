@@ -342,6 +342,23 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
     }
 
     /// <summary>Start one explicitly authorized follow task; continuous motion retains its operation while targets change.</summary>
+    public bool FollowForCurrentUser(string id, int previousRevision, Transform expectedUser, out string failure)
+    {
+        failure = "用户绑定已变化，当前跟随授权不能转交给另一个目标。";
+        if (expectedUser == null || userHead != expectedUser || !IsConnected) return false;
+        // Called once, synchronously, after the chat validates the complete user/turn/room lease.
+        // Recompute support and geometry; no old path is reused and no model retry is needed.
+        var current = ReadCurrentTargetEvidence(true);
+        if (userHead != expectedUser) return false;
+        if (current.bodyReserved) { failure = "已有房间目标正在执行；本次跟随决定未重复派发。"; return false; }
+        bool submitted = FollowForTarget(id, current.currentTargetRevision, out failure);
+        if (previousRevision != current.currentTargetRevision)
+            Debug.Log("[Room/FollowRefresh] " + Newtonsoft.Json.JsonConvert.SerializeObject(new {
+                actionId = id, previousRevision, currentRevision = current.currentTargetRevision, submitted, failure,
+                scope = "Same tracked user and current user command; one fresh geometry validation, never reuse an old path." }), this);
+        return submitted;
+    }
+
     public bool FollowForTarget(string id, int expectedTargetRevision, out string failure)
     {
         var evidence = ReadCurrentTargetEvidence(true);

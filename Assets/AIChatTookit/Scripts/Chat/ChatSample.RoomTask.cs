@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
@@ -211,6 +211,7 @@ public partial class ChatSample
         var requestAvatar = bridge.avatar;
         var requestEnvironment = bridge.environmentRoot;
         var requestController = bridge.Controller;
+        var requestUser = bridge.userHead;
         int workEpoch = m_WorkEpoch, userTurn = m_ActionConstraints.CurrentUserTurn;
         m_RoomPlanningBodyLease = new JObject { ["generation"] = generation, ["userTurn"] = userTurn,
             ["actionId"] = bridge.ActiveTaskId, ["following"] = bridge.IsFollowing };
@@ -257,7 +258,7 @@ public partial class ChatSample
                 userTurn == m_ActionConstraints.CurrentUserTurn && !m_UserSpeechActiveForAutonomy &&
                 !m_SceneTimePaused && isActiveAndEnabled && model == m_ChatSettings?.m_ChatModel &&
                 bridge != null && bridge == GetComponent<ArdyRoomDialogueBridge>() && bridge.IsConnected &&
-                bridge.avatar == requestAvatar && bridge.environmentRoot == requestEnvironment && bridge.Controller == requestController &&
+                bridge.avatar == requestAvatar && bridge.environmentRoot == requestEnvironment && bridge.Controller == requestController && bridge.userHead == requestUser &&
                 (!autonomous || autonomousIntention == m_SceneAutonomyIntention) &&
                 (workStep == null || IsCurrentWorkRoomStep(workStep));
             if (!current && generation == m_FormalResponseGeneration && m_RoomSpeechGuardGeneration == generation)
@@ -324,7 +325,7 @@ public partial class ChatSample
                     oldAction, oldOperation, bridge.Phase, bridge.IsFollowing).ToString(Formatting.None), (ok, result, status) => {
                     if (GetActiveSpatialGoalId() != goalId) return;
                     string failure = null;
-                    bool approved = ok && RoomTaskProtocol.TryDecision(result, m_ActionConstraints.CurrentUserText, false, out var control) &&
+                    bool approved = ok && RoomControlReviewProtocol.TryBodyDecision(result, m_ActionConstraints.CurrentUserText, true, out var control, out _) &&
                         control.intent == "stop-moving";
                     string stopId = m_MotionIdentityPrefix + ":handoff:" + generation + ":" + (++m_MotionSequence);
                     bool stopped = approved && bridge.StopForTaskIfCurrent(stopId, oldAction, oldOperation, out failure, oldFollowing);
@@ -381,6 +382,12 @@ public partial class ChatSample
             CancelSceneVisionStopPreparation();
             if (sceneStopCommitted)
             {
+                // The quick stop is a separate successful operation; it cannot turn
+                // a failed complete-request planner into a successful remainder plan.
+                if (!valid || sequenceRequired && !RoomTaskSequenceProtocol.TryPlan(json, m_ActionConstraints.CurrentUserText, out _, out _))
+                {
+                    RecordRoomTaskDecisionFailure(generation, userTurn, ok, status, validationFailure ?? "invalid-task-sequence-after-stop", sceneStopId);
+                }
                 valid = true;
                 decision = new RoomTaskProtocol.Decision { intent = "stop-moving" };
             }
@@ -404,7 +411,12 @@ public partial class ChatSample
                         });
                     return;
                 }
-                if (!equivalenceApproved) { valid = sceneStopCommitted; validationFailure = "invalid-task-sequence-equivalence"; }
+                if (!equivalenceApproved) {
+                    valid = sceneStopCommitted; validationFailure = "invalid-task-sequence-equivalence";
+                    if (sceneStopCommitted) {
+                        RecordRoomTaskDecisionFailure(generation, userTurn, ok, status, validationFailure, sceneStopId);
+                    }
+                }
             }
             if (sceneStopCommitted && sequenceRequired &&
                 (!RoomTaskSequenceProtocol.RequiresEquivalenceReview(json) || equivalenceCandidate == json && equivalenceApproved))
@@ -790,7 +802,8 @@ public partial class ChatSample
                         m_RoomTaskActionId = intent.ActionId;
                         string failure;
                         bool submitted = decision.intent == "follow"
-                            ? bridge.FollowForTarget(intent.ActionId, evidence.currentTargetRevision, out failure)
+                            ? (!autonomous ? bridge.FollowForCurrentUser(intent.ActionId, evidence.currentTargetRevision, requestUser, out failure)
+                                : bridge.FollowForTarget(intent.ActionId, evidence.currentTargetRevision, out failure))
                             : bridge.ApproachForTarget(intent.ActionId, evidence.currentTargetRevision, out failure);
                         m_RoomTaskDispatch = submitted ? (decision.intent == "follow" ? "follow-submitted" : "attempt-submitted")
                             : "not-submitted: " + failure;
@@ -1066,7 +1079,7 @@ public partial class ChatSample
             reason == "observation-goal-reference-not-pending" || reason == "newer-user-turn-superseded-observation-goal" ||
             reason == "transport:room-task-incomplete-output");
 
-    private void RecordRoomTaskDecisionFailure(int generation, int userTurn, bool wireAccepted, string status, string reason)
+    private void RecordRoomTaskDecisionFailure(int generation, int userTurn, bool wireAccepted, string status, string reason, string completedStopActionId = null)
     {
         // Keep the failed planner's receipt separate from prior navigation/scene
         // results. It proves only that this decision submitted no new action.
@@ -1090,12 +1103,18 @@ public partial class ChatSample
             m_RoomTaskDecisionFailure["providerDiagnostic"] = providerFailure;
         if (preflightBudgetFailure)
             m_RoomTaskDecisionFailure["scope"] = "This decision was stopped locally because the essential input still exceeded its budget after projection. No HTTP request was sent, no provider rejected it, and no new action was dispatched. Do not blame user clarity, claim a network outage, or promise an unsubmitted retry. Previous executed actions remain separate facts.";
+        if (!string.IsNullOrEmpty(completedStopActionId)) {
+            m_RoomTaskDecisionFailure["remainingAfterCommittedStop"] = true;
+            m_RoomTaskDecisionFailure["completedStopActionId"] = completedStopActionId;
+        }
         RememberRoomPlanningFailure(m_RoomTaskDecisionFailure);
     }
 
     private JObject ReadRoomTaskDecisionFailure()
     {
-        if (m_RoomTaskIntent != "unresolved" || m_RoomTaskDispatch != "decision-unavailable" ||
+        if (!(m_RoomTaskIntent == "unresolved" && m_RoomTaskDispatch == "decision-unavailable") &&
+            !((bool?)m_RoomTaskDecisionFailure?["remainingAfterCommittedStop"] == true && m_RoomTaskIntent == "stop-moving" &&
+                m_RoomTaskDispatch == "stop-submitted" && (string)m_RoomTaskDecisionFailure["completedStopActionId"] == m_RoomTaskActionId) ||
             m_RoomTaskGeneration != m_FormalResponseGeneration ||
             (int?)m_RoomTaskDecisionFailure?["generation"] != m_FormalResponseGeneration ||
             (int?)m_RoomTaskDecisionFailure?["userTurn"] != m_ActionConstraints.CurrentUserTurn) return null;
@@ -1275,7 +1294,8 @@ public partial class ChatSample
         // Mixed requests still need their question answered from relevant evidence.
         string kind = (string)ReadCompactCurrentRequestSemantics(generation)?["requestKind"];
         return generation == m_FormalResponseGeneration && (kind == "action" || kind == "control") &&
-            ReadRoomEvidenceReplyFacts(generation) == null && string.IsNullOrEmpty(m_RoomTaskActionId) &&
+            ReadRoomEvidenceReplyFacts(generation) == null && (string.IsNullOrEmpty(m_RoomTaskActionId) ||
+                (bool?)ReadRoomTaskDecisionFailure()?["remainingAfterCommittedStop"] == true) &&
             (bool?)ReadRoomTaskDecisionFailure()?["newActionSubmittedByThisDecision"] == false;
     }
 
@@ -1335,7 +1355,7 @@ public partial class ChatSample
                 (reviewedPlanningFailureReport == "not-mentioned" ||
                  reviewedPlanningFailureReport == (string)ReadRoomTaskDecisionFailure()?["kind"]);
             bool diagnosedPlanningFailure = !reviewedAnswerOnly &&
-                string.IsNullOrEmpty(m_RoomTaskActionId) &&
+                (string.IsNullOrEmpty(m_RoomTaskActionId) || (bool?)ReadRoomTaskDecisionFailure()?["remainingAfterCommittedStop"] == true) &&
                 (bool?)ReadRoomTaskDecisionFailure()?["newActionSubmittedByThisDecision"] == false;
             if (diagnosedPlanningFailure && (!coherent || ReadConcurrentBodyFailure(generation) != null ||
                 reviewedPlanningFailureReport != (string)ReadRoomTaskDecisionFailure()?["kind"]))
@@ -1710,6 +1730,12 @@ public partial class ChatSample
         // A current failed attempt takes precedence over an older goal's answer
         // obligation. ReadRoomTaskDecisionFailure already fences generation/turn.
         var planningFailure = ReadRoomTaskDecisionFailure();
+        if ((bool?)planningFailure?["remainingAfterCommittedStop"] == true)
+            return (string)planningFailure["kind"] == "input-budget-exceeded"
+                ? "我已经停止移动了，但后续动作的信息超出规划预算，还没有开始执行。"
+                : (string)planningFailure["kind"] == "service-request-failed"
+                ? "我已经停止移动了，但后续动作的规划请求失败，还没有开始执行。"
+                : "我已经停止移动了，但后续没有得到可执行的动作计划，还没有开始执行。";
         if (string.IsNullOrEmpty(m_RoomTaskActionId) &&
             (bool?)planningFailure?["newActionSubmittedByThisDecision"] == false)
         {

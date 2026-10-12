@@ -204,6 +204,7 @@ public partial class ChatSample
             m_SceneVisionCapture?.InvalidateHistoricalSession(reason);
         CancelSceneSearchTask(reason);
         CancelRoomSpeechReview(reason);
+        CancelSequenceContinuation(reason);
         CancelSceneVisionStopPreparation();
         CancelSceneAction(reason);
         if (m_AutonomyProbeInFlight) CancelAutonomyIntentProbe();

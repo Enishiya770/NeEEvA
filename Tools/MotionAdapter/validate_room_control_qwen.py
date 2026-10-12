@@ -32,14 +32,29 @@ for row in json.loads(source.read_text(encoding='utf-8-sig')):
         result['usage'] = envelope.get('usage')
         assert choice['finish_reason'] == 'stop'
         if row['input']['roomControlReview'] == 'body-stop':
-            assert set(value) == {'intent', 'origin', 'evidence'}
-            assert value['intent'] in ('stop-moving', 'none')
-            assert isinstance(value['evidence'], str) and len(value['evidence']) <= 160
-            if value['intent'] == 'stop-moving':
-                assert value['origin'] == 'user' and value['evidence'] and value['evidence'] in row['input']['currentUserText']
+            assert set(value) == {'explicitStopNow', 'bodyDirective', 'force', 'reason'}
+            assert isinstance(value['explicitStopNow'], bool)
+            assert all(isinstance(value[k], str) for k in ('bodyDirective', 'force', 'reason'))
+            assert value['bodyDirective'] in ('continue-current', 'stop-current', 'other-task', 'none', 'unclear')
+            assert value['force'] in ('command-now', 'conditional', 'reported', 'question', 'unclear')
+            assert 0 < len(value['reason']) <= 160
+            command = value['force'] == 'command-now' and value['bodyDirective'] in ('continue-current', 'stop-current', 'other-task')
+            assert not value['explicitStopNow'] or command and value['bodyDirective'] != 'continue-current'
+            assert not(command and value['bodyDirective'] == 'stop-current') or value['explicitStopNow']
+            actual = 'stop-moving' if command and (value['explicitStopNow'] or
+                value['bodyDirective'] == 'other-task' and row['input']['activeBody']['allowReplacement']) else 'none'
+        elif row['input']['roomControlReview'] == 'sequence-body-continuation':
+            assert set(value) == {'target', 'readiness', 'stepId', 'evidence', 'reason'}
+            assert value['stepId'] == row['input']['selectedStep']['id']
+            assert all(isinstance(v, str) for v in value.values()) and 0 < len(value['reason']) <= 160
+            assert len(value['evidence']) <= 160
+            assert value['target'] in ('current-user', 'other', 'unknown')
+            assert value['readiness'] in ('satisfied', 'waiting-user', 'waiting-speech', 'waiting-other', 'rejected', 'failed', 'unclear')
+            actual = 'execute' if value['target'] == 'current-user' and value['readiness'] == 'satisfied' else 'defer'
+            if actual == 'execute':
+                assert value['evidence'] == row['input']['selectedStep']['quote'] and value['evidence'] in row['input']['currentUserText']
             else:
-                assert value['origin'] == 'none' and value['evidence'] == ''
-            actual = value['intent']
+                assert not value['evidence'] or value['evidence'] in row['input']['currentUserText']
         else:
             assert set(value) == {'verdict', 'reason'} and isinstance(value['reason'], str) and 0 < len(value['reason']) <= 160
             actual = value['verdict']

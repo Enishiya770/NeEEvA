@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -12,6 +12,7 @@ public partial class ChatQW
     private UnityWebRequest m_RoomTaskRequest;
     private int m_RoomPreparationGeneration;
     private UnityWebRequest m_RoomPreparationRequest;
+    private string m_RoomPreparationRequestId;
     public override bool SupportsRoomTaskMessages => true;
     public override bool SupportsRoomTaskSequences => true;
     public override bool SupportsRoomPreparationMessages => true;
@@ -48,18 +49,55 @@ public partial class ChatQW
         using (var request = new UnityWebRequest(url, "POST"))
         {
             m_RoomPreparationRequest = request;
+            string requestId = Guid.NewGuid().ToString("N");
+            m_RoomPreparationRequestId = requestId;
+            string kind = RoomControlReviewProtocol.Kind(input) ?? "legacy";
             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(bounded));
             request.downloadHandler = new DownloadHandlerBuffer();
             request.timeout = 2;
             request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("X-Request-ID", requestId);
             request.SetRequestHeader("Authorization", "Bearer " + (string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
-            yield return request.SendWebRequest();
+            double sentAt = Time.realtimeSinceStartupAsDouble;
+            string sentUtc = DateTime.UtcNow.ToString("O");
+            double? firstBytes = null;
+            Debug.Log("[Room/ControlTiming] " + new JObject { ["requestId"] = requestId, ["generation"] = generation,
+                ["kind"] = kind, ["state"] = "sent", ["slot"] = JObject.Parse(bounded)["id_slot"],
+                ["sentUtc"] = sentUtc, ["wireBytes"] = Encoding.UTF8.GetByteCount(bounded), ["timeoutSeconds"] = 2 }.ToString(Newtonsoft.Json.Formatting.None));
+            var operation = request.SendWebRequest();
+            while (!operation.isDone && generation == m_RoomPreparationGeneration)
+            {
+                if (!firstBytes.HasValue && request.downloadedBytes > 0) firstBytes = Time.realtimeSinceStartupAsDouble - sentAt;
+                yield return null;
+            }
+            if (!firstBytes.HasValue && request.downloadedBytes > 0) firstBytes = Time.realtimeSinceStartupAsDouble - sentAt;
             if (ReferenceEquals(m_RoomPreparationRequest, request)) m_RoomPreparationRequest = null;
+            JObject envelope = null;
+            try { envelope = JObject.Parse(request.downloadHandler.text ?? ""); } catch (Exception) { }
+            Debug.Log("[Room/ControlTiming] " + new JObject { ["requestId"] = requestId, ["generation"] = generation,
+                ["kind"] = kind, ["state"] = generation == m_RoomPreparationGeneration ? "completed" : "cancelled",
+                ["sentUtc"] = sentUtc, ["httpSeconds"] = Time.realtimeSinceStartupAsDouble - sentAt,
+                ["firstBytesSeconds"] = firstBytes, ["receivedBytes"] = request.downloadedBytes,
+                ["httpStatus"] = request.responseCode, ["transport"] = request.result.ToString(), ["error"] = request.error,
+                ["serverTimings"] = envelope?["timings"], ["usage"] = envelope?["usage"], ["serverQueueSeconds"] = null,
+                ["scope"] = "First bytes are observed at Unity frame granularity. Server timings are reported values; missing queue timing is unknown. Cancellation never authorizes a callback." }.ToString(Newtonsoft.Json.Formatting.None));
             if (generation != m_RoomPreparationGeneration) yield break;
             string output = "", status = "preparation-http-failure";
             bool accepted = request.result == UnityWebRequest.Result.Success && request.responseCode == 200 &&
                 TryReadRoomTaskCompletion(request.downloadHandler.text, out output, out status);
             Debug.Log($"[Room/PreparationWire] kind={RoomControlReviewProtocol.Kind(input) ?? "legacy"} code={request.responseCode} accepted={accepted} elapsed={Time.realtimeSinceStartup-startedAt:F3}s status={status} transport={request.result} error={request.error}");
+            if (kind == RoomControlReviewProtocol.BodyStop)
+            {
+                bool replacement = (bool?)JObject.Parse(input).SelectToken("activeBody.allowReplacement") == true;
+                string parseFailure = null;
+                RoomTaskProtocol.Decision control = null;
+                bool parsed = accepted && RoomControlReviewProtocol.TryBodyDecision(output,
+                    (string)JObject.Parse(input)["currentUserText"], replacement, out control, out parseFailure);
+                Debug.Log("[Room/ControlReview] " + new JObject { ["requestId"] = requestId, ["generation"] = generation,
+                    ["allowReplacement"] = replacement, ["parsed"] = parsed, ["intent"] = control?.intent,
+                    ["parseFailure"] = parseFailure, ["review"] = output.Length <= 1600 ? output : output.Substring(0, 1600),
+                    ["executionAuthority"] = false }.ToString(Newtonsoft.Json.Formatting.None));
+            }
             callback?.Invoke(accepted, output, status);
         }
     }
@@ -68,7 +106,7 @@ public partial class ChatQW
     {
         string kind = RoomControlReviewProtocol.Kind(input);
         if (kind == null) return BuildRoomTaskRequestJson(input, false);
-        string schema = RoomControlReviewProtocol.Schema(kind);
+        string schema = RoomControlReviewProtocol.SchemaForInput(kind, input);
         var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
         sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":256,\"response_format\":{\"type\":\"json_object\"");
         if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(schema);

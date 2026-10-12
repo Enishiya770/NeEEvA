@@ -84,6 +84,8 @@ public partial class ChatSample
             ["concurrentBodyFailure"] = ReadConcurrentBodyFailure(generation),
             ["intent"] = m_RoomTaskIntent, ["dispatch"] = m_RoomTaskDispatch, ["actionId"] = m_RoomTaskActionId,
             ["execution"] = room["execution"]?.DeepClone(),
+            ["sequenceContinuation"] = RoomTaskSequenceCurrent() &&
+                (int?)m_SequenceBodySubmission?["generation"] == generation ? m_SequenceBodySubmission.DeepClone() : null,
             ["sceneAction"] = PickRoomFields(BuildSceneActionFacts()["lastAction"] as JObject,
                 "actionId", "intent", "phase", "reason", "observedUtc", "reached", "stateChanged"),
             ["publicText"] = text,

@@ -87,7 +87,15 @@ public static class FirstReplyTransportRegression
             var routine = (IEnumerator)Method("RequestFirstReply").Invoke(model, new object[] {
                 new LLM.SendData("user", user), generation, context,
                 new Action<SpeechText>(_ => deltas++), new Action<FirstReplyCompletion>(_ => completions++), true });
-            try { Check(!routine.MoveNext(), "Cancelled diagnostic listener still advanced to network send"); }
+            try {
+                var pending = new Stack<IEnumerator>(); pending.Push(routine);
+                while (pending.Count > 0) {
+                    var top = pending.Peek();
+                    if (!top.MoveNext()) { pending.Pop(); continue; }
+                    if (top.Current is IEnumerator child) pending.Push(child);
+                    else Check(false, "Cancelled diagnostic listener still advanced to network send");
+                }
+            }
             finally { (routine as IDisposable)?.Dispose(); model.OnRequestDiagnostic -= cancelBeforeSend; }
             Check(diagnostics == 1 && completions == 0 && deltas == 0 && model.m_DataList.Count == before + 1 &&
                 model.m_DataList[before].role == "user" && model.m_DataList[before].content == user,

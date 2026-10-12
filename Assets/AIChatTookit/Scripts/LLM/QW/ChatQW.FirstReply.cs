@@ -105,6 +105,52 @@ public partial class ChatQW
         if (!Current()) yield break;
         var userLease = BeginFirstReplyUserLease(current, generation, commitHistory);
         context = CompactScenePromptContext(context, true);
+        // Slots share compute. A large cold prefill can starve even a tiny stop
+        // on another slot. Give this turn's bounded control request first use;
+        // never extend its deadline or interpret timeout as a decision.
+        if (m_RoomPreparationRequest != null && !m_RoomPreparationRequest.isDone)
+        {
+            var priorityRequest = m_RoomPreparationRequest;
+            string priorityId = m_RoomPreparationRequestId;
+            float waitingAt = Time.realtimeSinceStartup;
+            while (Current() && ReferenceEquals(priorityRequest, m_RoomPreparationRequest) &&
+                !priorityRequest.isDone && Time.realtimeSinceStartup - waitingAt < 2.25f) yield return null;
+            if (!Current()) yield break;
+            if (ReferenceEquals(priorityRequest, m_RoomPreparationRequest) && !priorityRequest.isDone)
+                CancelRoomPreparationMessage();
+            Debug.Log("[LLM/ControlPriority] " + new JObject { ["requestGeneration"] = generation,
+                ["controlRequestId"] = priorityId, ["waitSeconds"] = Time.realtimeSinceStartup - waitingAt,
+                ["scope"] = "Bounded control precedes this turn's routing/generation. No inferred stop or increased control timeout." }.ToString(Formatting.None));
+        }
+        // Classify the complete turn before generating persona prose. Actions
+        // and evidence-only questions need no large candidate that says 'tools'.
+        // Ordinary conversation still uses the original generation/publication
+        // checks below, and an unavailable classifier cannot authorize actions.
+        string preflight = BuildFirstReplyPreflightWire(current, context);
+        if (preflight != null)
+        {
+            string route = null, kind = null, demand = null, status = null;
+            bool? sufficient = null; JObject understanding = null, proof = null;
+            float started = Time.realtimeSinceStartup;
+            yield return RequestFirstReplyReview(preflight, generation, (r, u, k, s, d, state, p) => {
+                route = r; understanding = u; kind = k; sufficient = s; demand = d; status = state; proof = p;
+            });
+            if (!Current()) yield break;
+            bool handoff = route != null && !(kind == "answer-only" && demand == "short-conversation");
+            Debug.Log("[LLM/FirstReplyPreflight] " + new JObject { ["requestGeneration"] = generation,
+                ["requestKind"] = kind, ["route"] = route, ["handoff"] = handoff,
+                ["elapsedSeconds"] = Time.realtimeSinceStartup - started, ["wireBytes"] = Encoding.UTF8.GetByteCount(preflight),
+                ["status"] = status, ["publicDeltaDelivered"] = false }.ToString(Formatting.None));
+            if (handoff)
+            {
+                var completion = FirstReplyProtocol.ResolveReviewedCompletion(null, route, status, understanding, kind, sufficient, demand);
+                completion.CurrentTurnEvidence = proof;
+                SettleFirstReplyUserLease(userLease, completion, new List<SendData>(m_DataList));
+                if (m_FirstReplyOwnedGeneration == generation) m_FirstReplyOwnedGeneration = -1;
+                onComplete?.Invoke(completion);
+                yield break;
+            }
+        }
         List<SendData> history = CreateFirstReplyHistory(current, context);
         string wire = BuildFirstReplyWire(history, context, !commitHistory);
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -224,6 +270,19 @@ public partial class ChatQW
     // A small independent task, without persona, executable skills, old images or
     // the generator's route claim. Preserve the whole latest user and each quoted
     // history entry; oversized mandatory input hands back to the normal pipeline.
+    private string BuildFirstReplyPreflightWire(SendData current, string context)
+    {
+        string wire = BuildFirstReplyReviewWire(current, new List<SendData>(m_DataList), context, new FirstReplyCompletion());
+        if (wire == null) return null;
+        var request = JObject.Parse(wire);
+        var input = JObject.Parse((string)request["messages"][1]["content"]);
+        input["routingPreflight"] = true;
+        string text = input.ToString(Formatting.None);
+        if (text.Length > FirstReplyProtocol.MaximumReviewInputCharacters) return null;
+        request["messages"][1]["content"] = text;
+        return request.ToString(Formatting.None);
+    }
+
     private string BuildFirstReplyReviewWire(SendData current, List<SendData> history,
         string context, FirstReplyCompletion candidate)
     {

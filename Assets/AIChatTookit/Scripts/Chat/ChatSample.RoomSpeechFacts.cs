@@ -191,6 +191,9 @@ public partial class ChatSample
             case "我已经调整了观察位置，还需要确认这个角度能否看清目标。": return ja ? "見る位置を変えたわ。この角度で目標がよく見えるか、まだ確かめる必要があるの。" : "I've adjusted my viewing position. I still need to check whether I can see the target clearly from here.";
             case "我正在尝试调整观察位置，之后再确认能否看清。": return ja ? "見る位置を変えようとしているわ。そのあと、よく見えるか確かめるね。" : "I'm trying to adjust my viewing position, then I'll check whether the view is clearer.";
             case "这次生成动作计划的服务请求失败了，没有启动新的动作。": return ja ? "動作を計画するサービスへのリクエストが失敗したので、新しい動作は始めていないわ。" : "The request to plan the action failed, so I haven't started a new action.";
+            case "我已经停止移动了，但后续动作的信息超出规划预算，还没有开始执行。": return ja ? "移動は止めたわ。ただ、続きの動作は情報量が計画の処理枠を超えて、まだ始められていないの。" : "I stopped moving, but the remaining actions exceeded the planning budget and have not started.";
+            case "我已经停止移动了，但后续动作的规划请求失败，还没有开始执行。": return ja ? "移動は止めたわ。ただ、続きの動作を計画するリクエストが失敗して、まだ始められていないの。" : "I stopped moving, but the request to plan the remaining actions failed, so they have not started.";
+            case "我已经停止移动了，但后续没有得到可执行的动作计划，还没有开始执行。": return ja ? "移動は止めたわ。ただ、続きの動作には実行できる計画が得られず、まだ始められていないの。" : "I stopped moving, but no executable plan was obtained for the remaining actions, so they have not started.";
             case "这次规划要处理的信息太多，没能生成动作计划，还没有开始新的动作。": return ja ? "動作を考えるための情報が多すぎて計画を作れなかったので、まだ新しい動作は始めていないわ。" : "There was too much information to process for this action plan, so I haven't started a new action.";
             case "这次没有得到可执行的动作计划，没有启动新的动作。": return ja ? "今回は実行できる動作計画が得られなかったので、新しい動作は始めていないわ。" : "I didn't obtain an executable action plan, so I haven't started a new action.";
             case "我已经看向那里确认了一下。": return ja ? "そちらを向いて、見直したわ。" : "I've looked that way and checked the view.";

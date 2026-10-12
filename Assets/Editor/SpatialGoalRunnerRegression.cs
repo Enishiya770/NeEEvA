@@ -33,6 +33,7 @@ public static partial class SpatialGoalRunnerRegression
         public readonly HashSet<string> pages = new HashSet<string>();
         public readonly JArray facts = new JArray(), choices = new JArray(), matchEvidence = new JArray();
         public float started;
+        public bool concurrentReturn;
     }
 
     private sealed class HeldPlayback : IDisposable
@@ -123,6 +124,8 @@ public static partial class SpatialGoalRunnerRegression
         LastReport["initialDistanceMeters"] = initialDistance; LastReport["operationLimitMeters"] = operationLimit;
         Run run = null;
         model.TaskSequencesEnabled = true;
+        bool oldControl = model.ControlReviewsEnabled;
+        model.ControlReviewsEnabled = !native;
         yield return Begin(chat, bridge, model, lamp, "reviewed-first-write", OffRequest + "然后回到我身边。", "off", "set-object-state", value => run = value);
         heldPlayback = new HeldPlayback(chat);
         yield return Wait(() => chat.IsVoiceOutputPlaying, 3, "real playback gate held");
@@ -144,9 +147,12 @@ public static partial class SpatialGoalRunnerRegression
             LastReport["actualNativeArrival"] = arrival.DeepClone();
             LastReport["nativeRootTranslation"] = Vector3.Distance(run.root, bridge.avatar.transform.position);
         }
-        else Require(bridge.Controller.OperationRevision == run.operation,
-            "An already-near visible target requires no unnecessary body move.");
+        else Require(run.concurrentReturn && bridge.Controller.OperationRevision > run.operation,
+            "Actual device completion submits the approved return before terminal prose is generated.");
+        if (run.concurrentReturn) bridge.StopMovement("continuation-tested-end", "End controlled successor before remaining fixtures");
         yield return Audit(chat, model, lamp, run);
+        model.ControlReviewsEnabled = oldControl;
+        yield return SequenceContinuationChecks(chat, bridge, model, lamp, run);
         model.TaskSequencesEnabled = false;
         AddCase(run, "legacy-first-write-unified-search-to-readback", chat);
 
@@ -381,6 +387,22 @@ public static partial class SpatialGoalRunnerRegression
                 }
                 CompleteMatch(request, lamp.EntityId, run);
             }
+            if (Get(chat, "m_SequenceBodyContinuation") != null && model.ControlReviews.Count > 0 && !run.concurrentReturn)
+            {
+                var control = model.ControlReviews.Last();
+                Require((string)JObject.Parse(control.Input)["roomControlReview"] == RoomControlReviewProtocol.Continuation &&
+                    model.Speech.Count == run.speech && (bool?)Goal(chat)["completionEvidenceValid"] == true,
+                    "Production device completion opens the bounded successor gate before result generation.");
+                Export(run.name + "-automatic-continuation", control);
+                run.concurrentReturn = true;
+                control.Complete(true, "{\"target\":\"current-user\",\"readiness\":\"satisfied\",\"stepId\":\"s2\",\"evidence\":\"回到我身边\",\"reason\":\"Explicit immediate return after actual completion.\"}", "controlled-automatic-continuation");
+                var ledger = (JObject)Call(chat, "ReadRoomTaskSequence");
+                Require((string)ledger.SelectToken("steps[1].actionId") == bridge.ActionId &&
+                    (string)ledger.SelectToken("steps[1].status") != "pending",
+                    "Automatic continuation records the actual bridge action without another RoomTask plan.");
+                LastReport["automaticSequenceContinuation"] = new JObject { ["sequence"] = ledger, ["deviceProof"] = Goal(chat)["completionEvidence"]?.DeepClone(),
+                    ["resultGenerationStartedAfterSubmission"] = true, ["extraLargePlans"] = 0 };
+            }
             yield return null;
         }
         Observe(chat, run);
@@ -408,7 +430,7 @@ public static partial class SpatialGoalRunnerRegression
                 (string)prior?.SelectToken("lastAction.phase") == "performed" &&
                 (bool?)prior?.SelectToken("goal.operationSummary.operationAttempted") == true,
                 "An actually performed device operation remains reportable after the return step advances the speech generation.");
-            if (model.TaskSequencesEnabled)
+            if (model.TaskSequencesEnabled && !run.concurrentReturn)
             {
                 var sequence = (JObject)Call(chat, "ReadRoomTaskSequence");
                 Require((string)sequence.SelectToken("steps[0].status") == "completed" &&

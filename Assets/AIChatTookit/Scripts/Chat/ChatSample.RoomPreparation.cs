@@ -38,6 +38,7 @@ public partial class ChatSample
         if (!bridge.ReservesBody && !bridge.IsFollowing) return;
         if (m_RoomSpeechPreparation != null && m_RoomSpeechPreparation.capture == evidence.CaptureSessionSerial &&
             m_RoomSpeechPreparation.inputRevision == m_InputAudioRevision) return;
+        CancelSequenceContinuation("new-closed-recording");
         CancelClosedRoomPreparation("new-closed-recording");
         CancelSceneVisionStopPreparation();
         var current = bridge.ReadCurrentTargetEvidence();

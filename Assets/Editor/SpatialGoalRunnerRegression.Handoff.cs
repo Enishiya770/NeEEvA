@@ -30,11 +30,11 @@ public static partial class SpatialGoalRunnerRegression
                 "Direct device replacement awaits one independent body handoff approval, with no premature device write.");
             var control = model.ControlReviews.Last(); Export("follow-direct-control", control);
             Require((string)JObject.Parse(control.Input)["currentUserText"] == OffRequest, "Handoff reads the exact latest request.");
-            control.Complete(true, new JObject { ["intent"] = "stop-moving", ["origin"] = "user", ["evidence"] = OffRequest }.ToString(), "controlled-replacement-approved");
+            control.Complete(true, new JObject { ["explicitStopNow"] = false, ["bodyDirective"] = "other-task", ["force"] = "command-now", ["reason"] = "Immediate approved device task replaces following." }.ToString(), "controlled-replacement-approved");
             Require(!bridge.IsFollowing && Get(chat, "m_SpatialGoalRunner") != null,
                 "Actual stop receipt releases follow ownership before device runner starts.");
             string stopId = bridge.ActionId;
-            control.Complete(true, new JObject { ["intent"] = "stop-moving", ["origin"] = "user", ["evidence"] = OffRequest }.ToString(), "controlled-duplicate");
+            control.Complete(true, new JObject { ["explicitStopNow"] = false, ["bodyDirective"] = "other-task", ["force"] = "command-now", ["reason"] = "Immediate approved device task replaces following." }.ToString(), "controlled-duplicate");
             Require(bridge.ActionId == stopId && model.ControlReviews.Count == reviews + 1, "Duplicate review cannot repeat handoff.");
             yield return Drive(chat, bridge, model, lamp, run);
             yield return Audit(chat, model, lamp, run);
@@ -44,7 +44,7 @@ public static partial class SpatialGoalRunnerRegression
             StageOwnedFollow(bridge, "handoff-denied-follow");
             Approve(run.review, null);
             control = model.ControlReviews.Last();
-            control.Complete(true, "{\"intent\":\"none\",\"origin\":\"none\",\"evidence\":\"\"}", "controlled-no-handoff-authority");
+            control.Complete(true, "{\"explicitStopNow\":false,\"bodyDirective\":\"none\",\"force\":\"unclear\",\"reason\":\"No permission.\"}", "controlled-no-handoff-authority");
             Require(bridge.IsFollowing && Get(chat, "m_SpatialGoalRunner") == null && !lamp.ReadState().on &&
                 (string)Goal(chat)["status"] == "blocked" && (string)Goal(chat)["reason"] == "device-task-body-owned-by-follow",
                 "Denied semantics preserves old follow, blocks device writes, and names the owner instead of generic startup failure.");

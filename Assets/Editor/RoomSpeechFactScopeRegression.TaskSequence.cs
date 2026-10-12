@@ -67,8 +67,52 @@ public static partial class RoomSpeechFactScopeRegression
             yield return CheckRepeatedStopDispatch(chat, bridge, model);
             yield return CheckConcurrentBodyFailure(chat, bridge, model);
             yield return CheckUserTargetRefreshWithoutReplanning(chat, bridge, model);
+            yield return CheckStopAndPlanningFailure(chat, bridge, model);
         }
         finally { model.TaskSequencesEnabled = old; }
+    }
+
+    private static IEnumerator CheckStopAndPlanningFailure(ChatSample chat, ArdyRoomDialogueBridge bridge,
+        NevaSceneVisionIntegrationModel model)
+    {
+        bool previous = model.ControlReviewsEnabled; model.ControlReviewsEnabled = true;
+        try {
+          foreach (string requestKind in new[] { "action", "mixed" }) {
+            string words = "先停止跟随，再打开灯，然后回到我身边。" + (requestKind == "mixed" ? "顺便告诉我二加二是多少。" : "");
+            yield return PrepareRoomPlanning(chat, bridge, words);
+            int generation = (int)Get(chat, "m_FormalResponseGeneration");
+            Call(chat, "RememberFirstReplyRequestSemantics", new FirstReplyCompletion {
+                Disposition = FirstReplyDisposition.Tools, RequestKind = requestKind }, generation, model);
+            Set(bridge, "followActive", true); Set(bridge, "actionId", "old-follow-before-budget-failure");
+            Set(bridge, "operationRevision", bridge.Controller.OperationRevision);
+            Call(chat, "BeginSceneVisionStopPreparation", generation);
+            model.ControlReviews.Last().Complete(true, new JObject { ["explicitStopNow"] = true, ["bodyDirective"] = "stop-current", ["force"] = "command-now", ["reason"] = "Explicit present stop before the next task." }.ToString(), "controlled-stop");
+            string stopId = bridge.ActionId;
+            Require(!bridge.IsFollowing && bridge.Phase == "stopped", "Actual quick stop completed independently.");
+            model.Decisions.Last(r => r.Kind == "room").Complete(false, "", "room-task-http-context-budget;attempts=0;recovery=preflight-budget");
+            var failure = (JObject)Call(chat, "ReadRoomTaskDecisionFailure");
+            Require((bool?)failure?["remainingAfterCommittedStop"] == true && (string)failure["completedStopActionId"] == stopId &&
+                (string)failure["kind"] == "input-budget-exceeded", "Successful stop cannot hide rejected remainder planning.");
+            Require((string)((JObject)Call(chat, "ReadPreviousRoomPlanningFailure")).SelectToken("receipt.completedStopActionId") == stopId,
+                "Later diagnostic questions retain the independent completed stop, too.");
+            string partial = requestKind == "action" ? "今は止まって待っているわ。" :
+                "移動は止めたわ。ただ、続きの動作は情報量が計画の処理枠を超えて、まだ始められていないの。二足す二は四よ。";
+            Call(chat, "CompleteRoomSpeech", Buffer(partial), partial, generation, true, null);
+            if (requestKind == "mixed") {
+                var review = JObject.Parse(Verdict("consistent", "scene-action", "input-budget-exceeded"));
+                review["requestDisposition"] = "action-request";
+                model.Decisions.Last().Complete(true, review.ToString(), "controlled-complete-mixed-reply");
+            }
+            var receipt = (JObject)Get(chat, "m_LastFormalReplyReceipt");
+            Require((string)receipt?["actionId"] == stopId && (bool?)receipt.SelectToken("planningFailure.remainingAfterCommittedStop") == true &&
+                model.m_DataList.Last().content.Contains("計画の処理枠"), "Final receipt and public fallback report stop success AND planning budget failure.");
+            if (requestKind == "mixed") Require(model.m_DataList.Last().content.Contains("二足す二は四よ。"),
+                "A reviewed complete mixed reply keeps its independent answer alongside the stop and planning diagnosis.");
+            Call(chat, "InvalidateFormalResponse", "stop-plus-failure-complete");
+            Require(Call(chat, "ReadRoomTaskDecisionFailure") == null, "Combined failure cannot leak into a replacement generation.");
+          }
+        }
+        finally { model.ControlReviewsEnabled = previous; bridge.StopMovement("stop-budget-fixture-end", "End receipt check"); }
     }
 
     private static IEnumerator CheckConcurrentBodyFailure(ChatSample chat, ArdyRoomDialogueBridge bridge,
@@ -121,7 +165,7 @@ public static partial class RoomSpeechFactScopeRegression
                 {
                     Set(bridge, "operationRevision", bridge.Controller.OperationRevision);
                     Call(chat, "BeginSceneVisionStopPreparation", (int)Get(chat, "m_FormalResponseGeneration"));
-                    model.ControlReviews.Last().Complete(true, new JObject { ["intent"] = "stop-moving", ["origin"] = "user", ["evidence"] = words }.ToString(), "controlled-early-stop");
+                    model.ControlReviews.Last().Complete(true, new JObject { ["explicitStopNow"] = true, ["bodyDirective"] = "stop-current", ["force"] = "command-now", ["reason"] = "Explicit stop now." }.ToString(), "controlled-early-stop");
                     Require(!bridge.IsFollowing && bridge.Phase == "stopped", "Independent explicit quick stop commits before the full planner replies.");
                     preparedStop = bridge.ActionId;
                 }

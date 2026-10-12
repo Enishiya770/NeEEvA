@@ -41,6 +41,7 @@ public partial class ChatSample
             {
                 receipt = m_WorkDeviceResult;
                 complete = (string)receipt.SelectToken("goal.status") == "satisfied" &&
+                    (bool?)receipt.SelectToken("goal.completionEvidenceValid") == true &&
                     (string)receipt.SelectToken("goal.desiredState") == (string)step["desiredState"];
             }
             else if (!string.IsNullOrEmpty(action))
@@ -57,7 +58,7 @@ public partial class ChatSample
                 else if ((string)execution?["actionId"] == action && (string)step["kind"] == "stop-moving" &&
                     !m_RoomTaskSequenceBridge.IsFollowing && !m_RoomTaskSequenceBridge.ReservesBody &&
                     new[] { "stopped", "cancelled", "idle" }.Contains((string)execution?["phase"])) { receipt = execution; complete = true; }
-                else if ((string)execution?["actionId"] == action && new[] { "failed", "blocked", "cancelled" }.Contains((string)execution?["phase"])) receipt = execution;
+                else if ((string)execution?["actionId"] == action && new[] { "failed", "blocked", "cancelled", "unavailable" }.Contains((string)execution?["phase"])) receipt = execution;
                 else if ((string)scene?["actionId"] == action && new[] { "failed", "rejected", "cancelled", "arrived-object-unconfirmed" }.Contains((string)scene?["phase"])) receipt = scene;
             }
             if (receipt == null) continue;
@@ -85,6 +86,7 @@ public partial class ChatSample
                 ["request"] = m_ActionConstraints.CurrentUserText, ["steps"] = plan,
                 ["coverage"] = JObject.Parse(json)["taskCoverage"]?.DeepClone() };
             m_RoomTaskSequenceReviewedSteps.Clear(); m_RoomTaskSequenceProgressCheckAt = 0;
+            m_SequenceBodyAttempts.Clear(); m_SequenceBodySubmission = null;
             m_RoomTaskSequenceModel = m_ChatSettings.m_ChatModel;
             m_RoomTaskSequenceBridge = GetComponent<ArdyRoomDialogueBridge>();
             m_RoomTaskSequenceAvatar = m_RoomTaskSequenceBridge.avatar; m_RoomTaskSequenceEnvironment = m_RoomTaskSequenceBridge.environmentRoot;

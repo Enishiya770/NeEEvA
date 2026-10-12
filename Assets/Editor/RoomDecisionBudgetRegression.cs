@@ -178,6 +178,7 @@ public static partial class RoomDecisionBudgetRegression
             CheckFreshProducerShape(provider);
             CheckRealProducerProjection(provider);
             CheckWorkingMemory(provider);
+            CheckLatestPlanningAttention(provider);
             CheckSharedSceneAttention(provider);
             CheckReplyFactPackets(provider);
             LastReport["raw"] = rawDiagnostic; LastReport["budget"] = result["diagnostic"].DeepClone();
@@ -186,6 +187,37 @@ public static partial class RoomDecisionBudgetRegression
         }
         catch (Exception error) { LastReport["status"] = "failed"; LastReport["error"] = error.ToString(); throw; }
         finally { LastReport["checks"] = checks; UnityEngine.Object.DestroyImmediate(host); }
+    }
+
+    private static void CheckLatestPlanningAttention(ChatQW provider)
+    {
+        var fixture = JObject.Parse(File.ReadAllText("Assets/Editor/Fixtures/TaskBudget.latest-1817-20261012.json"));
+        var reports = new JArray();
+        foreach (JObject item in fixture["cases"])
+        {
+            var source = (JObject)item["planningInput"].DeepClone();
+            string before = source.ToString(Formatting.None);
+            string raw = (string)Call(provider, "BuildRoomTaskRequestJsonWithImage", before, "data:image/png;base64,AA==", false);
+            var result = Budget(raw, false);
+            reports.Add(new JObject { ["name"] = item["name"], ["budget"] = result["diagnostic"]?.DeepClone() });
+            LastReport["latestPlanningAttention"] = reports;
+            Require((bool)result["ok"], "Latest accumulated real dialogue/active-goal load fits unchanged complete-wire limits: " + item["name"] + " " + result["diagnostic"]);
+            var input = Input((string)result["wire"]); Call(null, "RestoreRoomDecisionSharedEvidence", input);
+            Require(before == source.ToString(Formatting.None) && (string)input["currentUserText"] == (string)source["currentUserText"],
+                "Projection never mutates runtime records or truncates current authority.");
+            foreach (string key in new[] { "originalRequest", "latestUserText", "userUpdates", "boundEntityId", "referentKind", "referentSourceId", "desiredState", "completionEvidence", "completionEvidenceValid", "failedCandidates" })
+                Require(JToken.DeepEquals(input["spatialGoal"][key], source["spatialGoal"][key]), "General planning preserves task meaning and outcome: " + key);
+            Require(input["spatialGoal"]["referenceContext"] == null && input["planningAttention"] != null,
+                "Resolved identity quotations leave general working memory while source and all task requirements remain.");
+            var future = (JObject)source.DeepClone(); future["spatialGoal"]["referenceContext"]["futureConstraint"] = "Never operate until user confirms.";
+            var futureInput = Input(Wire(provider, future.ToString(Formatting.None)));
+            Require(JToken.DeepEquals(futureInput["spatialGoal"]["referenceContext"], future["spatialGoal"]["referenceContext"]),
+                "Unknown restrictions prevent archival of the affected reference record.");
+            future["spatialGoal"]["boundEntityId"] = null; future["spatialGoal"]["referenceContext"] = source["spatialGoal"]["referenceContext"].DeepClone();
+            futureInput = Input(Wire(provider, future.ToString(Formatting.None)));
+            Require(JToken.DeepEquals(futureInput["spatialGoal"]["referenceContext"], source["spatialGoal"]["referenceContext"]),
+                "Unresolved targets still receive complete reference dialogue for disambiguation.");
+        }
     }
 
     public static void ExportFixtures(string directory)

@@ -5,6 +5,7 @@ public partial class ChatQW
 {
     private static void FocusRoomStepContext(JObject input)
     {
+        FocusRoomPlanningEvidence(input);
         if (input["taskSequence"] is JObject sequence) input["taskSequence"] = RoomTaskContextPolicy.Sequence(sequence);
         var intents = RoomTaskContextPolicy.ReadyUserIntents(input);
         if (intents == null) return;
@@ -24,5 +25,44 @@ public partial class ChatQW
         input["stepAttention"] = new JObject { ["intents"] = new JArray(intents), ["omittedObservedRows"] = omitted,
             ["engineMemoryMutated"] = false,
             ["scope"] = "Current ready user-movement step only. Original request, dependencies, actual user pose/route/support, failures and unknown constraints remain. Object records stay in runtime; next object step gets a full fresh planner. Omitted rows neither prove absence nor authorize action." };
+    }
+
+    private static void FocusRoomPlanningEvidence(JObject input)
+    {
+        if (input["workingMemory"] == null || (bool?)input["quietSpatialGoalStep"] == true) return;
+        var archived = new JArray();
+        // The general planner chooses the next task. A reviewed, bound task
+        // already has a source ID and literal requirements; its frozen dialogue
+        // was for resolving identity, not another source of new instructions.
+        // The actual search/goal runner still reads the full runtime record.
+        foreach (string path in new[] { "spatialGoal", "standingGoal", "sceneSearch", "sceneActionFacts.sceneSearch" })
+        {
+            if (!(input.SelectToken(path) is JObject task)) continue;
+            bool bound = !string.IsNullOrEmpty((string)task["boundEntityId"]);
+            bool resolvedSearch = (bool?)task["active"] == false && !string.IsNullOrEmpty((string)task["foundEntityId"]);
+            if ((bound || resolvedSearch) && task["referenceContext"] is JObject context &&
+                RoomWorkingMemoryKnownArchiveField("referenceContext", context))
+            {
+                task.Remove("referenceContext");
+                archived.Add(path + ".referenceContext");
+            }
+        }
+        foreach (string path in new[] { "visibleObjectCatalog.current.candidates", "visibleObjectCatalog.memory", "sceneSpatialMemory.objects" })
+            if (input.SelectToken(path) is JArray rows)
+                foreach (var row in rows.OfType<JObject>())
+                {
+                    if (RoomDecisionUnknownObservationFields(row)) continue;
+                    // Frozen point, image point, identity uncertainty and current
+                    // body/camera bearings remain. Renderer bounds/neighbours
+                    // are detail for independent object matching, not a route.
+                    foreach (string field in new[] { "geometryNeighbor", "observedRendererBoundsCenter", "observedRendererBoundsSize",
+                        "cameraPositionAtCapture", "cameraRotationAtCapture", "bodyPositionAtCapture", "bodyRotationAtCapture", "viewDirectionWorldAtCapture" })
+                        row.Remove(field);
+                }
+        input["planningAttention"] = new JObject {
+            ["phase"] = "general-task-selection", ["archivedReferences"] = archived,
+            ["engineMemoryMutated"] = false,
+            ["scope"] = "Literal current/original requests, user updates, source identities, outcome proof, uncertainty, frozen points and current bearings retained. Bound tasks' identity-resolution dialogue and observed renderer geometry remain in runtime for the dedicated search/match step. Unknown fields remain. Omitted geometry cannot establish support/contact, absence, reachability or permission."
+        };
     }
 }

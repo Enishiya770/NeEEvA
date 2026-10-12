@@ -79,6 +79,7 @@ public partial class ChatSample
         m_SceneTimeLastRealtime = Time.realtimeSinceStartupAsDouble;
         if (paused)
         {
+            CancelSequenceContinuation("application-paused");
             CancelSceneSearchTask("application-paused");
             m_ScenePauseStartedRealtime = Time.realtimeSinceStartupAsDouble;
             PauseSceneAction();

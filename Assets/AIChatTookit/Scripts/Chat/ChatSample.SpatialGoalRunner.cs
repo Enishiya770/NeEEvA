@@ -370,7 +370,8 @@ public partial class ChatSample
         lease.ending = true; m_SpatialGoalRunner = null;
         ReleaseSpatialGoalRunnerWork(lease, reason, true);
         Debug.Log($"[SpatialGoal/Runner] goal={lease.goalId} generation={lease.generation} controller=unified-device-task outcome={outcome} steps={lease.steps} reason={reason}", this);
-        DispatchSpatialGoalTerminalReply(lease.generation);
+        if (outcome != "satisfied" || !TryStartRoomSequenceContinuation(lease.generation,
+            () => DispatchSpatialGoalTerminalReply(lease.generation))) DispatchSpatialGoalTerminalReply(lease.generation);
     }
 
     private void HandleSpatialGoalActionCancellation(string reason)

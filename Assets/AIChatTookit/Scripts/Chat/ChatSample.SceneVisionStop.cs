@@ -24,6 +24,7 @@ public partial class ChatSample
         if (m_SceneVisionStopPreparation != null && m_SceneVisionStopPreparation.generation == generation &&
             SceneVisionStopScopeIsCurrent(m_SceneVisionStopPreparation)) return;
         CancelSceneVisionStopPreparation();
+        CancelSequenceContinuation("new-stop-preparation");
         // Even an obsolete closed-speech object may still own the provider's
         // preparation channel. Its own cancellation path must release it first.
         if (!SceneEyesOpen || !isActiveAndEnabled || generation != m_FormalResponseGeneration ||
@@ -55,7 +56,7 @@ public partial class ChatSample
                 if (!SceneVisionStopScopeIsCurrent(prepared) ||
                     prepared.bridge.ActiveTaskId != prepared.taskId ||
                     !prepared.following && prepared.bridge.Controller.OperationRevision != prepared.operation ||
-                    !ok || !RoomTaskProtocol.TryDecision(json, prepared.text, false, out var decision) || decision.intent != "stop-moving") return;
+                    !ok || !RoomControlReviewProtocol.TryBodyDecision(json, prepared.text, false, out var decision, out _) || decision.intent != "stop-moving") return;
                 string id = m_MotionIdentityPrefix + ":vision-stop:" + generation + ":" + (++m_SceneVisionStopSequence);
                 bool stopped = prepared.bridge.StopForTaskIfCurrent(id, prepared.taskId, prepared.operation, out string failure, prepared.following);
                 if (stopped) { prepared.actionId = id; prepared.dispatch = "stop-submitted"; }

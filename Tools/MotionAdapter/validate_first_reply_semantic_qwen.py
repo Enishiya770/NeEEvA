@@ -98,6 +98,16 @@ public class FirstReplyWireProbe {
         if(args[0]=="repair-payload") {
             Console.Write(FirstReplyProtocol.BuildGroundingRepairWire(File.ReadAllText(args[1]),File.ReadAllText(args[2])));return 0;
         }
+        if(args[0]=="preflight-review") {
+            bool valid=FirstReplyProtocol.TryGroundedReview(File.ReadAllText(args[1]),File.ReadAllText(args[2]),
+                out string route,out JObject understanding,out string kind,out bool? sufficient,out string demand,out JObject proof);
+            bool handoff=valid && !(kind=="answer-only" && demand=="short-conversation");
+            var result=handoff ? FirstReplyProtocol.ResolveReviewedCompletion(null,route,"probe",understanding,kind,sufficient,demand) : null;
+            Console.Write(new JObject { ["valid"]=valid, ["handoff"]=handoff,
+                ["route"]=valid ? (handoff ? result?.Disposition.ToString().ToLowerInvariant() : "ordinary") : null,
+                ["requestKind"]=kind, ["responseDemand"]=demand,
+                ["repairableGrounding"]=!valid && FirstReplyProtocol.CanRepairGrounding(File.ReadAllText(args[1])) });return 0;
+        }
         if(args[0]=="parse-route") {
             var parser=new FirstReplyStreamParser(()=>true,null);parser.Push(File.ReadAllText(args[1]));
             var result=parser.Finish(true,args[2]);

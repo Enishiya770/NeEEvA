@@ -36,6 +36,7 @@ public static partial class FirstReplySemanticGateRegression
             model.m_Backend = ChatQW.BackendType.Local; model.m_LocalUrl = server.Url;
             model.m_PrewarmPrefixOnStart = false; model.m_LogRequestStats = false;
             host.SetActive(true); typeof(LLM).GetField("url", Flags).SetValue(model, server.Url);
+            yield return RunPreflightChecks(model, server, directory, cases);
             foreach (JObject item in FirstReplyTransportRegression.SemanticCases())
             {
                 model.m_DataList.Clear();
@@ -302,7 +303,8 @@ public static partial class FirstReplySemanticGateRegression
                 "An incomplete candidate is not reviewed, released or committed despite a valid say prefix.");
             yield return Await(broken.Finished, "incomplete candidate socket");
             cases.Add(new JObject { ["id"] = "incomplete-candidate", ["publicDeltas"] = failedSpeech });
-            LastReport["status"] = "passed"; LastReport["httpRequests"] = server.Count;
+            LastReport["status"] = "passed"; LastReport["httpRequests"] = server.Count + server.PreflightCount;
+            LastReport["legacyFixturePreflights"] = server.PreflightCount;
         }
         finally
         {
@@ -333,7 +335,11 @@ public static partial class FirstReplySemanticGateRegression
     }
     private sealed class Server : IDisposable
     {
-        private readonly HttpListener listener = new HttpListener(); public string Url { get; } public int Count;
+        private readonly HttpListener listener = new HttpListener(); public string Url { get; } public int Count, PreflightCount;
+        // Existing fixtures exercise candidate/publication guards after a
+        // classifier chooses conversation. Dedicated tests disable this helper
+        // and inspect the actual first exchange and early handoff explicitly.
+        public bool ConversationPreflight = true;
         public Server()
         {
             var probe = new TcpListener(IPAddress.Loopback, 0); probe.Start(); int port = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
@@ -344,8 +350,23 @@ public static partial class FirstReplySemanticGateRegression
         {
             var exchange = new Exchange();
             exchange.Finished = Task.Run(async () => {
-                var context = await listener.GetContextAsync(); ++Count;
-                using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8)) exchange.RequestJson = await reader.ReadToEndAsync();
+                HttpListenerContext context;
+                while (true) {
+                    context = await listener.GetContextAsync();
+                    using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8)) exchange.RequestJson = await reader.ReadToEndAsync();
+                    bool preflight = false;
+                    try { preflight = (bool?)JObject.Parse((string)JObject.Parse(exchange.RequestJson)["messages"][1]["content"])["routingPreflight"] == true; }
+                    catch (JsonException) { }
+                    if (!ConversationPreflight || !preflight) break;
+                    ++PreflightCount;
+                    var value = JObject.Parse(Verdict("ordinary"));
+                    value["currentTurnEvidence"] = new JObject { ["answerQuote"] = null, ["actionQuote"] = null };
+                    byte[] body = Encoding.UTF8.GetBytes(new JObject { ["choices"] = new JArray(new JObject {
+                        ["finish_reason"] = "stop", ["message"] = new JObject { ["role"] = "assistant", ["content"] = value.ToString(Formatting.None) } }) }.ToString(Formatting.None));
+                    context.Response.ContentType = "application/json"; context.Response.ContentLength64 = body.Length;
+                    await context.Response.OutputStream.WriteAsync(body, 0, body.Length); context.Response.Close();
+                }
+                ++Count;
                 // Legacy socket fixtures control semantic judgments; bind their
                 // synthetic proof to this supplied utterance. Grounding-specific
                 // cases provide literal proof themselves, including invalid ones.

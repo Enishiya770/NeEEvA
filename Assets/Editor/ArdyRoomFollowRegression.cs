@@ -132,6 +132,14 @@ public static class ArdyRoomFollowRegression
             user.position += Vector3.up * .02f;
             Check(!bridge.FollowForTarget("stale-follow", snapshot.currentTargetRevision, out _) && !bridge.IsFollowing,
                 "An obsolete target decision started following.");
+            Check(bridge.FollowForCurrentUser("refreshed-follow", snapshot.currentTargetRevision, user, out failure) && bridge.IsFollowing,
+                "Same user command refreshes changed position before follow submission: " + failure);
+            bridge.StopMovement();
+            var otherUser = new GameObject("Different follow user");
+            try { Check(!bridge.FollowForCurrentUser("wrong-user-follow", snapshot.currentTargetRevision, otherUser.transform, out _) && !bridge.IsFollowing,
+                "Refresh must not transfer authorization to another tracked user."); }
+            finally { UnityEngine.Object.DestroyImmediate(otherUser); }
+            report.cases.Add("same-user-follow-refresh-and-different-user-rejection");
             user.position -= Vector3.up * .02f;
             snapshot = bridge.ReadCurrentTargetEvidence(true);
             Check(bridge.FollowForTarget("follow-fixture-support", snapshot.currentTargetRevision, out failure), failure);

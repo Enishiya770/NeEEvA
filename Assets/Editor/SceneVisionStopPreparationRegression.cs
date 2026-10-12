@@ -238,9 +238,8 @@ public sealed class SceneVisionStopPreparationFakeLLM : LLM
         public Action<bool, string, string> Callback;
         public void Deliver(string intent)
         {
-            string text = (string)JObject.Parse(Input)["currentUserText"];
-            Callback(true, JsonConvert.SerializeObject(new { intent, origin = intent == "none" ? "none" : "user",
-                evidence = intent == "none" ? "" : text }), "controlled-pure-text-preparation");
+            Callback(true, JsonConvert.SerializeObject(new { explicitStopNow = intent == "stop-moving", bodyDirective = intent == "stop-moving" ? "stop-current" : "none",
+                force = intent == "stop-moving" ? "command-now" : "unclear", reason = "Controlled complete-turn judgment." }), "controlled-pure-text-preparation");
         }
     }
     public readonly List<Pending> PendingRequests = new List<Pending>();
