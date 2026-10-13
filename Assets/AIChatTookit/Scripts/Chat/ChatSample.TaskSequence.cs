@@ -58,14 +58,15 @@ public partial class ChatSample
                 else if ((string)execution?["actionId"] == action && (string)step["kind"] == "stop-moving" &&
                     !m_RoomTaskSequenceBridge.IsFollowing && !m_RoomTaskSequenceBridge.ReservesBody &&
                     new[] { "stopped", "cancelled", "idle" }.Contains((string)execution?["phase"])) { receipt = execution; complete = true; }
-                else if ((string)execution?["actionId"] == action && new[] { "failed", "blocked", "cancelled", "unavailable" }.Contains((string)execution?["phase"])) receipt = execution;
+                else if ((string)execution?["actionId"] == action && RoomMovementResultPolicy.IsTerminalFailure((string)execution?["phase"])) receipt = execution;
                 else if ((string)scene?["actionId"] == action && new[] { "failed", "rejected", "cancelled", "arrived-object-unconfirmed" }.Contains((string)scene?["phase"])) receipt = scene;
             }
             if (receipt == null) continue;
             step["status"] = complete ? "completed" : "failed";
             step["receipt"] = !string.IsNullOrEmpty(goal) ? receipt.DeepClone() : PickRoomFields(receipt,
                 "taskId", "actionId", "intent", "targetKind", "sceneTargetId", "entityId", "phase", "status", "reason", "stage",
-                "generation", "workEpoch", "userTurn", "observedUtc", "operationRevision", "stateChanged", "objectReobserved", "reached");
+                "generation", "workEpoch", "userTurn", "observedUtc", "operationRevision", "stateChanged", "objectReobserved", "reached",
+                "approachRetargetStatus", "approachRetargetCount", "approachRetargetTravel");
         }
         var result = (JObject)m_RoomTaskSequence.DeepClone();
         result["readyStepIds"] = RoomTaskSequenceProtocol.Ready((JArray)result["steps"]);

@@ -62,6 +62,23 @@ namespace NeEEvA.Motion
         public const float MaximumHeadHeight = 2.40f;
         private const float AlreadyNearTolerance = .15f;
 
+        public static bool GoalSatisfied(float distance, float facingDegrees, float desiredDistance) =>
+            Finite(distance) && Finite(facingDegrees) && Finite(desiredDistance) && desiredDistance > 0f &&
+            distance >= desiredDistance - .25f && distance <= desiredDistance + .25f &&
+            facingDegrees >= 0f && facingDegrees <= 15f;
+
+        // Revalidate the promised endpoint against the live target, including
+        // heading. Small target shifts can cross the goal boundary before the
+        // ordinary displacement threshold; head height is not a ground shift.
+        public static bool ProjectedGoalSatisfied(ArdyRoomApproachPlan plan, Vector3 head, float desiredDistance)
+        {
+            if (plan == null || !Finite(head)) return false;
+            Vector3 before = Horizontal(plan.FacePoint - plan.GroundTarget);
+            Vector3 current = Horizontal(head - plan.GroundTarget);
+            return before.sqrMagnitude > .000001f && current.sqrMagnitude > .000001f &&
+                GoalSatisfied(current.magnitude, Vector3.Angle(before, current), desiredDistance);
+        }
+
         /// <summary>Recheck the explicit head anchor's current real support without planning any route.</summary>
         public static bool TryGetUserGround(ArdyRoomNavigation navigation, Transform userAnchor,
             out Vector3 ground, out string reason)
@@ -142,6 +159,7 @@ namespace NeEEvA.Motion
             ArdyRoomRoute best = null;
             Vector3 bestGround = default;
             float bestScore = float.PositiveInfinity;
+            int bestRing = int.MaxValue;
             observation.stage = "candidates";
             // At most 24 ordinary NavMesh plans. Alternate +/- directions to avoid one-sided bias.
             int[] turns = { 0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6 };
@@ -179,8 +197,12 @@ namespace NeEEvA.Motion
                     }
                     candidateObservation.accepted = true;
                     observation.acceptedCount++;
-                    float score = route.Length + Mathf.Abs(turn) * .015f + ring * .15f;
-                    if (score >= bestScore) continue;
+                    // Keep the requested stand-off's tolerance margin whenever
+                    // that ring is reachable. A shorter outer-ring path is only
+                    // a fallback, not a reward for stopping farther away.
+                    float score = route.Length + Mathf.Abs(turn) * .015f;
+                    if (ring > bestRing || ring == bestRing && score >= bestScore) continue;
+                    bestRing = ring;
                     bestScore = score;
                     best = route;
                     bestGround = route.Corners[route.Corners.Length - 1];

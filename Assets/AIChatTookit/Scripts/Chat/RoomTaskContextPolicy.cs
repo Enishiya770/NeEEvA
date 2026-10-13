@@ -5,6 +5,17 @@ using Newtonsoft.Json.Linq;
 /// <summary>Consumer views of engine records. Never changes task ownership or completion.</summary>
 public static class RoomTaskContextPolicy
 {
+    public static bool AutonomousBodyAttention(JObject input)
+    {
+        var attention = input?["autonomousAttention"] as JObject;
+        return (bool?)input?["autonomous"] == true &&
+            (string)attention?["source"] == "current-private-intent-review" &&
+            (bool?)attention?["actionAuthorization"] == false &&
+            (string)attention?["kind"] == "current-user-body" &&
+            !string.IsNullOrWhiteSpace((string)input["autonomousIntention"]) &&
+            (string)attention["intention"] == (string)input["autonomousIntention"];
+    }
+
     public static bool InitialUserBodyAttention(JObject input)
     {
         var semantics = input?["currentRequestSemantics"] as JObject;

@@ -46,6 +46,7 @@ public sealed partial class ArdyRoomDialogueBridge
         if (!ArdyRoomApproachPlanner.RouteKeepsUserClearance(route, userCenter, radius))
         { failure = "用户位于角色身体净距内，未开始原地转身。"; return false; }
         ResetNavigationRecovery();
+        ResetApproachRetarget();
         sceneOrientId = actionId = id; sceneOrientCaptureId = captureId; sceneOrientYaw = yaw;
         sceneOrientRoot = avatar.transform.position;
         sceneOrientObservedForward = avatar.transform.forward; sceneOrientActualYaw = 0f;

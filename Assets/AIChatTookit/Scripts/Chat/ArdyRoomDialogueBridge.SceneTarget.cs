@@ -75,6 +75,7 @@ public sealed partial class ArdyRoomDialogueBridge
             return RejectSceneTarget(id, captureId, targetId, visibleSurfacePoint, failure, out failure, viewDirection, viewDistance, viewPurpose);
 
         ResetNavigationRecovery();
+        ResetApproachRetarget();
         executionTargetKind = "scene-object";
         sceneTargetEpoch++;
         sceneTargetActive = true;

@@ -63,11 +63,15 @@ public static partial class RoomDecisionBudgetRegression
         Require(!(bool)RoomMovementResultPolicy.Requirement(room, "approach", "another-action")["required"],
             "Another action's arrival cannot satisfy this reply.");
         room["currentFacts"]["currentlyNearAndFacingUser"] = false;
-        Require(!(bool)RoomMovementResultPolicy.Requirement(room, "approach", "current")["required"],
-            "A historical arrival cannot claim current proximity after the user moves away.");
+        room["currentFacts"]["actualUserDistance"] = 3.2;
+        room["currentFacts"]["desiredUserDistance"] = 1.2;
+        var changedRelation = RoomMovementResultPolicy.Requirement(room, "approach", "current");
+        Require((string)changedRelation["expectedReport"] == "arrived" && (string)changedRelation["arrivalRelation"] == "distance-changed",
+            "Completed arrival remains reportable while live distance explicitly disallows claiming current proximity.");
         room["currentFacts"] = JValue.CreateNull();
-        Require(!(bool)RoomMovementResultPolicy.Requirement(room, "approach", "current")["required"],
-            "Missing current proximity evidence cannot claim arrival or interrupt reply generation.");
+        var unknownRelation = RoomMovementResultPolicy.Requirement(room, "approach", "current");
+        Require((string)unknownRelation["expectedReport"] == "arrived" && (string)unknownRelation["arrivalRelation"] == "current-unverified",
+            "Missing live proximity evidence cannot erase committed arrival or establish present proximity.");
         var schema = JObject.Parse(RoomTaskProtocol.BuildSpeechReviewSchemaForInput(new JObject { ["movementReportRequirement"] = requirement }.ToString()));
         Require(((JArray)schema["required"]).Values<string>().Contains("resultReport") &&
             ((JArray)schema["properties"]["resultReport"]["enum"]).Values<string>().Contains("arrived"), "Arrival evidence requires semantic result classification on the real review wire.");

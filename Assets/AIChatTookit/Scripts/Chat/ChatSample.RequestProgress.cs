@@ -7,6 +7,17 @@ public partial class ChatSample
     private JObject m_RequestProgressSpeechState;
     private int m_RequestProgressSpeechGeneration = -1;
 
+    private JObject BuildRoomSpeechProgressOwner(int generation)
+    {
+        if (generation != m_SpatialGoalTerminalReplyGeneration) return null;
+        var body = BuildRoomRequestProgress()?["body"] as JObject;
+        return body == null ? null : new JObject {
+            ["actionId"] = body["actionId"]?.DeepClone(), ["intent"] = body["intent"]?.DeepClone(),
+            ["targetKind"] = "user", ["actor"] = "CHARACTER", ["target"] = "USER",
+            ["scope"] = "Only this current request's owned body step. Partition its spoken progress separately; this does not authorize another action."
+        };
+    }
+
     private bool RoomRequestProgressOwnerCurrent(string actionId, int generation) =>
         RoomTaskSequenceCurrent() && m_RoomTaskSequence["steps"] is JArray steps &&
         steps.OfType<JObject>().Any(step => (string)step["actionId"] == actionId &&
@@ -37,7 +48,8 @@ public partial class ChatSample
                 ["stepId"] = body["id"].DeepClone(), ["intent"] = body["kind"].DeepClone(),
                 ["actionId"] = body["actionId"].DeepClone(),
                 ["execution"] = PickRoomFields(execution, "actionId", "targetKind", "phase", "reason", "operationRevision", "observedUtc"),
-                ["currentFacts"] = PickRoomFields(room["currentFacts"] as JObject, "currentlyNearAndFacingUser")
+                ["currentFacts"] = PickRoomFields(room["currentFacts"] as JObject, "currentlyNearAndFacingUser",
+                    "userTrackingValid", "userSupportVerified", "actualUserDistance", "actualFacingErrorDegrees", "desiredUserDistance")
             },
             ["scope"] = "Current request progress, not new action authority. Completed device steps do not complete pending questions or movements. Body status is reportable only for this step's current owned action; old completed receipts are historical."
         };
@@ -77,6 +89,8 @@ public partial class ChatSample
         if (state == null) return null;
         bool ja = language == "ja", en = language == "en";
         string expected = (string)state["expectedReport"];
+        if (intent == "approach" && (string)state["phase"] == "arrived")
+            return ArrivalProgressText((string)state["arrivalRelation"], language);
         if (intent == "stop-moving" && expected != "stopped")
             return ja ? "移動を止められたかは、まだ確認できないわ。" :
                 en ? "I can't confirm that movement has stopped yet." : "我还不能确认移动已经停下。";
@@ -100,6 +114,24 @@ public partial class ChatSample
                         en ? "I can't confirm that I'm beside you right now." : "我还不能确认现在已经到你身边。";
                 string result = LocalizeRoomFallback(fallback, language);
                 return !transition ? result : (ja ? "ただ、今は状況が変わったわ。" : en ? "The situation has changed. " : "不过，现在情况变了。") + result;
+        }
+    }
+
+    private static string ArrivalProgressText(string relation, string language)
+    {
+        bool ja = language == "ja", en = language == "en";
+        if (relation == "near-facing") return ja ? "あなたのそばに着いたわ。" : en ? "I've reached your side." : "我已经到你身边了。";
+        string arrived = ja ? "さっきあなたのそばに着いたわ。" : en ? "I reached your side a moment ago. " : "刚才已经到你身边了。";
+        switch (relation)
+        {
+            case "distance-changed": return arrived + (ja ? "今はお互いの距離が変わっているわ。" :
+                en ? "The distance between us has changed since then." : "现在我们之间的距离又变了。");
+            case "facing-changed": return arrived + (ja ? "今はあなたの方をまっすぐ向いていないわ。" :
+                en ? "I'm not directly facing you now." : "现在我没有正对着你。");
+            case "tracking-unavailable": return arrived + (ja ? "ただ、今のあなたの位置は確認できないわ。" :
+                en ? "I can't verify your current position now." : "不过现在无法确认你的当前位置。");
+            default: return arrived + (ja ? "今もそばにいるかは、改めて確認が必要ね。" :
+                en ? "Whether I'm still beside you needs a fresh check." : "此刻是否仍在你身边，还需要重新确认。");
         }
     }
 }

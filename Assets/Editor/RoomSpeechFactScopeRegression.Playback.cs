@@ -41,6 +41,51 @@ public static partial class RoomSpeechFactScopeRegression
         {
             int operations = bridge.Controller.OperationRevision;
             int assessments = (int)Get(bridge, "assessmentBuildCount");
+            foreach (string language in new[] { "zh", "ja", "en" })
+            {
+                var facts = new JObject { ["execution"] = new JObject { ["actionId"] = "arrived-owned", ["targetKind"] = "user", ["phase"] = "arrived" },
+                    ["currentFacts"] = new JObject { ["currentlyNearAndFacingUser"] = true, ["userTrackingValid"] = true,
+                        ["userSupportVerified"] = true, ["actualUserDistance"] = 1.2, ["desiredUserDistance"] = 1.2, ["actualFacingErrorDegrees"] = 1.0 } };
+                var pose = (JObject)facts["currentFacts"];
+                foreach (string relation in new[] { "near-facing", "distance-changed", "facing-changed", "tracking-unavailable", "support-unverified" })
+                {
+                    pose["currentlyNearAndFacingUser"] = relation == "near-facing";
+                    pose["actualUserDistance"] = relation == "distance-changed" ? 2.0 : 1.2;
+                    pose["actualFacingErrorDegrees"] = relation == "facing-changed" ? 35 : 1;
+                    pose["userTrackingValid"] = relation != "tracking-unavailable";
+                    pose["userSupportVerified"] = relation != "support-unverified";
+                    Require(RoomMovementResultPolicy.ArrivalRelation(facts) == relation, "Separate current pose dimensions from historical arrival: " + relation);
+                    Require((string)RoomMovementResultPolicy.Requirement(facts, "approach", "arrived-owned")["expectedReport"] == "arrived",
+                        "Review retains confirmed arrival after current pose/tracking changes: " + relation);
+                    string text = (string)Call(chat, "MovementProgressText", facts, "approach", "arrived-owned", language, false);
+                    Require(text.Contains(language == "ja" ? "着いた" : language == "en" ? "reached" : "到你身边") &&
+                        (string)facts.SelectToken("execution.phase") == "arrived", "Every pose transition preserves actual completed arrival: " + language + "/" + relation);
+                    rows.Add(new JObject { ["arrivalRelation"] = relation, ["language"] = language, ["text"] = text });
+                }
+                Require(Call(chat, "MovementProgressText", facts, "approach", "replacement-owner", language, false) == null,
+                    "Historical arrival cannot cross action ownership.");
+            }
+            // Real Unity transforms and live receipt reader, without a route or
+            // action dispatch. The completion timestamp stays immutable.
+            Vector3 headBefore = bridge.userHead.position;
+            try {
+                var poseHistory = Bind(); Phase("arrived");
+                var poseLease = Get(chat, "m_RoomSpeechPlayback"); var poseChunk = Chunk(poseLease, poseHistory.content);
+                Call(chat, "RefreshRoomSpeechForPlayback", poseChunk, generation);
+                var arrival = bridge.ReadMovementSpeechReceipt();
+                Vector3 away = bridge.userHead.position - bridge.avatar.transform.position; away.y = 0;
+                bridge.userHead.position += (away.sqrMagnitude > .001f ? away.normalized : Vector3.right) * 2f;
+                var moved = bridge.ReadMovementSpeechReceipt();
+                Require(moved.phase == "arrived" && moved.arrivalObservedUtc == arrival.arrivalObservedUtc &&
+                    moved.actualUserDistance > arrival.actualUserDistance + 1.5f &&
+                    bridge.Controller.OperationRevision == operations && (int)Get(bridge, "assessmentBuildCount") == assessments,
+                    "User movement changes measured distance without erasing completion or planning another route.");
+                rows.Add(new JObject { ["liveUserMove"] = true, ["arrivalObservedUtc"] = moved.arrivalObservedUtc,
+                    ["beforeDistance"] = arrival.actualUserDistance, ["afterDistance"] = moved.actualUserDistance,
+                    ["afterPhase"] = moved.phase, ["supportVerified"] = moved.userSupportVerified });
+                Call(chat, "FinishRoomSpeechPlaybackHistory", "");
+            }
+            finally { bridge.userHead.position = headBefore; }
             foreach (string phase in new[] { "preparing", "follow-paused", "follow-recovering", "follow-waiting", "failed", "cancelled", "arrived" })
             {
                 var history = Bind(); var lease = Get(chat, "m_RoomSpeechPlayback"); var chunk = Chunk(lease, history.content);
@@ -56,13 +101,55 @@ public static partial class RoomSpeechFactScopeRegression
                 Call(chat, "FinishRoomSpeechPlaybackHistory", "");
                 Require(!model.m_DataList.Contains(history), "Unplayed receipt is removed from dialogue history.");
             }
+            foreach (string language in new[] { "zh", "ja", "en" })
+            {
+                var history = Bind(); Phase("preparing");
+                Call(chat, "BindRoomSpeechPlayback", generation, language, bridge, model, history);
+                var lease = Get(chat, "m_RoomSpeechPlayback");
+                Set(lease, "prefix", "Independent result. ");
+                var chunk = Chunk(lease, history.content); var late = Chunk(lease, history.content);
+                foreach (string phase in new[] { "moving", "returning", "arrived" })
+                {
+                    Phase(phase);
+                    Require(Call(chat, "RefreshRoomSpeechForPlayback", chunk, generation).ToString() == "Replaced",
+                        "Latest recorded phase transition updates queued speech: " + phase);
+                }
+                string arrival = language == "ja" ? "さっきあなたのそばに着いたわ。" : language == "en" ?
+                    "I reached your side a moment ago." : "刚才已经到你身边了。";
+                Require((int)Get(lease, "refreshes") == 3 && (bool)Get(lease, "neutral") &&
+                    ((string)Get(chunk, "Text")).EndsWith(arrival) && ((string)Get(chunk, "Text")).StartsWith("Independent result."),
+                    "Third refresh keeps definite arrival and independent outcome, without inventing uncertainty: " + language);
+                Vector3 originalHead = bridge.userHead.position;
+                try {
+                    bridge.userHead.position += Vector3.right * 3;
+                    Require(Call(chat, "RefreshRoomSpeechForPlayback", chunk, generation).ToString() == "Current" &&
+                        (int)Get(lease, "refreshes") == 3, "Stable past arrival does not resynthesize when the user moves after completion.");
+                } finally { bridge.userHead.position = originalHead; }
+                Require(Call(chat, "RefreshRoomSpeechForPlayback", late, generation).ToString() == "Drop",
+                    "A late clip cannot restore obsolete pre-arrival wording.");
+                rows.Add(new JObject { ["terminalAtRefreshCap"] = true, ["language"] = language, ["text"] = Get(chunk, "Text").ToString() });
+                Call(chat, "FinishRoomSpeechPlaybackHistory", "");
+            }
             var churnHistory = Bind(); var churn = Get(chat, "m_RoomSpeechPlayback"); var churnChunk = Chunk(churn, churnHistory.content);
             Call(bridge, "SetFact", "moving", "same movement, updated progress diagnostic");
             Require(Call(chat, "RefreshRoomSpeechForPlayback", churnChunk, generation).ToString() == "Current",
                 "Progress wording alone cannot invalidate truthful movement speech or trigger synthesis churn.");
-            foreach (string phase in new[] { "preparing", "moving", "returning", "arrived" })
+            Phase("preparing"); Call(chat, "RefreshRoomSpeechForPlayback", churnChunk, generation);
+            int meaningfulChanges = (int)Get(churn, "refreshes");
+            Phase("generating");
+            Require(Call(chat, "RefreshRoomSpeechForPlayback", churnChunk, generation).ToString() == "Current" &&
+                (int)Get(churn, "refreshes") == meaningfulChanges,
+                "Preparing and generating say the same thing and cannot consume the replacement budget.");
+            foreach (string phase in new[] { "moving", "returning" })
             { Phase(phase); Call(chat, "RefreshRoomSpeechForPlayback", churnChunk, generation); }
             Require((int)Get(churn, "refreshes") == 3 && (bool)Get(churn, "neutral"), "Rapid phase changes have a bounded synthesis replacement count.");
+            Phase("goal-not-reached");
+            Require(Call(chat, "RefreshRoomSpeechForPlayback", churnChunk, generation).ToString() == "Replaced" &&
+                ((string)Get(churnChunk, "Text")).Contains("没有达到要求") &&
+                !((string)Get(churnChunk, "Text")).Contains("暂时不能确认"),
+                "The latest production failure replaces neutral progress before audio starts.");
+            Require(Call(chat, "RefreshRoomSpeechForPlayback", churnChunk, generation).ToString() == "Current" &&
+                (int)Get(churn, "refreshes") == 4, "A settled terminal receipt does not repeatedly synthesize.");
             Set(bridge, "actionId", "new-owner"); Call(bridge, "SetFact", "moving", "replacement fixture");
             Require(Call(chat, "RefreshRoomSpeechForPlayback", churnChunk, generation).ToString() == "Drop",
                 "Even a phase-neutral receipt is revoked when another action owns the body.");

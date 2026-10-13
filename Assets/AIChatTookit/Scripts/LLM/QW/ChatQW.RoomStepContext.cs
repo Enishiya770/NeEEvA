@@ -9,7 +9,8 @@ public partial class ChatQW
         if (input["taskSequence"] is JObject sequence) input["taskSequence"] = RoomTaskContextPolicy.Sequence(sequence);
         var intents = RoomTaskContextPolicy.ReadyUserIntents(input);
         bool initialBody = RoomTaskContextPolicy.InitialUserBodyAttention(input);
-        if (intents == null && !initialBody) return;
+        bool autonomousBody = RoomTaskContextPolicy.AutonomousBodyAttention(input);
+        if (intents == null && !initialBody && !autonomousBody) return;
         var omitted = new JObject();
         foreach (string path in new[] { "visibleObjectCatalog.current.candidates", "visibleObjectCatalog.memory", "sceneSpatialMemory.objects",
             "sceneCognitionSummary.currentObjects", "sceneCognitionSummary.historicalObjects",
@@ -25,9 +26,9 @@ public partial class ChatQW
         }
         // A new, independently classified body-only request has no object
         // referent. Compound continuations still need predecessor evidence.
-        if (initialBody && !(input["taskSequence"] is JObject)) FocusInitialBodyHistory(input, omitted);
+        if ((initialBody || autonomousBody) && !(input["taskSequence"] is JObject)) FocusInitialBodyHistory(input, omitted);
         input["stepAttention"] = new JObject { ["intents"] = intents == null ? null : new JArray(intents),
-            ["source"] = initialBody ? "current-turn-semantic-attention" : "approved-ready-step", ["omittedObservedRows"] = omitted,
+            ["source"] = autonomousBody ? "current-autonomous-intent-attention" : initialBody ? "current-turn-semantic-attention" : "approved-ready-step", ["omittedObservedRows"] = omitted,
             ["engineMemoryMutated"] = false,
             ["scope"] = "Current-user movement attention. Original request, dependencies, user pose/route/support, failures and unknown constraints remain. Object records stay in runtime for a fresh search/match when needed. An initial semantic focus does NOT narrow the action menu or authorize a move. Omission proves neither absence nor permission." };
     }
@@ -50,6 +51,9 @@ public partial class ChatQW
             KnownHistory(row, new[] { "imageRole", "imageAttachedToCurrentLocalization", "returnDirection" }));
         Filter("workingMemory.recallIndex", row => KnownHistory(row, new[] { "authoredNames", "currentBearing", "recallStrength", "recallDetail",
             "coarseBodyDirection", "cameraYawDegreesRight", "cameraElevationDegreesUp", "bodyYawDegreesRight" }));
+        Filter("sceneSpatialMemory.dialogueViews", row => (string)row["imageRole"] == "historical-dialogue-view" &&
+            KnownHistory(row, new[] { "imageRole", "visualObservation", "imageAttachedToThisPlanner", "ageSeconds", "returnDirection",
+                "state", "reason", "sceneName", "scenePath", "loadedSceneFingerprint", "projection", "verticalFov", "sceneHandle", "hasImage", "verifiedEntity", "frame" }));
         if (input.SelectToken("visibleObjectCatalog.historicalViews") is JArray views && views.Count == 0 &&
             input["planningHistoryImageCaptureIds"] is JArray images && images.All(v => v.Type == JTokenType.String))
             input["planningHistoryImageCaptureIds"] = new JArray();
@@ -72,6 +76,11 @@ public partial class ChatQW
             .Any(path => input[path] is JObject task && !new[] { "satisfied", "cancelled" }.Contains((string)task["status"]));
         if (unfinished || (bool?)scene?["active"] != false || (bool?)last?["active"] != false ||
             (string)last?["intent"] != "set-object-state" || (string)last?["phase"] != "performed") return;
+        CompactCompletedDeviceGeometry(last, omitted);
+    }
+
+    private static void CompactCompletedDeviceGeometry(JObject last, JObject omitted)
+    {
         // Geometry and renderer diagnostics of a completed OLD device action
         // are not evidence for the new route to the live user. Its receipt and
         // result validity stay available; current movement facts are untouched.
@@ -130,5 +139,33 @@ public partial class ChatQW
             ["engineMemoryMutated"] = false,
             ["scope"] = "Literal requests, user updates, identities, outcome proof, uncertainty, image sample, visible extent, frozen points and current bearings retained. Bound identity dialogue, renderer hierarchy/geometry and annotation layout stay in runtime for dedicated matching. Unknown fields remain. Omission establishes neither absence, support, contact, reachability nor permission."
         };
+        FocusCompletedPlanningHistory(input);
+    }
+
+    private static void FocusCompletedPlanningHistory(JObject input)
+    {
+        // New-task selection needs the literal old outcome/identity, not the
+        // completed operation's view tracking. A live sequence retains its proof chain.
+        if (input["taskSequence"] is JObject) return;
+        if (new[] { "spatialGoal", "standingGoal", "pendingDeviceRequest", "pendingObservationGoal" }
+            .Any(path => input[path] is JObject task && !new[] { "satisfied", "cancelled" }.Contains((string)task["status"]))) return;
+        var scene = input["sceneActionFacts"] as JObject;
+        var last = scene?["lastAction"] as JObject;
+        if ((bool?)scene?["active"] != false || (bool?)last?["active"] != false ||
+            (string)last?["intent"] != "set-object-state" || (string)last?["phase"] != "performed") return;
+        var omitted = new JObject();
+        // Reuse the same audited completed-device projection for all new tasks;
+        // pure body attention additionally removes irrelevant object indexes.
+        CompactCompletedDeviceGeometry(last, omitted);
+        if (input.SelectToken("workingMemory.completedTasks") is JObject completed)
+            foreach (var goal in completed.Properties().Select(p => p.Value).OfType<JObject>())
+                if (new[] { "satisfied", "cancelled" }.Contains((string)goal["status"]) &&
+                    goal["boundEntityMemory"] is JObject memory && !RoomDecisionUnknownObservationFields(memory))
+                {
+                    CompactRoomWorkingMemoryObservation(memory);
+                    foreach (string name in new[] { "geometryNeighbor", "observedRendererBoundsCenter", "observedRendererBoundsSize",
+                        "localHierarchy", "markerAnchorPixel", "markerPlacement", "markerPixelBounds" }) memory.Remove(name);
+                }
+        if (omitted.Count > 0) input["planningAttention"]["completedDetailOmitted"] = omitted;
     }
 }

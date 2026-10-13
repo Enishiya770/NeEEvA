@@ -19,6 +19,59 @@ def write(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def speech_fragments(data):
+    """Mirror the deterministic C# span layout, not the semantic ownership decision."""
+    speech = data['publicSpeech']
+    claim = data.get('independentSpeechClaim', {})
+    evidence = claim.get('evidence', '')
+    quotes = [evidence, claim.get('pendingSameResultQuote', ''), *claim.get('otherClaims', [])]
+    spans = [(speech.index(q), speech.index(q) + len(q)) for q in quotes if q and q in speech]
+    protected = speech.find(evidence) if evidence else -1
+    ends = {len(speech)}
+    for i, character in enumerate(speech):
+        boundary = character in '。！？!?；;，,' or character == '.' and not (
+            i > 0 and i + 1 < len(speech) and speech[i-1].isdigit() and speech[i+1].isdigit())
+        if boundary and not any(start < i + 1 < end for start, end in spans):
+            ends.add(i + 1)
+    ends.update(end for _, end in spans)
+    adjusted = set()
+    for end in ends:
+        while end < len(speech) and (speech[end].isspace() or speech[end] in '。！？!?.,，;；'):
+            end += 1
+        adjusted.add(end)
+    result, start = [], 0
+    for end in sorted(adjusted):
+        if end <= start:
+            continue
+        result.append(dict(id=f'p{len(result)}', text=speech[start:end],
+                           protectedResult=protected >= 0 and start < protected+len(evidence) and end > protected))
+        start = end
+    return result
+
+
+def independent_speech(parts, language):
+    """Same punctuation-only join as RoomSpeechPartsProtocol.TryRead."""
+    kept, removed = '', False
+    def end_clause(text):
+        trimmed = text.rstrip()
+        if not trimmed:
+            return text
+        if trimmed[-1] in ',，;；':
+            return trimmed.rstrip(',，;；') + ('. ' if language == 'en' else '。')
+        if trimmed[-1] not in '.。！？!?':
+            return trimmed + ('. ' if language == 'en' else '。')
+        return text
+    for part in parts:
+        if part['owner'] == 'independent':
+            if removed and kept:
+                kept = end_clause(kept)
+            kept += part['text']
+            removed = False
+        else:
+            removed = True
+    return (end_clause(kept) if removed and kept else kept).strip()
+
+
 def request(base, payload, allow_invalid_json=False):
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     started = time.monotonic()
@@ -152,6 +205,12 @@ def main():
                 input_data = json.loads(input_text[json_start:])
                 input_data["independentSpeechClaim"] = claim
                 schema = wire["response_format"]["schema"]
+                if input_data.get("speechProgressOwner"):
+                    fragments = speech_fragments(input_data)
+                    input_data["progressSpeechParts"] = fragments
+                    eligible = [p["id"] for p in fragments if not p["protectedResult"]]
+                    schema["properties"]["bodyProgressParts"]["items"]["enum"] = eligible or ["none"]
+                    schema["properties"]["bodyProgressParts"]["maxItems"] = len(eligible)
                 for key in ("resultReport", "actualLanguage"):
                     schema["properties"][key]["enum"] = [claim[key]]
                 speech = input_data["publicSpeech"]
@@ -169,6 +228,21 @@ def main():
                 verdict, envelope, elapsed = request(args.url, wire)
                 write(args.output / (row["name"] + ".review.envelope.json"), envelope)
                 entry.update(review=verdict, reviewSeconds=elapsed)
+                if row["input"].get("speechProgressOwner"):
+                    selected = verdict.get("bodyProgressParts")
+                    assert isinstance(selected, list) and len(set(selected)) == len(selected), verdict
+                    assert all(key in eligible for key in selected), verdict
+                    assert not (verdict.get('verdict') == 'consistent' and verdict.get('otherClaimsSupport') == 'none' and selected), verdict
+                    parts = [dict(owner="current-body" if p["id"] in selected else "independent", text=p["text"]) for p in fragments]
+                    entry["resolvedSpeechParts"] = parts
+                    assert "".join(p["text"] for p in parts) == speech, parts
+                    retained_literal = "".join(p["text"] for p in parts if p["owner"] == "independent")
+                    assert not claim["evidence"] or claim["evidence"] in retained_literal, (claim, parts)
+                    stable = independent_speech(parts, claim['actualLanguage'])
+                    if row.get("expectedFactualApproval", True):
+                        assert all(q in stable for q in row.get("retainedQuotes", [])), stable
+                        assert all(q not in stable for q in row.get("replacedQuotes", [])), stable
+                    entry["independentSpeech"] = stable
                 assert isinstance(verdict.get("targetComparison"), str) and 0 < len(verdict["targetComparison"]) <= 160, verdict
                 assert isinstance(verdict.get("otherClaimsComparison"), str) and 0 < len(verdict["otherClaimsComparison"]) <= 200, verdict
                 assert isinstance(verdict.get("taskRelationComparison"), str) and 0 < len(verdict["taskRelationComparison"]) <= 160, verdict

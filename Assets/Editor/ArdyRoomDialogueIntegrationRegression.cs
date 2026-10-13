@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -54,7 +54,7 @@ public static class ArdyRoomDialogueIntegrationRegression
         public bool extendedRuntime, continuityRuntime;
         public int retargetChecks;
         public bool connectedThroughRuntimeBridge, vrmDisabledThroughout, vrmRuntimeUninitialized, ordinarySpeechPreservedMovement;
-        public bool staleRoleCallbackRejected, generationStopPreservedRoot, playingStopPreservedRoot, movingUserInvalidated;
+        public bool staleRoleCallbackRejected, generationStopPreservedRoot, playingStopPreservedRoot, movingUserRetargeted;
         public List<Source> sources = new List<Source>();
         public List<Case> cases = new List<Case>();
     }
@@ -218,9 +218,10 @@ public static class ArdyRoomDialogueIntegrationRegression
     private static IEnumerator Scenario()
     {
         yield return Delay(.4f);
-        report.roomTaskClosureChecks = ArdyRoomTaskClosureRegression.RunChecks(chat, bridge);
+        bool retargetOnly = Environment.GetCommandLineArgs().Contains("-ardyApproachRetargetOnly");
+        if (!retargetOnly) report.roomTaskClosureChecks = ArdyRoomTaskClosureRegression.RunChecks(chat, bridge);
         report.roomFollowChecks = ArdyRoomFollowRegression.RunChecks(chat, bridge);
-        report.roomSpeechPreparationChecks = ArdyRoomSpeechPreparationRegression.RunChecks(chat, bridge);
+        if (!retargetOnly) report.roomSpeechPreparationChecks = ArdyRoomSpeechPreparationRegression.RunChecks(chat, bridge);
         if (SessionState.GetBool(Key + "Continuity", false))
         {
             report.continuityRuntime = true;
@@ -381,18 +382,51 @@ public static class ArdyRoomDialogueIntegrationRegression
             !(bool)self["currentlyNearAndFacingUser"], "Avatar's own head was accepted as the user anchor.");
         CheckHeldRoot(); EndCase(); bridge.userHead = user;
 
-        BeginCase("moving-user-invalidates-pending-operation");
-        user.position = FindUser(false); RoleCommand("approach");
+        BeginCase("moving-user-retargets-pending-operation");
+        user.position = FindUser(false, true); RoleCommand("approach");
         yield return WaitFor(() => bridge.Controller.ExecutionState == ArdyRoomExecutionState.Generating, 30, "moving-user fixture generation");
-        SaveWire(); HoldRoot(); user.position += Vector3.right * .5f;
-        yield return WaitFor(() => !bridge.ReservesBody, 2, "user snapshot invalidation");
-        Check(bridge.Phase == "cancelled" && !bridge.Controller.IsBusy && !bridge.Controller.Player.HasPoseOwnership,
-            "Changed user snapshot retained pending body work.");
-        var changedUser = JObject.Parse(bridge.DescribeRoomContext());
-        Check((float)changedUser["latestExecutionObservation"]["userDisplacementXZ"] > .35f &&
-            (string)changedUser["latestExecutionObservation"]["stage"] == "generation",
-            "Cancellation must retain measured horizontal displacement and the interrupted execution stage.");
-        yield return Delay(1f); CheckHeldRoot(); report.movingUserInvalidated = true; EndCase();
+        SaveWire(); string retargetAction = bridge.ActionId;
+        user.position += Vector3.Cross(Vector3.up, Horizontal(user.position - avatar.transform.position).normalized) * .5f;
+        yield return WaitFor(() => bridge.ReadCurrentTargetEvidence().approachRetargetCount > 0, 2, "bounded target refresh");
+        Check(bridge.ActionId == retargetAction && !bridge.IsFollowing && bridge.Phase != "cancelled", "Small target drift cancelled the parent or enabled continuous following.");
+        yield return WaitFor(() => bridge.Phase == "arrived" && !bridge.ReservesBody, 50, "retarget arrival");
+        Check(bridge.ActionId == retargetAction && bridge.ReadCurrentTargetEvidence().approachRetargetCount <= 3, "Recovery created a new logical task or exceeded its count budget.");
+        HoldRoot(); user.position += Vector3.right * .6f;
+        yield return Delay(1f);
+        Check(bridge.Phase == "arrived" && !bridge.ReservesBody && !bridge.IsFollowing && bridge.ActionId == retargetAction,
+            "Moving after arrival rewrote history or silently restarted the old approach.");
+        CheckHeldRoot(); report.movingUserRetargeted = true; EndCase();
+
+        BeginCase("moving-user-retargets-playing-operation");
+        user.position = FindUser(false, true); RoleCommand("approach");
+        yield return WaitFor(() => bridge.Controller.Player.IsPlaying && bridge.Controller.Player.TimeSeconds > .2f, 40, "retarget while moving");
+        retargetAction = bridge.ActionId;
+        user.position += Vector3.Cross(Vector3.up, Horizontal(user.position - avatar.transform.position).normalized) * .5f;
+        yield return WaitFor(() => bridge.ReadCurrentTargetEvidence().approachRetargetCount > 0, 2, "playing target refresh");
+        yield return WaitFor(() => bridge.Phase == "arrived" && !bridge.ReservesBody, 50, "moving retarget arrival");
+        Check(bridge.ActionId == retargetAction && !bridge.IsFollowing, "Playing recovery changed its parent identity or became following.");
+        EndCase();
+
+        BeginCase("late-subthreshold-target-shift");
+        user.position = FindUser(false, true); RoleCommand("approach");
+        yield return WaitFor(() => bridge.Controller.ExecutionState == ArdyRoomExecutionState.Returning, 40, "final pose return before arrival");
+        retargetAction = bridge.ActionId;
+        user.position += Horizontal(user.position - avatar.transform.position).normalized * .30f;
+        yield return WaitFor(() => bridge.ReadCurrentTargetEvidence().approachRetargetCount > 0, 2, "subthreshold goal correction");
+        yield return WaitFor(() => bridge.Phase == "arrived" && !bridge.ReservesBody, 50, "subthreshold corrected arrival");
+        Check(bridge.ActionId == retargetAction && !bridge.IsFollowing &&
+            bridge.ReadCurrentTargetEvidence().currentlyNearAndFacingUser,
+            "A late shift below 35cm must complete under the same finite action, not fail or silently follow.");
+        EndCase();
+
+        BeginCase("one-shot-target-refresh-has-finite-travel");
+        user.position = FindUser(false, true); RoleCommand("approach");
+        yield return WaitFor(() => bridge.Controller.ExecutionState == ArdyRoomExecutionState.Generating, 30, "budget fixture generation");
+        user.position += Vector3.Cross(Vector3.up, Horizontal(user.position - avatar.transform.position).normalized) * 3.2f;
+        yield return WaitFor(() => !bridge.ReservesBody, 3, "bounded travel stop");
+        Check(bridge.ReadCurrentTargetEvidence().approachRetargetStatus == "exhausted" && bridge.Phase != "arrived" && !bridge.IsFollowing,
+            "A one-shot approach pursued unlimited target movement.");
+        HoldRoot(); yield return Delay(.5f); CheckHeldRoot(); EndCase();
 
         BeginCase("stop-during-actual-playback");
         // This fixture tests cancellation of ordinary travel, not the separate overlapping-
@@ -414,7 +448,7 @@ public static class ArdyRoomDialogueIntegrationRegression
         Check(bridge.Controller.Player.PlaybackRevision >= playerRevision && !bridge.Controller.Player.HasPoseOwnership,
             "A stale generation reclaimed ownership after explicit stop.");
         report.playingStopPreservedRoot = true; EndCase();
-        Check(report.cases.Count == 11 && report.cases.All(value => value.completed), "Expected all eleven bounded integration cases to complete.");
+        Check(report.cases.Count == 14 && report.cases.All(value => value.completed), "Expected all fourteen bounded integration cases to complete.");
     }
 
     private static DialogueMotionIntent RoleCommand(string name)

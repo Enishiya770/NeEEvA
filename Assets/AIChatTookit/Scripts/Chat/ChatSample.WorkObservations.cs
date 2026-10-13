@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -11,12 +11,14 @@ public partial class ChatSample
     {
         public int Epoch;
         public readonly List<Action> Acknowledge = new List<Action>();
+        public readonly JArray Facts = new JArray();
     }
 
-    private static void ObserveString(ObservationReceipt receipt, string value,
+    private static void ObserveString(ObservationReceipt receipt, string kind, string value,
         Func<string> current, Action clear)
     {
         if (string.IsNullOrEmpty(value)) return;
+        receipt.Facts.Add(new JObject { ["kind"] = kind, ["result"] = value });
         receipt.Acknowledge.Add(() => { if (current() == value) clear(); });
     }
 
@@ -33,29 +35,29 @@ public partial class ChatSample
     {
         if (!m_AgentRunning) return null;
         var receipt = new ObservationReceipt { Epoch = m_WorkEpoch };
-        ObserveString(receipt, m_PendingSkillStatusFrame, () => m_PendingSkillStatusFrame, () => m_PendingSkillStatusFrame = "");
-        ObserveString(receipt, m_PendingToolCorrectionFrame, () => m_PendingToolCorrectionFrame, () => m_PendingToolCorrectionFrame = "");
-        ObserveString(receipt, m_PendingSingingRoutingFact, () => m_PendingSingingRoutingFact, () => m_PendingSingingRoutingFact = "");
+        ObserveString(receipt, nameof(m_PendingSkillStatusFrame), m_PendingSkillStatusFrame, () => m_PendingSkillStatusFrame, () => m_PendingSkillStatusFrame = "");
+        ObserveString(receipt, nameof(m_PendingToolCorrectionFrame), m_PendingToolCorrectionFrame, () => m_PendingToolCorrectionFrame, () => m_PendingToolCorrectionFrame = "");
+        ObserveString(receipt, nameof(m_PendingSingingRoutingFact), m_PendingSingingRoutingFact, () => m_PendingSingingRoutingFact, () => m_PendingSingingRoutingFact = "");
         // The note is delivered with the completed memory result, never while saving is in flight.
         if (m_SongMemoryResultPending && !string.IsNullOrEmpty(m_LastSongMemoryResult))
-            ObserveString(receipt, m_DroppedSongTitleNote, () => m_DroppedSongTitleNote, () => m_DroppedSongTitleNote = "");
-        ObserveString(receipt, m_LastUnknownTagNote, () => m_LastUnknownTagNote, () => m_LastUnknownTagNote = "");
-        ObserveString(receipt, m_PracticeSemanticResolutionNote, () => m_PracticeSemanticResolutionNote, () => m_PracticeSemanticResolutionNote = "");
-        ObserveString(receipt, m_SelfRepeatNote, () => m_SelfRepeatNote, () => m_SelfRepeatNote = "");
-        ObserveString(receipt, m_PracticeSessionCarryNote, () => m_PracticeSessionCarryNote, () => m_PracticeSessionCarryNote = "");
-        ObserveString(receipt, m_PendingSelfInspection, () => m_PendingSelfInspection, () => {
+            ObserveString(receipt, nameof(m_DroppedSongTitleNote), m_DroppedSongTitleNote, () => m_DroppedSongTitleNote, () => m_DroppedSongTitleNote = "");
+        ObserveString(receipt, nameof(m_LastUnknownTagNote), m_LastUnknownTagNote, () => m_LastUnknownTagNote, () => m_LastUnknownTagNote = "");
+        ObserveString(receipt, nameof(m_PracticeSemanticResolutionNote), m_PracticeSemanticResolutionNote, () => m_PracticeSemanticResolutionNote, () => m_PracticeSemanticResolutionNote = "");
+        ObserveString(receipt, nameof(m_SelfRepeatNote), m_SelfRepeatNote, () => m_SelfRepeatNote, () => m_SelfRepeatNote = "");
+        ObserveString(receipt, nameof(m_PracticeSessionCarryNote), m_PracticeSessionCarryNote, () => m_PracticeSessionCarryNote, () => m_PracticeSessionCarryNote = "");
+        ObserveString(receipt, nameof(m_PendingSelfInspection), m_PendingSelfInspection, () => m_PendingSelfInspection, () => {
             m_PendingSelfInspection = "";
             m_SelfInspectionDeliveryAttempts = 0;
             m_WorkStatus = "inspection-result-delivered";
         });
-        if (m_SongSearchResultPending) ObserveString(receipt, m_LastSongSearchResult, () => m_LastSongSearchResult, () => m_SongSearchResultPending = false);
-        if (m_SongCatalogResultPending) ObserveString(receipt, m_LastSongCatalogResult, () => m_LastSongCatalogResult, () => m_SongCatalogResultPending = false);
-        if (m_SongMemoryResultPending) ObserveString(receipt, m_LastSongMemoryResult, () => m_LastSongMemoryResult, () => m_SongMemoryResultPending = false);
-        if (m_SpeakerManageResultPending) ObserveString(receipt, m_LastSpeakerManageResult, () => m_LastSpeakerManageResult, () => m_SpeakerManageResultPending = false);
-        if (m_PracticeDropResultPending) ObserveString(receipt, m_LastPracticeDropResult, () => m_LastPracticeDropResult, () => m_PracticeDropResultPending = false);
-        if (m_PracticeEditResultPending) ObserveString(receipt, m_LastPracticeEditResult, () => m_LastPracticeEditResult, () => m_PracticeEditResultPending = false);
-        if (m_HumBackResultPending) ObserveString(receipt, m_LastHumBackResult, () => m_LastHumBackResult, () => m_HumBackResultPending = false);
-        ObserveString(receipt, m_StickyToolFailure, () => m_StickyToolFailure, () => ++m_StickyToolFailureShown);
+        if (m_SongSearchResultPending) ObserveString(receipt, nameof(m_LastSongSearchResult), m_LastSongSearchResult, () => m_LastSongSearchResult, () => m_SongSearchResultPending = false);
+        if (m_SongCatalogResultPending) ObserveString(receipt, nameof(m_LastSongCatalogResult), m_LastSongCatalogResult, () => m_LastSongCatalogResult, () => m_SongCatalogResultPending = false);
+        if (m_SongMemoryResultPending) ObserveString(receipt, nameof(m_LastSongMemoryResult), m_LastSongMemoryResult, () => m_LastSongMemoryResult, () => m_SongMemoryResultPending = false);
+        if (m_SpeakerManageResultPending) ObserveString(receipt, nameof(m_LastSpeakerManageResult), m_LastSpeakerManageResult, () => m_LastSpeakerManageResult, () => m_SpeakerManageResultPending = false);
+        if (m_PracticeDropResultPending) ObserveString(receipt, nameof(m_LastPracticeDropResult), m_LastPracticeDropResult, () => m_LastPracticeDropResult, () => m_PracticeDropResultPending = false);
+        if (m_PracticeEditResultPending) ObserveString(receipt, nameof(m_LastPracticeEditResult), m_LastPracticeEditResult, () => m_LastPracticeEditResult, () => m_PracticeEditResultPending = false);
+        if (m_HumBackResultPending) ObserveString(receipt, nameof(m_LastHumBackResult), m_LastHumBackResult, () => m_LastHumBackResult, () => m_HumBackResultPending = false);
+        ObserveString(receipt, nameof(m_StickyToolFailure), m_StickyToolFailure, () => m_StickyToolFailure, () => ++m_StickyToolFailureShown);
         return receipt;
     }
 

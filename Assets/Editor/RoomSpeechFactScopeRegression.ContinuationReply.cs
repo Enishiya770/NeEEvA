@@ -98,6 +98,8 @@ public static partial class RoomSpeechFactScopeRegression
         } finally {foreach(var item in saved)Set(chat,item.Key,item.Value);serializer.m_DataList=oldHistory;}
         LastDecisionFailureReport["latestContinuationFeedbackBudgets"]=reports;
         yield return CheckNarrowMovementContinuation(chat, bridge, model, serializer, output);
+        yield return CheckWorkResultContinuation(chat, bridge, model, serializer, output);
+        yield return CheckAutonomousReply(chat, bridge, model, serializer, output);
     }
 
     private static IEnumerator CheckNarrowMovementContinuation(ChatSample chat, ArdyRoomDialogueBridge bridge,

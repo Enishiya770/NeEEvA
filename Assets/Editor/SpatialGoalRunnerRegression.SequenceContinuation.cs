@@ -80,7 +80,16 @@ public static partial class SpatialGoalRunnerRegression
     private static void CheckRequestProgressPlayback(ChatSample chat, ArdyRoomDialogueBridge bridge,
         NevaSceneVisionIntegrationModel model, int generation, string action)
     {
-        string prefix = "The device is off. Your separate answer is retained. Its final sentence survives too.";
+        string candidate = "The device is off. I'll come back to you now. Your separate answer is retained. Its final sentence survives too.";
+        var ownershipInput = new JObject { ["publicSpeech"] = candidate,
+            ["speechProgressOwner"] = (JObject)Call(chat, "BuildRoomSpeechProgressOwner", generation),
+            ["independentSpeechClaim"] = new JObject { ["evidence"] = "The device is off.", ["otherClaims"] = new JArray() } };
+        var reviewedParts = new JObject { ["bodyProgressParts"] = new JArray("p1"), ["actualLanguage"] = "en" };
+        Require(RoomSpeechPartsProtocol.Required(ownershipInput) && RoomSpeechPartsProtocol.Resolve(ownershipInput, reviewedParts, out _) &&
+            RoomSpeechPartsProtocol.TryRead(reviewedParts, candidate, out _, out _), "Actual current return owner admits only its audited speech fragments.");
+        RoomSpeechPartsProtocol.TryRead(reviewedParts, candidate, out string prefix, out _);
+        Require(prefix == "The device is off. Your separate answer is retained. Its final sentence survives too.",
+            "Return promise is excluded before installing an immutable compound prefix; every independent sentence survives.");
         var progress = (JObject)Call(chat, "BuildRoomRequestProgress");
         Require((string)progress?.SelectToken("body.actionId") == action &&
             (string)progress.SelectToken("steps[0].status") == "completed", "Compound progress binds real predecessor and current successor receipts.");
@@ -112,7 +121,8 @@ public static partial class SpatialGoalRunnerRegression
                 bridge.Controller.OperationRevision == revision && (int)Get(bridge, "assessmentBuildCount") == assessments &&
                 (bool?)Goal(chat)["completionEvidenceValid"] == true,
                 "Trimmed sentence boundaries retain the unplayed independent answer; refresh cannot resubmit a body/device operation.");
-            LastReport["requestProgressPlayback"] = new JObject { ["status"] = "passed", ["published"] = combined,
+            LastReport["requestProgressPlayback"] = new JObject { ["status"] = "passed", ["originalCandidate"] = candidate,
+                ["retainedPrefix"] = prefix, ["published"] = combined,
                 ["afterResume"] = history.content, ["scope"] = "Real owned goal/sequence and actual playback gate; controlled body phases, no audible playback claim." };
         }
         finally {

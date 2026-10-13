@@ -134,6 +134,9 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         public RoomRejectionEvidence lastObservedRejection;
         public bool navigationRecoveryActive, navigationRecoveryAttempted;
         public string navigationRecoveryReason;
+        public string approachRetargetStatus;
+        public int approachRetargetCount;
+        public float approachRetargetTravel;
         public string scope = "Current engine observations for the explicit user's target revision. assessment describes user approach, not a scene-object destination. executionTargetKind identifies the running/last task. no-attempt means no user approach has been submitted for this target; assessment is not an action result.";
     }
 
@@ -184,6 +187,9 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         public RoomRejectionEvidence lastObservedRejection;
         public bool navigationRecoveryActive, navigationRecoveryAttempted;
         public string navigationRecoveryReason;
+        public string approachRetargetStatus;
+        public int approachRetargetCount;
+        public float approachRetargetTravel;
     }
 
     [Serializable] private sealed class RoomFact
@@ -274,6 +280,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         StopMovement("replaced", "新空间目标替换旧目标。");
         ResetSceneTargetForUserTask();
         ResetNavigationRecovery();
+        ResetApproachRetarget();
         BeginApproachLeg(id);
     }
 
@@ -297,7 +304,12 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
             RecordPlanningRejection(attemptObservation, failure);
             if (TryRecoverPlanStart(attemptObservation, failure)) return;
             if (followActive) PauseFollow("follow-paused", failure, true);
-            else SetFact("unreachable", failure);
+            else
+            {
+                activeAction = false;
+                if (approachRetargetCount > 0) approachRetargetStatus = "route-rejected";
+                SetFact("unreachable", failure);
+            }
             return;
         }
         boundUser = userHead;
@@ -371,6 +383,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         StopMovement("replaced", "新的持续跟随任务替换旧空间任务。");
         ResetSceneTargetForUserTask();
         ResetNavigationRecovery();
+        ResetApproachRetarget();
         actionId = id ?? "";
         lastAttemptActionId = actionId; lastAttemptTargetRevision = currentTargetRevision;
         actionStartedAt = Time.realtimeSinceStartup; lastAttemptTime = actionStartedAt;
@@ -429,6 +442,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         if (activeAction && controller != null && ((!sceneTargetActive && !sceneOrientActive) || controller.OperationRevision == operationRevision) && !ControllerAlreadyTerminated())
         { controller.Cancel(); operationRevision = controller.OperationRevision; }
         activeAction = false; followActive = false; followNeedsNewTarget = false; followUser = null;
+        approachRetargetPending = approachRetargetSettling = false;
         navigationRecoveryActive = false;
         ResetFollowSpeed();
         SetFact(result, explanation);
@@ -511,12 +525,11 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         Vector3 expectedHead = navigationRecoveryActive ? navigationRecoveryUserHead : plan.FacePoint;
         Vector3 expectedGround = navigationRecoveryActive ? navigationRecoveryUserGround : plan.UserGround;
         float displacement = ArdyRoomApproachPlanner.UserGroundDisplacement(expectedHead, userHead.position);
-        if (!followActive && displacement > .35f)
-            return $"用户地面位置较本次目标快照移动了 {displacement:F3} 米，超过 0.350 米；本次走近已停止，请重新呼唤或明确请求持续跟随。";
+
         if (!ArdyRoomApproachPlanner.TryGetUserGround(navigation, userHead, out Vector3 ground, out failure)) return failure;
         if (Mathf.Abs(ground.y - expectedGround.y) > navigation.MaxRouteHeightVariation)
             return "用户已离开原来的同层支撑地面，本次走近已停止。";
-        return null;
+        return NoticeApproachTargetShift(displacement);
     }
 
     private void LateUpdate()
@@ -528,8 +541,13 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         if (sceneTargetActive) { TickSceneTarget(); return; }
         if (followActive) { TickFollow(Time.realtimeSinceStartup); return; }
         if (!activeAction) return;
+        if (controller.OperationRevision != operationRevision) { ObserveExecution(); return; }
+        // Until the parent commits arrival, recheck a target that changed while
+        // the final controller frame was finishing. Committed arrivals have
+        // activeAction=false and can never enter this recovery path again.
         string failure = CheckUserSnapshot();
-        if (failure != null) { StopMovement("cancelled", failure); return; }
+        if (failure != null) { StopMovement(approachRetargetStatus == "exhausted" ? "blocked" : "cancelled", failure); return; }
+        if (TickApproachRetarget()) return;
         ObserveExecution();
     }
 
@@ -825,6 +843,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         if (controller.OperationRevision != operationRevision)
         { activeAction = false; followActive = false; navigationRecoveryActive = false; SetFact("cancelled", "空间执行已被另一目标替换，旧动作不会认领其结果。"); return; }
         if (navigationRecoveryActive) { ObserveNavigationRecovery(); return; }
+        if (approachRetargetSettling) return;
         if (StreamRecovering)
         {
             // The controller owns bounded recovery, including its pose return and restart.
@@ -865,7 +884,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
                     followNeedsNewTarget = false; followPausedHead = userHead.position;
                     SetFact("follow-waiting", "本段行走已结束，持续跟随仍启用；实际距离足够时等待用户移远。");
                 }
-                else SetFact(distance >= approachDistance - .25f && distance <= approachDistance + .25f && facing >= 0 && facing <= 15f
+                else SetFact(ArdyRoomApproachPlanner.GoalSatisfied(distance, facing, approachDistance)
                         ? "arrived" : "goal-not-reached", "行走已结束；是否已到身边并面对用户，以实际距离和朝向观测为准。");
                 break;
             case ArdyRoomExecutionState.Blocked:
@@ -996,7 +1015,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
             connected = connected, userAnchorValid = supported, userTrackingValid = valid, userSupportVerified = supported, bodyReserved = ReservesBody,
             activeActionId = activeAction ? actionId : "", observedAtRealtime = now,
             desiredUserDistance = approachDistance, actualUserDistance = distance, actualFacingErrorDegrees = facing,
-            currentlyNearAndFacingUser = supported && distance >= approachDistance - .25f && distance <= approachDistance + .25f && facing >= 0 && facing <= 15,
+            currentlyNearAndFacingUser = supported && ArdyRoomApproachPlanner.GoalSatisfied(distance, facing, approachDistance),
             actualRoot = avatar != null ? avatar.transform.position : Vector3.zero,
             userHeadWorld = valid ? userHead.position : Vector3.zero, assessment = assessment,
             taskMode = TaskMode, activeTaskId = ActiveTaskId, followActive = followActive,
@@ -1028,7 +1047,8 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
             currentUserClearanceRadius = connected ? navigation.AgentRadius + ArdyRoomApproachPlanner.UserBodyRadius + ArdyRoomApproachPlanner.UserClearance : 0,
             streamTelemetry = ReadStreamTelemetry(), lastObservedRejection = ReadRejectionEvidence(),
             navigationRecoveryActive = navigationRecoveryActive, navigationRecoveryAttempted = navigationRecoveryAttempted,
-            navigationRecoveryReason = navigationRecoveryReason
+            navigationRecoveryReason = navigationRecoveryReason,
+            approachRetargetStatus = approachRetargetStatus, approachRetargetCount = approachRetargetCount, approachRetargetTravel = approachRetargetTravel
         };
         var detached = JsonUtility.FromJson<CurrentTargetEvidence>(JsonUtility.ToJson(value));
         // Models need the bounded verdict and counts. Individual candidate colliders are retained
@@ -1063,7 +1083,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
                 targetKind = executionTargetKind,
                 reason = lastAttemptReason, targetRevision = lastAttemptTargetRevision,
                 appliesToCurrentTarget = current.lastAttemptAppliesToCurrentTarget, observedAtRealtime = lastAttemptTime },
-            currentlyNearAndFacingUser = supportedUser && distance >= approachDistance - .25f && distance <= approachDistance + .25f && facing >= 0 && facing <= 15,
+            currentlyNearAndFacingUser = supportedUser && ArdyRoomApproachPlanner.GoalSatisfied(distance, facing, approachDistance),
             desiredUserDistance = approachDistance, actualUserDistance = distance, actualFacingErrorDegrees = facing,
             actualRoot = avatar != null ? avatar.transform.position : Vector3.zero,
             userHeadWorld = userHead != null ? userHead.position : Vector3.zero,
@@ -1124,7 +1144,8 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
             followRemainingPath = followRemainingPath, followSpeedLimited = followSpeedLimited, followVelocityState = followVelocity.State,
             streamTelemetry = ReadStreamTelemetry(), lastObservedRejection = ReadRejectionEvidence(),
             navigationRecoveryActive = navigationRecoveryActive, navigationRecoveryAttempted = navigationRecoveryAttempted,
-            navigationRecoveryReason = navigationRecoveryReason
+            navigationRecoveryReason = navigationRecoveryReason,
+            approachRetargetStatus = approachRetargetStatus, approachRetargetCount = approachRetargetCount, approachRetargetTravel = approachRetargetTravel
         };
         value.approachObservation = attemptObservation;
         if (avatar != null && importedReference != null)

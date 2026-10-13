@@ -279,6 +279,8 @@ public partial class ChatQW
         if (review) input = RoomTaskProtocol.ProjectSpeechReviewInput(input);
         string contract = review ? RoomTaskProtocol.ReviewContract : RoomTaskProtocol.DecisionContract +
             (schema.Contains("\"taskStep\"") ? RoomTaskSequenceProtocol.Contract : "");
+        if (review && RoomSpeechPartsProtocol.Required(ReadRoomTaskRecoveryJson(input)))
+            contract = RoomSpeechPartsProtocol.Contract + "\n\n" + contract;
         var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
         sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":").Append(review ?
             (schema.Contains("\"targetConsistency\"") ? 480 : 240) : 640);

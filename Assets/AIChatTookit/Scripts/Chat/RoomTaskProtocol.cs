@@ -146,6 +146,7 @@ public static class RoomTaskProtocol
             var value = StrictObject(input);
             value.Remove("publicSpeechLanguage");
             value.Remove("configuredDialogueLanguage");
+            if (RoomSpeechPartsProtocol.Required(value)) value["progressSpeechParts"] = RoomSpeechPartsProtocol.Fragments(value);
             // Actor/target roles come from the owned engine action, not a
             // keyword guess over either speaker's sentence. Claim extraction
             // stays words-only; this is used only by the subsequent reviewer.
@@ -265,6 +266,7 @@ public static class RoomTaskProtocol
                 schema["properties"] = ordered;
                 schema["required"] = new JArray(ordered.Properties().Select(p => p.Name).Where(key => required.Values<string>().Contains(key)));
             }
+            RoomSpeechPartsProtocol.AddSchema(schema, value);
             return schema.ToString(Newtonsoft.Json.Formatting.None);
         }
         catch (Exception error) { throw new Newtonsoft.Json.JsonException("Invalid speech review input; schema downgrade refused.", error); }
@@ -576,7 +578,7 @@ public static class RoomTaskProtocol
         "当前视觉描述本身也是可核实陈述，即使是在直接回答主问题，也须逐项在otherClaimsComparison核验，不得称为没有额外事实而跳过。不可辨认的文字不能被推测成精确引文；像列表的排布只支持界面结构推测，不支持具体行内文字。" +
         "先分清言语功能与证据种类：常规感谢等候、道歉和邀请是社交表达，不因其中隐含日常等候或配合就要求事件回执；若另外断言具体时长、人物行为或操作经过，再核验那部分。角色正在怎样行动（例如绕开障碍）属于执行事实，不能归为日常印象或视觉推测；只有动作回执证明该方法才可放行。" +
         "额外未来行动承诺也须有本轮已批准的计划或已派发动作支持，不能因为是未来时就标记otherClaimsSupport=none并放行未计划的新动作。纯粹请求听者做事与说话者承诺自身行动分开。" +
-        "independentSpeechClaim已独立解析台词主状态，保留它，再与匹配的执行phase比较。currentlyNearAndFacingUser是到达完成条件，false在moving/preparing/recovering期间正常，不能用于否定正在靠近。进行时提到目的地不等于声称已经到达；额外的目标与行进方向仍须分别核对。" +
+        "independentSpeechClaim已独立解析台词主状态，保留它，再与匹配的执行phase比较。执行phase=arrived证明该动作过去已到达；currentFacts和arrivalRelation单独决定现在是否仍贴近或正对用户，位置后来变化不能否认完成事件，也不能用完成事件证明现在仍在身边。currentlyNearAndFacingUser=false在moving/preparing/recovering期间正常，不能用于否定正在靠近。进行时提到目的地不等于声称已经到达；额外的目标与行进方向仍须分别核对。" +
         "先核对整句各分句的主体、目标、步骤与时间关系。已经完成某一步，却又要求等待同一步稍后完成，属于内部矛盾；‘能马上到’不能仅凭路线可达来洗掉‘已经到了’与未来到达的矛盾。主结果状态正确也必须拒绝整句矛盾。已完成第一步、接下来做不同的第二步可以相容；只有请求等候而未断言未来完成不自动构成矛盾。时间承诺需要实际依据，可达或距离近不证明很快能完成。" +
         "factScope描述真正依赖的事实：移动结果与历史设备回执的合并仍用scene-action，程序保留移动依赖；仅当台词另外断言当前图像内容时用combined。历史设备操作不能仅因当前图像过期而重审。" +
         "额外断言须先分过去事件、现在状态、未来承诺。过去操作按historicalDeviceEvents中的实体、时间、operationAttempted与performed回执核对；即使本轮sceneActionFacts=null或generation不同，历史事件仍可支持过去时陈述。historicalOnly只限制把旧状态当现在状态，不否认事件。多个先后操作逐一匹配，后一次反向操作不否定前一次发生过。比较说明引用事件序号、时间和状态即可，不抄写长entityId/captureId；身份仍须按输入中的完整ID核对。" +
@@ -1078,10 +1080,11 @@ public static class RoomTaskProtocol
         try
         {
             JObject value = StrictObject(json);
-            if (value.Count < 2 || value.Count > 15 || value.Properties().Any(p => !new[] { "verdict", "reason", "factScope", "resultReport", "requestDisposition", "planningFailureReport", "actualLanguage", "conflict", "conflictQuote", "targetComparison", "targetConsistency", "otherClaimsComparison", "otherClaimsSupport", "taskRelation", "taskRelationComparison" }.Contains(p.Name)) ||
+            if (value.Count < 2 || value.Count > 16 || value.Properties().Any(p => !new[] { "verdict", "reason", "factScope", "resultReport", "requestDisposition", "planningFailureReport", "actualLanguage", "conflict", "conflictQuote", "targetComparison", "targetConsistency", "otherClaimsComparison", "otherClaimsSupport", "taskRelation", "taskRelationComparison", "speechParts", "bodyProgressParts" }.Contains(p.Name)) ||
                 value["verdict"]?.Type != JTokenType.String ||
                 !new[] { "consistent", "inconsistent", "uncertain" }.Contains((string)value["verdict"]) ||
                 value["reason"]?.Type != JTokenType.String || ((string)value["reason"]).Length > 160) return false;
+            if (value["speechParts"] != null && !(value["speechParts"] is JArray)) return false;
             if (value["conflict"] != null)
             {
                 string conflict = (string)value["conflict"], verdict = (string)value["verdict"];

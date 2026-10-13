@@ -1,0 +1,1389 @@
+{
+  "sourceSha256": "dbea60ed8af28b3ac3a40fe70a60a36dd1620e8e72225dce93612615124e7dce",
+  "provenance": "Exact recorded perception frames and actually completed speech, all user turns before each autonomous round. Execution in regression is a controlled owned receipt, not replayed physical movement.",
+  "cases": [
+    {
+      "name": "gen7-conversation",
+      "sourceLine": 25658,
+      "frame": "[感知帧 11:30:17] [Sing/Execution] request_submitted_since_user_turn=false work_active=false state=idle continuations_without_work=0 以上只表示程序执行状态；提交过不等于成功，idle不表示素材丢失。口头说准备好、look、continue都不会启动演唱。是否行动、询问或安静仍由你决定。  [Sing/Goal] {\"user_turn\":3,\"latest_user_request\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\",\"recent_actual_user_inputs\":[{\"turn\":1,\"text\":\"现在能看到什么吗？\"},{\"turn\":2,\"text\":\"先来我身边。\"},{\"turn\":3,\"text\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\"}],\"input_scope\":\"原始用户输入，不保证是执行请求；按完整时序区分用户表演与要求角色行动\",\"review_field_scope\":\"requestQuote/sourceUserTurn由独立审核依据实际用户输入产生，不是sing_goal提案的必填参数；尚未核定时省略。已存在的值是前次审核保存的来源，可供continue核对。审核员在本次singing_goal_expected.request_quote中引用真实请求。\",\"next_step\":{\"stage\":\"goal_required\",\"action\":\"\",\"scope\":\"未授权演唱。依据完整实际用户输入和素材自行决定目标；后续询问不代表原请求已取消。\"},\"goal\":null,\"active_goal\":null,\"active_goal_unfinished\":false,\"previous_goal\":null,\"last_playback\":null,\"rejected_plans\":[],\"feedback_scope\":\"completed仅表示Unity实际播完所列refs/revision/raw范围；不证明用户听到或指定歌词/缺失内容满足。active_goal是持久成功条件；goal是当前轮待审核/执行草案，null不代表原任务已取消或完成。没有当前轮动作授权不能自动续唱。\"}  [视觉关注与行动事实] {\"enabled\":true,\"active\":false,\"lastAction\":{\"source\":\"Unity-visible-target-execution\",\"actionId\":\"4e5c162c48d54ae1a5c6b1a50c0f72f2:6:6\",\"intent\":\"set-object-state\",\"origin\":\"user\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-76d0069f3a124ea1b399b89a817de75c\",\"confirmedCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b561bd6fe4d2416bada78a1f8a945df7\",\"resultCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f\",\"surfaceId\":\"\",\"visualLabel\":\"桌面装饰灯\",\"phase\":\"performed\",\"reason\":\"runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press\",\"observedUtc\":\"2026-10-13T02:29:58.5209531Z\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"focusKind\":\"visible-object\",\"requestedEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"requestedState\":\"off\",\"targetResolutionSource\":\"candidate-confirmed\",\"requestedImagePoint\":{\"x\":0.49531251192092896,\"y\":0.845370352268219},\"objectConfirmed\":true,\"stateChanged\":true,\"groundArrived\":false,\"objectReobserved\":false,\"postArrivalObservationStatus\":\"\",\"targetPurpose\":\"direct-target\",\"targetDescription\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\",\"targetMatchVerdict\":\"matched\",\"targetMatchReason\":\"c1为电视柜上的桌面装饰灯，符合“刚才看到的小灯”描述。画面显示其处于点亮状态，是执行“关掉”动作的目标。\",\"matchCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-76d0069f3a124ea1b399b89a817de75c\",\"semanticTargetConfirmed\":true,\"needsCloserObservation\":false,\"navigationFocusImagePoint\":{\"x\":0.0,\"y\":0.0},\"observationStandOff\":0.0,\"predictedObservationPitch\":0.0,\"observationGoalId\":\"\",\"viewDirection\":\"\",\"viewPurpose\":\"\",\"viewPurposeStatus\":\"\",\"requestedViewDistance\":0.0,\"actualViewOffset\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},\"viewBefore\":{\"captureId\":\"\",\"entityId\":\"\",\"capturedAtUtc\":\"\",\"frame\":0,\"width\":0,\"height\":0,\"visibleOpaquePixels\":0,\"normalizedVisibleBounds\":{\"x\":0.0,\"y\":0.0,\"z\":0.0,\"w\":0.0},\"visiblePixelFraction\":0.0,\"cameraDistanceToObservedPoint\":0.0,\"touchesImageBoundary\":false,\"scope\":\"Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose.\"},\"viewAfter\":{\"captureId\":\"\",\"entityId\":\"\",\"capturedAtUtc\":\"\",\"frame\":0,\"width\":0,\"height\":0,\"visibleOpaquePixels\":0,\"normalizedVisibleBounds\":{\"x\":0.0,\"y\":0.0,\"z\":0.0,\"w\":0.0},\"visiblePixelFraction\":0.0,\"cameraDistanceToObservedPoint\":0.0,\"touchesImageBoundary\":false,\"scope\":\"Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose.\"},\"intentFocusWorldPoint\":{\"x\":-0.29212218523025513,\"y\":-0.081785798072814941,\"z\":-4.7759666442871094},\"hasIntentFocus\":true,\"navigationFocusAdjusted\":false,\"trackingVisibility\":\"\",\"trackingCaptureId\":\"\",\"trackingFocusStatus\":\"\",\"trackingFocusWorldPoint\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},\"trackingConfirmedImages\":0,\"trackingMovingConfirmedImages\":0,\"trackingLastSeenRealtime\":-1.0,\"trackingFocusLastAppliedFrame\":-1,\"trackingFocusAppliedDegrees\":0.0,\"measuredSurface\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},\"actualRoot\":{\"x\":-1.2611377239227295,\"y\":-0.72000002861022949,\"z\":-6.166989803314209},\"requestedYaw\":0.0,\"requestedPitch\":0.0,\"actualViewChangeDegrees\":0.0,\"active\":false,\"reached\":false,\"canReobserveTarget\":false,\"scope\":\"Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation.\"},\"objectContext\":{\"enabled\":true,\"runtimeDeviceControl\":{\"implementationConnected\":true,\"featureEnabled\":true,\"supportedOperation\":\"set-object-state:on|off for an explicitly registered lamp\",\"physicalHandRequired\":false,\"requiresCurrentTargetConfirmation\":true,\"requiresIndependentUserAuthorization\":true,\"scope\":\"Software capability facts, not target identity, current visibility, permission or proof of execution. A missing goal approval or unresolved target does not remove this interface. Lack of physical switch-touching does not prevent this registered runtime lamp control.\"},\"selected\":{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f\",\"observedUtc\":\"2026-10-13T02:29:58.4136129Z\",\"visibleInCapturedFrame\":true,\"pointAtCapture\":{\"x\":-0.29366082,\"y\":-0.0800344348,\"z\":-4.77500629},\"scope\":\"opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability\",\"capabilities\":[\"inspect-object\",\"look-at\",\"set-object-state:on|off\"],\"runtimeDeviceStateReadAfterObservation\":{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"lightState\":\"disabled\",\"emissionState\":\"off\",\"conflict\":\"\",\"registered\":true,\"on\":false,\"lightEnabled\":false,\"emissionEnabled\":false,\"bakedLightingResidualUncontrolled\":true,\"emissionColor\":{\"r\":0.0,\"g\":0.0,\"b\":0.0,\"a\":1.0},\"lightIntensity\":1.0,\"lightBakeType\":\"Baked\",\"scope\":\"Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation.\"},\"stateReadAtUtc\":\"2026-10-13T02:29:58.5174514Z\",\"localStructure\":{\"source\":\"engine-registered-local-structure; not an inference from image or proof that every part is visible\",\"relation\":\"parts-of-selected-entity; does not mean resting-on furniture\",\"emissivePartName\":\"スタンドライト.001\",\"lightComponentNodeName\":\"Point Light\"}},\"stateResult\":{\"actionId\":\"4e5c162c48d54ae1a5c6b1a50c0f72f2:6:6\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"reason\":\"已关闭登记灯具的可见发光体及 Light 组件；未移除烘焙余光。\",\"on\":false,\"changed\":true,\"completed\":true,\"replayed\":false,\"partial\":false,\"physicalSwitchPress\":false,\"freshVisualObservation\":true,\"actual\":{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"lightState\":\"disabled\",\"emissionState\":\"off\",\"conflict\":\"\",\"registered\":true,\"on\":false,\"lightEnabled\":false,\"emissionEnabled\":false,\"bakedLightingResidualUncontrolled\":true,\"emissionColor\":{\"r\":0.0,\"g\":0.0,\"b\":0.0,\"a\":1.0},\"lightIntensity\":1.0,\"lightBakeType\":\"Baked\",\"scope\":\"Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation.\"},\"scope\":\"Whitelist device action: set the registered lamp's visible emission and Light component power. Original material assets and baked lighting are unchanged; visual confirmation must be obtained separately.\",\"appliedAtUtc\":\"2026-10-13T02:29:58.0022480Z\",\"visualConfirmation\":\"same-entity-in-new-image\",\"resultCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f\"},\"recentObservations\":[{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1\",\"observedUtc\":\"2026-10-13T02:29:44.4979147Z\",\"pointAtCapture\":{\"x\":-0.299996972,\"y\":-0.08576971,\"z\":-4.7781415}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-d818bc651145426e9039cbf8ede581d5\",\"observedUtc\":\"2026-10-13T02:29:47.7417447Z\",\"pointAtCapture\":{\"x\":-0.295456052,\"y\":-0.08816022,\"z\":-4.779449}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-ff8ad22bc3ab422b9144ba553640d8ac\",\"observedUtc\":\"2026-10-13T02:29:54.1235424Z\",\"pointAtCapture\":{\"x\":-0.295206845,\"y\":-0.0790543556,\"z\":-4.77446842}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b561bd6fe4d2416bada78a1f8a945df7\",\"observedUtc\":\"2026-10-13T02:29:57.9045293Z\",\"pointAtCapture\":{\"x\":-0.2921998,\"y\":-0.08280069,\"z\":-4.77652073}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f\",\"observedUtc\":\"2026-10-13T02:29:58.4136129Z\",\"pointAtCapture\":{\"x\":-0.29366082,\"y\":-0.0800344348,\"z\":-4.77500629}}],\"knownObjectHistory\":[{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f\",\"observedUtc\":\"2026-10-13T02:29:58.4136129Z\",\"capturedAtRealtime\":112.824318,\"pointAtCapture\":{\"x\":-0.29366082,\"y\":-0.0800344348,\"z\":-4.77500629},\"cameraPositionAtCapture\":{\"x\":-1.25758958,\"y\":0.71821,\"z\":-6.16662359},\"cameraRotationAtCapture\":{\"x\":-0.204368323,\"y\":-0.295652479,\"z\":0.06518082,\"w\":-0.9309004},\"bodyPositionAtCapture\":{\"x\":-1.26113772,\"y\":-0.72,\"z\":-6.16699},\"bodyRotationAtCapture\":{\"x\":0.0,\"y\":-0.292680949,\"z\":0.0,\"w\":-0.956210256},\"viewDirectionWorldAtCapture\":{\"x\":0.523804247,\"y\":-0.419034839,\"z\":0.7416464},\"capabilities\":[\"inspect-object\",\"look-at\",\"set-object-state:on|off\"],\"samplePurpose\":\"selected-object-observation\",\"rootPositionAtCapture\":{\"x\":-0.251999855,\"y\":-0.008000851,\"z\":-4.71600246},\"rootRotationAtCapture\":{\"x\":-0.707106948,\"y\":0.0,\"z\":0.0,\"w\":0.7071068},\"rootScaleAtCapture\":{\"x\":0.06,\"y\":0.0600000359,\"z\":0.0600000359},\"scope\":\"Previously confirmed opaque pixels and their exact capture-time geometry/view. Root snapshot is recorded only while captured renderer geometry still matches. Historical location is a search hint, never current visibility, a navigation destination, device state or action permission.\",\"historical\":true,\"positionMemoryValid\":true,\"positionInvalidReason\":null,\"requiresReobservation\":true,\"actionAuthorization\":false,\"currentVisibility\":\"not-established\"}],\"verifiedObservedDeviceHistory\":[{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"actionId\":\"scene-search-ad9f88bb7e484e49967fbb84e16143c6:confirmed\",\"originalRequest\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\",\"targetDescription\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\",\"semanticReason\":\"c1为电视柜上的桌面装饰灯，符合“刚才看到的小灯”描述。画面显示其处于点亮状态，是执行“关掉”动作的目标。\",\"matchCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-aa5cac9fbdfb4118b107682126083eac\",\"confirmedCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1\",\"observedUtc\":\"2026-10-13T02:29:44.6069075Z\",\"historical\":true,\"semanticTargetConfirmedAtObservation\":true,\"observation\":{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1\",\"observedUtc\":\"2026-10-13T02:29:44.4979147Z\",\"capabilities\":[\"inspect-object\",\"look-at\",\"set-object-state:on|off\"]},\"scope\":\"Actual direct-target semantic match followed by same-entity opaque confirmation in a new image and observed registered capability. Previously seen referent only: no executed operation, goal ID, current visibility, current power state or action authority. Assistant speech alone cannot create this record. An independent authorization may select this engine-listed source to constrain the same entity; every action still needs its own fresh semantic match.\"}],\"targetReview\":{\"actionId\":\"4e5c162c48d54ae1a5c6b1a50c0f72f2:6:6\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-76d0069f3a124ea1b399b89a817de75c\",\"originalGoal\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\",\"requestedDescription\":null,\"parentSpatialGoalId\":\"device-goal-19b488cf153242559ff418052e7af279\",\"targetPurpose\":\"direct-target\",\"verdict\":\"matched\",\"associationCurrent\":true,\"reason\":\"c1为电视柜上的桌面装饰灯，符合“刚才看到的小灯”描述。画面显示其处于点亮状态，是执行“关掉”动作的目标。\",\"semanticTargetConfirmed\":true,\"modelVerdict\":\"matched\",\"candidateRole\":\"target\",\"observationLandmarkConfirmed\":false,\"modelReason\":\"c1为电视柜上的桌面装饰灯，符合“刚才看到的小灯”描述。画面显示其处于点亮状态，是执行“关掉”动作的目标。\",\"boundGoalEntityConflict\":false,\"matchedEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"initialGeometryEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"needsCloserObservation\":false,\"proposedCandidateId\":\"c1\",\"proposedEntityId\":null,\"proposedImagePoint\":null,\"needsTargetReselection\":false,\"proposalScope\":\"A nonmatched proposal is only a cue for the next fresh-image decision, not a semantic match or permission for this action. At most one candidate-match request is made by this action; never retry stale pixels automatically.\",\"targetSelection\":null,\"scope\":\"Model interpretation of this exact candidate image, separate from engine identity. A reference selected for observe-closer is not confirmation of the original small target. When uncertain, consider a visible larger reference and targetPurpose=observe-closer in a NEW approach decision, then reobserve and retry the original goal; no automatic device operation. User correction can revoke a referent association without deleting objective seen-object history.\",\"observationGoal\":null},\"lastDeviceStateEvidenceValid\":true,\"deviceEvidenceScope\":\"Engine result-validity check only; false invalidates prior device state claims. No new device setting or visual observation is supplied here; inspect again to establish current facts.\",\"rejectionCauseScope\":\"Pixel/identity resolution failure does not establish which intended object was selected. Missing registered power capability concerns only the resolved entity and this software interface. Neither finding diagnoses electricity, cables, outlets, broken hardware or whether the intended lamp is a nonfunctional ornament. A different selected entity does not erase the prior device's successful operation.\",\"scope\":\"Only previously selected visible entities, observed timestamps and explicit device results. These are snapshots, not continuous perception or a room inventory. Scene-authored labels are annotations, not visual recognition. Hierarchy does not prove support/contact. No arbitrary Inspector edits or physical hand interaction. On/off controls the registered emitter and Light flag; baked lighting may remain.\",\"deviceDistanceLimitMeters\":2.5},\"sceneSearch\":{\"taskId\":\"scene-search-ad9f88bb7e484e49967fbb84e16143c6\",\"generation\":6,\"workEpoch\":4,\"userTurn\":4,\"active\":false,\"ownerCurrent\":true,\"mode\":\"find\",\"originalUserRequest\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\",\"latestUserText\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\",\"referenceContext\":{\"quotedDialogue\":[{\"role\":\"assistant\",\"quotedText\":\"ふふっ、ユウも気になるのね。私が見える範囲では、正面に大きなモニターと机、その横に小さなランプと観葉植物が見えているわ。左側には棚があるかな。ユウ、何か気になることはあったの？\",\"textTruncated\":false},{\"role\":\"user\",\"quotedText\":\"[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.65] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.40; 语言:zh; 音域:A2～C3; 音高稳定度:0.58; 旋律:C3-B2-A2-A#2; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 先来我身边。\",\"textTruncated\":false},{\"role\":\"assistant\",\"quotedText\":\"あなたのそばへ向かっているわ。\",\"textTruncated\":false},{\"role\":\"user\",\"quotedText\":\"[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\\n[局部倾听观测] {\\\"capture\\\":3,\\\"observed_until_ms\\\":920,\\\"partial_mode\\\":\\\"speech\\\",\\\"mode_confidence\\\":0.95,\\\"matches_complete_transcript\\\":false,\\\"scope\\\":\\\"仅覆盖当时的局部输入，不能替代完整录音时序或推导用户要求角色演唱\\\"}\\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.90] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.27; 语言:zh; 音域:G2～A5; 音高稳定度:0.54; 旋律:G#5-A5-F3-A#2-A2-G#3-B2-G5-G2-F#5-A5-F5-A2-B2-A#2-D#5-D5-A2-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 现在你去把刚才看到的那个小灯关掉，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\\n{\\\"id\\\":1,\\\"start_seconds\\\":0.0,\\\"end_seconds\\\":4.170000076293945,\\\"region\\\":\\\"island\\\",\\\"type\\\":\\\"singing_candidate\\\",\\\"type_source\\\":\\\"acoustic_boundary_hypothesis\\\",\\\"text\\\":\\\"现在你去把刚才看到的那个小灯关掉。\\\",\\\"language\\\":\\\"zh\\\",\\\"status\\\":\\\"ok\\\",\\\"error\\\":\\\"\\\",\\\"confidence_available\\\":false,\\\"review_required\\\":false,\\\"alternatives\\\":[]}\\r\\n{\\\"id\\\":2,\\\"start_seconds\\\":4.170000076293945,\\\"end_seconds\\\":6.510000228881836,\\\"region\\\":\\\"tail\\\",\\\"type\\\":\\\"uncertain\\\",\\\"type_source\\\":\\\"acoustic_boundary_hypothesis\\\",\\\"text\\\":\\\"然后回到我身边。\\\",\\\"language\\\":\\\"zh\\\",\\\"status\\\":\\\"ok\\\",\\\"error\\\":\\\"\\\",\\\"confidence_available\\\":false,\\\"review_required\\\":false,\\\"alternatives\\\":[]}\\r\\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\\\"text\\\":\\\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\\\"}]\\n[同一录音的较早 ASR 观测：不是额外发言，也不表示最终结果必然更准确。可用于补漏和判断冲突，不要重复拼接；有歧义时可以询问。\\n覆盖录音前 4.23s：现在你去把刚才看到的那个小灯关掉。]\",\"textTruncated\":false}],\"scope\":\"Frozen recent dialogue quotations for resolving descriptive references only. They do not verify an entity, visibility, position, state, or completion. The complete current/original user request is the sole new operation authority. Recheck the same description in real observations; multiple matching objects remain unresolved. No subsequent dialogue may silently change this snapshot.\"},\"phase\":\"terminal\",\"status\":\"found\",\"reason\":\"search-current-target-confirmed\",\"steps\":1,\"stepLimit\":12,\"decisions\":2,\"decisionLimit\":36,\"noProgressSteps\":0,\"totalNoProgress\":0,\"recoveryAttempts\":0,\"recoveryLimit\":1,\"revisitedMemoryEntityIds\":[\"scene-object-72ec6b928c2747e197be5343f2605fda\"],\"unsupportedDeviceEntityIds\":[],\"durationSeconds\":21.28939,\"durationLimitSeconds\":180.0,\"coveredHorizontalRegions\":5,\"horizontalRegionCount\":12,\"candidatePageCoverage\":[{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-d9bf893f653b42b9b96059191bc0b1fa\",\"offeredPages\":1,\"reviewedPagesInExactCapture\":1,\"allCurrentCandidatesReviewedAtThisPose\":true,\"truncated\":false},{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1\",\"offeredPages\":3,\"reviewedPagesInExactCapture\":0,\"allCurrentCandidatesReviewedAtThisPose\":false,\"truncated\":false}],\"allVisitedCandidatePagesReviewed\":false,\"foundEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"foundCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1\",\"boundEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"deviceGoalId\":\"device-goal-19b488cf153242559ff418052e7af279\",\"goalExecutionRevision\":0,\"searchAttempted\":true,\"deviceWriteAuthorized\":false,\"receipts\":[{\"stage\":\"memory-retrieval\",\"referenceId\":\"4ae06d7549db4e3391a3edbfc51c2a32-f453781f14bf4c59980a84fffaf79299-b53b22bd730e4ff7b5df007c9ab04e81:memory:scene-object-72ec6b928c2747e197be5343f2605fda\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"selectionRole\":\"target\",\"sourceCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-f453781f14bf4c59980a84fffaf79299-b53b22bd730e4ff7b5df007c9ab04e81\",\"scope\":\"This frozen point was selected for reobservation only; neither target identity nor device operation is confirmed.\"},{\"choice\":\"historical-object\",\"referenceId\":\"4ae06d7549db4e3391a3edbfc51c2a32-f453781f14bf4c59980a84fffaf79299-b53b22bd730e4ff7b5df007c9ab04e81:memory:scene-object-72ec6b928c2747e197be5343f2605fda\",\"intent\":\"turn-in-place\",\"requestedYaw\":-135.573212,\"requestedPitch\":0.0,\"sourceCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-d9bf893f653b42b9b96059191bc0b1fa\",\"resultCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-cbacee368fab4afa85a6ea4f70de29c8\",\"actionId\":\"4e5c162c48d54ae1a5c6b1a50c0f72f2:6:4\",\"observed\":true,\"controllerOperationRevision\":5,\"rootDisplacementFromStationaryBaseline\":0.004877497,\"rootDisplacementFromActionStart\":0.004877497,\"stationaryRootRebased\":true,\"actualViewChangeDegrees\":133.323776,\"reason\":\"actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents\"},{\"taskId\":\"scene-search-ad9f88bb7e484e49967fbb84e16143c6\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"selectionCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-cbacee368fab4afa85a6ea4f70de29c8\",\"freshCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-aa5cac9fbdfb4118b107682126083eac\",\"cameraTranslationMeters\":0.00792884547,\"cameraRotationDegrees\":4.547312,\"selectionGeometryCurrent\":true,\"freshOpaqueConfirmed\":true,\"freshSameRoot\":true,\"freshGeometryCurrent\":true,\"acceptedForIndependentReview\":true,\"reason\":null},{\"choice\":\"current-candidate\",\"referenceId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-cbacee368fab4afa85a6ea4f70de29c8:visible:p0:c4\",\"selectionCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-cbacee368fab4afa85a6ea4f70de29c8\",\"matchCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-aa5cac9fbdfb4118b107682126083eac\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"confirmed\":true,\"returnedCandidateId\":\"c1\",\"returnedEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"freshCandidateMapping\":[{\"candidateId\":\"c1\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\"},{\"candidateId\":\"c2\",\"entityId\":\"renderer-object-7146af3918de413fbaa0c73fdc1d94a3-7ef6\",\"sceneLabel\":\"\"},{\"candidateId\":\"c3\",\"entityId\":\"renderer-object-7146af3918de413fbaa0c73fdc1d94a3-8104\",\"sceneLabel\":\"\"},{\"candidateId\":\"c4\",\"entityId\":\"renderer-object-7146af3918de413fbaa0c73fdc1d94a3-80ba\",\"sceneLabel\":\"\"},{\"candidateId\":\"c5\",\"entityId\":\"renderer-object-7146af3918de413fbaa0c73fdc1d94a3-8084\",\"sceneLabel\":\"\"},{\"candidateId\":\"c6\",\"entityId\":\"renderer-object-7146af3918de413fbaa0c73fdc1d94a3-8176\",\"sceneLabel\":\"\"}],\"verdict\":\"matched\",\"candidateRole\":\"target\",\"reason\":\"c1为电视柜上的桌面装饰灯，符合“刚才看到的小灯”描述。画面显示其处于点亮状态，是执行“关掉”动作的目标。\",\"freshSameEntityCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1\"}],\"reviewedHistoricalCaptureIds\":[],\"scope\":\"Bounded observation task only. found requires an independent semantic match and same-entity opaque confirmation in a NEW current frame. completed surveys concern sampled horizontal view directions, not every room object or occluded space. Candidate identification is limited to pages actually reviewed; candidatePageCoverage separately records skipped or truncated pages in visited views. Never claim all offered objects were inspected unless allVisitedCandidatePagesReviewed is true; even then unsupported/occluded objects remain unassessed. incomplete/cancelled do not prove the target absent. Historical positions/descriptions are hints, not current visibility, navigation or device authority. No device state was changed by this search. The most recent motion receipt describes only one substep, not the overall result.\"},\"capability\":\"look-at or approach-object using captureId plus normalized visible image point; reposition-view uses a freshly confirmed entity to adjust the same-floor observation station farther/closer/left/right by 0.2 to 1.2 metres while facing that target. see-whole/read-detail/avoid-occlusion are observation purposes, not promised outcomes; assess the new image after movement. orient-view changes real head direction without needing an already visible target; turn-in-place turns the actual body on its current legal floor. Bounded historical snapshots may be acquired during an actual body turn; a new current view is still captured after completion. No stairs or touching. When objectContext.enabled, inspect-object resolves only the selected visible entity; set-object-state on/off requires its explicit registered nearby device capability and fresh confirmation. look-at can focus an unresolved image region without claiming a measured object. Autonomous view changes bounded to three per 30 seconds.\"} [时间与活动状态] {\"source\":\"Unity-runtime-time-and-action-facts\",\"session\":1,\"activeSeconds\":126.8,\"wallClockUtc\":\"2026-10-13T02:30:17.1157730Z\",\"suspended\":false,\"activity\":\"performed\",\"purpose\":\"桌面装饰灯\",\"activityForSeconds\":18.59,\"sinceLastDecisionSeconds\":0.01,\"stationaryForSeconds\":8.86,\"viewHeldForSeconds\":0.34,\"poseThresholds\":\"root translation 1 cm; head direction 2 degrees; breathing below thresholds is not a new activity\",\"sinceLastSampleSeconds\":0.02,\"lastDecisionIntent\":\"回到用户身边后，确认用户是否安好，并询问接下来想做什么。\",\"modelRequestedRecheckSeconds\":0.0,\"nextReviewInSeconds\":null,\"reviewDue\":false,\"queuedWakeReason\":\"\",\"latestQueuedWakeReason\":\"\",\"coalescedWakeEvents\":0,\"scenePlaybackReview\":{\"state\":\"none\",\"started\":1,\"handedOff\":1,\"discarded\":0,\"lastReason\":\"candidate-handed-to-normal-decision-with-new-image\",\"scope\":\"One budgeted scene-action review can overlap only the final generated local speech clip. It cannot speak, execute tools, mutate work/memory, or claim unheard speech was delivered. Any next action still requires normal current-view decision and execution checks.\"},\"reviewsInLastMinute\":1,\"reviewBudgetPerMinute\":6,\"lastSuccessfulArrival\":{\"actionId\":\"4e5c162c48d54ae1a5c6b1a50c0f72f2:6:5\",\"intent\":\"approach-object\",\"targetLabel\":\"桌面装饰灯\",\"phase\":\"arrival-observing\",\"reason\":\"actual floor station and facing reached; same-entity sight has not yet been confirmed\",\"session\":1,\"activeSeconds\":103.67506869999988,\"utc\":\"2026-10-13T02:29:53.9934826Z\",\"scope\":\"Actual floor-station arrival time; semantic target identity, current visibility and physical contact are separate facts.\",\"elapsedActiveSeconds\":23.12},\"lastFailedAttempt\":null,\"samples\":[{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b561bd6fe4d2416bada78a1f8a945df7\",\"purpose\":\"scene-object-confirm\",\"activeSeconds\":107.67,\"capturedAtUtc\":\"2026-10-13T02:29:57.9045293Z\",\"viewDirectionWorld\":{\"x\":0.52013641595840454,\"y\":-0.40971970558166504,\"z\":0.74939179420471191},\"gapSincePreviousSampleSeconds\":3.28,\"scope\":\"one actual sampled image; intervening visual events unknown\"},{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f\",\"purpose\":\"scene-object-state-result\",\"activeSeconds\":108.19,\"capturedAtUtc\":\"2026-10-13T02:29:58.4136129Z\",\"viewDirectionWorld\":{\"x\":0.523804247379303,\"y\":-0.41903483867645264,\"z\":0.741646409034729},\"gapSincePreviousSampleSeconds\":0.52,\"scope\":\"one actual sampled image; intervening visual events unknown\"},{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-d770f9f81ae2481c87592f3c1f73b7c5\",\"purpose\":\"autonomy\",\"activeSeconds\":121.73,\"capturedAtUtc\":\"2026-10-13T02:30:11.9961681Z\",\"viewDirectionWorld\":{\"x\":-0.29489868879318237,\"y\":-0.053402692079544067,\"z\":-0.9540366530418396},\"gapSincePreviousSampleSeconds\":13.54,\"scope\":\"one actual sampled image; intervening visual events unknown\"},{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-7d6cee7df18043eb82f3199944c9b586\",\"purpose\":\"scene-review-after-playback\",\"activeSeconds\":126.78,\"capturedAtUtc\":\"2026-10-13T02:30:17.0341565Z\",\"viewDirectionWorld\":{\"x\":-0.30734559893608093,\"y\":-0.021802280098199844,\"z\":-0.95135003328323364},\"gapSincePreviousSampleSeconds\":5.05,\"scope\":\"one actual sampled image; intervening visual events unknown\"}],\"lastUnobservedRuntimeGapSeconds\":0.0,\"scope\":\"Only actual samples are seen. Between samples visual events are unknown; private model reasoning is intermittent. Pauses/session closure are not continuous experience. You may remain quiet, look elsewhere, approach or rest; no action is compulsory.\"} 你最近发言:   1分51秒前: \"ふふっ、ユウも気になるのね。私が見える範囲では、正面に大きなモニターと机、その横に小さなランプと観葉植物が見えているわ。…\"   1分17秒前: \"あなたのそばへ向かっているわ。\"   12秒前: \"照明は正常にオフになりました。そばへ行くリクエストは送ったわ。歩く動作を準備中で、まだ歩き始めていないの。\" 距用户上句: 1分2秒 (\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\") 你已连续说话: 1 次未等到用户回应 环境: 安静 [演唱素材主接口：sing refs=具体引用；不填 source/mode/order。clip 身份在确认、修订后不变；range默认current；起止秒数统一基于原始录音。]  [歌唱事项闭环] 先区分用户已发生的演唱、要求角色执行的动作与你的自主提议。用户唱过、分享歌词、说自己试唱都不构成回唱任务；可以只自然回应，不必登记目标。确有角色演唱目标时才登记；origin=user_request 表示用户要求你唱，origin=autonomous 表示你自己的提议，不得记成用户欠办事项。为什么/检查技能等追问不自动取消已核对的原目标。演唱前提交 <sing_goal origin=\"user_request\" refs=\"clip:真实身份,clip:真实身份\" range=\"current\" intent=\"perform\" completion=\"playback\" expected=\"实际要唱的内容及顺序\" feedback=\"none\"/>。refs顺序就是目标顺序；revisions省略时程序绑定这些refs当前的实际版本；显式提供须从清单复制，不能猜数字，候选为pending；range=current/clean/expanded/window，window须成对start_seconds/end_seconds。window仅是goal的范围类型：真正sing只填写成对start_seconds/end_seconds，不填写range=window或其它range。intent=perform/repair/repeat；repair_scope=content/music/delivery（默认content，音高/速度修正用music）；completion=playback/user_confirmation；补漏内容须user_confirmation，播完不能证明缺失内容已经补回。用户负面反馈用feedback=unsatisfied；明确认可用satisfied；这些反馈或repeat须evidence引用最新用户原话。只记录反馈可用intent=observe且不填refs。不得把自己的道歉/声称成功作为用户反馈。目标先由独立语义审查核对，approved后才能sing或修改其范围。同一合法after_action回复可以先sing_goal再显式sing；该sing会绑定本次目标等待审核，通过后仍全量检查范围/版本/权限才执行一次；拒绝、新用户输入或取消会撤销它。只登记sing_goal不自动演唱。已approved且用户未更新时，无需重写目标；改变refs/range/revision/完成条件需重新审查。新用户轮只暂停执行，不清空active_goal。追问失败原因或没听到时，原refs顺序和成功条件仍在；确认要继续可用<sing_goal transition=\"continue\"/>，程序绑定原目标和版本，不默认最近录音。修改原任务用transition=revise，换成独立新演唱任务用replace，明确放弃原任务用cancel；用户事项须change_quote逐字引用最新用户改变/取消要求，并由独立审查确认其语义。有未完成active_goal时省略transition等于continue，不能借新proposal缩减原目标。revise/replace仍须完整refs/range/expected/completion；revisions可省略由程序绑定当前素材，提供时必须匹配。登记时还是候选的素材绑定revisions=pending；之后来源被确认，程序会把它解析成实际版本，不需要你改目标，也不算改变内容。continue不能改素材/范围/完成条件；只解释或回答追问可以不发工具，保留待办但不会自动演唱。cancel只取消事项，不删除录音。reason只是解释，expanded必须写入range。目标与真正工具参数都要落实用户修正，不能只把二者填成同一个错误方案。  [Sing/Goal] {\"user_turn\":3,\"latest_user_request\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\",\"recent_actual_user_inputs\":[{\"turn\":1,\"text\":\"现在能看到什么吗？\"},{\"turn\":2,\"text\":\"先来我身边。\"},{\"turn\":3,\"text\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\"}],\"input_scope\":\"原始用户输入，不保证是执行请求；按完整时序区分用户表演与要求角色行动\",\"review_field_scope\":\"requestQuote/sourceUserTurn由独立审核依据实际用户输入产生，不是sing_goal提案的必填参数；尚未核定时省略。已存在的值是前次审核保存的来源，可供continue核对。审核员在本次singing_goal_expected.request_quote中引用真实请求。\",\"next_step\":{\"stage\":\"goal_required\",\"action\":\"\",\"scope\":\"未授权演唱。依据完整实际用户输入和素材自行决定目标；后续询问不代表原请求已取消。\"},\"goal\":null,\"active_goal\":null,\"active_goal_unfinished\":false,\"previous_goal\":null,\"last_playback\":null,\"rejected_plans\":[],\"feedback_scope\":\"completed仅表示Unity实际播完所列refs/revision/raw范围；不证明用户听到或指定歌词/缺失内容满足。active_goal是持久成功条件；goal是当前轮待审核/执行草案，null不代表原任务已取消或完成。没有当前轮动作授权不能自动续唱。\"}  [Sing/Inventory] retained=0 confirmed_list=0 pending_list=0；以下按录音先后并列，不是播放顺序。来源待确认不等于没有录到。\r 最近留存的录音证据=none；只是录音时间事实，不替你选择或确认来源。\r playback=ready仅表示音频可执行，不是歌唱判定；结合整段转写、声学证据和语境选择或询问。shared_prefix表示联合识别复用了前段音频，不是又唱了一次，也不证明是同一说话人。\r 录音先后（早→晚；不是角色播放顺序）见下列 recording 编号；不是练唱清单编号。\r  [Audio/Recent] 最近 3 个用户轮的完整原始录音仍在内存（未判定模态、不在清单里）：\r [Audio/Capture] cap:1 audio=3.03s p=0.12 stab=0.53 旋律岛=1.54s text=现在能看到什么吗？\r [Audio/Capture] cap:2 audio=1.85s p=0.40 stab=0.58 旋律岛=1.85s text=先来我身边。\r [Audio/Capture] cap:3 audio=6.51s p=0.27 stab=0.54 旋律岛=4.17s text=现在你去把刚才看到的那个小灯关掉，然后回到我身边。\r p 只是声学测量，实测它分不开演唱和噪声，不能当模态结论；结合这一轮用户原话判断。要用其中一段先 <clip_adopt ref=\"cap:…\" reason=\"…\"/> 收进清单，收进来仍是 source=pending，播放仍需 sing_goal 与独立审核。不收也不会删除，最近几轮之后自然淘汰。\r [Sing/PlaybackFact] 角色最近完整播放（位置从左至右1起；不是清单编号）last_completed=none; latest_outcome=none\r 清单中的每个引用只对应该录音；某次播放未列出的引用不在那次完整播放里。pending 可由你结合语境确认，也可先询问；程序不自动补选。以上是只读事实，不代表详细 Skill 已加载。\r ‘刚唱的录音’与‘你刚才唱的第几段’可分别参考上面两种顺序；歌名/相似歌词不等于同一次录音。指代仍由你判断，可询问。\r pending：来源不确定，可询问或自主选已有音频；演唱不要求确认来源，也不自动确认来源。evidence_only：已录到但未选可播放范围。多 refs 的 range 对各段独立采用其自身 clean/expanded；不同范围可先逐段修订。准备好不等于已唱。\r 素材当前总长=0.0s；明确要求完整演唱可自然分块流式播放。自主发起的软预算=60s，由你选择范围，不在句中强制截断。曲库不是本次录音：曲库快照中的完整id可写 sing refs=\"song:完整id\"；不指定 lyrics 时表示该曲库条目的全部已存片段，不代表完整原曲。相似候选不证明用户要唱曲库版本。\r  视觉: 场景视野开启（从角色眼位按请求采样；是否成功及对应时刻，以实际图片附件和采集标识为准。开眼不等于转头。） 会话阶段: 中 (2分钟) (本帧由你上次排定的 <next in/> 时钟触发) [自主意图预判已通过：这是没有新用户消息时由你自己浮现的意图。意图=回到用户身边后，确认用户是否安好，并询问接下来想做什么。。现在仍可选择说话、保持沉默或只做非语言动作；不要重新回答最后一条用户发言，也不要复述你最近说过的话。]",
+      "history": [
+        {
+          "role": "user",
+          "content": "现在能看到什么吗？"
+        },
+        {
+          "role": "assistant",
+          "content": "ふふっ、ユウも気になるのね。私が見える範囲では、正面に大きなモニターと机、その横に小さなランプと観葉植物が見えているわ。左側には棚があるかな。ユウ、何か気になることはあったの？"
+        },
+        {
+          "role": "user",
+          "content": "先来我身边。"
+        },
+        {
+          "role": "assistant",
+          "content": "あなたのそばへ向かっているわ。"
+        },
+        {
+          "role": "user",
+          "content": "现在你去把刚才看到的那个小灯关掉，然后回到我身边。"
+        },
+        {
+          "role": "assistant",
+          "content": "照明は正常にオフになりました。さっきあなたのそばに着いたわ。今もそばにいるかは、改めて確認が必要ね。"
+        }
+      ],
+      "originalRequest": "现在你去把刚才看到的那个小灯关掉，然后回到我身边。",
+      "intention": "回到用户身边后，确认用户是否安好，并询问接下来想做什么。",
+      "scene": {
+        "enabled": true,
+        "active": false,
+        "lastAction": {
+          "source": "Unity-visible-target-execution",
+          "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:6:6",
+          "intent": "set-object-state",
+          "origin": "user",
+          "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-76d0069f3a124ea1b399b89a817de75c",
+          "confirmedCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b561bd6fe4d2416bada78a1f8a945df7",
+          "resultCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f",
+          "surfaceId": "",
+          "visualLabel": "桌面装饰灯",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "observedUtc": "2026-10-13T02:29:58.5209531Z",
+          "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+          "focusKind": "visible-object",
+          "requestedEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+          "requestedState": "off",
+          "targetResolutionSource": "candidate-confirmed",
+          "requestedImagePoint": {
+            "x": 0.49531251192092896,
+            "y": 0.845370352268219
+          },
+          "objectConfirmed": true,
+          "stateChanged": true,
+          "groundArrived": false,
+          "objectReobserved": false,
+          "postArrivalObservationStatus": "",
+          "targetPurpose": "direct-target",
+          "targetDescription": "现在你去把刚才看到的那个小灯关掉，然后回到我身边。",
+          "targetMatchVerdict": "matched",
+          "targetMatchReason": "c1为电视柜上的桌面装饰灯，符合“刚才看到的小灯”描述。画面显示其处于点亮状态，是执行“关掉”动作的目标。",
+          "matchCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-76d0069f3a124ea1b399b89a817de75c",
+          "semanticTargetConfirmed": true,
+          "needsCloserObservation": false,
+          "navigationFocusImagePoint": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "observationStandOff": 0.0,
+          "predictedObservationPitch": 0.0,
+          "observationGoalId": "",
+          "viewDirection": "",
+          "viewPurpose": "",
+          "viewPurposeStatus": "",
+          "requestedViewDistance": 0.0,
+          "actualViewOffset": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "viewBefore": {
+            "captureId": "",
+            "entityId": "",
+            "capturedAtUtc": "",
+            "frame": 0,
+            "width": 0,
+            "height": 0,
+            "visibleOpaquePixels": 0,
+            "normalizedVisibleBounds": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0,
+              "w": 0.0
+            },
+            "visiblePixelFraction": 0.0,
+            "cameraDistanceToObservedPoint": 0.0,
+            "touchesImageBoundary": false,
+            "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+          },
+          "viewAfter": {
+            "captureId": "",
+            "entityId": "",
+            "capturedAtUtc": "",
+            "frame": 0,
+            "width": 0,
+            "height": 0,
+            "visibleOpaquePixels": 0,
+            "normalizedVisibleBounds": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0,
+              "w": 0.0
+            },
+            "visiblePixelFraction": 0.0,
+            "cameraDistanceToObservedPoint": 0.0,
+            "touchesImageBoundary": false,
+            "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+          },
+          "intentFocusWorldPoint": {
+            "x": -0.2921221852302551,
+            "y": -0.08178579807281494,
+            "z": -4.775966644287109
+          },
+          "hasIntentFocus": true,
+          "navigationFocusAdjusted": false,
+          "trackingVisibility": "",
+          "trackingCaptureId": "",
+          "trackingFocusStatus": "",
+          "trackingFocusWorldPoint": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "trackingConfirmedImages": 0,
+          "trackingMovingConfirmedImages": 0,
+          "trackingLastSeenRealtime": -1.0,
+          "trackingFocusLastAppliedFrame": -1,
+          "trackingFocusAppliedDegrees": 0.0,
+          "measuredSurface": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "actualRoot": {
+            "x": -1.2611377239227295,
+            "y": -0.7200000286102295,
+            "z": -6.166989803314209
+          },
+          "requestedYaw": 0.0,
+          "requestedPitch": 0.0,
+          "actualViewChangeDegrees": 0.0,
+          "active": false,
+          "reached": false,
+          "canReobserveTarget": false,
+          "scope": "Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation."
+        },
+        "objectContext": {
+          "enabled": true,
+          "runtimeDeviceControl": {
+            "implementationConnected": true,
+            "featureEnabled": true,
+            "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+            "physicalHandRequired": false,
+            "requiresCurrentTargetConfirmation": true,
+            "requiresIndependentUserAuthorization": true,
+            "scope": "Software capability facts, not target identity, current visibility, permission or proof of execution. A missing goal approval or unresolved target does not remove this interface. Lack of physical switch-touching does not prevent this registered runtime lamp control."
+          },
+          "selected": {
+            "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+            "sceneLabel": "桌面装饰灯",
+            "identitySource": "scene-authored",
+            "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f",
+            "observedUtc": "2026-10-13T02:29:58.4136129Z",
+            "visibleInCapturedFrame": true,
+            "pointAtCapture": {
+              "x": -0.29366082,
+              "y": -0.0800344348,
+              "z": -4.77500629
+            },
+            "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+            "capabilities": [
+              "inspect-object",
+              "look-at",
+              "set-object-state:on|off"
+            ],
+            "runtimeDeviceStateReadAfterObservation": {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "lightState": "disabled",
+              "emissionState": "off",
+              "conflict": "",
+              "registered": true,
+              "on": false,
+              "lightEnabled": false,
+              "emissionEnabled": false,
+              "bakedLightingResidualUncontrolled": true,
+              "emissionColor": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "lightIntensity": 1.0,
+              "lightBakeType": "Baked",
+              "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+            },
+            "stateReadAtUtc": "2026-10-13T02:29:58.5174514Z",
+            "localStructure": {
+              "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+              "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+              "emissivePartName": "スタンドライト.001",
+              "lightComponentNodeName": "Point Light"
+            }
+          },
+          "stateResult": {
+            "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:6:6",
+            "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+            "reason": "已关闭登记灯具的可见发光体及 Light 组件；未移除烘焙余光。",
+            "on": false,
+            "changed": true,
+            "completed": true,
+            "replayed": false,
+            "partial": false,
+            "physicalSwitchPress": false,
+            "freshVisualObservation": true,
+            "actual": {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "lightState": "disabled",
+              "emissionState": "off",
+              "conflict": "",
+              "registered": true,
+              "on": false,
+              "lightEnabled": false,
+              "emissionEnabled": false,
+              "bakedLightingResidualUncontrolled": true,
+              "emissionColor": {
+                "r": 0.0,
+                "g": 0.0,
+                "b": 0.0,
+                "a": 1.0
+              },
+              "lightIntensity": 1.0,
+              "lightBakeType": "Baked",
+              "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+            },
+            "scope": "Whitelist device action: set the registered lamp's visible emission and Light component power. Original material assets and baked lighting are unchanged; visual confirmation must be obtained separately.",
+            "appliedAtUtc": "2026-10-13T02:29:58.0022480Z",
+            "visualConfirmation": "same-entity-in-new-image",
+            "resultCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f"
+          },
+          "recentObservations": [
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1",
+              "observedUtc": "2026-10-13T02:29:44.4979147Z",
+              "pointAtCapture": {
+                "x": -0.299996972,
+                "y": -0.08576971,
+                "z": -4.7781415
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-d818bc651145426e9039cbf8ede581d5",
+              "observedUtc": "2026-10-13T02:29:47.7417447Z",
+              "pointAtCapture": {
+                "x": -0.295456052,
+                "y": -0.08816022,
+                "z": -4.779449
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-ff8ad22bc3ab422b9144ba553640d8ac",
+              "observedUtc": "2026-10-13T02:29:54.1235424Z",
+              "pointAtCapture": {
+                "x": -0.295206845,
+                "y": -0.0790543556,
+                "z": -4.77446842
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b561bd6fe4d2416bada78a1f8a945df7",
+              "observedUtc": "2026-10-13T02:29:57.9045293Z",
+              "pointAtCapture": {
+                "x": -0.2921998,
+                "y": -0.08280069,
+                "z": -4.77652073
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f",
+              "observedUtc": "2026-10-13T02:29:58.4136129Z",
+              "pointAtCapture": {
+                "x": -0.29366082,
+                "y": -0.0800344348,
+                "z": -4.77500629
+              }
+            }
+          ],
+          "knownObjectHistory": [
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f",
+              "observedUtc": "2026-10-13T02:29:58.4136129Z",
+              "capturedAtRealtime": 112.824318,
+              "pointAtCapture": {
+                "x": -0.29366082,
+                "y": -0.0800344348,
+                "z": -4.77500629
+              },
+              "cameraPositionAtCapture": {
+                "x": -1.25758958,
+                "y": 0.71821,
+                "z": -6.16662359
+              },
+              "cameraRotationAtCapture": {
+                "x": -0.204368323,
+                "y": -0.295652479,
+                "z": 0.06518082,
+                "w": -0.9309004
+              },
+              "bodyPositionAtCapture": {
+                "x": -1.26113772,
+                "y": -0.72,
+                "z": -6.16699
+              },
+              "bodyRotationAtCapture": {
+                "x": 0.0,
+                "y": -0.292680949,
+                "z": 0.0,
+                "w": -0.956210256
+              },
+              "viewDirectionWorldAtCapture": {
+                "x": 0.523804247,
+                "y": -0.419034839,
+                "z": 0.7416464
+              },
+              "capabilities": [
+                "inspect-object",
+                "look-at",
+                "set-object-state:on|off"
+              ],
+              "samplePurpose": "selected-object-observation",
+              "rootPositionAtCapture": {
+                "x": -0.251999855,
+                "y": -0.008000851,
+                "z": -4.71600246
+              },
+              "rootRotationAtCapture": {
+                "x": -0.707106948,
+                "y": 0.0,
+                "z": 0.0,
+                "w": 0.7071068
+              },
+              "rootScaleAtCapture": {
+                "x": 0.06,
+                "y": 0.0600000359,
+                "z": 0.0600000359
+              },
+              "scope": "Previously confirmed opaque pixels and their exact capture-time geometry/view. Root snapshot is recorded only while captured renderer geometry still matches. Historical location is a search hint, never current visibility, a navigation destination, device state or action permission.",
+              "historical": true,
+              "positionMemoryValid": true,
+              "positionInvalidReason": null,
+              "requiresReobservation": true,
+              "actionAuthorization": false,
+              "currentVisibility": "not-established"
+            }
+          ],
+          "verifiedObservedDeviceHistory": [
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "actionId": "scene-search-ad9f88bb7e484e49967fbb84e16143c6:confirmed",
+              "originalRequest": "现在你去把刚才看到的那个小灯关掉，然后回到我身边。",
+              "targetDescription": "现在你去把刚才看到的那个小灯关掉，然后回到我身边。",
+              "semanticReason": "c1为电视柜上的桌面装饰灯，符合“刚才看到的小灯”描述。画面显示其处于点亮状态，是执行“关掉”动作的目标。",
+              "matchCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-aa5cac9fbdfb4118b107682126083eac",
+              "confirmedCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1",
+              "observedUtc": "2026-10-13T02:29:44.6069075Z",
+              "historical": true,
+              "semanticTargetConfirmedAtObservation": true,
+              "observation": {
+                "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+                "sceneLabel": "桌面装饰灯",
+                "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1",
+                "observedUtc": "2026-10-13T02:29:44.4979147Z",
+                "capabilities": [
+                  "inspect-object",
+                  "look-at",
+                  "set-object-state:on|off"
+                ]
+              },
+              "scope": "Actual direct-target semantic match followed by same-entity opaque confirmation in a new image and observed registered capability. Previously seen referent only: no executed operation, goal ID, current visibility, current power state or action authority. Assistant speech alone cannot create this record. An independent authorization may select this engine-listed source to constrain the same entity; every action still needs its own fresh semantic match."
+            }
+          ],
+          "targetReview": {
+            "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:6:6",
+            "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-76d0069f3a124ea1b399b89a817de75c",
+            "originalGoal": "现在你去把刚才看到的那个小灯关掉，然后回到我身边。",
+            "requestedDescription": null,
+            "parentSpatialGoalId": "device-goal-19b488cf153242559ff418052e7af279",
+            "targetPurpose": "direct-target",
+            "verdict": "matched",
+            "associationCurrent": true,
+            "reason": "c1为电视柜上的桌面装饰灯，符合“刚才看到的小灯”描述。画面显示其处于点亮状态，是执行“关掉”动作的目标。",
+            "semanticTargetConfirmed": true,
+            "modelVerdict": "matched",
+            "candidateRole": "target",
+            "observationLandmarkConfirmed": false,
+            "modelReason": "c1为电视柜上的桌面装饰灯，符合“刚才看到的小灯”描述。画面显示其处于点亮状态，是执行“关掉”动作的目标。",
+            "boundGoalEntityConflict": false,
+            "matchedEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+            "initialGeometryEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+            "needsCloserObservation": false,
+            "proposedCandidateId": "c1",
+            "proposedEntityId": null,
+            "proposedImagePoint": null,
+            "needsTargetReselection": false,
+            "proposalScope": "A nonmatched proposal is only a cue for the next fresh-image decision, not a semantic match or permission for this action. At most one candidate-match request is made by this action; never retry stale pixels automatically.",
+            "targetSelection": null,
+            "scope": "Model interpretation of this exact candidate image, separate from engine identity. A reference selected for observe-closer is not confirmation of the original small target. When uncertain, consider a visible larger reference and targetPurpose=observe-closer in a NEW approach decision, then reobserve and retry the original goal; no automatic device operation. User correction can revoke a referent association without deleting objective seen-object history.",
+            "observationGoal": null
+          },
+          "lastDeviceStateEvidenceValid": true,
+          "deviceEvidenceScope": "Engine result-validity check only; false invalidates prior device state claims. No new device setting or visual observation is supplied here; inspect again to establish current facts.",
+          "rejectionCauseScope": "Pixel/identity resolution failure does not establish which intended object was selected. Missing registered power capability concerns only the resolved entity and this software interface. Neither finding diagnoses electricity, cables, outlets, broken hardware or whether the intended lamp is a nonfunctional ornament. A different selected entity does not erase the prior device's successful operation.",
+          "scope": "Only previously selected visible entities, observed timestamps and explicit device results. These are snapshots, not continuous perception or a room inventory. Scene-authored labels are annotations, not visual recognition. Hierarchy does not prove support/contact. No arbitrary Inspector edits or physical hand interaction. On/off controls the registered emitter and Light flag; baked lighting may remain.",
+          "deviceDistanceLimitMeters": 2.5
+        },
+        "sceneSearch": {
+          "taskId": "scene-search-ad9f88bb7e484e49967fbb84e16143c6",
+          "generation": 6,
+          "workEpoch": 4,
+          "userTurn": 4,
+          "active": false,
+          "ownerCurrent": true,
+          "mode": "find",
+          "originalUserRequest": "现在你去把刚才看到的那个小灯关掉，然后回到我身边。",
+          "latestUserText": "现在你去把刚才看到的那个小灯关掉，然后回到我身边。",
+          "referenceContext": {
+            "quotedDialogue": [
+              {
+                "role": "assistant",
+                "quotedText": "ふふっ、ユウも気になるのね。私が見える範囲では、正面に大きなモニターと机、その横に小さなランプと観葉植物が見えているわ。左側には棚があるかな。ユウ、何か気になることはあったの？",
+                "textTruncated": false
+              },
+              {
+                "role": "user",
+                "quotedText": "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.65] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.40; 语言:zh; 音域:A2～C3; 音高稳定度:0.58; 旋律:C3-B2-A2-A#2; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 先来我身边。",
+                "textTruncated": false
+              },
+              {
+                "role": "assistant",
+                "quotedText": "あなたのそばへ向かっているわ。",
+                "textTruncated": false
+              },
+              {
+                "role": "user",
+                "quotedText": "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n[局部倾听观测] {\"capture\":3,\"observed_until_ms\":920,\"partial_mode\":\"speech\",\"mode_confidence\":0.95,\"matches_complete_transcript\":false,\"scope\":\"仅覆盖当时的局部输入，不能替代完整录音时序或推导用户要求角色演唱\"}\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.90] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.27; 语言:zh; 音域:G2～A5; 音高稳定度:0.54; 旋律:G#5-A5-F3-A#2-A2-G#3-B2-G5-G2-F#5-A5-F5-A2-B2-A#2-D#5-D5-A2-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 现在你去把刚才看到的那个小灯关掉，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":4.170000076293945,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"现在你去把刚才看到的那个小灯关掉。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\r\n{\"id\":2,\"start_seconds\":4.170000076293945,\"end_seconds\":6.510000228881836,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\r\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\"}]\n[同一录音的较早 ASR 观测：不是额外发言，也不表示最终结果必然更准确。可用于补漏和判断冲突，不要重复拼接；有歧义时可以询问。\n覆盖录音前 4.23s：现在你去把刚才看到的那个小灯关掉。]",
+                "textTruncated": false
+              }
+            ],
+            "scope": "Frozen recent dialogue quotations for resolving descriptive references only. They do not verify an entity, visibility, position, state, or completion. The complete current/original user request is the sole new operation authority. Recheck the same description in real observations; multiple matching objects remain unresolved. No subsequent dialogue may silently change this snapshot."
+          },
+          "phase": "terminal",
+          "status": "found",
+          "reason": "search-current-target-confirmed",
+          "steps": 1,
+          "stepLimit": 12,
+          "decisions": 2,
+          "decisionLimit": 36,
+          "noProgressSteps": 0,
+          "totalNoProgress": 0,
+          "recoveryAttempts": 0,
+          "recoveryLimit": 1,
+          "revisitedMemoryEntityIds": [
+            "scene-object-72ec6b928c2747e197be5343f2605fda"
+          ],
+          "unsupportedDeviceEntityIds": [],
+          "durationSeconds": 21.28939,
+          "durationLimitSeconds": 180.0,
+          "coveredHorizontalRegions": 5,
+          "horizontalRegionCount": 12,
+          "candidatePageCoverage": [
+            {
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-d9bf893f653b42b9b96059191bc0b1fa",
+              "offeredPages": 1,
+              "reviewedPagesInExactCapture": 1,
+              "allCurrentCandidatesReviewedAtThisPose": true,
+              "truncated": false
+            },
+            {
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1",
+              "offeredPages": 3,
+              "reviewedPagesInExactCapture": 0,
+              "allCurrentCandidatesReviewedAtThisPose": false,
+              "truncated": false
+            }
+          ],
+          "allVisitedCandidatePagesReviewed": false,
+          "foundEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+          "foundCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1",
+          "boundEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+          "deviceGoalId": "device-goal-19b488cf153242559ff418052e7af279",
+          "goalExecutionRevision": 0,
+          "searchAttempted": true,
+          "deviceWriteAuthorized": false,
+          "receipts": [
+            {
+              "stage": "memory-retrieval",
+              "referenceId": "4ae06d7549db4e3391a3edbfc51c2a32-f453781f14bf4c59980a84fffaf79299-b53b22bd730e4ff7b5df007c9ab04e81:memory:scene-object-72ec6b928c2747e197be5343f2605fda",
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "selectionRole": "target",
+              "sourceCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-f453781f14bf4c59980a84fffaf79299-b53b22bd730e4ff7b5df007c9ab04e81",
+              "scope": "This frozen point was selected for reobservation only; neither target identity nor device operation is confirmed."
+            },
+            {
+              "choice": "historical-object",
+              "referenceId": "4ae06d7549db4e3391a3edbfc51c2a32-f453781f14bf4c59980a84fffaf79299-b53b22bd730e4ff7b5df007c9ab04e81:memory:scene-object-72ec6b928c2747e197be5343f2605fda",
+              "intent": "turn-in-place",
+              "requestedYaw": -135.573212,
+              "requestedPitch": 0.0,
+              "sourceCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-d9bf893f653b42b9b96059191bc0b1fa",
+              "resultCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-cbacee368fab4afa85a6ea4f70de29c8",
+              "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:6:4",
+              "observed": true,
+              "controllerOperationRevision": 5,
+              "rootDisplacementFromStationaryBaseline": 0.004877497,
+              "rootDisplacementFromActionStart": 0.004877497,
+              "stationaryRootRebased": true,
+              "actualViewChangeDegrees": 133.323776,
+              "reason": "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents"
+            },
+            {
+              "taskId": "scene-search-ad9f88bb7e484e49967fbb84e16143c6",
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "selectionCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-cbacee368fab4afa85a6ea4f70de29c8",
+              "freshCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-aa5cac9fbdfb4118b107682126083eac",
+              "cameraTranslationMeters": 0.00792884547,
+              "cameraRotationDegrees": 4.547312,
+              "selectionGeometryCurrent": true,
+              "freshOpaqueConfirmed": true,
+              "freshSameRoot": true,
+              "freshGeometryCurrent": true,
+              "acceptedForIndependentReview": true,
+              "reason": null
+            },
+            {
+              "choice": "current-candidate",
+              "referenceId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-cbacee368fab4afa85a6ea4f70de29c8:visible:p0:c4",
+              "selectionCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-cbacee368fab4afa85a6ea4f70de29c8",
+              "matchCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-aa5cac9fbdfb4118b107682126083eac",
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "confirmed": true,
+              "returnedCandidateId": "c1",
+              "returnedEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "freshCandidateMapping": [
+                {
+                  "candidateId": "c1",
+                  "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+                  "sceneLabel": "桌面装饰灯"
+                },
+                {
+                  "candidateId": "c2",
+                  "entityId": "renderer-object-7146af3918de413fbaa0c73fdc1d94a3-7ef6",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c3",
+                  "entityId": "renderer-object-7146af3918de413fbaa0c73fdc1d94a3-8104",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c4",
+                  "entityId": "renderer-object-7146af3918de413fbaa0c73fdc1d94a3-80ba",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c5",
+                  "entityId": "renderer-object-7146af3918de413fbaa0c73fdc1d94a3-8084",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c6",
+                  "entityId": "renderer-object-7146af3918de413fbaa0c73fdc1d94a3-8176",
+                  "sceneLabel": ""
+                }
+              ],
+              "verdict": "matched",
+              "candidateRole": "target",
+              "reason": "c1为电视柜上的桌面装饰灯，符合“刚才看到的小灯”描述。画面显示其处于点亮状态，是执行“关掉”动作的目标。",
+              "freshSameEntityCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b5a0cf8d03c1479f850b50348df61dc1"
+            }
+          ],
+          "reviewedHistoricalCaptureIds": [],
+          "scope": "Bounded observation task only. found requires an independent semantic match and same-entity opaque confirmation in a NEW current frame. completed surveys concern sampled horizontal view directions, not every room object or occluded space. Candidate identification is limited to pages actually reviewed; candidatePageCoverage separately records skipped or truncated pages in visited views. Never claim all offered objects were inspected unless allVisitedCandidatePagesReviewed is true; even then unsupported/occluded objects remain unassessed. incomplete/cancelled do not prove the target absent. Historical positions/descriptions are hints, not current visibility, navigation or device authority. No device state was changed by this search. The most recent motion receipt describes only one substep, not the overall result."
+        },
+        "capability": "look-at or approach-object using captureId plus normalized visible image point; reposition-view uses a freshly confirmed entity to adjust the same-floor observation station farther/closer/left/right by 0.2 to 1.2 metres while facing that target. see-whole/read-detail/avoid-occlusion are observation purposes, not promised outcomes; assess the new image after movement. orient-view changes real head direction without needing an already visible target; turn-in-place turns the actual body on its current legal floor. Bounded historical snapshots may be acquired during an actual body turn; a new current view is still captured after completion. No stairs or touching. When objectContext.enabled, inspect-object resolves only the selected visible entity; set-object-state on/off requires its explicit registered nearby device capability and fresh confirmation. look-at can focus an unresolved image region without claiming a measured object. Autonomous view changes bounded to three per 30 seconds."
+      },
+      "lastReplyReceipt": {
+        "generation": 6,
+        "userTurn": 4,
+        "recordedAtUtc": "2026-10-13T02:30:04.4236683Z",
+        "replyFailure": null,
+        "planningFailure": null,
+        "reviewStatus": "received",
+        "concurrentBodyFailure": null,
+        "intent": "set-object-state",
+        "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+        "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:6:6",
+        "execution": {
+          "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:6:7",
+          "targetKind": "user",
+          "captureId": "",
+          "sceneTargetId": "",
+          "phase": "preparing",
+          "stage": "capabilities",
+          "reason": "正在读取 ARDY 全身生成能力",
+          "executionReason": "None",
+          "operationRevision": 12,
+          "observedUtc": "2026-10-13T02:30:04.3708215Z",
+          "approachRetargetStatus": "restarted",
+          "approachRetargetCount": 1,
+          "approachRetargetTravel": 0.3576279282569885,
+          "matchesRequestedAction": false
+        },
+        "sequenceContinuation": {
+          "generation": 6,
+          "workEpoch": 4,
+          "userTurn": 4,
+          "stepId": "s2",
+          "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:6:7",
+          "intent": "approach"
+        },
+        "sceneAction": {
+          "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:6:6",
+          "intent": "set-object-state",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "observedUtc": "2026-10-13T02:29:58.5209531Z",
+          "reached": false,
+          "stateChanged": true
+        },
+        "publicText": "照明は正常にオフになりました。そばへ行くリクエストは送ったわ。歩く動作を準備中で、まだ歩き始めていないの。",
+        "scope": "Accepted final public reply and contemporaneous independent execution receipts. Historical snapshot, not current state or retry permission; accepted text does not prove audio playback."
+      }
+    },
+    {
+      "name": "gen12-approach",
+      "sourceLine": 32836,
+      "frame": "[感知帧 11:31:48] [Sing/Execution] request_submitted_since_user_turn=false work_active=false state=idle continuations_without_work=0 以上只表示程序执行状态；提交过不等于成功，idle不表示素材丢失。口头说准备好、look、continue都不会启动演唱。是否行动、询问或安静仍由你决定。  [Sing/Goal] {\"user_turn\":5,\"latest_user_request\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\",\"recent_actual_user_inputs\":[{\"turn\":1,\"text\":\"现在能看到什么吗？\"},{\"turn\":2,\"text\":\"先来我身边。\"},{\"turn\":3,\"text\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\"},{\"turn\":4,\"text\":\"跟着我走。\"},{\"turn\":5,\"text\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\"}],\"input_scope\":\"原始用户输入，不保证是执行请求；按完整时序区分用户表演与要求角色行动\",\"review_field_scope\":\"requestQuote/sourceUserTurn由独立审核依据实际用户输入产生，不是sing_goal提案的必填参数；尚未核定时省略。已存在的值是前次审核保存的来源，可供continue核对。审核员在本次singing_goal_expected.request_quote中引用真实请求。\",\"next_step\":{\"stage\":\"goal_required\",\"action\":\"\",\"scope\":\"未授权演唱。依据完整实际用户输入和素材自行决定目标；后续询问不代表原请求已取消。\"},\"goal\":null,\"active_goal\":null,\"active_goal_unfinished\":false,\"previous_goal\":null,\"last_playback\":null,\"rejected_plans\":[],\"feedback_scope\":\"completed仅表示Unity实际播完所列refs/revision/raw范围；不证明用户听到或指定歌词/缺失内容满足。active_goal是持久成功条件；goal是当前轮待审核/执行草案，null不代表原任务已取消或完成。没有当前轮动作授权不能自动续唱。\"}  [视觉关注与行动事实] {\"enabled\":true,\"active\":false,\"lastAction\":{\"source\":\"Unity-visible-target-execution\",\"actionId\":\"4e5c162c48d54ae1a5c6b1a50c0f72f2:11:14\",\"intent\":\"set-object-state\",\"origin\":\"user\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-234db7cd2c0a4670b32f694d5a0b38e0\",\"confirmedCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-7faef29967894aaaab4dff0de2a1d6f2\",\"resultCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35\",\"surfaceId\":\"\",\"visualLabel\":\"桌面装饰灯\",\"phase\":\"performed\",\"reason\":\"runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press\",\"observedUtc\":\"2026-10-13T02:31:30.7423109Z\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"focusKind\":\"visible-object\",\"requestedEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"requestedState\":\"on\",\"targetResolutionSource\":\"candidate-confirmed\",\"requestedImagePoint\":{\"x\":0.50260418653488159,\"y\":0.84907406568527222},\"objectConfirmed\":true,\"stateChanged\":true,\"groundArrived\":false,\"objectReobserved\":false,\"postArrivalObservationStatus\":\"\",\"targetPurpose\":\"direct-target\",\"targetDescription\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\",\"targetMatchVerdict\":\"matched\",\"targetMatchReason\":\"c1为电视柜上的桌面装饰灯，与用户要求重新打开的“刚才关掉的那盏灯”语义一致。图片显示该灯处于熄灭状态，符合“重新打开”的操作前提。\",\"matchCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-234db7cd2c0a4670b32f694d5a0b38e0\",\"semanticTargetConfirmed\":true,\"needsCloserObservation\":false,\"navigationFocusImagePoint\":{\"x\":0.0,\"y\":0.0},\"observationStandOff\":0.0,\"predictedObservationPitch\":0.0,\"observationGoalId\":\"\",\"viewDirection\":\"\",\"viewPurpose\":\"\",\"viewPurposeStatus\":\"\",\"requestedViewDistance\":0.0,\"actualViewOffset\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},\"viewBefore\":{\"captureId\":\"\",\"entityId\":\"\",\"capturedAtUtc\":\"\",\"frame\":0,\"width\":0,\"height\":0,\"visibleOpaquePixels\":0,\"normalizedVisibleBounds\":{\"x\":0.0,\"y\":0.0,\"z\":0.0,\"w\":0.0},\"visiblePixelFraction\":0.0,\"cameraDistanceToObservedPoint\":0.0,\"touchesImageBoundary\":false,\"scope\":\"Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose.\"},\"viewAfter\":{\"captureId\":\"\",\"entityId\":\"\",\"capturedAtUtc\":\"\",\"frame\":0,\"width\":0,\"height\":0,\"visibleOpaquePixels\":0,\"normalizedVisibleBounds\":{\"x\":0.0,\"y\":0.0,\"z\":0.0,\"w\":0.0},\"visiblePixelFraction\":0.0,\"cameraDistanceToObservedPoint\":0.0,\"touchesImageBoundary\":false,\"scope\":\"Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose.\"},\"intentFocusWorldPoint\":{\"x\":-0.3152763843536377,\"y\":-0.087846219539642334,\"z\":-4.7040252685546875},\"hasIntentFocus\":true,\"navigationFocusAdjusted\":false,\"trackingVisibility\":\"\",\"trackingCaptureId\":\"\",\"trackingFocusStatus\":\"\",\"trackingFocusWorldPoint\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},\"trackingConfirmedImages\":0,\"trackingMovingConfirmedImages\":0,\"trackingLastSeenRealtime\":-1.0,\"trackingFocusLastAppliedFrame\":-1,\"trackingFocusAppliedDegrees\":0.0,\"measuredSurface\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},\"actualRoot\":{\"x\":-1.9770179986953735,\"y\":-0.72000002861022949,\"z\":-4.4358372688293457},\"requestedYaw\":0.0,\"requestedPitch\":0.0,\"actualViewChangeDegrees\":0.0,\"active\":false,\"reached\":false,\"canReobserveTarget\":false,\"scope\":\"Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation.\"},\"objectContext\":{\"enabled\":true,\"runtimeDeviceControl\":{\"implementationConnected\":true,\"featureEnabled\":true,\"supportedOperation\":\"set-object-state:on|off for an explicitly registered lamp\",\"physicalHandRequired\":false,\"requiresCurrentTargetConfirmation\":true,\"requiresIndependentUserAuthorization\":true,\"scope\":\"Software capability facts, not target identity, current visibility, permission or proof of execution. A missing goal approval or unresolved target does not remove this interface. Lack of physical switch-touching does not prevent this registered runtime lamp control.\"},\"selected\":{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35\",\"observedUtc\":\"2026-10-13T02:31:30.6525217Z\",\"visibleInCapturedFrame\":true,\"pointAtCapture\":{\"x\":-0.3146193,\"y\":-0.08664602,\"z\":-4.70546675},\"scope\":\"opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability\",\"capabilities\":[\"inspect-object\",\"look-at\",\"set-object-state:on|off\"],\"runtimeDeviceStateReadAfterObservation\":{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"lightState\":\"enabled\",\"emissionState\":\"on\",\"conflict\":\"\",\"registered\":true,\"on\":true,\"lightEnabled\":true,\"emissionEnabled\":true,\"bakedLightingResidualUncontrolled\":true,\"emissionColor\":{\"r\":0.75663495063781738,\"g\":1.11836576461792,\"b\":1.3041188716888428,\"a\":1.0},\"lightIntensity\":1.0,\"lightBakeType\":\"Baked\",\"scope\":\"Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation.\"},\"stateReadAtUtc\":\"2026-10-13T02:31:30.7413227Z\",\"localStructure\":{\"source\":\"engine-registered-local-structure; not an inference from image or proof that every part is visible\",\"relation\":\"parts-of-selected-entity; does not mean resting-on furniture\",\"emissivePartName\":\"スタンドライト.001\",\"lightComponentNodeName\":\"Point Light\"}},\"stateResult\":{\"actionId\":\"4e5c162c48d54ae1a5c6b1a50c0f72f2:11:14\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"reason\":\"已开启登记灯具的可见发光体及 Light 组件。\",\"on\":true,\"changed\":true,\"completed\":true,\"replayed\":false,\"partial\":false,\"physicalSwitchPress\":false,\"freshVisualObservation\":true,\"actual\":{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"lightState\":\"enabled\",\"emissionState\":\"on\",\"conflict\":\"\",\"registered\":true,\"on\":true,\"lightEnabled\":true,\"emissionEnabled\":true,\"bakedLightingResidualUncontrolled\":true,\"emissionColor\":{\"r\":0.75663495063781738,\"g\":1.11836576461792,\"b\":1.3041188716888428,\"a\":1.0},\"lightIntensity\":1.0,\"lightBakeType\":\"Baked\",\"scope\":\"Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation.\"},\"scope\":\"Whitelist device action: set the registered lamp's visible emission and Light component power. Original material assets and baked lighting are unchanged; visual confirmation must be obtained separately.\",\"appliedAtUtc\":\"2026-10-13T02:31:30.2294945Z\",\"visualConfirmation\":\"same-entity-in-new-image\",\"resultCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35\"},\"recentObservations\":[{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-ff8ad22bc3ab422b9144ba553640d8ac\",\"observedUtc\":\"2026-10-13T02:29:54.1235424Z\",\"pointAtCapture\":{\"x\":-0.295206845,\"y\":-0.0790543556,\"z\":-4.77446842}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b561bd6fe4d2416bada78a1f8a945df7\",\"observedUtc\":\"2026-10-13T02:29:57.9045293Z\",\"pointAtCapture\":{\"x\":-0.2921998,\"y\":-0.08280069,\"z\":-4.77652073}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f\",\"observedUtc\":\"2026-10-13T02:29:58.4136129Z\",\"pointAtCapture\":{\"x\":-0.29366082,\"y\":-0.0800344348,\"z\":-4.77500629}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155\",\"observedUtc\":\"2026-10-13T02:31:16.3761110Z\",\"pointAtCapture\":{\"x\":-0.3169129,\"y\":-0.09085244,\"z\":-4.70257473}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-c813025f013d4262b54b1b9e79112cc5\",\"observedUtc\":\"2026-10-13T02:31:19.7890776Z\",\"pointAtCapture\":{\"x\":-0.3190241,\"y\":-0.0947079062,\"z\":-4.707317}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-23afa48e828941e8b5fcbc51f262eaf1\",\"observedUtc\":\"2026-10-13T02:31:26.2888718Z\",\"pointAtCapture\":{\"x\":-0.3161161,\"y\":-0.08938593,\"z\":-4.70271444}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-7faef29967894aaaab4dff0de2a1d6f2\",\"observedUtc\":\"2026-10-13T02:31:30.1479883Z\",\"pointAtCapture\":{\"x\":-0.315592527,\"y\":-0.08842462,\"z\":-4.702693}},{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35\",\"observedUtc\":\"2026-10-13T02:31:30.6525217Z\",\"pointAtCapture\":{\"x\":-0.3146193,\"y\":-0.08664602,\"z\":-4.70546675}}],\"knownObjectHistory\":[{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35\",\"observedUtc\":\"2026-10-13T02:31:30.6525217Z\",\"capturedAtRealtime\":205.063416,\"pointAtCapture\":{\"x\":-0.3146193,\"y\":-0.08664602,\"z\":-4.70546675},\"cameraPositionAtCapture\":{\"x\":-1.97401285,\"y\":0.717048168,\"z\":-4.425952},\"cameraRotationAtCapture\":{\"x\":0.1922583,\"y\":0.7322544,\"z\":-0.125508949,\"w\":0.641161561},\"bodyPositionAtCapture\":{\"x\":-1.977018,\"y\":-0.72,\"z\":-4.43583727},\"bodyRotationAtCapture\":{\"x\":0.0,\"y\":0.74823606,\"z\":0.0,\"w\":0.6634327},\"viewDirectionWorldAtCapture\":{\"x\":0.890726447,\"y\":-0.430346221,\"z\":-0.146319449},\"capabilities\":[\"inspect-object\",\"look-at\",\"set-object-state:on|off\"],\"samplePurpose\":\"selected-object-observation\",\"rootPositionAtCapture\":{\"x\":-0.251999855,\"y\":-0.008000851,\"z\":-4.71600246},\"rootRotationAtCapture\":{\"x\":-0.707106948,\"y\":0.0,\"z\":0.0,\"w\":0.7071068},\"rootScaleAtCapture\":{\"x\":0.06,\"y\":0.0600000359,\"z\":0.0600000359},\"scope\":\"Previously confirmed opaque pixels and their exact capture-time geometry/view. Root snapshot is recorded only while captured renderer geometry still matches. Historical location is a search hint, never current visibility, a navigation destination, device state or action permission.\",\"historical\":true,\"positionMemoryValid\":true,\"positionInvalidReason\":null,\"requiresReobservation\":true,\"actionAuthorization\":false,\"currentVisibility\":\"not-established\"}],\"verifiedObservedDeviceHistory\":[{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"actionId\":\"scene-search-117777598f604bad9ba84cf313f841dd:confirmed\",\"originalRequest\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\",\"targetDescription\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\",\"semanticReason\":\"c1为电视柜上的桌面装饰灯，与用户要求重新打开的“刚才关掉的那盏灯”语义一致。图片显示该灯处于熄灭状态，符合“重新打开”的操作前提。\",\"matchCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1674b63ccd5e427f90ce99fcb0693dce\",\"confirmedCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155\",\"observedUtc\":\"2026-10-13T02:31:16.4852989Z\",\"historical\":true,\"semanticTargetConfirmedAtObservation\":true,\"observation\":{\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155\",\"observedUtc\":\"2026-10-13T02:31:16.3761110Z\",\"capabilities\":[\"inspect-object\",\"look-at\",\"set-object-state:on|off\"]},\"scope\":\"Actual direct-target semantic match followed by same-entity opaque confirmation in a new image and observed registered capability. Previously seen referent only: no executed operation, goal ID, current visibility, current power state or action authority. Assistant speech alone cannot create this record. An independent authorization may select this engine-listed source to constrain the same entity; every action still needs its own fresh semantic match.\"}],\"targetReview\":{\"actionId\":\"4e5c162c48d54ae1a5c6b1a50c0f72f2:11:14\",\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-234db7cd2c0a4670b32f694d5a0b38e0\",\"originalGoal\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\",\"requestedDescription\":null,\"parentSpatialGoalId\":\"device-goal-0194234a8c5a4c919eea06dac7a17be6\",\"targetPurpose\":\"direct-target\",\"verdict\":\"matched\",\"associationCurrent\":true,\"reason\":\"c1为电视柜上的桌面装饰灯，与用户要求重新打开的“刚才关掉的那盏灯”语义一致。图片显示该灯处于熄灭状态，符合“重新打开”的操作前提。\",\"semanticTargetConfirmed\":true,\"modelVerdict\":\"matched\",\"candidateRole\":\"target\",\"observationLandmarkConfirmed\":false,\"modelReason\":\"c1为电视柜上的桌面装饰灯，与用户要求重新打开的“刚才关掉的那盏灯”语义一致。图片显示该灯处于熄灭状态，符合“重新打开”的操作前提。\",\"boundGoalEntityConflict\":false,\"matchedEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"initialGeometryEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"needsCloserObservation\":false,\"proposedCandidateId\":\"c1\",\"proposedEntityId\":null,\"proposedImagePoint\":null,\"needsTargetReselection\":false,\"proposalScope\":\"A nonmatched proposal is only a cue for the next fresh-image decision, not a semantic match or permission for this action. At most one candidate-match request is made by this action; never retry stale pixels automatically.\",\"targetSelection\":null,\"scope\":\"Model interpretation of this exact candidate image, separate from engine identity. A reference selected for observe-closer is not confirmation of the original small target. When uncertain, consider a visible larger reference and targetPurpose=observe-closer in a NEW approach decision, then reobserve and retry the original goal; no automatic device operation. User correction can revoke a referent association without deleting objective seen-object history.\",\"observationGoal\":null},\"lastDeviceStateEvidenceValid\":true,\"deviceEvidenceScope\":\"Engine result-validity check only; false invalidates prior device state claims. No new device setting or visual observation is supplied here; inspect again to establish current facts.\",\"rejectionCauseScope\":\"Pixel/identity resolution failure does not establish which intended object was selected. Missing registered power capability concerns only the resolved entity and this software interface. Neither finding diagnoses electricity, cables, outlets, broken hardware or whether the intended lamp is a nonfunctional ornament. A different selected entity does not erase the prior device's successful operation.\",\"scope\":\"Only previously selected visible entities, observed timestamps and explicit device results. These are snapshots, not continuous perception or a room inventory. Scene-authored labels are annotations, not visual recognition. Hierarchy does not prove support/contact. No arbitrary Inspector edits or physical hand interaction. On/off controls the registered emitter and Light flag; baked lighting may remain.\",\"deviceDistanceLimitMeters\":2.5},\"sceneSearch\":{\"taskId\":\"scene-search-117777598f604bad9ba84cf313f841dd\",\"generation\":11,\"workEpoch\":6,\"userTurn\":6,\"active\":false,\"ownerCurrent\":true,\"mode\":\"find\",\"originalUserRequest\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\",\"latestUserText\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\",\"referenceContext\":{\"quotedDialogue\":[{\"role\":\"user\",\"quotedText\":\"[程序感知 tick；不是新的用户发言。请依据本次临时观测判断下一步。]\",\"textTruncated\":false},{\"role\":\"user\",\"quotedText\":\"[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\\n[说话人:陌生访客1; speaker_id:guest_ac513a643e; 类型:guest; 可信度:1.00; 注册进度:0%] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.12; 语言:zh; 音域:A#2～A5; 音高稳定度:0.54; 旋律:F#5-G5-C3-B2-D3-C#5-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 跟着我走。\",\"textTruncated\":false},{\"role\":\"assistant\",\"quotedText\":\"あなたについて移動しているわ。\",\"textTruncated\":false},{\"role\":\"user\",\"quotedText\":\"[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.87] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.20; 语言:zh; 音域:G#2～A5; 音高稳定度:0.51; 旋律:A5-C5-A#4-A#2-A#4-A5-D5-C3-D5-A#2-D4-A2-C4-F#5-B2-F#5-A2-C5-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\\n{\\\"id\\\":1,\\\"start_seconds\\\":0.0,\\\"end_seconds\\\":1.0299999713897706,\\\"region\\\":\\\"head\\\",\\\"type\\\":\\\"uncertain\\\",\\\"type_source\\\":\\\"acoustic_boundary_hypothesis\\\",\\\"text\\\":\\\"ok.\\\",\\\"language\\\":\\\"en\\\",\\\"status\\\":\\\"ok\\\",\\\"error\\\":\\\"\\\",\\\"confidence_available\\\":false,\\\"review_required\\\":true,\\\"alternatives\\\":[{\\\"source\\\":\\\"boundary_overlap\\\",\\\"text\\\":\\\"O.\\\",\\\"language\\\":\\\"zh\\\",\\\"audio_event\\\":\\\"Speech\\\",\\\"error\\\":\\\"\\\",\\\"start_seconds\\\":0.0,\\\"end_seconds\\\":1.4299999475479127}]}\\r\\n{\\\"id\\\":2,\\\"start_seconds\\\":1.0299999713897706,\\\"end_seconds\\\":6.590000152587891,\\\"region\\\":\\\"island\\\",\\\"type\\\":\\\"singing_candidate\\\",\\\"type_source\\\":\\\"acoustic_boundary_hypothesis\\\",\\\"text\\\":\\\"现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\\\",\\\"language\\\":\\\"zh\\\",\\\"status\\\":\\\"ok\\\",\\\"error\\\":\\\"\\\",\\\"confidence_available\\\":false,\\\"review_required\\\":false,\\\"alternatives\\\":[]}\\r\\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\\\"text\\\":\\\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\\\"}]\",\"textTruncated\":false}],\"scope\":\"Frozen recent dialogue quotations for resolving descriptive references only. They do not verify an entity, visibility, position, state, or completion. The complete current/original user request is the sole new operation authority. Recheck the same description in real observations; multiple matching objects remain unresolved. No subsequent dialogue may silently change this snapshot.\"},\"phase\":\"terminal\",\"status\":\"found\",\"reason\":\"search-current-target-confirmed\",\"steps\":1,\"stepLimit\":12,\"decisions\":2,\"decisionLimit\":36,\"noProgressSteps\":0,\"totalNoProgress\":0,\"recoveryAttempts\":0,\"recoveryLimit\":1,\"revisitedMemoryEntityIds\":[],\"unsupportedDeviceEntityIds\":[],\"durationSeconds\":7.30964661,\"durationLimitSeconds\":180.0,\"coveredHorizontalRegions\":5,\"horizontalRegionCount\":12,\"candidatePageCoverage\":[{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155\",\"offeredPages\":2,\"reviewedPagesInExactCapture\":0,\"allCurrentCandidatesReviewedAtThisPose\":false,\"truncated\":false}],\"allVisitedCandidatePagesReviewed\":false,\"foundEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"foundCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155\",\"boundEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"deviceGoalId\":\"device-goal-0194234a8c5a4c919eea06dac7a17be6\",\"goalExecutionRevision\":0,\"searchAttempted\":true,\"deviceWriteAuthorized\":false,\"receipts\":[{\"choice\":\"bound-historical-object\",\"referenceId\":\"known-object-point:4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f:scene-object-72ec6b928c2747e197be5343f2605fda\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"reason\":\"Revisit the already observed frozen point; memory is direction only, not visibility or permission.\",\"deviceWriteAuthorized\":false},{\"choice\":\"historical-object\",\"referenceId\":\"known-object-point:4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f:scene-object-72ec6b928c2747e197be5343f2605fda\",\"intent\":\"turn-in-place\",\"requestedYaw\":106.580025,\"requestedPitch\":0.0,\"sourceCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-aa635d7420ab4d48af08e73a83c373fc\",\"resultCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-dada59e28cf1403db8b9cf9a1cd6cef8\",\"actionId\":\"4e5c162c48d54ae1a5c6b1a50c0f72f2:11:12\",\"observed\":true,\"controllerOperationRevision\":17,\"rootDisplacementFromStationaryBaseline\":0.01004492,\"rootDisplacementFromActionStart\":0.01004492,\"stationaryRootRebased\":true,\"actualViewChangeDegrees\":106.205811,\"reason\":\"actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents\"},{\"choice\":\"bound-current-candidate\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sourceCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-dada59e28cf1403db8b9cf9a1cd6cef8\",\"reason\":\"Existing bound identity is in current opaque pixels; independent complete-target match follows.\",\"deviceWriteAuthorized\":false},{\"taskId\":\"scene-search-117777598f604bad9ba84cf313f841dd\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"selectionCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-dada59e28cf1403db8b9cf9a1cd6cef8\",\"freshCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1674b63ccd5e427f90ce99fcb0693dce\",\"cameraTranslationMeters\":0.002653523,\"cameraRotationDegrees\":1.38815939,\"selectionGeometryCurrent\":true,\"freshOpaqueConfirmed\":true,\"freshSameRoot\":true,\"freshGeometryCurrent\":true,\"acceptedForIndependentReview\":true,\"reason\":null},{\"choice\":\"current-candidate\",\"referenceId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-dada59e28cf1403db8b9cf9a1cd6cef8:visible:p0:c4\",\"selectionCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-dada59e28cf1403db8b9cf9a1cd6cef8\",\"matchCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1674b63ccd5e427f90ce99fcb0693dce\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"confirmed\":true,\"returnedCandidateId\":\"c1\",\"returnedEntityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"freshCandidateMapping\":[{\"candidateId\":\"c1\",\"entityId\":\"scene-object-72ec6b928c2747e197be5343f2605fda\",\"sceneLabel\":\"桌面装饰灯\"},{\"candidateId\":\"c2\",\"entityId\":\"renderer-object-7146af3918de413fbaa0c73fdc1d94a3-7ef6\",\"sceneLabel\":\"\"},{\"candidateId\":\"c3\",\"entityId\":\"renderer-object-7146af3918de413fbaa0c73fdc1d94a3-8104\",\"sceneLabel\":\"\"},{\"candidateId\":\"c4\",\"entityId\":\"renderer-object-7146af3918de413fbaa0c73fdc1d94a3-8084\",\"sceneLabel\":\"\"},{\"candidateId\":\"c5\",\"entityId\":\"renderer-object-7146af3918de413fbaa0c73fdc1d94a3-7dc8\",\"sceneLabel\":\"\"},{\"candidateId\":\"c6\",\"entityId\":\"renderer-object-7146af3918de413fbaa0c73fdc1d94a3-81f0\",\"sceneLabel\":\"\"}],\"verdict\":\"matched\",\"candidateRole\":\"target\",\"reason\":\"c1为电视柜上的桌面装饰灯，与用户要求重新打开的“刚才关掉的那盏灯”语义一致。图片显示该灯处于熄灭状态，符合“重新打开”的操作前提。\",\"freshSameEntityCaptureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155\"}],\"reviewedHistoricalCaptureIds\":[],\"scope\":\"Bounded observation task only. found requires an independent semantic match and same-entity opaque confirmation in a NEW current frame. completed surveys concern sampled horizontal view directions, not every room object or occluded space. Candidate identification is limited to pages actually reviewed; candidatePageCoverage separately records skipped or truncated pages in visited views. Never claim all offered objects were inspected unless allVisitedCandidatePagesReviewed is true; even then unsupported/occluded objects remain unassessed. incomplete/cancelled do not prove the target absent. Historical positions/descriptions are hints, not current visibility, navigation or device authority. No device state was changed by this search. The most recent motion receipt describes only one substep, not the overall result.\"},\"capability\":\"look-at or approach-object using captureId plus normalized visible image point; reposition-view uses a freshly confirmed entity to adjust the same-floor observation station farther/closer/left/right by 0.2 to 1.2 metres while facing that target. see-whole/read-detail/avoid-occlusion are observation purposes, not promised outcomes; assess the new image after movement. orient-view changes real head direction without needing an already visible target; turn-in-place turns the actual body on its current legal floor. Bounded historical snapshots may be acquired during an actual body turn; a new current view is still captured after completion. No stairs or touching. When objectContext.enabled, inspect-object resolves only the selected visible entity; set-object-state on/off requires its explicit registered nearby device capability and fresh confirmation. look-at can focus an unresolved image region without claiming a measured object. Autonomous view changes bounded to three per 30 seconds.\"} [时间与活动状态] {\"source\":\"Unity-runtime-time-and-action-facts\",\"session\":1,\"activeSeconds\":217.73,\"wallClockUtc\":\"2026-10-13T02:31:48.0517136Z\",\"suspended\":false,\"activity\":\"performed\",\"purpose\":\"桌面装饰灯\",\"activityForSeconds\":17.31,\"sinceLastDecisionSeconds\":0.01,\"stationaryForSeconds\":11.4,\"viewHeldForSeconds\":0.44,\"poseThresholds\":\"root translation 1 cm; head direction 2 degrees; breathing below thresholds is not a new activity\",\"sinceLastSampleSeconds\":0.02,\"lastDecisionIntent\":\"回到用户身边，确认一切安好。\",\"modelRequestedRecheckSeconds\":0.0,\"nextReviewInSeconds\":null,\"reviewDue\":false,\"queuedWakeReason\":\"\",\"latestQueuedWakeReason\":\"\",\"coalescedWakeEvents\":0,\"scenePlaybackReview\":{\"state\":\"none\",\"started\":2,\"handedOff\":2,\"discarded\":0,\"lastReason\":\"candidate-handed-to-normal-decision-with-new-image\",\"scope\":\"One budgeted scene-action review can overlap only the final generated local speech clip. It cannot speak, execute tools, mutate work/memory, or claim unheard speech was delivered. Any next action still requires normal current-view decision and execution checks.\"},\"reviewsInLastMinute\":1,\"reviewBudgetPerMinute\":6,\"lastSuccessfulArrival\":{\"actionId\":\"4e5c162c48d54ae1a5c6b1a50c0f72f2:11:13\",\"intent\":\"approach-object\",\"targetLabel\":\"桌面装饰灯\",\"phase\":\"arrival-observing\",\"reason\":\"actual floor station and facing reached; same-entity sight has not yet been confirmed\",\"session\":1,\"activeSeconds\":195.96998269999995,\"utc\":\"2026-10-13T02:31:26.2878725Z\",\"scope\":\"Actual floor-station arrival time; semantic target identity, current visibility and physical contact are separate facts.\",\"elapsedActiveSeconds\":21.76},\"lastFailedAttempt\":null,\"samples\":[{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-7faef29967894aaaab4dff0de2a1d6f2\",\"purpose\":\"scene-object-confirm\",\"activeSeconds\":199.9,\"capturedAtUtc\":\"2026-10-13T02:31:30.1479883Z\",\"viewDirectionWorld\":{\"x\":0.89689236879348755,\"y\":-0.4156893789768219,\"z\":-0.15095382928848267},\"gapSincePreviousSampleSeconds\":3.35,\"scope\":\"one actual sampled image; intervening visual events unknown\"},{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35\",\"purpose\":\"scene-object-state-result\",\"activeSeconds\":200.41,\"capturedAtUtc\":\"2026-10-13T02:31:30.6525217Z\",\"viewDirectionWorld\":{\"x\":0.89072644710540771,\"y\":-0.43034622073173523,\"z\":-0.14631944894790649},\"gapSincePreviousSampleSeconds\":0.51,\"scope\":\"one actual sampled image; intervening visual events unknown\"},{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-6b4dc8eff35b433f8d99ec17f918bc5a\",\"purpose\":\"autonomy\",\"activeSeconds\":211.36,\"capturedAtUtc\":\"2026-10-13T02:31:41.6243529Z\",\"viewDirectionWorld\":{\"x\":0.17782750725746155,\"y\":-0.0101728281006217,\"z\":-0.98401015996932983},\"gapSincePreviousSampleSeconds\":10.95,\"scope\":\"one actual sampled image; intervening visual events unknown\"},{\"captureId\":\"4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-5ff02a4ae1d547d68a79e912238a756c\",\"purpose\":\"scene-review-after-playback\",\"activeSeconds\":217.71,\"capturedAtUtc\":\"2026-10-13T02:31:47.9873622Z\",\"viewDirectionWorld\":{\"x\":0.19734224677085876,\"y\":-0.0662773996591568,\"z\":-0.9780927300453186},\"gapSincePreviousSampleSeconds\":6.35,\"scope\":\"one actual sampled image; intervening visual events unknown\"}],\"lastUnobservedRuntimeGapSeconds\":0.0,\"scope\":\"Only actual samples are seen. Between samples visual events are unknown; private model reasoning is intermittent. Pauses/session closure are not continuous experience. You may remain quiet, look elsewhere, approach or rest; no action is compulsory.\"} 你最近发言:   1分43秒前: \"照明は正常にオフになりました。そばへ行くリクエストは送ったわ。歩く動作を準備中で、まだ歩き始めていないの。\"   1分10秒前: \"あなたについて移動しているわ。\"   11秒前: \"灯は正常に点灯しています。今、あなたのところへ向かっているわ。\" 距用户上句: 52秒 (\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\") 你已连续说话: 1 次未等到用户回应 环境: 安静 [演唱素材主接口：sing refs=具体引用；不填 source/mode/order。clip 身份在确认、修订后不变；range默认current；起止秒数统一基于原始录音。]  [歌唱事项闭环] 先区分用户已发生的演唱、要求角色执行的动作与你的自主提议。用户唱过、分享歌词、说自己试唱都不构成回唱任务；可以只自然回应，不必登记目标。确有角色演唱目标时才登记；origin=user_request 表示用户要求你唱，origin=autonomous 表示你自己的提议，不得记成用户欠办事项。为什么/检查技能等追问不自动取消已核对的原目标。演唱前提交 <sing_goal origin=\"user_request\" refs=\"clip:真实身份,clip:真实身份\" range=\"current\" intent=\"perform\" completion=\"playback\" expected=\"实际要唱的内容及顺序\" feedback=\"none\"/>。refs顺序就是目标顺序；revisions省略时程序绑定这些refs当前的实际版本；显式提供须从清单复制，不能猜数字，候选为pending；range=current/clean/expanded/window，window须成对start_seconds/end_seconds。window仅是goal的范围类型：真正sing只填写成对start_seconds/end_seconds，不填写range=window或其它range。intent=perform/repair/repeat；repair_scope=content/music/delivery（默认content，音高/速度修正用music）；completion=playback/user_confirmation；补漏内容须user_confirmation，播完不能证明缺失内容已经补回。用户负面反馈用feedback=unsatisfied；明确认可用satisfied；这些反馈或repeat须evidence引用最新用户原话。只记录反馈可用intent=observe且不填refs。不得把自己的道歉/声称成功作为用户反馈。目标先由独立语义审查核对，approved后才能sing或修改其范围。同一合法after_action回复可以先sing_goal再显式sing；该sing会绑定本次目标等待审核，通过后仍全量检查范围/版本/权限才执行一次；拒绝、新用户输入或取消会撤销它。只登记sing_goal不自动演唱。已approved且用户未更新时，无需重写目标；改变refs/range/revision/完成条件需重新审查。新用户轮只暂停执行，不清空active_goal。追问失败原因或没听到时，原refs顺序和成功条件仍在；确认要继续可用<sing_goal transition=\"continue\"/>，程序绑定原目标和版本，不默认最近录音。修改原任务用transition=revise，换成独立新演唱任务用replace，明确放弃原任务用cancel；用户事项须change_quote逐字引用最新用户改变/取消要求，并由独立审查确认其语义。有未完成active_goal时省略transition等于continue，不能借新proposal缩减原目标。revise/replace仍须完整refs/range/expected/completion；revisions可省略由程序绑定当前素材，提供时必须匹配。登记时还是候选的素材绑定revisions=pending；之后来源被确认，程序会把它解析成实际版本，不需要你改目标，也不算改变内容。continue不能改素材/范围/完成条件；只解释或回答追问可以不发工具，保留待办但不会自动演唱。cancel只取消事项，不删除录音。reason只是解释，expanded必须写入range。目标与真正工具参数都要落实用户修正，不能只把二者填成同一个错误方案。  [Sing/Goal] {\"user_turn\":5,\"latest_user_request\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\",\"recent_actual_user_inputs\":[{\"turn\":1,\"text\":\"现在能看到什么吗？\"},{\"turn\":2,\"text\":\"先来我身边。\"},{\"turn\":3,\"text\":\"现在你去把刚才看到的那个小灯关掉，然后回到我身边。\"},{\"turn\":4,\"text\":\"跟着我走。\"},{\"turn\":5,\"text\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\"}],\"input_scope\":\"原始用户输入，不保证是执行请求；按完整时序区分用户表演与要求角色行动\",\"review_field_scope\":\"requestQuote/sourceUserTurn由独立审核依据实际用户输入产生，不是sing_goal提案的必填参数；尚未核定时省略。已存在的值是前次审核保存的来源，可供continue核对。审核员在本次singing_goal_expected.request_quote中引用真实请求。\",\"next_step\":{\"stage\":\"goal_required\",\"action\":\"\",\"scope\":\"未授权演唱。依据完整实际用户输入和素材自行决定目标；后续询问不代表原请求已取消。\"},\"goal\":null,\"active_goal\":null,\"active_goal_unfinished\":false,\"previous_goal\":null,\"last_playback\":null,\"rejected_plans\":[],\"feedback_scope\":\"completed仅表示Unity实际播完所列refs/revision/raw范围；不证明用户听到或指定歌词/缺失内容满足。active_goal是持久成功条件；goal是当前轮待审核/执行草案，null不代表原任务已取消或完成。没有当前轮动作授权不能自动续唱。\"}  [Sing/Inventory] retained=0 confirmed_list=0 pending_list=0；以下按录音先后并列，不是播放顺序。来源待确认不等于没有录到。\r 最近留存的录音证据=none；只是录音时间事实，不替你选择或确认来源。\r playback=ready仅表示音频可执行，不是歌唱判定；结合整段转写、声学证据和语境选择或询问。shared_prefix表示联合识别复用了前段音频，不是又唱了一次，也不证明是同一说话人。\r 录音先后（早→晚；不是角色播放顺序）见下列 recording 编号；不是练唱清单编号。\r  [Audio/Recent] 最近 3 个用户轮的完整原始录音仍在内存（未判定模态、不在清单里）：\r [Audio/Capture] cap:3 audio=6.51s p=0.27 stab=0.54 旋律岛=4.17s text=现在你去把刚才看到的那个小灯关掉，然后回到我身边。\r [Audio/Capture] cap:4 audio=2.58s p=0.12 stab=0.54 旋律岛=1.06s text=跟着我走。\r [Audio/Capture] cap:5 audio=6.59s p=0.20 stab=0.51 旋律岛=5.56s text=OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\r p 只是声学测量，实测它分不开演唱和噪声，不能当模态结论；结合这一轮用户原话判断。要用其中一段先 <clip_adopt ref=\"cap:…\" reason=\"…\"/> 收进清单，收进来仍是 source=pending，播放仍需 sing_goal 与独立审核。不收也不会删除，最近几轮之后自然淘汰。\r [Sing/PlaybackFact] 角色最近完整播放（位置从左至右1起；不是清单编号）last_completed=none; latest_outcome=none\r 清单中的每个引用只对应该录音；某次播放未列出的引用不在那次完整播放里。pending 可由你结合语境确认，也可先询问；程序不自动补选。以上是只读事实，不代表详细 Skill 已加载。\r ‘刚唱的录音’与‘你刚才唱的第几段’可分别参考上面两种顺序；歌名/相似歌词不等于同一次录音。指代仍由你判断，可询问。\r pending：来源不确定，可询问或自主选已有音频；演唱不要求确认来源，也不自动确认来源。evidence_only：已录到但未选可播放范围。多 refs 的 range 对各段独立采用其自身 clean/expanded；不同范围可先逐段修订。准备好不等于已唱。\r 素材当前总长=0.0s；明确要求完整演唱可自然分块流式播放。自主发起的软预算=60s，由你选择范围，不在句中强制截断。曲库不是本次录音：曲库快照中的完整id可写 sing refs=\"song:完整id\"；不指定 lyrics 时表示该曲库条目的全部已存片段，不代表完整原曲。相似候选不证明用户要唱曲库版本。\r  视觉: 场景视野开启（从角色眼位按请求采样；是否成功及对应时刻，以实际图片附件和采集标识为准。开眼不等于转头。） 会话阶段: 中 (4分钟) (本帧由你上次排定的 <next in/> 时钟触发) [自主意图预判已通过：这是没有新用户消息时由你自己浮现的意图。意图=回到用户身边，确认一切安好。。现在仍可选择说话、保持沉默或只做非语言动作；不要重新回答最后一条用户发言，也不要复述你最近说过的话。]",
+      "history": [
+        {
+          "role": "user",
+          "content": "现在能看到什么吗？"
+        },
+        {
+          "role": "assistant",
+          "content": "ふふっ、ユウも気になるのね。私が見える範囲では、正面に大きなモニターと机、その横に小さなランプと観葉植物が見えているわ。左側には棚があるかな。ユウ、何か気になることはあったの？"
+        },
+        {
+          "role": "user",
+          "content": "先来我身边。"
+        },
+        {
+          "role": "assistant",
+          "content": "あなたのそばへ向かっているわ。"
+        },
+        {
+          "role": "user",
+          "content": "现在你去把刚才看到的那个小灯关掉，然后回到我身边。"
+        },
+        {
+          "role": "assistant",
+          "content": "照明は正常にオフになりました。さっきあなたのそばに着いたわ。今もそばにいるかは、改めて確認が必要ね。"
+        },
+        {
+          "role": "user",
+          "content": "跟着我走。"
+        },
+        {
+          "role": "assistant",
+          "content": "あなたについて移動しているわ。"
+        },
+        {
+          "role": "user",
+          "content": "OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。"
+        },
+        {
+          "role": "assistant",
+          "content": "灯は正常に点灯しています。さっきあなたのそばに着いたわ。今もそばにいるかは、改めて確認が必要ね。"
+        }
+      ],
+      "originalRequest": "OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。",
+      "intention": "回到用户身边，确认一切安好。",
+      "scene": {
+        "enabled": true,
+        "active": false,
+        "lastAction": {
+          "source": "Unity-visible-target-execution",
+          "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:11:14",
+          "intent": "set-object-state",
+          "origin": "user",
+          "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-234db7cd2c0a4670b32f694d5a0b38e0",
+          "confirmedCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-7faef29967894aaaab4dff0de2a1d6f2",
+          "resultCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35",
+          "surfaceId": "",
+          "visualLabel": "桌面装饰灯",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "observedUtc": "2026-10-13T02:31:30.7423109Z",
+          "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+          "focusKind": "visible-object",
+          "requestedEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+          "requestedState": "on",
+          "targetResolutionSource": "candidate-confirmed",
+          "requestedImagePoint": {
+            "x": 0.5026041865348816,
+            "y": 0.8490740656852722
+          },
+          "objectConfirmed": true,
+          "stateChanged": true,
+          "groundArrived": false,
+          "objectReobserved": false,
+          "postArrivalObservationStatus": "",
+          "targetPurpose": "direct-target",
+          "targetDescription": "OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。",
+          "targetMatchVerdict": "matched",
+          "targetMatchReason": "c1为电视柜上的桌面装饰灯，与用户要求重新打开的“刚才关掉的那盏灯”语义一致。图片显示该灯处于熄灭状态，符合“重新打开”的操作前提。",
+          "matchCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-234db7cd2c0a4670b32f694d5a0b38e0",
+          "semanticTargetConfirmed": true,
+          "needsCloserObservation": false,
+          "navigationFocusImagePoint": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "observationStandOff": 0.0,
+          "predictedObservationPitch": 0.0,
+          "observationGoalId": "",
+          "viewDirection": "",
+          "viewPurpose": "",
+          "viewPurposeStatus": "",
+          "requestedViewDistance": 0.0,
+          "actualViewOffset": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "viewBefore": {
+            "captureId": "",
+            "entityId": "",
+            "capturedAtUtc": "",
+            "frame": 0,
+            "width": 0,
+            "height": 0,
+            "visibleOpaquePixels": 0,
+            "normalizedVisibleBounds": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0,
+              "w": 0.0
+            },
+            "visiblePixelFraction": 0.0,
+            "cameraDistanceToObservedPoint": 0.0,
+            "touchesImageBoundary": false,
+            "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+          },
+          "viewAfter": {
+            "captureId": "",
+            "entityId": "",
+            "capturedAtUtc": "",
+            "frame": 0,
+            "width": 0,
+            "height": 0,
+            "visibleOpaquePixels": 0,
+            "normalizedVisibleBounds": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0,
+              "w": 0.0
+            },
+            "visiblePixelFraction": 0.0,
+            "cameraDistanceToObservedPoint": 0.0,
+            "touchesImageBoundary": false,
+            "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+          },
+          "intentFocusWorldPoint": {
+            "x": -0.3152763843536377,
+            "y": -0.08784621953964233,
+            "z": -4.7040252685546875
+          },
+          "hasIntentFocus": true,
+          "navigationFocusAdjusted": false,
+          "trackingVisibility": "",
+          "trackingCaptureId": "",
+          "trackingFocusStatus": "",
+          "trackingFocusWorldPoint": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "trackingConfirmedImages": 0,
+          "trackingMovingConfirmedImages": 0,
+          "trackingLastSeenRealtime": -1.0,
+          "trackingFocusLastAppliedFrame": -1,
+          "trackingFocusAppliedDegrees": 0.0,
+          "measuredSurface": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "actualRoot": {
+            "x": -1.9770179986953735,
+            "y": -0.7200000286102295,
+            "z": -4.435837268829346
+          },
+          "requestedYaw": 0.0,
+          "requestedPitch": 0.0,
+          "actualViewChangeDegrees": 0.0,
+          "active": false,
+          "reached": false,
+          "canReobserveTarget": false,
+          "scope": "Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation."
+        },
+        "objectContext": {
+          "enabled": true,
+          "runtimeDeviceControl": {
+            "implementationConnected": true,
+            "featureEnabled": true,
+            "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+            "physicalHandRequired": false,
+            "requiresCurrentTargetConfirmation": true,
+            "requiresIndependentUserAuthorization": true,
+            "scope": "Software capability facts, not target identity, current visibility, permission or proof of execution. A missing goal approval or unresolved target does not remove this interface. Lack of physical switch-touching does not prevent this registered runtime lamp control."
+          },
+          "selected": {
+            "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+            "sceneLabel": "桌面装饰灯",
+            "identitySource": "scene-authored",
+            "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35",
+            "observedUtc": "2026-10-13T02:31:30.6525217Z",
+            "visibleInCapturedFrame": true,
+            "pointAtCapture": {
+              "x": -0.3146193,
+              "y": -0.08664602,
+              "z": -4.70546675
+            },
+            "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+            "capabilities": [
+              "inspect-object",
+              "look-at",
+              "set-object-state:on|off"
+            ],
+            "runtimeDeviceStateReadAfterObservation": {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "lightState": "enabled",
+              "emissionState": "on",
+              "conflict": "",
+              "registered": true,
+              "on": true,
+              "lightEnabled": true,
+              "emissionEnabled": true,
+              "bakedLightingResidualUncontrolled": true,
+              "emissionColor": {
+                "r": 0.7566349506378174,
+                "g": 1.11836576461792,
+                "b": 1.3041188716888428,
+                "a": 1.0
+              },
+              "lightIntensity": 1.0,
+              "lightBakeType": "Baked",
+              "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+            },
+            "stateReadAtUtc": "2026-10-13T02:31:30.7413227Z",
+            "localStructure": {
+              "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+              "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+              "emissivePartName": "スタンドライト.001",
+              "lightComponentNodeName": "Point Light"
+            }
+          },
+          "stateResult": {
+            "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:11:14",
+            "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+            "reason": "已开启登记灯具的可见发光体及 Light 组件。",
+            "on": true,
+            "changed": true,
+            "completed": true,
+            "replayed": false,
+            "partial": false,
+            "physicalSwitchPress": false,
+            "freshVisualObservation": true,
+            "actual": {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "lightState": "enabled",
+              "emissionState": "on",
+              "conflict": "",
+              "registered": true,
+              "on": true,
+              "lightEnabled": true,
+              "emissionEnabled": true,
+              "bakedLightingResidualUncontrolled": true,
+              "emissionColor": {
+                "r": 0.7566349506378174,
+                "g": 1.11836576461792,
+                "b": 1.3041188716888428,
+                "a": 1.0
+              },
+              "lightIntensity": 1.0,
+              "lightBakeType": "Baked",
+              "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+            },
+            "scope": "Whitelist device action: set the registered lamp's visible emission and Light component power. Original material assets and baked lighting are unchanged; visual confirmation must be obtained separately.",
+            "appliedAtUtc": "2026-10-13T02:31:30.2294945Z",
+            "visualConfirmation": "same-entity-in-new-image",
+            "resultCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35"
+          },
+          "recentObservations": [
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-ff8ad22bc3ab422b9144ba553640d8ac",
+              "observedUtc": "2026-10-13T02:29:54.1235424Z",
+              "pointAtCapture": {
+                "x": -0.295206845,
+                "y": -0.0790543556,
+                "z": -4.77446842
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-b561bd6fe4d2416bada78a1f8a945df7",
+              "observedUtc": "2026-10-13T02:29:57.9045293Z",
+              "pointAtCapture": {
+                "x": -0.2921998,
+                "y": -0.08280069,
+                "z": -4.77652073
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f",
+              "observedUtc": "2026-10-13T02:29:58.4136129Z",
+              "pointAtCapture": {
+                "x": -0.29366082,
+                "y": -0.0800344348,
+                "z": -4.77500629
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155",
+              "observedUtc": "2026-10-13T02:31:16.3761110Z",
+              "pointAtCapture": {
+                "x": -0.3169129,
+                "y": -0.09085244,
+                "z": -4.70257473
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-c813025f013d4262b54b1b9e79112cc5",
+              "observedUtc": "2026-10-13T02:31:19.7890776Z",
+              "pointAtCapture": {
+                "x": -0.3190241,
+                "y": -0.0947079062,
+                "z": -4.707317
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-23afa48e828941e8b5fcbc51f262eaf1",
+              "observedUtc": "2026-10-13T02:31:26.2888718Z",
+              "pointAtCapture": {
+                "x": -0.3161161,
+                "y": -0.08938593,
+                "z": -4.70271444
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-7faef29967894aaaab4dff0de2a1d6f2",
+              "observedUtc": "2026-10-13T02:31:30.1479883Z",
+              "pointAtCapture": {
+                "x": -0.315592527,
+                "y": -0.08842462,
+                "z": -4.702693
+              }
+            },
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35",
+              "observedUtc": "2026-10-13T02:31:30.6525217Z",
+              "pointAtCapture": {
+                "x": -0.3146193,
+                "y": -0.08664602,
+                "z": -4.70546675
+              }
+            }
+          ],
+          "knownObjectHistory": [
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1ef470e755db48c68b1d3be34854af35",
+              "observedUtc": "2026-10-13T02:31:30.6525217Z",
+              "capturedAtRealtime": 205.063416,
+              "pointAtCapture": {
+                "x": -0.3146193,
+                "y": -0.08664602,
+                "z": -4.70546675
+              },
+              "cameraPositionAtCapture": {
+                "x": -1.97401285,
+                "y": 0.717048168,
+                "z": -4.425952
+              },
+              "cameraRotationAtCapture": {
+                "x": 0.1922583,
+                "y": 0.7322544,
+                "z": -0.125508949,
+                "w": 0.641161561
+              },
+              "bodyPositionAtCapture": {
+                "x": -1.977018,
+                "y": -0.72,
+                "z": -4.43583727
+              },
+              "bodyRotationAtCapture": {
+                "x": 0.0,
+                "y": 0.74823606,
+                "z": 0.0,
+                "w": 0.6634327
+              },
+              "viewDirectionWorldAtCapture": {
+                "x": 0.890726447,
+                "y": -0.430346221,
+                "z": -0.146319449
+              },
+              "capabilities": [
+                "inspect-object",
+                "look-at",
+                "set-object-state:on|off"
+              ],
+              "samplePurpose": "selected-object-observation",
+              "rootPositionAtCapture": {
+                "x": -0.251999855,
+                "y": -0.008000851,
+                "z": -4.71600246
+              },
+              "rootRotationAtCapture": {
+                "x": -0.707106948,
+                "y": 0.0,
+                "z": 0.0,
+                "w": 0.7071068
+              },
+              "rootScaleAtCapture": {
+                "x": 0.06,
+                "y": 0.0600000359,
+                "z": 0.0600000359
+              },
+              "scope": "Previously confirmed opaque pixels and their exact capture-time geometry/view. Root snapshot is recorded only while captured renderer geometry still matches. Historical location is a search hint, never current visibility, a navigation destination, device state or action permission.",
+              "historical": true,
+              "positionMemoryValid": true,
+              "positionInvalidReason": null,
+              "requiresReobservation": true,
+              "actionAuthorization": false,
+              "currentVisibility": "not-established"
+            }
+          ],
+          "verifiedObservedDeviceHistory": [
+            {
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "actionId": "scene-search-117777598f604bad9ba84cf313f841dd:confirmed",
+              "originalRequest": "OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。",
+              "targetDescription": "OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。",
+              "semanticReason": "c1为电视柜上的桌面装饰灯，与用户要求重新打开的“刚才关掉的那盏灯”语义一致。图片显示该灯处于熄灭状态，符合“重新打开”的操作前提。",
+              "matchCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1674b63ccd5e427f90ce99fcb0693dce",
+              "confirmedCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155",
+              "observedUtc": "2026-10-13T02:31:16.4852989Z",
+              "historical": true,
+              "semanticTargetConfirmedAtObservation": true,
+              "observation": {
+                "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+                "sceneLabel": "桌面装饰灯",
+                "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155",
+                "observedUtc": "2026-10-13T02:31:16.3761110Z",
+                "capabilities": [
+                  "inspect-object",
+                  "look-at",
+                  "set-object-state:on|off"
+                ]
+              },
+              "scope": "Actual direct-target semantic match followed by same-entity opaque confirmation in a new image and observed registered capability. Previously seen referent only: no executed operation, goal ID, current visibility, current power state or action authority. Assistant speech alone cannot create this record. An independent authorization may select this engine-listed source to constrain the same entity; every action still needs its own fresh semantic match."
+            }
+          ],
+          "targetReview": {
+            "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:11:14",
+            "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-234db7cd2c0a4670b32f694d5a0b38e0",
+            "originalGoal": "OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。",
+            "requestedDescription": null,
+            "parentSpatialGoalId": "device-goal-0194234a8c5a4c919eea06dac7a17be6",
+            "targetPurpose": "direct-target",
+            "verdict": "matched",
+            "associationCurrent": true,
+            "reason": "c1为电视柜上的桌面装饰灯，与用户要求重新打开的“刚才关掉的那盏灯”语义一致。图片显示该灯处于熄灭状态，符合“重新打开”的操作前提。",
+            "semanticTargetConfirmed": true,
+            "modelVerdict": "matched",
+            "candidateRole": "target",
+            "observationLandmarkConfirmed": false,
+            "modelReason": "c1为电视柜上的桌面装饰灯，与用户要求重新打开的“刚才关掉的那盏灯”语义一致。图片显示该灯处于熄灭状态，符合“重新打开”的操作前提。",
+            "boundGoalEntityConflict": false,
+            "matchedEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+            "initialGeometryEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+            "needsCloserObservation": false,
+            "proposedCandidateId": "c1",
+            "proposedEntityId": null,
+            "proposedImagePoint": null,
+            "needsTargetReselection": false,
+            "proposalScope": "A nonmatched proposal is only a cue for the next fresh-image decision, not a semantic match or permission for this action. At most one candidate-match request is made by this action; never retry stale pixels automatically.",
+            "targetSelection": null,
+            "scope": "Model interpretation of this exact candidate image, separate from engine identity. A reference selected for observe-closer is not confirmation of the original small target. When uncertain, consider a visible larger reference and targetPurpose=observe-closer in a NEW approach decision, then reobserve and retry the original goal; no automatic device operation. User correction can revoke a referent association without deleting objective seen-object history.",
+            "observationGoal": null
+          },
+          "lastDeviceStateEvidenceValid": true,
+          "deviceEvidenceScope": "Engine result-validity check only; false invalidates prior device state claims. No new device setting or visual observation is supplied here; inspect again to establish current facts.",
+          "rejectionCauseScope": "Pixel/identity resolution failure does not establish which intended object was selected. Missing registered power capability concerns only the resolved entity and this software interface. Neither finding diagnoses electricity, cables, outlets, broken hardware or whether the intended lamp is a nonfunctional ornament. A different selected entity does not erase the prior device's successful operation.",
+          "scope": "Only previously selected visible entities, observed timestamps and explicit device results. These are snapshots, not continuous perception or a room inventory. Scene-authored labels are annotations, not visual recognition. Hierarchy does not prove support/contact. No arbitrary Inspector edits or physical hand interaction. On/off controls the registered emitter and Light flag; baked lighting may remain.",
+          "deviceDistanceLimitMeters": 2.5
+        },
+        "sceneSearch": {
+          "taskId": "scene-search-117777598f604bad9ba84cf313f841dd",
+          "generation": 11,
+          "workEpoch": 6,
+          "userTurn": 6,
+          "active": false,
+          "ownerCurrent": true,
+          "mode": "find",
+          "originalUserRequest": "OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。",
+          "latestUserText": "OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。",
+          "referenceContext": {
+            "quotedDialogue": [
+              {
+                "role": "user",
+                "quotedText": "[程序感知 tick；不是新的用户发言。请依据本次临时观测判断下一步。]",
+                "textTruncated": false
+              },
+              {
+                "role": "user",
+                "quotedText": "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n[说话人:陌生访客1; speaker_id:guest_ac513a643e; 类型:guest; 可信度:1.00; 注册进度:0%] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.12; 语言:zh; 音域:A#2～A5; 音高稳定度:0.54; 旋律:F#5-G5-C3-B2-D3-C#5-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 跟着我走。",
+                "textTruncated": false
+              },
+              {
+                "role": "assistant",
+                "quotedText": "あなたについて移動しているわ。",
+                "textTruncated": false
+              },
+              {
+                "role": "user",
+                "quotedText": "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.87] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.20; 语言:zh; 音域:G#2～A5; 音高稳定度:0.51; 旋律:A5-C5-A#4-A#2-A#4-A5-D5-C3-D5-A#2-D4-A2-C4-F#5-B2-F#5-A2-C5-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":1.0299999713897706,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"ok.\",\"language\":\"en\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"O.\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.0,\"end_seconds\":1.4299999475479127}]}\r\n{\"id\":2,\"start_seconds\":1.0299999713897706,\"end_seconds\":6.590000152587891,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\r\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"OK现在你去把刚才你关掉那盏灯重新打开，然后回到我身边。\"}]",
+                "textTruncated": false
+              }
+            ],
+            "scope": "Frozen recent dialogue quotations for resolving descriptive references only. They do not verify an entity, visibility, position, state, or completion. The complete current/original user request is the sole new operation authority. Recheck the same description in real observations; multiple matching objects remain unresolved. No subsequent dialogue may silently change this snapshot."
+          },
+          "phase": "terminal",
+          "status": "found",
+          "reason": "search-current-target-confirmed",
+          "steps": 1,
+          "stepLimit": 12,
+          "decisions": 2,
+          "decisionLimit": 36,
+          "noProgressSteps": 0,
+          "totalNoProgress": 0,
+          "recoveryAttempts": 0,
+          "recoveryLimit": 1,
+          "revisitedMemoryEntityIds": [],
+          "unsupportedDeviceEntityIds": [],
+          "durationSeconds": 7.30964661,
+          "durationLimitSeconds": 180.0,
+          "coveredHorizontalRegions": 5,
+          "horizontalRegionCount": 12,
+          "candidatePageCoverage": [
+            {
+              "captureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155",
+              "offeredPages": 2,
+              "reviewedPagesInExactCapture": 0,
+              "allCurrentCandidatesReviewedAtThisPose": false,
+              "truncated": false
+            }
+          ],
+          "allVisitedCandidatePagesReviewed": false,
+          "foundEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+          "foundCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155",
+          "boundEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+          "deviceGoalId": "device-goal-0194234a8c5a4c919eea06dac7a17be6",
+          "goalExecutionRevision": 0,
+          "searchAttempted": true,
+          "deviceWriteAuthorized": false,
+          "receipts": [
+            {
+              "choice": "bound-historical-object",
+              "referenceId": "known-object-point:4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f:scene-object-72ec6b928c2747e197be5343f2605fda",
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "reason": "Revisit the already observed frozen point; memory is direction only, not visibility or permission.",
+              "deviceWriteAuthorized": false
+            },
+            {
+              "choice": "historical-object",
+              "referenceId": "known-object-point:4ae06d7549db4e3391a3edbfc51c2a32-7e34f32bfc5a4bf89bc663203aea93e3-5f832fb8077f4e31a5c2467b0ebb600f:scene-object-72ec6b928c2747e197be5343f2605fda",
+              "intent": "turn-in-place",
+              "requestedYaw": 106.580025,
+              "requestedPitch": 0.0,
+              "sourceCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-aa635d7420ab4d48af08e73a83c373fc",
+              "resultCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-dada59e28cf1403db8b9cf9a1cd6cef8",
+              "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:11:12",
+              "observed": true,
+              "controllerOperationRevision": 17,
+              "rootDisplacementFromStationaryBaseline": 0.01004492,
+              "rootDisplacementFromActionStart": 0.01004492,
+              "stationaryRootRebased": true,
+              "actualViewChangeDegrees": 106.205811,
+              "reason": "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents"
+            },
+            {
+              "choice": "bound-current-candidate",
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "sourceCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-dada59e28cf1403db8b9cf9a1cd6cef8",
+              "reason": "Existing bound identity is in current opaque pixels; independent complete-target match follows.",
+              "deviceWriteAuthorized": false
+            },
+            {
+              "taskId": "scene-search-117777598f604bad9ba84cf313f841dd",
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "selectionCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-dada59e28cf1403db8b9cf9a1cd6cef8",
+              "freshCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1674b63ccd5e427f90ce99fcb0693dce",
+              "cameraTranslationMeters": 0.002653523,
+              "cameraRotationDegrees": 1.38815939,
+              "selectionGeometryCurrent": true,
+              "freshOpaqueConfirmed": true,
+              "freshSameRoot": true,
+              "freshGeometryCurrent": true,
+              "acceptedForIndependentReview": true,
+              "reason": null
+            },
+            {
+              "choice": "current-candidate",
+              "referenceId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-dada59e28cf1403db8b9cf9a1cd6cef8:visible:p0:c4",
+              "selectionCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-dada59e28cf1403db8b9cf9a1cd6cef8",
+              "matchCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-1674b63ccd5e427f90ce99fcb0693dce",
+              "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "confirmed": true,
+              "returnedCandidateId": "c1",
+              "returnedEntityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+              "freshCandidateMapping": [
+                {
+                  "candidateId": "c1",
+                  "entityId": "scene-object-72ec6b928c2747e197be5343f2605fda",
+                  "sceneLabel": "桌面装饰灯"
+                },
+                {
+                  "candidateId": "c2",
+                  "entityId": "renderer-object-7146af3918de413fbaa0c73fdc1d94a3-7ef6",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c3",
+                  "entityId": "renderer-object-7146af3918de413fbaa0c73fdc1d94a3-8104",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c4",
+                  "entityId": "renderer-object-7146af3918de413fbaa0c73fdc1d94a3-8084",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c5",
+                  "entityId": "renderer-object-7146af3918de413fbaa0c73fdc1d94a3-7dc8",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c6",
+                  "entityId": "renderer-object-7146af3918de413fbaa0c73fdc1d94a3-81f0",
+                  "sceneLabel": ""
+                }
+              ],
+              "verdict": "matched",
+              "candidateRole": "target",
+              "reason": "c1为电视柜上的桌面装饰灯，与用户要求重新打开的“刚才关掉的那盏灯”语义一致。图片显示该灯处于熄灭状态，符合“重新打开”的操作前提。",
+              "freshSameEntityCaptureId": "4ae06d7549db4e3391a3edbfc51c2a32-848b9cd16d5a4c02828ba66a7e90151b-573bf9e25e664ee7bb9e42007597f155"
+            }
+          ],
+          "reviewedHistoricalCaptureIds": [],
+          "scope": "Bounded observation task only. found requires an independent semantic match and same-entity opaque confirmation in a NEW current frame. completed surveys concern sampled horizontal view directions, not every room object or occluded space. Candidate identification is limited to pages actually reviewed; candidatePageCoverage separately records skipped or truncated pages in visited views. Never claim all offered objects were inspected unless allVisitedCandidatePagesReviewed is true; even then unsupported/occluded objects remain unassessed. incomplete/cancelled do not prove the target absent. Historical positions/descriptions are hints, not current visibility, navigation or device authority. No device state was changed by this search. The most recent motion receipt describes only one substep, not the overall result."
+        },
+        "capability": "look-at or approach-object using captureId plus normalized visible image point; reposition-view uses a freshly confirmed entity to adjust the same-floor observation station farther/closer/left/right by 0.2 to 1.2 metres while facing that target. see-whole/read-detail/avoid-occlusion are observation purposes, not promised outcomes; assess the new image after movement. orient-view changes real head direction without needing an already visible target; turn-in-place turns the actual body on its current legal floor. Bounded historical snapshots may be acquired during an actual body turn; a new current view is still captured after completion. No stairs or touching. When objectContext.enabled, inspect-object resolves only the selected visible entity; set-object-state on/off requires its explicit registered nearby device capability and fresh confirmation. look-at can focus an unresolved image region without claiming a measured object. Autonomous view changes bounded to three per 30 seconds."
+      },
+      "lastReplyReceipt": {
+        "generation": 11,
+        "userTurn": 6,
+        "recordedAtUtc": "2026-10-13T02:31:36.6092245Z",
+        "replyFailure": null,
+        "planningFailure": null,
+        "reviewStatus": "received",
+        "concurrentBodyFailure": null,
+        "intent": "set-object-state",
+        "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+        "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:11:14",
+        "execution": {
+          "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:11:15",
+          "targetKind": "user",
+          "captureId": "",
+          "sceneTargetId": "",
+          "phase": "moving",
+          "stage": "playback",
+          "reason": "正在房间内移动；逐帧检查障碍物和地面边界",
+          "executionReason": "None",
+          "operationRevision": 21,
+          "observedUtc": "2026-10-13T02:31:33.3144416Z",
+          "approachRetargetStatus": "none",
+          "approachRetargetCount": 0,
+          "approachRetargetTravel": 0.0,
+          "matchesRequestedAction": false
+        },
+        "sequenceContinuation": {
+          "generation": 11,
+          "workEpoch": 6,
+          "userTurn": 6,
+          "stepId": "s2",
+          "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:11:15",
+          "intent": "approach"
+        },
+        "sceneAction": {
+          "actionId": "4e5c162c48d54ae1a5c6b1a50c0f72f2:11:14",
+          "intent": "set-object-state",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "observedUtc": "2026-10-13T02:31:30.7423109Z",
+          "reached": false,
+          "stateChanged": true
+        },
+        "publicText": "灯は正常に点灯しています。今、あなたのところへ向かっているわ。",
+        "scope": "Accepted final public reply and contemporaneous independent execution receipts. Historical snapshot, not current state or retry permission; accepted text does not prove audio playback."
+      }
+    }
+  ]
+}

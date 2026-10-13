@@ -2006,6 +2006,7 @@ public partial class ChatQW : LLM
     private string BuildWorkReviewRequestJsonWithImage(string prompt, string imageDataUrl)
     {
         var selected = new List<SendData>();
+        string reviewSchema = WorkNextIntentProtocol.ExtendReviewSchema(k_WorkReviewSchema);
         bool taskPacket = (prompt ?? "").StartsWith("[内部事项进度判定；不生成角色台词，不调用工具]\n", StringComparison.Ordinal);
         // The production packet already owns the task, request/corrections, actual
         // playback and current execution. Do not append the entire formal window
@@ -2038,7 +2039,7 @@ public partial class ChatQW : LLM
             "独立核对后确属自主草案时，核对现有自主权限、最新用户限制和素材；结构化goal已经是角色选定的动作，你只审核该动作，不重新替角色决定唱不唱。允许的自主目标不要求用户逐次指令；通过则origin=autonomous并返回这份草案的实际有序refs/range。" +
             "用户已唱不等于要求角色唱；既无用户演唱请求也无合规自主目标才用origin=none，不确定用uncertain。none/uncertain不能批准perform。" +
             "只有无草案、草案intent=observe或判定取消演唱时expected使用refs空串、range=none；approved的perform/repair/repeat必须有实际refs/range。非window的start_seconds/end_seconds为null。" +
-            "没有待审查歌唱目标时 singing_goal_status=none，singing_goal_evidence留空。\n" + k_WorkReviewSchema));
+            "没有待审查歌唱目标时 singing_goal_status=none，singing_goal_evidence留空。\n" + WorkNextIntentProtocol.Contract + reviewSchema));
         if (taskPacket)
         {
             prompt = ProjectWorkReviewAttention(prompt, out var projection);
@@ -2051,7 +2052,7 @@ public partial class ChatQW : LLM
         sb.Append(",\"response_format\":{\"type\":\"json_object\"");
         // Match the server dialect already used by the boundary transport. Cloud
         // uses JSON-object mode plus the same prompt schema and client validation.
-        if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(k_WorkReviewSchema);
+        if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(reviewSchema);
         sb.Append("},\"messages\":[");
         for (int i = 0; i < selected.Count; i++)
         {
@@ -2096,6 +2097,10 @@ public partial class ChatQW : LLM
 
     private static bool IsValidWorkReviewObject(Newtonsoft.Json.Linq.JObject value)
     {
+        if (!WorkNextIntentProtocol.ValidExtension(value)) return false;
+        value = (Newtonsoft.Json.Linq.JObject)value.DeepClone();
+        // Legacy providers remain readable; missing source never grants a new autonomous handoff.
+        foreach (string name in new[] { "next_intent_source", "next_step_id", "planning_focus" }) value.Remove(name);
         var schema = Newtonsoft.Json.Linq.JObject.Parse(k_WorkReviewSchema);
         var properties = (Newtonsoft.Json.Linq.JObject)schema["properties"];
         if (value.Count != properties.Count) return false;

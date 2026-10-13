@@ -106,6 +106,7 @@ public static partial class RoomStepContextRegression
             File.WriteAllText(Path.Combine(directory, "report.json"), report.ToString(Formatting.Indented));
             File.WriteAllText(Path.Combine(directory, "continuation-model-cases.json"), modelCases.ToString(Formatting.Indented));
             checks += CheckInitialTaskAndTerminalRepair(model, directory);
+            checks += CheckAutonomousAttention(model, directory);
         }
         finally { UnityEngine.Object.DestroyImmediate(host); foreach (var asset in assets) UnityEngine.Object.DestroyImmediate(asset); }
         return checks;

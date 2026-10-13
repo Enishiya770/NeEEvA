@@ -1,7 +1,7 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$Output,
-    [ValidateSet('transport','feedback','room','cognition','speech-view','xr-lifecycle','device-sequence')][string]$Focus='transport'
+    [ValidateSet('transport','feedback','room','cognition','speech-view','xr-lifecycle','device-sequence','work-loop','approach','approach-plan')][string]$Focus='transport'
 )
 $ErrorActionPreference='Stop'
 $taskSourceRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -37,9 +37,12 @@ $taskManifest=@(foreach($taskCode in $taskCodePaths) {
 })
 @{source=$taskSourceRoot;project=$taskValidationRoot;createdUtc=[DateTime]::UtcNow.ToString('o');focus=$Focus;files=$taskManifest} |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskOutput 'source-manifest.json') -Encoding utf8
-$taskMethod=if($Focus -eq 'transport'){'FormalStreamRecoveryRegression.RunBatch'}elseif($Focus -eq 'feedback'){'FeedbackStageHttpRegression.RunBatch'}elseif($Focus -eq 'xr-lifecycle'){'ReloadSafeTrackedDeviceGraphicRaycasterRegression.RunBatch'}else{'NevaSceneVisionIntegrationRegression.RunBatch'}
+$taskMethod=if($Focus -eq 'transport'){'FormalStreamRecoveryRegression.RunBatch'}elseif($Focus -eq 'feedback'){'FeedbackStageHttpRegression.RunBatch'}elseif($Focus -eq 'xr-lifecycle'){'ReloadSafeTrackedDeviceGraphicRaycasterRegression.RunBatch'}elseif($Focus -eq 'work-loop'){'AgentWorkLoopRegression.RunBatch'}elseif($Focus -eq 'approach'){'ArdyRoomDialogueIntegrationRegression.RunBatch'}elseif($Focus -eq 'approach-plan'){'ArdyRoomApproachRegression.RunBatch'}else{'NevaSceneVisionIntegrationRegression.RunBatch'}
 $taskArguments=@('-batchmode','-projectPath',$taskValidationRoot,'-executeMethod',$taskMethod,'-logFile',(Join-Path $taskOutput 'unity.log'))
 if($Focus -eq 'transport') { $taskArguments+=@('-nographics','-formalStreamRecoveryOutput',$taskOutput) }
+elseif($Focus -eq 'work-loop') { $taskArguments+=@('-nographics','-workNextIntentOnly') }
+elseif($Focus -eq 'approach-plan') { $taskArguments+=@('-nographics','-ardyRoomApproachOutput',$taskOutput) }
+elseif($Focus -eq 'approach') { $taskArguments+=@('-ardyRoomDialogueOutput',$taskOutput,'-ardyApproachRetargetOnly') }
 elseif($Focus -eq 'feedback') { $taskArguments+=@('-nographics','-feedbackStageOutput',$taskOutput) }
 elseif($Focus -eq 'xr-lifecycle') { $taskArguments+=@('-nevaXRReloadOutput',$taskOutput) }
 elseif($Focus -eq 'cognition') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-roomCognitionRegression','1') }
@@ -59,5 +62,7 @@ $taskChanges=@(foreach($taskItem in $taskManifest) {
     ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $taskOutput 'hash-verification.json') -Encoding utf8
 if($taskTimedOut) { throw 'Isolated regression timed out.' }
 if($taskChanges.Count) { throw 'Source changed during verification; rerun a fresh snapshot.' }
+if($Focus -eq 'work-loop') { Copy-Item -LiteralPath (Join-Path $taskValidationRoot 'Tools/MotionAdapter/reports/agent-work-loop-regression.json') -Destination $taskOutput }
+if($Focus -eq 'work-loop') { Copy-Item -LiteralPath (Join-Path $taskValidationRoot 'Tools/MotionAdapter/reports/work-next-intent-model-cases.json') -Destination $taskOutput }
 if($taskProcess.ExitCode -ne 0) { throw "Unity exited with $($taskProcess.ExitCode). Inspect this run's log." }
 Write-Output "Completed $Focus validation: $taskOutput"

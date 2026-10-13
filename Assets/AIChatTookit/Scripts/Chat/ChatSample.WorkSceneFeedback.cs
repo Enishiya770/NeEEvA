@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using System.Linq;
 
 public partial class ChatSample
 {
@@ -10,7 +11,7 @@ public partial class ChatSample
     private sealed class WorkRoomStepRequest
     {
         public int epoch, userTurn, continuationOrdinal;
-        public string originalRequest, nextStepIntention, priorIntent, priorActionId;
+        public string originalRequest, nextStepIntention, priorIntent, priorActionId, reviewedNextStepId;
         public JObject previousUnfinishedWork;
         public bool replyCommitted, reclassifyReadOnlyRequest;
     }
@@ -31,14 +32,23 @@ public partial class ChatSample
         if (m_WorkRoomTaskEpoch != m_WorkEpoch || m_WorkRoomTaskUserTurn != m_ActionConstraints.CurrentUserTurn ||
             string.IsNullOrEmpty(m_WorkRoomTaskActionId)) return null;
         var room = ReadCompactRoomTaskFacts(GetComponent<ArdyRoomDialogueBridge>());
-        return new JObject { ["intent"] = m_WorkRoomTaskIntent, ["actionId"] = m_WorkRoomTaskActionId,
+        var sequence = ReadRoomTaskSequence();
+        var body = (sequence?["steps"] as JArray)?.OfType<JObject>().FirstOrDefault(s =>
+            (string)s["actionId"] == (string)room.SelectToken("execution.actionId") &&
+            new[] { "approach", "follow", "stop-moving" }.Contains((string)s["kind"]));
+        string intent = body == null ? m_WorkRoomTaskIntent : (string)body["kind"];
+        string action = body == null ? m_WorkRoomTaskActionId : (string)body["actionId"];
+        return new JObject { ["intent"] = intent, ["actionId"] = action,
             ["currentRoomFacts"] = room,
-            ["movementReportRequirement"] = RoomMovementResultPolicy.Requirement(room, m_WorkRoomTaskIntent, m_WorkRoomTaskActionId),
-            ["scope"] = "Read current matching execution before proposing continuation. Generated replies and an old attempt-submitted dispatch cannot override actual arrival. Satisfied movement is not a reason to move again; independently unfinished requirements remain separate." };
+            ["movementReportRequirement"] = RoomMovementResultPolicy.Requirement(room, intent, action),
+            ["scope"] = "Read current matching execution before proposing continuation. Generated replies and an old attempt-submitted dispatch cannot override actual arrival. Later world changes do not undo a completed event. A new autonomous intention needs its own current decision and action identity; independently unfinished answers or requirements remain separate." };
     }
 
     private WorkRoomStepRequest CreateWorkRoomStepRequest()
     {
+        if (m_WorkReplyOnly) return null;
+        var sequence = ReadRoomTaskSequence();
+        if (sequence != null && !WorkNextIntentProtocol.HasReadyStep(sequence, m_WorkNextStepId)) return null;
         bool recovering = IsCurrentReadOnlyWorkRequest() && m_WorkContinuations == 0;
         if (!HasRoomTaskPlanner || !m_WorkReviewOpen || m_WorkStatus != "continue" || m_WorkNoProgress ||
             m_WorkContinuations >= MaxWorkContinuations || (!recovering && (m_WorkRoomTaskEpoch != m_WorkEpoch ||
@@ -53,6 +63,7 @@ public partial class ChatSample
             epoch = m_WorkEpoch, userTurn = m_ActionConstraints.CurrentUserTurn,
             continuationOrdinal = m_WorkContinuations + 1,
             originalRequest = m_ActionConstraints.CurrentUserText, nextStepIntention = m_WorkIntent,
+            reviewedNextStepId = m_WorkNextStepId,
             previousUnfinishedWork = m_PreviousUnfinishedWork?.DeepClone() as JObject,
             priorIntent = recovering ? "none" : m_WorkRoomTaskIntent,
             priorActionId = recovering ? "" : m_WorkRoomTaskActionId, reclassifyReadOnlyRequest = recovering
@@ -85,6 +96,7 @@ public partial class ChatSample
             ["workEpoch"] = step.epoch, ["userTurn"] = step.userTurn,
             ["continuationOrdinal"] = step.continuationOrdinal,
             ["originalRequest"] = step.originalRequest, ["nextStepIntention"] = step.nextStepIntention,
+            ["reviewedNextStepId"] = step.reviewedNextStepId,
             ["previousUnfinishedWork"] = step.previousUnfinishedWork?.DeepClone(),
             ["priorIntent"] = step.priorIntent, ["priorActionId"] = step.priorActionId,
             ["feedbackOnly"] = false,

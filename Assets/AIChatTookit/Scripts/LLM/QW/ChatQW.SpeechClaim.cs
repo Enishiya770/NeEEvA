@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -175,6 +176,19 @@ public partial class ChatQW
             if (ok && RoomTaskProtocol.TryReviewScope(output, out _))
             {
                 var result = ReadRoomTaskRecoveryJson(output);
+                if (RoomSpeechPartsProtocol.Required(input))
+                {
+                    if (!RoomSpeechPartsProtocol.Resolve(input, result, out string selectionFailure))
+                    { callback?.Invoke(false, "", selectionFailure); return; }
+                    if (!RoomSpeechPartsProtocol.TryRead(result, (string)input["publicSpeech"], out string stable, out string partFailure))
+                    { callback?.Invoke(false, "", partFailure); return; }
+                    // The independent extractor's main device/search result may
+                    // not disappear into a movement span, even with a valid partition.
+                    string evidence = (string)claim["evidence"];
+                    string retainedLiteral = string.Concat(((JArray)result["speechParts"]).Where(p => (string)p["owner"] == "independent").Select(p => (string)p["text"]));
+                    if (!string.IsNullOrEmpty(evidence) && retainedLiteral.IndexOf(evidence, StringComparison.Ordinal) < 0)
+                    { callback?.Invoke(false, "", "speech-parts-main-result-removed"); return; }
+                }
                 string quote = (string)result["conflictQuote"];
                 if (result["conflict"] == null || result["targetComparison"] == null || result["targetConsistency"] == null ||
                     result["otherClaimsComparison"] == null || result["otherClaimsSupport"] == null || result["taskRelation"] == null || result["taskRelationComparison"] == null ||

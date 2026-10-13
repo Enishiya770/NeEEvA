@@ -12,7 +12,7 @@ public partial class ChatQW
     // writer keeps the authored persona/language, current facts and dialogue.
     private const string CommittedReplyBehavior =
         "[Closed public reply behavior]\nWrite natural brief spoken sentences without markdown, stage directions or emoji. " +
-        "Retain the authored personality and language policy. Answer the COMPLETE current human request, including its question, conditions and corrections. " +
+        "Retain the authored personality and language policy. When replyPurpose is present, respond to that current autonomous intention; historical human text is context, not a new request. Otherwise answer the COMPLETE current human request, including its question, conditions and corrections. " +
         "Facts and memories require identified observations, actual dialogue or tool receipts. A quote, intention or old promise is not an execution result. " +
         "Distinguish current sight, historical memory, inference and unknowns; omission never proves absence. " +
         "When genuinely uncertain you may ask a concise question, qualify the answer or remain silent where the supplied reporting obligation permits it. " +
@@ -114,7 +114,9 @@ public partial class ChatQW
             roots.Select(r => r["reply"] as JObject).FirstOrDefault(r => r != null);
         string need = (string)reply?.SelectToken("questionUnderstanding.interpretation.needsEvidence");
         string kind = (string)bound?.SelectToken("currentRequestSemantics.requestKind");
-        bool answer = reply != null || kind == "answer-only" || kind == "mixed" || kind == "uncertain" || kind == null;
+        bool autonomousBodyReport = (string)bound?.SelectToken("replyPurpose.source") == "accepted-current-autonomous-decision" &&
+            (bool?)bound?.SelectToken("replyPurpose.actionAuthorization") == false;
+        bool answer = reply != null || kind == "answer-only" || kind == "mixed" || kind == "uncertain" || kind == null && !autonomousBodyReport;
         int detailUnits = (answer ? 6500 : 2600) / (pressure + 1);
         int slots = pressure == 0 ? 12 : pressure == 1 ? 6 : 3;
         var attentionRoots = roots.Concat(new[] { new JObject {
@@ -168,6 +170,7 @@ public partial class ChatQW
         // Exact sharing includes read-only questions and their duplicated memory.
         result = SceneFactContextCompactor.Compact(result, out var sharing, (bool)diagnostic["producerContext"]);
         diagnostic["answerRoute"] = answer; diagnostic["needsEvidence"] = need;
+        diagnostic["autonomousBodyReport"] = autonomousBodyReport;
         diagnostic["ordinarySlots"] = slots; diagnostic["optionalDetailUnits"] = detailUnits;
         diagnostic["fields"] = fields; diagnostic["afterCharacters"] = result.Length;
         diagnostic["afterTextUnits"] = EstimateRoomDecisionTextUnits(result);

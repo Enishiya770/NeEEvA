@@ -114,6 +114,18 @@ public static class ArdyRoomApproachRegression
             Check(Vector3.Distance(plan.FacePoint, f.User.transform.position) < .00001f, "Facing target is the explicit anchor snapshot.");
             Check(plan.GroundTarget.x < -.85f && Mathf.Abs(plan.GroundTarget.z) < .1f, "Open-room approach should retain the current user-relative side.");
             ValidatePlan(plan);
+            Check(plan.Observation.candidates[plan.Observation.selectedCandidate].ring == 0 &&
+                Mathf.Abs(Vector3.Distance(plan.GroundTarget, plan.UserGround) - 1f) < .02f,
+                "A valid inner stand-off retains arrival margin even when the outer route is shorter.");
+            Vector3 away = (plan.UserGround - plan.GroundTarget).normalized;
+            Check(ArdyRoomApproachPlanner.ProjectedGoalSatisfied(plan, plan.FacePoint + away * .24f, 1f),
+                "Small drift still inside the completion region does not require chasing.");
+            Check(!ArdyRoomApproachPlanner.ProjectedGoalSatisfied(plan, plan.FacePoint + away * .30f, 1f),
+                "Sub-35cm drift which leaves the success region must update the target.");
+            Check(!ArdyRoomApproachPlanner.GoalSatisfied(1.4431143f, .98536f, 1f) &&
+                ArdyRoomApproachPlanner.GoalSatisfied(1.02f, 1f, 1f) &&
+                !ArdyRoomApproachPlanner.GoalSatisfied(1f, 18f, 1f),
+                "Latest production miss and angular misses cannot become false arrivals.");
             Vector3 target = plan.GroundTarget;
             f.User.transform.position += new Vector3(2f, 0f, 0f);
             Check(plan.GroundTarget == target && plan.FacePoint.x == 0f, "Existing plans must stay snapshots when anchor moves.");
@@ -253,8 +265,10 @@ public static class ArdyRoomApproachRegression
                 observation.sourceObjectPath == observation.colliderPath && observation.colliderType == "BoxCollider",
                 "Start rejection retains tested position and the actual blocking collider hierarchy.");
             Check(!ArdyRoomApproachPlanner.TryPlan(f.Navigation, start, f.User.transform, 1f, out _, out _, out var approach) &&
-                approach.candidateCount == 24 && approach.startRejected == 24 && approach.targetRejected == 0 && approach.pathRejected == 0,
-                "Start obstruction must not be attributed to the 24 different candidate destinations.");
+                approach.candidateCount == 0 && approach.candidates.Count == 0 && approach.targetRejected == 0 && approach.pathRejected == 0 &&
+                approach.preflightFailure?.stage == "start" && approach.preflightFailure.code == "body-overlap" &&
+                approach.preflightFailure.colliderId == obstacle.GetInstanceID(),
+                "One start preflight rejection retains the real obstacle without inventing untested candidate failures.");
             obstacle.transform.position = target + Vector3.up * .85f;
             Check(!f.Navigation.TryPlan(start, target, out _, out reason, out observation) &&
                 observation.stage == "target" && observation.code == "body-overlap" &&

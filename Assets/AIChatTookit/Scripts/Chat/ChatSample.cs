@@ -4627,10 +4627,12 @@ public partial class ChatSample : MonoBehaviour
         imageUrl = ResolveFormalSceneImage(responseGeneration);
         if (!roomTaskPrepared && TryDispatchFirstReply(prompt, imageUrl, responseGeneration, recordAssistantHistory, transientSystemContext)) return;
         if (!roomTaskPrepared && TryPlanRoomTask(prompt, imageUrl, responseGeneration, recordAssistantHistory, transientSystemContext)) return;
+        bool bodyReply = roomTaskPrepared && UseBodyReplyPacket(responseGeneration);
+        if (bodyReply) { imageUrl = null; ClearStagedFormalObservation(); }
         Debug.Log($"[Vision/Consumer] consumer=formal generation={responseGeneration} capture={GetFormalSceneObservation(responseGeneration)?.CaptureId ?? "none"} image={!string.IsNullOrEmpty(imageUrl)}", this);
         PublishSpokenPrefixToLlm();
         m_ChatSettings.m_ChatModel.RequestContext = BuildFormalResponseRequestContext(
-            BuildFormalObservationContext(transientSystemContext), responseGeneration, roomTaskPrepared);
+            bodyReply ? "" : BuildFormalObservationContext(transientSystemContext), responseGeneration, roomTaskPrepared);
         ObservationReceipt observations = CaptureObservationReceipt();
         bool consumed = false;
         bool guardRoomSpeech = ShouldGuardRoomSpeech(responseGeneration);
@@ -7013,6 +7015,7 @@ public partial class ChatSample : MonoBehaviour
         public bool proceed;
         public string work_evidence;
         public string work_status;
+        public string next_intent_source, next_step_id, planning_focus;
         public string singing_goal_status;
         public string singing_goal_evidence;
         [NonSerialized] public Newtonsoft.Json.Linq.JObject singing_goal_expected;
@@ -8972,6 +8975,7 @@ public partial class ChatSample : MonoBehaviour
             return false;
         try
         {
+            if (!WorkNextIntentProtocol.ValidExtension(Newtonsoft.Json.Linq.JObject.Parse(json))) return false;
             decision = JsonUtility.FromJson<AutonomyIntentDecision>(json);
             if (decision != null)
                 decision.singing_goal_expected = Newtonsoft.Json.Linq.JObject.Parse(json)["singing_goal_expected"] as Newtonsoft.Json.Linq.JObject;
@@ -9014,7 +9018,8 @@ public partial class ChatSample : MonoBehaviour
             frame + BuildWorkReviewContext() + "\n\n" +
             "先在work_evidence用一句话对照用户问题与已完成回复，指出已经给了什么答案或缺哪一步，再选择状态。" +
             "仅有礼貌回应、点头、承诺稍后检查，没有实际检查或问题答案时必须是continue，不能因回复已播完而closed。\n" +
-            "只输出一个紧凑 JSON，不要 Markdown：" +
+            WorkNextIntentProtocol.Contract +
+            "只输出一个紧凑 JSON，不要 Markdown；同时填写next_intent_source、next_step_id、planning_focus：" +
             "{\"work_evidence\":\"问题与已完成步骤的简短对照\",\"work_status\":\"continue|waiting_tool|waiting_user|closed|none\",\"proceed\":false,\"intent\":\"下一步具体做什么；没有则留空\"," +
             "\"novelty\":\"它相对最近发言的新信息；没有则留空\"," +
             "\"wait_seconds\":45}";
@@ -9078,6 +9083,7 @@ public partial class ChatSample : MonoBehaviour
             m_ConsecutiveAITurns >= ((m_Urge != null && m_Urge.Enabled) ? m_MonologueBackstopTurns : m_MaxConsecutiveAITurns);
         if (m_QuietAutonomyRound) frame += "\n[主动发言冷却：本轮可以观察和行动，正式文本只作为不发声内容；不要重复开口。]";
         m_SceneAutonomyIntention = decision?.intent ?? "";
+        BindAutonomyAttention(workContinuation ? null : decision);
         frame += ConsumeDeferredAutonomyThought();
 
         if (!workContinuation)
@@ -9229,7 +9235,7 @@ public partial class ChatSample : MonoBehaviour
             bool workContinuation = reviewingAutonomousGoal
                 ? CanContinueAutonomousSingingGoal(decision) : ApplyWorkReviewDecision(decision);
             if (reviewingAutonomousGoal) decision.proceed = workContinuation;
-            if (reviewingWork && !workContinuation) decision.proceed = false;
+            if (reviewingWork && !workContinuation && !m_WorkAutonomousHandoff) decision.proceed = false;
             if (decision.proceed)
             {
                 m_AutonomyProbeNotBefore = -999f;

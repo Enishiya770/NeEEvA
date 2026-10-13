@@ -57,6 +57,7 @@ public static partial class RoomDecisionBudgetRegression
             ["focused"] = budget["diagnostic"], ["scope"] = "Real serializer; controlled semantic attention, unchanged menu and protected constraints." };
         CheckLatestAccumulatedAttention(provider);
         CheckLatestAccumulatedAttention(provider, "TaskBudget.latest-2123-20261012.json", "latest2123Attention");
+        CheckLatestAccumulatedAttention(provider, "TaskBudget.latest-2252-20261012.json", "latest2252Attention");
     }
 
     private static void CheckLatestAccumulatedAttention(ChatQW provider, string fixtureName = "TaskBudget.latest-1945-20261012.json", string reportName = "latestAccumulatedAttention")
@@ -82,6 +83,8 @@ public static partial class RoomDecisionBudgetRegression
             {
                 Require(((JArray)sent.SelectToken("visibleObjectCatalog.historicalViews")).Count == 0,
                     "New follow request does not preload historical object viewpoint directions.");
+                Require(((JArray)sent.SelectToken("sceneSpatialMemory.dialogueViews")).Count == 0,
+                    "Pure follow does not retain a historical dialogue RGB/pose packet.");
                 var canonical = (JObject)Call(null, "ReadRoomTaskRecoveryJson", original);
                 Require(JToken.DeepEquals(sent["currentFacts"], canonical["currentFacts"]), "Current body facts survive historical-detail projection.");
                 Require(JToken.DeepEquals(sent["execution"], canonical["execution"]), "Current execution survives historical-detail projection.");
@@ -90,16 +93,41 @@ public static partial class RoomDecisionBudgetRegression
                 var unknown = (JObject)input.DeepClone();
                 unknown["visibleObjectCatalog"]["historicalViews"][0]["returnDirection"]["futureConstraint"] = "preserve exactly";
                 unknown["sceneActionFacts"]["lastAction"]["viewBefore"] = new JObject { ["captureId"] = "old-view", ["futureConstraint"] = "preserve exactly" };
+                unknown["sceneSpatialMemory"]["dialogueViews"][0]["visualObservation"]["futureConstraint"] = "preserve exactly";
                 string protectedWire = Wire(provider, unknown.ToString(Formatting.None));
                 var protectedInput = Input(protectedWire);
                 Require((string)protectedInput.SelectToken("visibleObjectCatalog.historicalViews[0].returnDirection.futureConstraint") == "preserve exactly" &&
-                    (string)protectedInput.SelectToken("sceneActionFacts.lastAction.viewBefore.futureConstraint") == "preserve exactly",
+                    (string)protectedInput.SelectToken("sceneActionFacts.lastAction.viewBefore.futureConstraint") == "preserve exactly" &&
+                    (string)protectedInput.SelectToken("sceneSpatialMemory.dialogueViews[0].visualObservation.futureConstraint") == "preserve exactly",
                     "Unknown nested history/geometry constraints remain intact.");
                 var continuation = (JObject)input.DeepClone(); continuation["taskSequence"] = new JObject { ["steps"] = new JArray() };
                 var continuationInput = Input(Wire(provider, continuation.ToString(Formatting.None)));
                 Require(((JArray)continuationInput.SelectToken("visibleObjectCatalog.historicalViews")).Count > 0 &&
                     JToken.DeepEquals(continuationInput.SelectToken("sceneActionFacts.lastAction"), canonical.SelectToken("sceneActionFacts.lastAction")),
                     "A compound continuation cannot discard predecessor action detail through initial attention.");
+            }
+            if ((string)row["name"] == "latest-2252-gen10")
+            {
+                var rich = (JObject)input.DeepClone();
+                var oldAction = (JObject)rich["sceneActionFacts"]["lastAction"];
+                oldAction["requestedYaw"] = 143.958481;
+                oldAction["viewBefore"] = new JObject { ["captureId"] = "historical-device-view", ["frame"] = 42,
+                    ["normalizedVisibleBounds"] = new JObject { ["x"] = .1, ["y"] = .2, ["z"] = .3, ["w"] = .4 } };
+                oldAction["newSafetyConstraint"] = new JObject { ["allow"] = false };
+                string intact = rich.ToString(Formatting.None);
+                var projected = Input(Wire(provider, intact));
+                Call(null, "RestoreRoomDecisionSharedEvidence", projected);
+                var canonicalRich = (JObject)Call(null, "ReadRoomTaskRecoveryJson", intact);
+                Require(projected.SelectToken("sceneActionFacts.lastAction.requestedYaw") == null &&
+                    projected.SelectToken("sceneActionFacts.lastAction.viewBefore") == null &&
+                    JToken.DeepEquals(projected.SelectToken("sceneActionFacts.lastAction.newSafetyConstraint"), oldAction["newSafetyConstraint"]),
+                    "New device planning drops completed old camera tracking but preserves unknown constraints.");
+                Require(JToken.DeepEquals(projected.SelectToken("workingMemory.completedTasks.spatialGoal.completionEvidence"), canonicalRich.SelectToken("spatialGoal.completionEvidence")) &&
+                    (string)projected.SelectToken("sceneActionFacts.lastAction.entityId") == (string)oldAction["entityId"] && rich.ToString(Formatting.None) == intact,
+                    "Completed same-device identity/proof survives and runtime input is untouched.");
+                oldAction["active"] = true;
+                Require(Input(Wire(provider, rich.ToString(Formatting.None))).SelectToken("sceneActionFacts.lastAction.requestedYaw") != null,
+                    "Current unfinished device operations retain their camera tracking evidence.");
             }
         }
         var results = new JArray();

@@ -62,6 +62,7 @@ public static partial class RoomSpeechClaimRegression
     public static IEnumerator RunChecks(string output)
     {
         checks = 0; string directory = Path.Combine(output, "speech-claim"); Directory.CreateDirectory(directory);
+        CheckSpeechParts();
         var directionConflict = new JObject { ["verdict"] = "inconsistent", ["reason"] = "Direction contradicts approach.",
             ["targetConsistency"] = "contradicted", ["conflict"] = "claim-state", ["conflictQuote"] = "walking away" };
         Check(RoomTaskProtocol.TryReviewScope(directionConflict.ToString(), out _), "Concrete direction denial remains eligible for repair despite overlapping conflict categories.");
@@ -343,6 +344,20 @@ public static partial class RoomSpeechClaimRegression
         Add("arrival-zh", "我已经到你身边了。", "arrived", "movement", "zh", "arrived");
         Add("arrival-ja", "もう隣にいるよ。", "arrived", "movement", "ja", "arrived");
         Add("arrival-en", "I'm here beside you now.", "arrived", "movement", "en", "arrived");
+        foreach (var item in new[] {
+            new[] { "past-arrival-zh", "刚才已经到你身边了。", "zh", "true" },
+            new[] { "past-arrival-ja", "さっきあなたのそばに着いたわ。", "ja", "true" },
+            new[] { "past-arrival-en", "I reached your side a moment ago.", "en", "true" },
+            new[] { "past-arrival-not-current-proximity", "I reached your side a moment ago and I am still right beside you now.", "en", "false" } })
+        {
+            Add(item[0], item[1], "arrived", "movement", item[2], "arrived", item[3] == "true");
+            var input = (JObject)rows.Last()["input"];
+            var room = (JObject)input["currentRoomFacts"];
+            room["currentFacts"] = new JObject { ["currentlyNearAndFacingUser"] = false, ["userTrackingValid"] = true,
+                ["userSupportVerified"] = true, ["actualUserDistance"] = 4.0, ["desiredUserDistance"] = 1.2 };
+            input["movementReportRequirement"] = RoomMovementResultPolicy.Requirement(room, "approach", "owned");
+            rows.Last()["reviewRequest"] = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(), null, true));
+        }
         Add("arrival-social", "ふふっ、もう隣にいるよ。待っててくれてありがとう。", "arrived", "movement", "ja", "arrived");
         Add("arrival-social-en", "I'm here beside you now. Thanks for your patience.", "arrived", "movement", "en", "arrived");
         Add("arrival-listener-request", "我已经到你身边了，请稍等一下。", "arrived", "movement", "zh", "arrived");
@@ -522,6 +537,8 @@ public static partial class RoomSpeechClaimRegression
             row["expectedTaskRelationConflict"] = sample[5] == "false";
             row["reviewRequest"] = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(), null, true));
         }
+        AddProgressModelCases(model, rows);
+        CheckCapturedProgressReplies(model);
         foreach (JObject row in rows)
         {
             row["languageRecheckRequest"] = JObject.Parse((string)Call(model,"BuildSpeechClaimRequest",row["input"].ToString(),

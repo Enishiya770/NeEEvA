@@ -29,8 +29,13 @@ public partial class ChatSample
         var value = bridge != null ? bridge.ReadMovementSpeechReceipt() : null;
         return value == null ? new JObject() : new JObject {
             ["execution"] = new JObject { ["actionId"] = value.actionId, ["targetKind"] = value.targetKind,
-                ["phase"] = value.phase, ["reason"] = value.reason, ["operationRevision"] = value.operationRevision },
-            ["currentFacts"] = new JObject { ["currentlyNearAndFacingUser"] = value.currentlyNearAndFacingUser }
+                ["phase"] = value.phase, ["reason"] = value.reason, ["operationRevision"] = value.operationRevision,
+                ["approachRetargetStatus"] = value.approachRetargetStatus,
+                ["arrivalObservedUtc"] = value.arrivalObservedUtc },
+            ["currentFacts"] = new JObject { ["currentlyNearAndFacingUser"] = value.currentlyNearAndFacingUser,
+                ["userTrackingValid"] = value.userTrackingValid, ["userSupportVerified"] = value.userSupportVerified,
+                ["actualUserDistance"] = value.actualUserDistance, ["actualFacingErrorDegrees"] = value.actualFacingErrorDegrees,
+                ["desiredUserDistance"] = value.desiredUserDistance }
         };
     }
 
@@ -43,10 +48,16 @@ public partial class ChatSample
             ["actionId"] = actionId, ["phase"] = execution["phase"]?.DeepClone(),
             ["operationRevision"] = execution["operationRevision"]?.DeepClone(),
             ["reportText"] = RoomMovementResultPolicy.Fallback(room, intent, actionId),
+            ["arrivalRelation"] = intent == "approach" && (string)execution["phase"] == "arrived"
+                ? RoomMovementResultPolicy.ArrivalRelation(room) : null,
             ["expectedReport"] = intent == "stop-moving" && new[] { "stopped", "cancelled", "idle" }.Contains((string)execution["phase"])
                 ? new JValue("stopped") : RoomMovementResultPolicy.Requirement(room, intent, actionId)["expectedReport"]?.DeepClone()
         };
     }
+
+    private static bool SameMovementReport(JObject before, JObject after) => JToken.DeepEquals(
+        PickRoomFields(before, "actionId", "reportText", "arrivalRelation", "expectedReport"),
+        PickRoomFields(after, "actionId", "reportText", "arrivalRelation", "expectedReport"));
 
     private void BindRoomSpeechPlayback(int generation, string language, ArdyRoomDialogueBridge bridge,
         LLM model, LLM.SendData history)
@@ -108,15 +119,27 @@ public partial class ChatSample
             }.ToString(Formatting.None));
             return RoomPlaybackCheck.Drop;
         }
-        if (lease.neutral || JToken.DeepEquals(lease.state, state)) return RoomPlaybackCheck.Current;
+        bool terminal = RoomMovementResultPolicy.IsTerminalFailure((string)state["phase"]) ||
+            (string)state["phase"] == "arrived" || (string)state["expectedReport"] == "stopped";
+        if (SameMovementReport(lease.state, state) || lease.neutral && !terminal) return RoomPlaybackCheck.Current;
+        // Once neutral, live pose changes after a committed arrival must not
+        // churn synthesis. A new terminal verdict still overrides intermediate
+        // wording, even after the ordinary replacement budget is consumed.
+        if (lease.neutral && terminal && (string)lease.state["phase"] == (string)state["phase"])
+            return RoomPlaybackCheck.Current;
 
         var previous = lease.state;
         lease.state = state; lease.version++; lease.refreshes++;
-        // Synthesis may straddle several movement phases. Three replacements
-        // are enough; further churn uses a phase-neutral truthful receipt.
+        // Count meaningful speech changes, not preparing/generating or operation
+        // revisions. The cap applies to intermediate progress, never a new result.
         lease.neutral = lease.refreshes >= 3;
         string text;
-        if (lease.neutral)
+        if (lease.neutral && (string)state["phase"] == "arrived")
+            // An immutable completed event is stable across later pose changes.
+            // The refresh cap must not invent missing evidence or uncertainty.
+            text = lease.language == "ja" ? "さっきあなたのそばに着いたわ。" :
+                lease.language == "en" ? "I reached your side a moment ago." : "刚才已经到你身边了。";
+        else if (lease.neutral && !terminal)
             text = lease.language == "ja" ? "移動の依頼は受け付けたわ。状況が変わっているので、最終結果はまだ断言できないの。" :
                 lease.language == "en" ? "The movement request was accepted. Its state is changing, so I can't confirm a final result yet. " :
                 "移动请求已受理，状态还在变化，我暂时不能确认最终结果。";
@@ -137,6 +160,8 @@ public partial class ChatSample
             ["generation"] = generation, ["userTurn"] = lease.userTurn, ["actionId"] = lease.actionId,
             ["revision"] = lease.version, ["observedUtc"] = DateTime.UtcNow.ToString("o"),
             ["before"] = previous, ["after"] = state.DeepClone(), ["publicText"] = text,
+            ["currentRelativePose"] = room["currentFacts"]?.DeepClone(),
+            ["arrivalObservedUtc"] = room.SelectToken("execution.arrivalObservedUtc")?.DeepClone(),
             ["phaseNeutral"] = lease.neutral, ["disposition"] = "replace-unplayed-speech",
             ["scope"] = "Playback-boundary text replacement from current owned execution; no new action, model request or proof of audible playback. Previously played words remain historical."
         };

@@ -54,6 +54,7 @@ public partial class ChatSample
         ClearStagedFormalObservation();
         ResetWorkProgress();
         m_WorkReviewOpen = open;
+        m_WorkAutonomousHandoff = m_WorkReplyOnly = false; m_WorkNextStepId = null; m_SceneAutonomyAttention = null;
         m_WorkStatus = open ? "unreviewed" : "none";
         m_WorkIntent = "";
         m_WorkContinuations = 0;
@@ -91,6 +92,7 @@ public partial class ChatSample
                 previousUnfinishedWork = m_PreviousUnfinishedWork,
                 responses = m_WorkResponses.ToArray(), status = m_WorkStatus,
                 taskSequence = ReadRoomTaskSequence(),
+                nextIntentFacts = WorkNextIntentProtocol.Progress(ReadRoomTaskSequence()),
                 continuationCount = m_WorkContinuations, maximumContinuations = MaxWorkContinuations,
                 lastInspection = m_LastSelfInspection,
                 lastMotionExecution = m_LastMotionExecutionFeedback == null ? null : MotionFeedbackJson(m_LastMotionExecutionFeedback),
@@ -135,7 +137,7 @@ public partial class ChatSample
 
     private string BuildDedicatedWorkReviewPrompt(string frame) =>
         "[内部事项进度判定；不生成角色台词，不调用工具]\n" +
-        (m_WorkReviewOpen ? "这次只判断上一用户请求有没有必要的未完成步骤，不讨论主动闲聊或新意。\n" :
+        (m_WorkReviewOpen ? "先判断原用户请求的进度，再独立判断当前是否有新的自主意图。不能为继续行动而把已完成任务改成未完成。\n" :
             "当前没有打开的用户事项续接；program_work_status=" + m_WorkStatus + "。这次独立审核当前歌唱草案。" +
             "goal.origin/autonomous是角色对来源的提案，不证明原用户要求已完成。先按recent_actual_user_inputs、实际播放和取消事实核对是否仍是原用户目标，" +
             "只有初始来源标签误写时可在expected中如实填写原用户请求与逐字引文；不能附和错误autonomous标签。" +
@@ -145,7 +147,7 @@ public partial class ChatSample
         "continue=仍欠必要检查/执行/回答；waiting_tool=已有真实操作正在运行；" +
         "waiting_user=已经询问必要信息，等用户回答；closed=已经实质回答、说明无法完成或用户取消。" +
         "只说稍等或点头没有回答问题，属于continue。已给出有依据的能力列表就完成了能力问答，无需演示。" +
-        "proceed只在continue时为true。intent写必要下一步，不给原请求增加新目标。" +
+        WorkNextIntentProtocol.Contract + "\n" +
         "\n独立核验歌唱目标：sing_goal 是角色提出的草案，不是用户要求的权威来源。" +
         "首先从完整时序区分用户已经唱过什么、用户是否要求角色唱。singing_goal_expected.origin=user_request/autonomous/none/uncertain；" +
         "user_request须用request_quote逐字引用用户要求角色演唱的原话；用户说自己试唱、实际歌词和角色自己的承诺不能充当该请求。" +
@@ -181,16 +183,19 @@ public partial class ChatSample
         "responses中的台词、工具标签与reason是生成记录，不是动作已经执行的证据；只有当前目标匹配的实际播放完成记录才支持已演唱，旧播放也不满足本次新范围。" +
         "\n只输出紧凑JSON：{\"work_evidence\":\"简短对照\",\"work_status\":\"continue|waiting_tool|waiting_user|closed\"," +
         "\"proceed\":false,\"intent\":\"必要下一步；没有则留空\",\"wait_seconds\":45," +
+        "\"next_intent_source\":\"none|current-work|autonomous\",\"next_step_id\":\"\",\"planning_focus\":\"unknown\"," +
         "\"singing_goal_status\":\"none|approved|revise|waiting_user|cancelled\",\"singing_goal_evidence\":\"目标与用户要求的核验依据\"," +
         "\"singing_goal_expected\":{\"origin\":\"none\",\"request_quote\":\"\",\"refs\":\"\",\"range\":\"none\",\"start_seconds\":null,\"end_seconds\":null}}";
 
     // Meaning is judged by the existing LLM probe; ownership, liveness and budgets are local.
     private bool ApplyWorkReviewDecision(AutonomyIntentDecision decision)
     {
+        m_WorkAutonomousHandoff = m_WorkReplyOnly = false; m_WorkNextStepId = null;
         if (!m_WorkReviewOpen || decision == null || m_WorkNoProgress) return false;
         m_WorkSubstepReviewPending = false;
         string status = (decision.work_status ?? "").Trim().ToLowerInvariant();
         var sequence = ReadRoomTaskSequence();
+        if (AcceptWorkAutonomousHandoff(decision, sequence)) return false;
         if ((status == "closed" || status == "none") && sequence?["steps"] is JArray steps &&
             System.Linq.Enumerable.Any(System.Linq.Enumerable.OfType<JObject>(steps), s =>
                 (string)s["kind"] != "other" && (string)s["status"] != "completed" &&
@@ -240,6 +245,7 @@ public partial class ChatSample
             return false;
         }
         m_WorkStatus = "continue";
+        SelectWorkContinuationScope(decision, sequence);
         m_WorkIntent = string.IsNullOrWhiteSpace(decision.intent)
             ? "结合原用户要求与真实结果，判断并完成必要下一步；不能执行时明确说明限制"
             : TruncateForFrame(decision.intent.Trim(), 400);
@@ -385,13 +391,15 @@ public partial class ChatSample
         bool terminalDeviceResult = generation == m_SpatialGoalTerminalReplyGeneration;
         bool guardSceneFeedback = plannedRoomStep || ShouldGuardWorkSceneFeedback(generation);
         bool movementResult = movementFactsOnly && plannedRoomStep && !terminalDeviceResult && UseMovementReplyPacket(generation);
+        bool workResult = !plannedRoomStep && !terminalDeviceResult && UseWorkResultReplyPacket(generation);
         // A committed movement already has its request, constraints, step ledger and
         // live execution receipt. Do not append the planner's perception frame again.
         // Unsent observations remain pending; this narrow report cannot acknowledge them.
-        if (movementResult) ClearStagedFormalObservation();
-        string latest = movementResult ? "" : terminalDeviceResult ? feedback : BuildFormalObservationContext(feedback) +
+        if (movementResult || workResult) ClearStagedFormalObservation();
+        if (movementResult || workResult) imageUrl = null;
+        string latest = movementResult || workResult ? "" : terminalDeviceResult ? feedback : BuildFormalObservationContext(feedback) +
             (guardSceneFeedback && !plannedRoomStep ? BuildWorkSceneFeedbackContext() : "");
-        ObservationReceipt observations = movementResult ? null : CaptureObservationReceipt();
+        ObservationReceipt observations = movementResult ? null : workResult ? CreateObservationReceipt() : CaptureObservationReceipt();
         bool consumed = false;
         var sceneSpeech = guardSceneFeedback ? new SpeechTextBuffer() : null;
         if (guardSceneFeedback)

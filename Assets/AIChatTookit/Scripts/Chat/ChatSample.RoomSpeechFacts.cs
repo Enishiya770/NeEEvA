@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using NeEEvA.Perception;
@@ -62,13 +62,17 @@ public partial class ChatSample
         RoomSpeechDependencies required = intent == "approach" || intent == "follow" || intent == "stop-moving" || intent == "unresolved"
             ? RoomSpeechDependencies.UserTarget
             : IsSceneVisualIntent(intent) ? RoomSpeechDependencies.SceneAction : RoomSpeechDependencies.None;
+        if (UseWorkResultReplyPacket(m_FormalResponseGeneration) &&
+            (bool?)CurrentSpeechMovementRequirement(m_FormalResponseGeneration)?["required"] == true)
+            required |= RoomSpeechDependencies.UserTarget;
         // The terminal device claim always depends on the actual goal proof,
         // even when the last step was none or the reviewer labels it conversational.
         if (m_SpatialGoalTerminalReplyGeneration == m_FormalResponseGeneration || CurrentUserTurnRequiresIndependentSpatialRequest())
             required |= RoomSpeechDependencies.SceneAction;
         // A no-action spatial answer and a whole-search result cannot be downgraded
         // to generic chatter by a reviewer choosing factScope=none.
-        bool evidenceOnly = ReadRoomEvidenceReplyFacts(m_FormalResponseGeneration) != null;
+        bool evidenceOnly = ReadRoomEvidenceReplyFacts(m_FormalResponseGeneration) != null || UseBodyReplyPacket(m_FormalResponseGeneration);
+        if (ReadAutonomousBodyReplyPurpose(m_FormalResponseGeneration) != null) required |= RoomSpeechDependencies.UserTarget;
         if ((m_RoomTaskSpatialAnswer && !evidenceOnly) || intent == "search-scene") required |= RoomSpeechDependencies.SceneAction;
         if (m_RoomTaskSpatialAnswer && !evidenceOnly && SceneEyesOpen) required |= RoomSpeechDependencies.VisualObservation;
         if (reviewedScope == "legacy")
@@ -148,7 +152,9 @@ public partial class ChatSample
             if (!JToken.DeepEquals(before.sceneAction, current)) changes.Add("sceneActionResult");
             if (!JToken.DeepEquals(before.sceneAction?["spatialGoalCompletionDependency"], current["spatialGoalCompletionDependency"]))
                 changes.Add("spatialGoalCompletion");
-            if (bridge.Controller == null || bridge.Controller.OperationRevision != before.controllerOperation) changes.Add("bodyOperation");
+            // A different body operation does not revoke an already observed or
+            // performed scene result. Its own action/proof stamps above remain
+            // mandatory; current movement and pixels have separate dependencies.
         }
         if ((scope & RoomSpeechDependencies.VisualObservation) != 0)
         {
@@ -209,6 +215,10 @@ public partial class ChatSample
             case "现在的路线检查没有通过，我先停在这里，等位置变化后再确认。": return ja ? "今の経路は確認を通らなかったので、ここで一旦止まっているわ。位置が変わってから確認し直すの。" : "The current route failed its checks, so I'm paused here pending a position change and another check.";
             case "这段移动正在收尾并恢复姿态，还不能据此确认整个任务完成。": return ja ? "この移動を終えて姿勢を戻しているところよ。これだけではタスク全体の完了は確認できないわ。" : "This movement segment is winding down and my pose is returning. That alone doesn't confirm the whole task is complete.";
             case "这次移动已经取消。": return ja ? "今回の移動は取り消されたわ。" : "This movement was cancelled.";
+            case "距离或朝向还需要调整，我正在重新检查路线，这次走近尚未完成。": return ja ? "距離や向きを調整する必要があるので、経路を確認し直しているわ。今回の移動はまだ完了していないの。" : "The distance or facing still needs adjustment. I'm checking the route again; this approach is incomplete.";
+            case "这次有限的路线调整已用完，距离或朝向仍未满足。我先停下，这次走近还没有完成。": return ja ? "今回の経路調整は上限に達したけれど、必要な距離や向きにはまだ届いていないわ。いったん止まるね。今回の移動は未完了なの。" : "This attempt's route adjustments reached their limit, but the required distance or facing is still unmet. I've stopped; this approach is incomplete.";
+            case "调整后的路线检查没有通过。我先停下，这次还没走到你身边。": return ja ? "調整後の経路の確認が通らなかったわ。いったん止まるね。まだそばには着いていないの。" : "The adjusted route did not pass the checks. I've stopped and haven't reached you yet.";
+            case "这段行走已经结束，但没有达到要求的距离或朝向，这次走近还没有完成。": return ja ? "歩く動作は終わったけれど、必要な距離や向きにはまだ届いていないわ。今回の移動は未完了なの。" : "The walking segment ended, but the required distance or facing was not reached. This approach is still incomplete.";
             case "这次移动没有完成，路线或空间检查没有通过。": return ja ? "経路か空間の確認を通らず、今回の移動は完了していないわ。" : "This movement is incomplete because route or space checks failed.";
             case "这次移动请求已提交，但执行失败了，还没有完成。": return ja ? "移動リクエストは送ったけれど、実行に失敗して完了していないわ。" : "The movement request was submitted, but execution failed and it hasn't completed.";
             case "这次跟随请求已提交，但动作服务等待超时，跟随没有完成。": return ja ? "追従のリクエストは送ったけれど、動作サービスの待機が時間切れになり、追従は完了していないわ。" : "The follow request was submitted, but the motion service timed out. The follow task is incomplete.";

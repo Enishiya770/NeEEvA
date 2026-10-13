@@ -11,7 +11,7 @@ using UnityEngine;
 // Regression of the observable request boundary, rather than copies of prompt/ack logic.
 // Only ASR capture and model/audio transport are fixtures. Chat orchestration, clip parsing,
 // result recording, completion/cancellation callbacks and ChatQW JSON assembly are production.
-public static class AgentWorkLoopRegression
+public static partial class AgentWorkLoopRegression
 {
     private const string SessionKey = "NeEEvA.AgentWorkLoop.PlayMode";
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
@@ -74,7 +74,13 @@ public static class AgentWorkLoopRegression
 
     private static IEnumerator Run()
     {
-        foreach (IEnumerator scenario in new[] { CompleteMixedHearing(), PendingAndRepeatedSinging(), RequestOriginAndMaterials(), ConfirmationAndContinue(), PlaybackObservation(), CancellationAndSupersession(), BoundedRecovery(), VoiceEvidence(), ReviewWireContract(), ReviewedGoalMustMatchStructuredExpectation(), ReadUserTextIsNotRoleAction(), EmptyInspectionDeliveryIsBounded(), WorkEpochFencesStreamCallbacks(), ConditionalObservationReceipt(), MemoryAcknowledgementOwnership(), MemoryAcknowledgementSupersession(), NonAgentMemoryDelivery() })
+        if (Environment.GetCommandLineArgs().Contains("-workNextIntentOnly"))
+        {
+            foreach (IEnumerator scenario in new[] { GenericNextIntent(), NextIntentLedger(), CompleteMixedHearing(), PendingAndRepeatedSinging(), RequestOriginAndMaterials(), ConfirmationAndContinue(), PlaybackObservation(), CancellationAndSupersession(), BoundedRecovery(), VoiceEvidence(), ReviewWireContract() })
+                while (scenario.MoveNext()) yield return scenario.Current;
+            yield break;
+        }
+        foreach (IEnumerator scenario in new[] { GenericNextIntent(), NextIntentLedger(), CompleteMixedHearing(), PendingAndRepeatedSinging(), RequestOriginAndMaterials(), ConfirmationAndContinue(), PlaybackObservation(), CancellationAndSupersession(), BoundedRecovery(), VoiceEvidence(), ReviewWireContract(), ReviewedGoalMustMatchStructuredExpectation(), ReadUserTextIsNotRoleAction(), EmptyInspectionDeliveryIsBounded(), WorkEpochFencesStreamCallbacks(), ConditionalObservationReceipt(), MemoryAcknowledgementOwnership(), MemoryAcknowledgementSupersession(), NonAgentMemoryDelivery() })
             while (scenario.MoveNext()) yield return scenario.Current;
     }
 
@@ -322,23 +328,19 @@ public static class AgentWorkLoopRegression
         var f = fixture; yield return null;
         f.BeginUser("检查有哪些可播放的录音，再告诉我。");
         f.PreviousReply("稍等，我先检查。");
-        for (int attempt = 0; attempt < 3; attempt++)
+        for (int attempt = 0; attempt < 2; attempt++)
         {
+            Set(f.chat, "m_AutonomyProbeNotBefore", -999f);
             Call(f.chat, "FireTick", "scheduled");
-            f.model.Decide(attempt == 0 ? "" : attempt == 1 ? "{\"work_status\":" : "{\"work_status\":\"invented\"}");
-            Check(f.model.Requests.Count == attempt + 1, "Malformed progress did not perform exactly one bounded recovery.");
-            Check((int)Get(f.chat, "m_WorkContinuations") == attempt + 1, "Recovery did not consume the same program-owned work budget.");
-            AssertOriginalUser(f, 1);
-            f.model.Complete("<silent/>");
-            double deadline = EditorApplication.timeSinceStartup + 5;
-            while ((bool)Get(f.chat, "m_AgentRoundInFlight") && EditorApplication.timeSinceStartup < deadline) yield return null;
-            Check(!(bool)Get(f.chat, "m_AgentRoundInFlight"), "Silent formal response did not drain its production audio pipeline.");
+            f.model.Decide(attempt == 0 ? "" : "{\"work_status\":");
+            Check(f.model.Requests.Count == 0 && (int)Get(f.chat, "m_WorkContinuations") == 0,
+                "Invalid private output invented continuation authority or escaped into the formal action planner.");
         }
-        Call(f.chat, "FireTick", "scheduled");
-        f.model.Decide("still malformed");
-        Check(f.model.Requests.Count == 3, "Invalid progress escaped its continuation budget.");
-        Check((string)Get(f.chat, "m_WorkStatus") == "blocked" && !(bool)Get(f.chat, "m_WorkReviewOpen"), "Recovery exhaustion was declared completed or left unbounded.");
-        Check(f.model.reviewRequests == 4 && f.model.ephemeralRequests == 0, "Pending-work progress reused the idle ephemeral request route.");
+        Check(Get(f.chat, "m_PrivateDecisionFailure") != null && (bool)Get(f.chat, "m_WorkReviewOpen") &&
+            ((string)Get(f.chat, "m_WorkStatus")).StartsWith("review-blocked:"), "Private retry exhaustion erased the unmet obligation or remained unbounded.");
+        Check(f.model.reviewRequests == 2 && f.model.ephemeralRequests == 0, "Private retry used a different decision route.");
+        f.BeginUser("现在只解释检查遇到了什么问题。");
+        Check(Get(f.chat, "m_PrivateDecisionFailure") == null, "New accepted input did not release the private failure hold.");
         SaveScenario(f); f.Dispose(); fixture = null;
     }
 
@@ -767,6 +769,7 @@ public static class AgentWorkLoopRegression
         public void BeginUser(string utterance)
         {
             user = utterance; Call(chat, "SetCurrentUserInput", utterance, "public fixture");
+            Call(chat, "RecordAcceptedMotionUserTurn", utterance);
             model.m_DataList.Add(new LLM.SendData("user", utterance));
             Call(chat, "PrepareActiveSkillsForRound", utterance, "user-spoke");
         }
