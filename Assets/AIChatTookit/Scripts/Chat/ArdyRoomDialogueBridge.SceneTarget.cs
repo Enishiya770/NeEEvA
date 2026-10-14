@@ -80,6 +80,7 @@ public sealed partial class ArdyRoomDialogueBridge
         sceneTargetEpoch++;
         sceneTargetActive = true;
         sceneTargetActionId = actionId = id;
+        actionIntent = viewDirection == null ? "approach-object" : "reposition-view";
         sceneCaptureId = captureId; sceneSurfaceId = targetId; sceneSurfacePoint = visibleSurfacePoint;
         sceneViewDirection = viewDirection; sceneViewDistance = viewDistance; sceneViewPurpose = viewPurpose;
         sceneTargetValidator = validateTarget; sceneTargetPlan = null; sceneTargetObservation = null;

@@ -17,6 +17,8 @@ public static class WorkNextIntentProtocol
         "原请求完成后可以根据新的环境/相对位置/交流动机主动行动，此时work_status=closed，next_intent_source=autonomous，" +
         "proceed=true，intent写新的自主意图，next_step_id留空；不需要用户重复命令，不能声称旧任务未完成或重做已完成步骤。" +
         "尚欠独立问题的答案、工具结果或原任务步骤时不能通过改成autonomous绕过；最新取消、停留和其他用户限制始终有效。" +
+        "自主意图是未来选择，不是事实来源；涉及用户已经说过/做过/同意过什么，只能依据真实对话或有出处的回忆，不能从人设、愿望、靠近或完成工具倒推出用户事件。" +
+        "没有依据时可自由选择不依赖该前提的新话题或保持观察，不得把猜测写成既成事实。" +
         "没有值得推进的下一意图时source=none、proceed=false。planning_focus只表示下一意图需要的信息：" +
         "current-user-body=仅处理角色与当前用户的身体位置/跟随/停止，scene=物件或空间观察，other=回答或其他任务，unknown=不确定。" +
         "这三个字段只说明来源和注意范围，不授权工具，不把已有到达事实改成当前仍在身边，也不把一次性靠近变成持续跟随。";

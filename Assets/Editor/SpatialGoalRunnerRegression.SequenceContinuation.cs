@@ -108,6 +108,32 @@ public static partial class SpatialGoalRunnerRegression
         int revision = bridge.Controller.OperationRevision;
         int assessments = (int)Get(bridge, "assessmentBuildCount");
         try {
+            // Exercise the actual sentence queue before any audio starts. The
+            // result/answer must stay separate from a fast-changing successor.
+            Call(Get(chat, "m_PendingChunks"), "Clear");
+            var sentenceBuffer = (SpeechTextBuffer)Get(chat, "m_SentenceBuffer");
+            sentenceBuffer.Length = 0;
+            sentenceBuffer.Append(new SpeechText(combined, "en"));
+            Call(chat, "FlushCompleteSentences", true);
+            var queue = Get(chat, "m_PendingChunks");
+            var queued = ((System.Collections.IEnumerable)queue).Cast<object>().ToArray();
+            Require(queued.Length == 2 && (bool)Get(queued[0], "RoomPrefixOnly") &&
+                (string)Get(queued[0], "Text") == prefix && !(bool)Get(queued[1], "RoomPrefixOnly"),
+                "Actual queue separates the entire audited independent answer from the dynamic progress sentence.");
+            Call(bridge, "SetFact", "arrived", "Controlled arrival while the independent answer plays");
+            Require(Call(chat, "RefreshRoomSpeechForPlayback", queued[0], generation).ToString() == "Current",
+                "Arrival does not replace or resynthesize the stable result segment.");
+            Call(chat, "RecordRoomSpeechPlayed", lease, prefix);
+            Require(Call(chat, "RefreshRoomSpeechForPlayback", queued[1], generation).ToString() == "Replaced" &&
+                !((string)Get(queued[1], "Text")).Contains("device is off") &&
+                ((string)Get(queued[1], "Text")).Contains("reached"),
+                "Arrival replaces only the unplayed progress, without replaying the independent result.");
+            Call(queue, "Clear");
+            // Restore the independent partial-playback scenario below.
+            Call(bridge, "SetFact", (string)phase, (string)reason);
+            Call(chat, "BindRoomSpeechPlayback", generation, "en", bridge, model, history);
+            lease = Get(chat, "m_RoomSpeechPlayback");
+            Set(chunk, "RoomState", lease); Set(chunk, "RoomStateVersion", (int)Get(lease, "version"));
             Call(bridge, "SetFact", "follow-paused", "Controlled successor pause before playback");
             Require(Call(chat, "RefreshRoomSpeechForPlayback", chunk, generation).ToString() == "Replaced" &&
                 ((string)Get(chunk, "Text")).StartsWith(prefix) && ((string)Get(chunk, "Text")).Contains("paused"),

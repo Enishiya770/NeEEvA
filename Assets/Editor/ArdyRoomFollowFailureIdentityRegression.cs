@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -35,7 +35,7 @@ public static class ArdyRoomFollowFailureIdentityRegression
         var fields = new Dictionary<string, object>();
         foreach (string name in new[] { "ExecutionState", "ExecutionReason", "Stage", "Status", "IsBusy", "IsContinuousFollowActive", "LastErrorResponseJson" })
             properties[name] = GetProperty(controller, name);
-        foreach (string name in new[] { "revision", "streamRecovering", "streamEventName", "streamLastFailureCategory", "streamLastFailureReason", "streamBackend" })
+        foreach (string name in new[] { "revision", "streamRecovering", "streamEventName", "streamLastFailureCategory", "streamLastFailureReason", "streamBackend", "streamFailureRequestId", "streamFailureSessionId", "streamFailureObservedUtc", "streamFailureOperationRevision" })
             fields[name] = GetField(controller, name);
         var bridgeFields = SnapshotFields(bridge);
         var reports = (Queue<string>)GetField(bridge, "actionReports");
@@ -53,12 +53,12 @@ public static class ArdyRoomFollowFailureIdentityRegression
             NavigationRecoveryChecks(bridge, report);
             foreach (var item in new[] {
                 (ArdyRoomExecutionState.Failed, ArdyRoomExecutionReason.GenerationFailed, "motion-supply", "fixture: next short prefix arrived too late", false),
+                (ArdyRoomExecutionState.Blocked, ArdyRoomExecutionReason.GeneratedPathRejected, "motion-control", "fixture: current speed cannot brake at the new corridor", true),
                 (ArdyRoomExecutionState.Blocked, ArdyRoomExecutionReason.GeneratedPathRejected, "user-clearance", "fixture: native candidate entered user clearance", true),
                 (ArdyRoomExecutionState.Failed, ArdyRoomExecutionReason.OwnershipLost, "ownership", "fixture: player acquired by a different owner", false) })
             {
                 ArmFollow(bridge, "failure-identity-" + item.Item3, false);
-                SetField(controller, "streamLastFailureCategory", item.Item3);
-                SetField(controller, "streamLastFailureReason", item.Item4);
+                Call(controller, "RecordStreamEvent", "failed", item.Item4, item.Item3);
                 SetField(controller, "streamBackend", .24f);
                 SetProperty(controller, "Stage", "stream-step");
                 Call(controller, "SetStatus", item.Item4, item.Item1, item.Item2);
@@ -80,8 +80,8 @@ public static class ArdyRoomFollowFailureIdentityRegression
                     Mathf.Abs((float)diagnostic["streamTelemetry"]["backendSeconds"] - .24f) < .0001f,
                     "RoomTrace/current speech context lost the original reason or stream timing snapshot.");
                 if (item.Item5)
-                    Check(bridge.PeekCurrentTargetEvidence().activeBlockingCategory == "user-clearance",
-                        "Current paused category did not identify the actual user-clearance rejection.");
+                    Check(bridge.PeekCurrentTargetEvidence().activeBlockingCategory == item.Item3,
+                        "Current paused category did not retain the actual classified rejection.");
                 bridge.StopMovement();
                 Check(!bridge.IsFollowing && bridge.PeekCurrentTargetEvidence().activeBlockingCategory == "" && controller.Revision == before,
                     "An explicit stop of an already ended/paused controller fabricated a second cancellation or retained a pause.");
@@ -214,6 +214,11 @@ public static class ArdyRoomFollowFailureIdentityRegression
             "{\"error\":{\"code\":\"stream_quality_rejected_later\"}}")) == "service-request",
             "A similar machine code bypassed exact quality-code matching.");
 
+        Check(Classify(NewException("ExecutionException", "fixture: local braking", ArdyRoomExecutionReason.GeneratedPathRejected,
+            new ArdyRoomStreamTrajectory.KinematicsException("braking-distance", "fixture: braking"))) == "motion-control",
+            "Local kinematics are not room geometry or server transport failure.");
+        Check(Classify(NewException("ExecutionException", "braking-distance only in prose", ArdyRoomExecutionReason.GeneratedPathRejected)) == "navigation",
+            "Failure prose cannot grant the typed finite control recovery.");
         SetProperty(controller, "LastErrorResponseJson", quality);
         Check(Classify(NewException("ExecutionException", "fixture: a different player acquired the body", ArdyRoomExecutionReason.OwnershipLost)) == "ownership",
             "A retained old HTTP quality body contaminated a later ownership exception.");

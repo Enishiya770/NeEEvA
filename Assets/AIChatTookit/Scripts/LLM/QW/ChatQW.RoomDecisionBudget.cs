@@ -138,6 +138,15 @@ public partial class ChatQW
             var initial = MeasureRoomDecisionBudget(json, ceiling); diagnostic["original"] = initial;
             var initialWire = ReadRoomTaskRecoveryJson(json);
             bool workingMemory = TryFindRoomTaskInput(initialWire, out _, out var initialInput) && initialInput["workingMemory"] != null;
+            // Optional evidence yields before the hard limit. Mandatory facts may
+            // exceed this preference and still use the unchanged admission limit.
+            string mode = (string)(initialInput?["attentionState"] as JObject)?["mode"];
+            double fraction = mode == "investigate" ? .9 : mode == "dialogue" || mode == "idle" ? .7 : .8;
+            long preferred = workingMemory && !recovery ? (long)(ceiling * fraction) : long.MaxValue;
+            diagnostic["preferredTextUnits"] = preferred == long.MaxValue ? (long?)null : preferred;
+            string best = !recovery && (bool)initial["allowed"] ? json : null;
+            JObject bestMeasure = best == null ? null : initial;
+            string bestProjection = "none"; JObject bestSummary = null; int? bestRows = null;
             if (!recovery && !workingMemory && (bool)initial["allowed"])
             { diagnostic["final"] = initial.DeepClone(); diagnostic["admitted"] = true; return true; }
             // Cheap exact sharing first; this can be enough without omitting any facts.
@@ -146,11 +155,14 @@ public partial class ChatQW
                 var sharedMeasure = MeasureRoomDecisionBudget(shared, ceiling);
                 if ((bool)sharedMeasure["allowed"])
                 {
-                    admitted = shared; diagnostic["projection"] = "lossless-sharing";
-                    diagnostic["final"] = sharedMeasure; diagnostic["admitted"] = true; return true;
+                    if (bestMeasure == null || (long)sharedMeasure["estimatedUnits"] < (long)bestMeasure["estimatedUnits"])
+                    { best = shared; bestMeasure = sharedMeasure; bestProjection = "lossless-sharing"; }
+                    if ((long)sharedMeasure["estimatedTextUnits"] <= preferred)
+                    { admitted = shared; diagnostic["projection"] = "lossless-sharing";
+                      diagnostic["final"] = sharedMeasure; diagnostic["admitted"] = true; return true; }
                 }
             }
-            if (!recovery && (bool)initial["allowed"])
+            if (!recovery && (bool)initial["allowed"] && (long)initial["estimatedTextUnits"] <= preferred)
             { diagnostic["final"] = initial.DeepClone(); diagnostic["admitted"] = true; return true; }
             var originalWire = ReadRoomTaskRecoveryJson(json);
             if (!TryFindRoomTaskInput(originalWire, out _, out var originalInput))
@@ -180,7 +192,20 @@ public partial class ChatQW
                 diagnostic["summary"] = projected[RoomDecisionProjectionKey].DeepClone();
                 bool meaningfullyReduced = Encoding.UTF8.GetByteCount(json) - Encoding.UTF8.GetByteCount(candidate) >= 1024;
                 if ((bool)measured["allowed"] && (!recovery || meaningfullyReduced))
-                { admitted = candidate; diagnostic["admitted"] = true; return true; }
+                {
+                    if (bestMeasure == null || (long)measured["estimatedUnits"] < (long)bestMeasure["estimatedUnits"])
+                    { best = candidate; bestMeasure = measured; bestProjection = "structured-evidence";
+                      bestSummary = projected[RoomDecisionProjectionKey] as JObject; bestRows = optionalRows; }
+                    if ((long)measured["estimatedTextUnits"] <= preferred)
+                    { admitted = candidate; diagnostic["admitted"] = true; return true; }
+                }
+            }
+            if (best != null)
+            {
+                admitted = best; diagnostic["admitted"] = true; diagnostic["final"] = bestMeasure;
+                diagnostic["projection"] = bestProjection; diagnostic["summary"] = bestSummary;
+                diagnostic["optionalHistoryRowsPerCollection"] = bestRows;
+                diagnostic["preferenceExceededByProtectedEvidence"] = true; return true;
             }
             diagnostic["reason"] = "protected-input-and-reserved-payload-exceed-budget";
             // The rejected candidate is not returned; callers cannot accidentally send it.

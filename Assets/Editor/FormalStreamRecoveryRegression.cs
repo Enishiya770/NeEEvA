@@ -71,7 +71,11 @@ public static class FormalStreamRecoveryRegression
         if (!SessionState.GetBool(Key + "Active", false) || SessionState.GetBool(Key + "Finished", false) || !EditorApplication.isPlaying || routines.Count == 0) return;
         try
         {
-            if (EditorApplication.timeSinceStartup - started > 90) throw new TimeoutException("Formal stream loopback suite timed out.");
+            // The full suite now includes independent semantic/control fixtures
+            // and bounded transport failures; retain each production timeout,
+            // but allow the sequential aggregate to finish.
+            if (EditorApplication.timeSinceStartup - started > 180)
+                throw new TimeoutException("Formal stream validation timed out.");
             IEnumerator current = routines.Peek();
             if (!current.MoveNext())
             {
@@ -116,11 +120,23 @@ public static class FormalStreamRecoveryRegression
 
     private static IEnumerator RunChecks()
     {
+        string[] conversationArgs=Environment.GetCommandLineArgs(); int conversationIndex=Array.IndexOf(conversationArgs,"-conversationRepairInput");
+        if(conversationIndex>=0) {
+            yield return ConversationRepairRegression.RunNative(conversationArgs[conversationIndex+1],Output);
+            LastReport=ConversationRepairRegression.LastReport; yield break;
+        }
+        string[] liveArgs=Environment.GetCommandLineArgs();int liveIndex=Array.IndexOf(liveArgs,"-attentionLifecycleInput");
+        if(liveIndex>=0) {
+            yield return AttentionLifecycleLiveRegression.Run(liveArgs[liveIndex+1],Output);
+            LastReport=new JObject { ["passed"]=true,["scope"]="Explicit local-model lifecycle replay; see lifecycle-live.json. Not the synthetic transport suite." };
+            yield break;
+        }
         checks = 0;
         LastReport = new JObject { ["passed"] = false, ["cases"] = new JArray(),
             ["scope"] = "Empty-scene Play Mode; production ChatQW public stage entrypoint and UnityWebRequest/SSE, synthetic loopback only. No real LLM, microphone, TTS, private prompt, avatar, navigation or device actions.",
             ["realModelRequests"] = 0, ["actionExecutorsCreated"] = 0 };
         PureChecks();
+        checks += ConversationRepairRegression.RunChecks();
         LastReport["taskSequenceChecks"] = RoomTaskSequenceRegression.RunChecks(Output);
         checks += CommittedSpatialReplyProtocolRegression.RunChecks(Output);
         LastReport["committedPublicProtocol"] = CommittedSpatialReplyProtocolRegression.LastReport.DeepClone();

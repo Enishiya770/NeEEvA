@@ -8,6 +8,8 @@ public partial class ChatQW
 {
     private int m_SceneObjectMatchGeneration;
     private UnityWebRequest m_SceneObjectMatchRequest;
+    private string m_ExactObjectMatchKey, m_ExactObjectMatchOutput;
+    private float m_ExactObjectMatchAt;
     public override bool SupportsSceneObjectMatchMessages => true;
 
     public override void PostSceneObjectMatchMessage(string input, string imageDataUrl,
@@ -22,7 +24,18 @@ public partial class ChatQW
         int generation = m_SceneObjectMatchGeneration;
         // Snapshot only this request's facts/image, never shared prompt or historical image state.
         string json = BuildSceneObjectMatchRequestJson(input ?? "", imageDataUrl);
-        StartCoroutine(RequestSceneObjectMatchPayload(json, generation, callback));
+        string key;
+        using (var hash=System.Security.Cryptography.SHA256.Create())
+            key=Convert.ToBase64String(hash.ComputeHash(Encoding.UTF8.GetBytes(url+"\n"+m_Backend+"\n"+json)));
+        if (key==m_ExactObjectMatchKey && Time.realtimeSinceStartup-m_ExactObjectMatchAt<5f) {
+            Debug.Log("[Vision/ObjectMatchReuse] exact request, image, model and endpoint; caller still validates current identity and ownership");
+            callback?.Invoke(true,m_ExactObjectMatchOutput,"exact-evidence-reuse");return;
+        }
+        StartCoroutine(RequestSceneObjectMatchPayload(json, generation, (ok,output,status)=> {
+            if(generation!=m_SceneObjectMatchGeneration)return;
+            if(ok) {m_ExactObjectMatchKey=key;m_ExactObjectMatchOutput=output;m_ExactObjectMatchAt=Time.realtimeSinceStartup;}
+            callback?.Invoke(ok,output,status);
+        }));
     }
 
     public override void CancelSceneObjectMatchMessage()

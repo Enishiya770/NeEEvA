@@ -3,6 +3,7 @@ using UnityEngine;
 public partial class SenseVoiceSpeechToText
 {
     private ClosedSpeechEvidence m_ClosedSpeechEvidence;
+    private ClosedSpeechEvidence m_TranscriptComparison;
     public int LastFinalCaptureSerial { get; private set; }
     public string LastFinalTranscriptSource { get; private set; } = "none";
     public string LastFinalRejectionReason { get; private set; } = "";
@@ -11,6 +12,7 @@ public partial class SenseVoiceSpeechToText
     private void BeginClosedSpeechCapture()
     {
         m_ClosedSpeechEvidence = null;
+        m_TranscriptComparison = null;
         LastFinalCaptureSerial = InputCaptureSessionSerial;
         LastFinalTranscriptSource = "pending";
         LastFinalRejectionReason = LastFinalRawText = "";
@@ -21,6 +23,22 @@ public partial class SenseVoiceSpeechToText
         if (evidence == null || evidence.CaptureSessionSerial != InputCaptureSessionSerial ||
             evidence.NormalizedText != ClosedSpeechEvidence.Normalize(evidence.Text)) return;
         m_ClosedSpeechEvidence = evidence.Copy();
+    }
+
+    public void RetainTranscriptComparison(ClosedSpeechEvidence evidence)
+    {
+        if (evidence?.CaptureSessionSerial == InputCaptureSessionSerial &&
+            evidence.Source == "closed-stream-comparison" &&
+            evidence.NormalizedText == ClosedSpeechEvidence.Normalize(evidence.Text))
+            m_TranscriptComparison = evidence.Copy();
+    }
+
+    public Newtonsoft.Json.Linq.JObject ConsumeTranscriptDisagreement()
+    {
+        var evidence = m_TranscriptComparison;
+        m_TranscriptComparison = null;
+        return TranscriptDisagreementPolicy.Compare(evidence, InputCaptureSessionSerial,
+            LastFinalCaptureSerial, LastFinalTranscriptSource, LastText, Time.realtimeSinceStartup);
     }
 
     private void PublishFinalTranscriptOutcome(int capture, string source, string rejection, string rawText)

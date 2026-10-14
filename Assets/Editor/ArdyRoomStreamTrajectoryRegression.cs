@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using System.IO;
 using NeEEvA.Motion;
@@ -347,6 +347,20 @@ public static class ArdyRoomStreamTrajectoryRegression
         Check(lastMean - speedState.CommittedSpeed > .015f && lastMean - speedState.CommittedSpeed <= .0301f,
             "50ms mean speed is not reused as instantaneous speed under nominal or hard braking");
         state.Clear(); Check(!state.HasPlan && state.CommittedSpeed == 0, "session cancellation discards geometry and speed state");
+        var rejectedState = new ArdyRoomStreamTrajectory.PathState();
+        bool typedBraking = false;
+        try {
+            ArdyRoomStreamTrajectory.Build(Route(Vector3.zero, Vector3.forward * .02f), Vector3.zero, 0, .49f, .65f,
+                Quaternion.identity, Vector3.zero, 1, continuity: rejectedState);
+        } catch (ArdyRoomStreamTrajectory.KinematicsException error) {
+            typedBraking = error.Code == "braking-distance";
+        }
+        Check(typedBraking && rejectedState.LastPlanningMode == "new-path" && rejectedState.LastWarmExitReason == "no-continuation" &&
+            rejectedState.LastHardInitialSpeed > .2f && rejectedState.LastHardInitialSpeed < .23f,
+            "Recorded .490 m/s braking mechanism remains rejected and identifies the exact warm exit/hard speed.");
+        rejectedState.Clear();
+        Check(rejectedState.LastWarmExitReason == null && rejectedState.LastHardInitialSpeed == 0,
+            "A new operation cannot inherit a former control diagnostic.");
         return checks;
     }
 

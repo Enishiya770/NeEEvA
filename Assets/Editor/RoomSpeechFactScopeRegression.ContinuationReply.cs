@@ -99,7 +99,9 @@ public static partial class RoomSpeechFactScopeRegression
         LastDecisionFailureReport["latestContinuationFeedbackBudgets"]=reports;
         yield return CheckNarrowMovementContinuation(chat, bridge, model, serializer, output);
         yield return CheckWorkResultContinuation(chat, bridge, model, serializer, output);
+        yield return CheckQualityFailureReply(chat, bridge, model, serializer, output);
         yield return CheckAutonomousReply(chat, bridge, model, serializer, output);
+        yield return CheckPrivatePreflight(chat, bridge, model, serializer, output);
     }
 
     private static IEnumerator CheckNarrowMovementContinuation(ChatSample chat, ArdyRoomDialogueBridge bridge,

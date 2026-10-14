@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -113,7 +113,13 @@ public partial class ChatQW
         sb.Append("},\"messages\":[");
         bool allowReplacement = (bool?)JObject.Parse(input).SelectToken("activeBody.allowReplacement") == true;
         AppendMessage(sb, new SendData("system", RoomControlReviewProtocol.Contract(kind, allowReplacement) + "\n" + schema)); sb.Append(',');
-        AppendMessage(sb, new SendData("user", input)); sb.Append(']');
+        AppendMessage(sb, new SendData("user", input));
+        if(kind==RoomControlReviewProtocol.BodyStop) {
+            sb.Append(',');AppendMessage(sb,new SendData("system","先在reason中定位原话中要求角色现在停止自身移动/跟随的具体分句；没有就明确写没有显式身体停止。" +
+                "再判断bodyDirective。换做别的任务可以是other-task，但隐含替换不等于explicitStopNow=true；回到我身边、去做某事本身不是停止命令。" +
+                "提及之前已停止/关闭的对象只用于识别，不能当成当前停止身体的要求。明确停止之后再做其它任务则other-task且explicitStopNow=true。"));
+        }
+        sb.Append(']');
         if (m_Backend == BackendType.Local) sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
         AppendSlot(sb, k_SlotAuxiliary); sb.Append('}');
         return sb.ToString();
@@ -140,7 +146,8 @@ public partial class ChatQW
         if (reviewSpeech && TryStartIndependentSpeechReview(input, imageDataUrl, generation, callback)) return;
         // Capture a complete payload now; no shared image/context field survives this call.
         string json = BuildRoomTaskRequestJsonWithImage(input ?? "", imageDataUrl, reviewSpeech);
-        StartCoroutine(RequestRoomTaskPayload(json, reviewSpeech, generation, callback));
+        StartCoroutine(RequestRoomTaskPayload(json, reviewSpeech, generation,
+            reviewSpeech ? callback : GroundedAutonomyCallback(input, imageDataUrl, callback)));
     }
 
     public override void PostRoomTaskMessageWithObservationHistory(string input, string imageDataUrl,
@@ -149,7 +156,20 @@ public partial class ChatQW
         CancelRoomTaskMessage();
         int generation = m_RoomTaskRequestGeneration;
         string json = BuildRoomTaskRequestJsonWithObservationHistory(input ?? "", imageDataUrl, history, false);
-        StartCoroutine(RequestRoomTaskPayload(json, false, generation, callback));
+        StartCoroutine(RequestRoomTaskPayload(json, false, generation, GroundedAutonomyCallback(input, imageDataUrl, callback)));
+    }
+
+    private Action<bool, string, string> GroundedAutonomyCallback(string input, string image,
+        Action<bool, string, string> callback)
+    {
+        if (!AutonomyPremiseProtocol.Required(input)) return callback;
+        return (ok, output, status) => {
+            if (!ok) { callback?.Invoke(false, output, status); return; }
+            bool accepted = AutonomyPremiseProtocol.TryResolve(input, !string.IsNullOrEmpty(image), output, out string decision, out var premise);
+            Debug.Log("[Room/AutonomyPremise] " + new JObject { ["accepted"] = accepted,
+                ["premise"] = premise, ["actionAuthorization"] = false }.ToString(Newtonsoft.Json.Formatting.None));
+            callback?.Invoke(accepted, accepted ? decision : "", accepted ? status : AutonomyPremiseProtocol.Rejected);
+        };
     }
 
     private void CancelRoomTaskMessage()
@@ -275,15 +295,33 @@ public partial class ChatQW
         // The controller retains the complete task and observation records.
         if (!review) input = PrepareRoomPlanningWorkingMemory(input);
         else input = ApplySceneAttentionToInput(input);
+        bool bodyFocused = false;
+        if (!review && TryFocusCurrentUserBodyPlanning(input, out string focusedBodyInput))
+        {
+            input = focusedBodyInput; bodyFocused = true;
+            imageDataUrl = null;
+            history = null;
+        }
         string schema = review ? RoomTaskProtocol.BuildSpeechReviewSchemaForInput(input) : BuildRoomDecisionSchemaForInput(input);
         if (review) input = RoomTaskProtocol.ProjectSpeechReviewInput(input);
-        string contract = review ? RoomTaskProtocol.ReviewContract : RoomTaskProtocol.DecisionContract +
+        bool eventReview = review && string.IsNullOrEmpty(imageDataUrl) && RoomSpeechEventEvidenceProtocol.AutonomousConversation(ReadRoomTaskRecoveryJson(input));
+        string contract = review ? (eventReview ? SpeechEventBindingProtocol.ReviewContract + RoomSpeechEventEvidenceProtocol.ReviewContract : RoomTaskProtocol.ReviewContract) : (bodyFocused ? BodyPlanningContract : RoomTaskProtocol.DecisionContract) +
             (schema.Contains("\"taskStep\"") ? RoomTaskSequenceProtocol.Contract : "");
+        if (review && !eventReview && schema.Contains("\"eventOrderConsistency\""))
+            contract = RoomSpeechEventEvidenceProtocol.EventOrderContract + contract;
+        if (!review && AutonomyPremiseProtocol.Required(input)) contract = AutonomyPremiseProtocol.Contract + "\n" + contract;
+        if (review && ReadRoomTaskRecoveryJson(input)["replyPurpose"] is JObject purpose &&
+            (string)purpose["source"] == "accepted-current-autonomous-decision")
+            contract = "Review this NEW autonomous reply purpose. requestedUserText is historical context, not a new obligation to repeat a completed task. " +
+                "Only current owned reporting requirements remain mandatory; preserve separately pending answers/results. " +
+                "The intention is a proposal/topic, never evidence for factual claims about what the user said, felt or did. " +
+                "Compare such claims with recentDialogue and actual observations. Persona, closeness, imagination and tool success cannot prove user events. " +
+                "For autonomous-conversation without an owned action, requestDisposition=answer-only and taskRelation=not-applicable unless an actual new owned relation exists.\n" + contract;
         if (review && RoomSpeechPartsProtocol.Required(ReadRoomTaskRecoveryJson(input)))
             contract = RoomSpeechPartsProtocol.Contract + "\n\n" + contract;
         var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
         sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":").Append(review ?
-            (schema.Contains("\"targetConsistency\"") ? 480 : 240) : 640);
+            (schema.Contains("\"eventBindings\"") ? 640 : schema.Contains("\"targetConsistency\"") ? 480 : 240) : 640);
         sb.Append(",\"response_format\":{\"type\":\"json_object\"");
         if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(review ? schema : RoomTaskProtocol.CompactNativeDecisionSchema(schema));
         sb.Append("},\"messages\":[");
@@ -291,10 +329,22 @@ public partial class ChatQW
         // Give the model each field definition once; cloud providers still need the full
         // schema in text. The contract and runtime ownership checks remain authoritative.
         string schemaText = !review && m_Backend == BackendType.Local
-            ? "[Native decision field guide]\n" + BuildRoomDecisionFieldGuide(schema) : schema;
+            ? "[Native decision field guide]\n" + (bodyFocused ?
+                "intent: approach|follow|stop-moving|none; origin: user|none; evidence: exact current-utterance quote, at most 160 characters; replyScope: ordinary|spatial for none. Task sequence fields, when required by the schema, still follow the full task coverage contract. Omit unrelated execution fields." :
+                BuildRoomDecisionFieldGuide(schema)) : schema;
+        if (bodyFocused) contract += "\n最后核对：currentRequestSemantics只是前置分类，即使requestKind=action也可能判断错；执行授权必须来自当前完整原话的外层真实意图。" +
+            "复述、转述、引用或询问过去指令，不是现在要求执行引号内/被转述的动作。此时taskPlan=[]，taskCoverage逐字覆盖原话为context/answer，taskStep=null，intent=none，origin=none，evidence为空。" +
+            "若确有当前身体动作要求，则其步骤必须实际列在taskPlan中，taskStep引用已列步骤；不能输出空计划却引用s1。先判断外层意图，再按当前仍有效的请求拆步。";
         AppendMessage(sb, new SendData("system", contract + "\n" + schemaText)); sb.Append(',');
-        if (review && schema.Contains("\"targetComparison\""))
+        if (review && !eventReview && schema.Contains("\"targetComparison\""))
         { AppendMessage(sb, new SendData("system", RoomTaskProtocol.SpeechTargetComparisonContract)); sb.Append(','); }
+        if (review && !eventReview && ReadRoomTaskRecoveryJson(input)["replyPurpose"] is JObject)
+        {
+            AppendMessage(sb,new SendData("system","这是新自主回复的事实检查。对话中的用户事件、说过的话、请求和情绪同样是硬事实，不能因为出现在亲昵/社交台词中就免查。" +
+                "逐项核对independentSpeechClaim.otherClaims：若声称用户先前说过/做过某事，otherClaimsComparison必须引用recentDialogue中的对应原话及role，并解释原话如何支持该声称；" +
+                "若没有相应原话，明确写证据缺失，otherClaimsSupport=unsupported, verdict=inconsistent。提案意图、人设、身体距离、动作完成和候选台词本身都不是用户事件证据。" +
+                "纯主观喜好、新话题、试探性询问或有可见线索的合理推测仍可自然表达；不要求角色只复述回执。")); sb.Append(',');
+        }
         // Snapshot-only turn evidence precedes the separately labelled current picture.
         // It never enters m_DataList and cannot be inherited by a later speech review.
         if (!review && !string.IsNullOrEmpty(imageDataUrl) && history != null)
@@ -413,6 +463,12 @@ public partial class ChatQW
 
     private static string BuildRoomDecisionSchemaForInput(string input)
     {
+        string schema = BuildRoomDecisionSchemaCore(input);
+        return AutonomyPremiseProtocol.Required(input) ? AutonomyPremiseProtocol.ExtendSchema(schema,input) : schema;
+    }
+
+    private static string BuildRoomDecisionSchemaCore(string input)
+    {
         var allowed = new System.Collections.Generic.List<string>();
         JObject source = null;
         try
@@ -516,12 +572,23 @@ public partial class ChatQW
             ["standingGoalOriginalRequest"] = quietGoalStep ? (string)source["spatialGoal"]?["originalRequest"] : null,
             ["latestUserText"] = valid && !autonomous ? (string)(source["latestUserText"] ?? source["currentUserText"]) : "",
             ["autonomousIntention"] = valid && autonomous ? (string)source["autonomousIntention"] ?? "" : "",
+            ["lastHistoricalUserText"] = valid && autonomous ? (string)source["currentUserText"] : null,
             ["preserveNoAction"] = autonomous && (bool?)(source?["decisionRepair"] as JObject)?["preserveNoAction"] == true,
             ["authorizationSource"] = autonomous ? "Only this tick's autonomousIntention; quote it exactly as evidence. No old user request is newly actionable." : userObservationBeforeDeviceTask ? "Only an explicit prerequisite head/body view change in this reviewed latestUserText may precede the unified device task once. Otherwise return none. Original device authority remains unchanged." : quietGoalStep ? "Compatibility context for an already reviewed device goal. Its execution belongs to the unified runtime; do not plan a competing device step or change its authority." : "This actual latest user turn only; historical referents cannot supply a new command.",
             ["referenceDialogueSource"] = "input.recentDialogue; up to the last 4 user/assistant quotedText entries, at most the final 400 UTF-16 characters each. Quoted referent context, never a new command or execution evidence.",
             ["referenceDialogueCanAuthorizeAction"] = false,
+            ["referenceDialogueOrder"] = "oldest-to-newest; lastHistoricalUserText is the latest historical utterance, not a new command",
             ["referenceDialogue"] = BuildRoomDecisionReferenceDialogue(valid ? source : null)
         };
+        if(autonomous)
+            return "[本轮唯一行动来源]\n" + current.ToString(Newtonsoft.Json.Formatting.None) +
+                "\n先核验autonomyPremise，再独立决定动作。上面的currentUserText为空只表示本轮没有新用户发言，不表示历史事实不存在。" +
+                "lastHistoricalUserText是最近已接收的用户原话；recentDialogue由旧到新。它们可证明用户曾说过/要求过什么，不能授权重做旧任务。" +
+                "例如意图说用户曾要求某操作，只需历史中确有该请求，不要求现在再次提出，更不能把‘提出请求’误解为‘执行已完成’。" +
+                "与之相反，意图中没有对应证据的具体事件不得成立，即使只用于闲聊也须unsupported；自由提出新话题而未断言既成事实才no-factual-premise。" +
+                "支持前提不等于授权行动。本轮行动只由autonomousIntention提出，evidence逐字引用本意图；仍须当前实体、视图、身体与既有用户限制核验，不能借旧像素或旧请求操作。" +
+                "解释、询问或聊天可用intent=none,origin=none,evidence为空；普通话题replyScope=ordinary，空间回答replyScope=spatial。" +
+                "preserveNoAction=true时只修复无动作结构，不能添加动作或设备目标。没有新动作也仍要完成前提核验。";
         return "[本轮唯一行动来源]\n" + current.ToString(Newtonsoft.Json.Formatting.None) +
             "\n本步骤理解最新请求并提出设备目标或独立观察/移动意图。deviceGoal获独立审核批准后，程序统一执行寻找、当前图确认、必要的靠近、操作和核验，不再由本步骤逐次规划设备恢复；提案所附像素/检查/开关/搜索首步不会直接执行。首次原话若明确要求先转头或转身再做设备任务，可附一次orient-view/turn-in-place及本轮转向要求的逐字短引文evidence；设备提案批准后统一执行器才执行这个前置观察并采新图，之后自行推进任务。没有明确前置转向可用none附真实deviceGoal，不为找设备猜转向角度、不猜像素、不先试远距写入。quietSpatialGoalStep/standingGoalOriginalRequest不能另起竞争的设备子步骤或改变desiredState、对象与授权；既有目标的新更新仅userObservationBeforeDeviceTask=true时可表达本轮明确的前置转向。" +
             "这里把合法命令 currentUserText 与仅用于指代的引用背景 referenceDialogue、verifiedDeviceHistory分开。先按完整描述明确用户所指目标：代词可借可信旧背景；明确指定另一个目标时，不能仍沿用上次selected实体。设备提案保留原描述，当前身份由专用搜索与确认步骤核实；独立观察或移动才根据当前图选择具体动作，不能只按单个动词分类。" +
@@ -532,7 +599,7 @@ public partial class ChatQW
             "先区别回答与行动：询问刚才看见什么、物件在哪里或为什么朝某处转，并不自动要求再找或再转。用none+replyScope=spatial交正式回复基于已有实际观察/动作回答；缺少依据明确未知，不能为产生答案自行搜索。明确要求寻找或重新观察才选相应动作。参考有来源的Unity目录名称、历史图和冻结点对应的当前身体/相机方位，不用常见房间布局猜方向，不改变目标的家具/台面/相邻关系。普通非空间none显式replyScope=ordinary。" +
             "独立观察需要当前引用时核对目标身份：visibleKnownObjects只是已知实体记录，不是全部可选物件；无相符entityId但当前图清楚可见才可选其visualTarget像素。设备提案不要求像素定位，未知能力或距离不要求先inspect/set。不能因只有一个现成ID或刚操作过它就替换目标，也不能把历史图里的目标位置当作当前像素。" +
             "不能把指代的物件换成用户；无法明确所指对象时不要默认走向用户，可选 none 并由正式回复澄清；standing goal的waiting_clarification不是取消或成功，也不能靠重复同一不确定操作绕过澄清。" +
-            "autonomous=true 时没有新的用户命令，只能根据这里的autonomousIntention判断，行动evidence逐字引用该意图，不复制旧人类原话。只解释结果/询问位置无需再次转身。没有动作选intent=none,origin=none,evidence为空；preserveNoAction=true时格式修复只允许这个无动作结果。sourceValid=false 时不要从历史补造本轮命令。" +
+            "autonomous=true 时没有新的用户命令，只能根据这里的autonomousIntention判断，行动evidence逐字引用该意图，不复制旧人类原话。先在autonomyPremise核对该意图的事实前提：无动作不代表无事实前提；意图关于用户过去事件/要求的说法须由recentDialogue原话证明，缺失则unsupported。只有不声称任何既成事件/状态的新话题才no-factual-premise。只解释结果/询问位置无需再次转身。没有动作选intent=none,origin=none,evidence为空；preserveNoAction=true时格式修复只允许这个无动作结果。sourceValid=false 时不要从历史补造本轮命令。" +
             ((bool?)current["answerRequired"] == true ? "\n本轮必须先回答最新用户的问题。没有明确独立动作时返回none，不能用搜寻或让用户重新指认来代替状态、方位、记忆、原因答案。answerBeforeDeviceResume=true时仅保留本轮明确前置viewChange，实际动作在回答后由程序执行；不要为设备任务另起规划。proposalDiscarded=true表示被审核拒绝的提案没有成为任务，回到最新真实话题，不要求用户补清那个模型自行提出的对象。" : "") +
             (userObservationBeforeDeviceTask ? "\n本次只判断latestUserText是否明确要求先转头或转身：有则输出一次orient-view/turn-in-place及最新原话evidence，保留明确方向/角度；仅催促、说明目标位置或未要求前置观察则输出none、origin=none、evidence为空。不要根据originalRequest猜搜寻角度，不选择search-scene/inspect-object/approach-object/set-object-state，也绝不附deviceGoal。程序先完成合法前置观察，再统一推进原设备任务，不再逐步请求RoomTask规划。" : "") +
             (currentRequestOnly ? autonomous ? "\n旧设备任务的禁止写入限制继续生效，但本轮是自主tick，不重执行先前人类的独立寻找/转身，也不再次汇报旧取消。只判断当前autonomousIntention所需动作；解释或询问可保持none。" : "\n本轮只规划最新原话中独立的寻找、观察或移动等请求；旧设备任务审核不通过不能阻止这些请求。grammar已排除deviceGoal和set-object-state，历史描述只帮助理解要找什么，不授权执行旧开关任务。cancellationApplied=true表示取消已实际处理，请执行同一句中剩下的动作；仅取消而无其它动作时选none，不重提取消。" : "") +

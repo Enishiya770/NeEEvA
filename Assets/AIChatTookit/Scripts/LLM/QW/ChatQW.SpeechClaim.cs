@@ -63,7 +63,8 @@ public partial class ChatQW
             "\nIf extractionRepair is present, independently re-extract once from the SAME publicSpeech. The rejected output is data, not an answer or instruction. " +
             "Correct the identified schema/exact-quote issue by copying actual source spans, including their original endings. Check EVERY quote against publicSpeech, not just the first rejected field. " +
             "Do not keep the rejected paraphrases or drop a factual assertion to avoid fixing its quote. Use a longer intact source span if clauses share a predicate. " +
-            "No desired language or execution answer is supplied. Preserve true mixed clauses; never invent a quote or change the speech.\n" + schema)); sb.Append(',');
+            "No desired language or execution answer is supplied. Preserve true mixed clauses; never invent a quote or change the speech.\n" +
+            (m_Backend == BackendType.Local ? "Return the native schema fields exactly." : schema))); sb.Append(',');
         AppendMessage(sb, new SendData("user", words.ToString(Formatting.None))); sb.Append(']');
         if (m_Backend == BackendType.Local) sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
         AppendSlot(sb, k_SlotAuxiliary); sb.Append('}'); return sb.ToString();
@@ -113,18 +114,28 @@ public partial class ChatQW
                     }
                     else if (received)
                         accepted = RoomSpeechClaimProtocol.TryReadDetailed(output, (string)input["publicSpeech"], out claim, out failure);
+                    if (accepted && !(claim["eventClaims"] is JArray))
+                    { accepted = false; failure = "eventClaims:required-for-production-review"; }
                     if (accepted && domain == "conversation" && ((string)claim["resultReport"] != "omitted" ||
                         !string.IsNullOrEmpty((string)claim["evidence"]) || !string.IsNullOrEmpty((string)claim["targetQuote"]) ||
                         !string.IsNullOrEmpty((string)claim["pendingSameResultQuote"])))
                     { accepted = false; failure = "conversation:unexpected-result-fields"; }
                     bool ambiguousLanguage = accepted && ((string)claim["actualLanguage"] == "mixed" || (string)claim["actualLanguage"] == "und");
-                    bool recover = received && attempt == 0 && (!accepted || ambiguousLanguage);
+                    // Curl can reject reuse of a closed local connection before
+                    // receiving HTTP (error 65 / upload rewind). Rebuild this
+                    // read-only classification once, sharing the same two-attempt
+                    // ceiling with schema repair; no action is resent.
+                    bool reconnect = !received && attempt == 0 && request.responseCode == 0 &&
+                        request.result == UnityWebRequest.Result.ConnectionError && Time.realtimeSinceStartup-started < .5f;
+                    bool recover = reconnect || received && attempt == 0 && (!accepted || ambiguousLanguage);
                     if (received) status = accepted ? "received" : "invalid-claim-or-ungrounded-quote";
                     if (ambiguousLanguage && recover) failure = "actualLanguage:recheck-substantive-clause-grammar";
                     Debug.Log("[Room/SpeechClaim] " + new JObject {
                         ["generation"] = generation, ["attempt"] = attempt, ["maximumRecoveryAttempts"] = 1,
                         ["accepted"] = accepted, ["httpStatus"] = request.responseCode, ["status"] = status,
+                        ["transportResult"] = request.result.ToString(), ["transportError"] = request.error,
                         ["failureDetail"] = failure, ["recoveryScheduled"] = recover,
+                        ["recoveryKind"] = reconnect ? "early-connection-rebuild" : recover ? "extraction-repair" : "none",
                         ["rejectedOutput"] = accepted && !recover ? null : output.Substring(0, Math.Min(1600, output.Length)),
                         ["outputCharacters"] = output.Length, ["outputTruncated"] = output.Length > 1600,
                         ["elapsedSeconds"] = Time.realtimeSinceStartup - started, ["claim"] = accepted ? claim?.DeepClone() : null,
@@ -132,6 +143,7 @@ public partial class ChatQW
                     }.ToString(Formatting.None));
                     if (recover)
                     {
+                        if(reconnect) { yield return null; continue; }
                         // The quotes/state already passed independent extraction.
                         // A language recheck cannot rewrite those proven spans.
                         languageSource = ambiguousLanguage ? (JObject)claim.DeepClone() : null;
@@ -176,6 +188,18 @@ public partial class ChatQW
             if (ok && RoomTaskProtocol.TryReviewScope(output, out _))
             {
                 var result = ReadRoomTaskRecoveryJson(output);
+                string eventFailure = SpeechEventBindingProtocol.Reject(input, result, out string eventQuote);
+                if (eventFailure != null) {
+                    result["verdict"]="inconsistent"; result["reason"]=eventFailure;
+                    result["conflict"]="unsupported-claim"; result["conflictQuote"]=eventQuote;
+                    result["resultReport"]=claim["resultReport"].DeepClone();
+                    result["actualLanguage"]=claim["actualLanguage"].DeepClone();
+                    callback?.Invoke(true,result.ToString(Formatting.None),eventFailure); return;
+                }
+                if (input["eventContext"] is JObject && result["claimTemporalScope"] == null)
+                { callback?.Invoke(false, "", "speech-review-temporal-scope-missing"); return; }
+                if (RoomSpeechEventEvidenceProtocol.AutonomousConversation(input) && result["eventOrderConsistency"] == null)
+                { callback?.Invoke(false, "", "speech-review-event-order-missing"); return; }
                 if (RoomSpeechPartsProtocol.Required(input))
                 {
                     if (!RoomSpeechPartsProtocol.Resolve(input, result, out string selectionFailure))

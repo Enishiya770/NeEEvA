@@ -10,7 +10,8 @@ using System.Threading.Tasks;
 
 /// <summary>
 /// Disposable loopback-only test transport. Every response is obtained from the real
-/// service, unchanged; selected successful stream replies are held before delivery.
+/// service; selected successful stream replies are held before delivery. Explicit
+/// quality scenarios instead inject labeled synthetic 422 diagnostics (never poses).
 /// No runtime assembly reference and no synthetic pose/trajectory generation.
 /// </summary>
 internal sealed class ArdyRoomStreamDelayProxy : IDisposable
@@ -21,6 +22,7 @@ internal sealed class ArdyRoomStreamDelayProxy : IDisposable
         public int step = -1, status, delayMilliseconds;
         public double receivedSeconds, backendFinishedSeconds, finishedSeconds;
         public bool delivered, finished;
+        public bool injectedQualityFailure;
     }
     private readonly object gate = new object();
     private readonly List<Record> records = new List<Record>();
@@ -33,6 +35,7 @@ internal sealed class ArdyRoomStreamDelayProxy : IDisposable
     private string scenario;
     private int delayedStep, delayMilliseconds;
     private bool oncePerSession, delayedOnce;
+    private bool qualityInjection;
     internal string Endpoint { get; private set; }
 
     internal ArdyRoomStreamDelayProxy(string endpoint)
@@ -51,8 +54,12 @@ internal sealed class ArdyRoomStreamDelayProxy : IDisposable
         {
             scenario = name; delayedStep = step; delayMilliseconds = milliseconds;
             oncePerSession = everySession; delayedOnce = false; delayedSessions.Clear();
+            qualityInjection = false;
         }
     }
+
+    internal void ConfigureQuality(string name, int step, bool everySession)
+    { Configure(name,step,0,everySession); lock(gate) qualityInjection=true; }
 
     internal Record[] Snapshot()
     {
@@ -66,7 +73,7 @@ internal sealed class ArdyRoomStreamDelayProxy : IDisposable
                     request = r.request, error = r.error, step = r.step, status = r.status,
                     delayMilliseconds = r.delayMilliseconds, receivedSeconds = r.receivedSeconds,
                     backendFinishedSeconds = r.backendFinishedSeconds, finishedSeconds = r.finishedSeconds,
-                    delivered = r.delivered, finished = r.finished };
+                    delivered = r.delivered, finished = r.finished, injectedQualityFailure=r.injectedQualityFailure };
             }
             return output;
         }
@@ -133,6 +140,7 @@ internal sealed class ArdyRoomStreamDelayProxy : IDisposable
                         (oncePerSession ? !delayedSessions.Contains(record.session ?? "") : !delayedOnce))
                     {
                         delayedOnce = true; delayedSessions.Add(record.session ?? ""); record.delayMilliseconds = delayMilliseconds;
+                        record.injectedQualityFailure=qualityInjection;
                     }
                     records.Add(record);
                 }
@@ -161,7 +169,20 @@ internal sealed class ArdyRoomStreamDelayProxy : IDisposable
                         if (record.delayMilliseconds > 0 && record.status >= 200 && record.status < 300)
                             await Task.Delay(record.delayMilliseconds, stop.Token).ConfigureAwait(false);
                         byte[] payload = result.ToArray();
-                        byte[] prefix = Encoding.ASCII.GetBytes("HTTP/1.1 " + (int)response.StatusCode + " " + response.StatusDescription +
+                        if(record.injectedQualityFailure && record.status==200)
+                        {
+                            var candidates=new Newtonsoft.Json.Linq.JArray();
+                            for(int i=1;i<=3;i++)candidates.Add(new Newtonsoft.Json.Linq.JObject {
+                                ["attempt"]=i,["seed"]=i,["accepted"]=false,["windowMs"]=1,["qualityMs"]=1,
+                                ["reasons"]=new Newtonsoft.Json.Linq.JArray(new Newtonsoft.Json.Linq.JObject {
+                                    ["code"]="joint_step",["frame"]=0,["joint"]="LeftFoot",["value"]=38,["maximum"]=35 }) });
+                            payload=Encoding.UTF8.GetBytes(new Newtonsoft.Json.Linq.JObject { ["error"]=new Newtonsoft.Json.Linq.JObject {
+                                ["code"]="stream_quality_rejected",["message"]="Explicit synthetic quality rejection in isolated proxy; no generated pose is modified.",
+                                ["details"]=new Newtonsoft.Json.Linq.JObject { ["testInjected"]=true,["timings"]=new Newtonsoft.Json.Linq.JObject {
+                                    ["qualityAttempts"]=3,["qualityCandidates"]=candidates } } } }.ToString());
+                            lock(gate)record.status=422;
+                        }
+                        byte[] prefix = Encoding.ASCII.GetBytes("HTTP/1.1 " + record.status + " " + (record.status==422?"Unprocessable Entity":response.StatusDescription) +
                             "\r\nContent-Type: application/json\r\nContent-Length: " + payload.Length + "\r\nConnection: close\r\n\r\n");
                         await input.WriteAsync(prefix, 0, prefix.Length, stop.Token).ConfigureAwait(false);
                         await input.WriteAsync(payload, 0, payload.Length, stop.Token).ConfigureAwait(false);

@@ -69,6 +69,7 @@ public static partial class RoomSpeechFactScopeRegression
             yield return CheckConcurrentBodyFailure(chat, bridge, model);
             yield return CheckUserTargetRefreshWithoutReplanning(chat, bridge, model);
             yield return CheckStopAndPlanningFailure(chat, bridge, model);
+            yield return CheckPreparedStopDirectHandoff(chat, bridge, model);
         }
         finally { model.TaskSequencesEnabled = old; }
     }
@@ -292,14 +293,15 @@ public static partial class RoomSpeechFactScopeRegression
         // Controlled follow state belongs at the stop callback boundary. It is
         // not a simulated live controller leg across asynchronous fixture waits.
         Set(bridge, "followActive", true);
+        int beforeStopDecisions=model.Decisions.Count,beforeStopSpeech=model.Speech.Count;
         model.Decisions.Last().Complete(true, stop.ToString(Formatting.None), "controlled-complete-stop-device-return");
         yield return Wait(() => (string)Get(chat, "m_RoomTaskDispatch") == "stop-submitted", "Actual stop committed");
         Require(!bridge.IsFollowing && !bridge.ReservesBody && bridge.Phase == "stopped", "A real StopForTask releases the previous follow before device takeover.");
         var sequence = (JObject)Call(chat, "ReadRoomTaskSequence");
         Require((string)sequence.SelectToken("steps[0].status") == "completed" && ((JArray)sequence["readyStepIds"]).Values<string>().SequenceEqual(new[] { "s2" }),
             "The real stop receipt unlocks only the device step; return stays dependent on that device.");
-        Require((bool)Get(chat, "m_WorkSubstepReviewPending") && (string)Get(chat, "m_WorkStatus") == "substep-result-pending",
-            "Synchronous stop queues remaining-work review without waiting thirty seconds or another user prompt.");
+        Require(!(bool)Get(chat, "m_WorkSubstepReviewPending") && model.Decisions.Count==beforeStopDecisions+1 && model.Speech.Count==beforeStopSpeech,
+            "Synchronous stop plans remaining work directly without a redundant reply/review or another user prompt.");
         string fallback = (string)Call(chat, "RoomTaskFallback", bridge);
         Require(fallback == "我已经停止移动了。", "Successful stop fallback uses its actual result after rejected device proposals.");
         var clock = (SceneReviewClock)Get(chat, "m_SceneReviewClock"); double due = clock.Deadline;
@@ -312,10 +314,10 @@ public static partial class RoomSpeechFactScopeRegression
         // Exercise adoption of an already committed early stop even when the
         // later draft selected its successor; adoption must not execute either.
         stop["taskStep"] = "s2";
-        Call(chat, "AdoptPreparedStopSequence", stop.ToString(Formatting.None));
+        Call(chat, "AdoptPreparedStopSequence", stop.ToString(Formatting.None), bridge.ActionId, "stop-submitted");
         Call(chat, "BindRoomTaskSequenceStep", new object[] { null });
         sequence = (JObject)Call(chat, "ReadRoomTaskSequence");
-        Require((string)sequence.SelectToken("steps[0].status") == "completed" && (bool)Get(chat, "m_WorkSubstepReviewPending") &&
+        Require((string)sequence.SelectToken("steps[0].status") == "completed" && !(bool)Get(chat, "m_WorkSubstepReviewPending") &&
             bridge.Controller.OperationRevision == operations, "Already executed early stop attaches to the full plan without replaying cancellation or skipping the device.");
         int epoch = (int)Get(chat, "m_WorkEpoch"); Set(chat, "m_WorkEpoch", epoch + 1);
         Call(chat, "ClearScheduledAgentWake"); Set(chat, "m_WorkSubstepReviewPending", false);

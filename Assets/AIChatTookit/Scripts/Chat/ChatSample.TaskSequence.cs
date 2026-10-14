@@ -140,7 +140,7 @@ public partial class ChatSample
         ObserveRoomTaskSequenceProgress(true);
     }
 
-    private void AdoptPreparedStopSequence(string json)
+    private void AdoptPreparedStopSequence(string json, string actionId, string dispatch)
     {
         // The stop already has its own current execution proof. Attach it to a
         // ready matching obligation without executing the planner's later action.
@@ -158,7 +158,16 @@ public partial class ChatSample
             var stop = steps.OfType<JObject>().FirstOrDefault(s => (string)s["kind"] == "stop-moving" && ready.Contains((string)s["id"]));
             if (stop == null) return;
             var source = JObject.Parse(json); source["taskStep"] = stop["id"].DeepClone();
-            ValidateRoomTaskSequence(source.ToString(Formatting.None), new RoomTaskProtocol.Decision { intent = "stop-moving" }, out _);
+            if (!ValidateRoomTaskSequence(source.ToString(Formatting.None), new RoomTaskProtocol.Decision { intent = "stop-moving" }, out _)) return;
+            var bridge = GetComponent<ArdyRoomDialogueBridge>();
+            if (bridge == null || bridge.ActionId != actionId || bridge.Phase != "stopped" || dispatch != "stop-submitted") return;
+            var owned = ((JArray)m_RoomTaskSequence["steps"]).OfType<JObject>().First(s => (string)s["id"] == (string)stop["id"]);
+            owned["status"] = "completed"; owned["intent"] = "stop-moving"; owned["actionId"] = actionId;
+            owned["generation"] = m_FormalResponseGeneration;
+            owned["receipt"] = new JObject { ["actionId"] = actionId, ["phase"] = "stopped", ["dispatch"] = dispatch,
+                ["execution"] = ReadCompactRoomTaskFacts(bridge)["execution"]?.DeepClone() };
+            m_RoomTaskSequenceReviewedSteps.Add((string)owned["id"]);
+            m_RoomTaskSequenceSelection = null;
         }
         catch (JsonException) { } // Full-request review remains owed even if the later plan was malformed.
     }

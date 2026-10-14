@@ -48,6 +48,7 @@ public sealed partial class ArdyRoomDialogueBridge
         ResetNavigationRecovery();
         ResetApproachRetarget();
         sceneOrientId = actionId = id; sceneOrientCaptureId = captureId; sceneOrientYaw = yaw;
+        actionIntent = "turn-in-place";
         sceneOrientRoot = avatar.transform.position;
         sceneOrientObservedForward = avatar.transform.forward; sceneOrientActualYaw = 0f;
         sceneOrientGround = legal;

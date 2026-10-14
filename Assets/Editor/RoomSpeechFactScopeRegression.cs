@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.IO;
 using System.Linq;
@@ -560,7 +560,8 @@ public static partial class RoomSpeechFactScopeRegression
                 (string)feedback["rejectedPublicSpeech"] == original &&
                 JToken.DeepEquals(feedback["actualReview"], JObject.Parse(rejection)) &&
                 (string)feedback["humanInput"]["primaryUtterance"] == question &&
-                (bool?)feedback["boundReplyFacts"]["readOnlyEvidenceReply"]["actionAuthorization"] == false,
+                feedback["boundReplyFacts"] == null && !string.IsNullOrEmpty((string)feedback["factsSource"]) &&
+                (bool?)CommittedSpatialReplyProtocol.ReadReplyFacts(repair.Context)?.SelectToken("readOnlyEvidenceReply.actionAuthorization") == false,
                 "Correction receives the real rejection, original complete human question and bound evidence, without handwritten desired answer or authority.");
             Require(mode.StartsWith("guard-", StringComparison.Ordinal)
                     ? (string)feedback["actualReview"]["verdict"] == "consistent" && (string)feedback["guardRejectedReason"] == "planning-failure-cause-mismatch"

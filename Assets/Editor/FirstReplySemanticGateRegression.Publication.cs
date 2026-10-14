@@ -19,10 +19,14 @@ public static partial class FirstReplySemanticGateRegression
             model.PostFirstReplyStream("你这次也没走回来哦。", _ => ++deltas, r => { result = r; ++done; });
             yield return Await(first.Received.Task, "ordinary promise");
             var route = server.Serve(Verdict("ordinary"), false, false);
+            first.Release.TrySetResult(true);
+            // Register the next listener only after routing has its request.
+            // Two Task.Run acceptors may otherwise receive these in reverse order.
+            yield return Await(route.Received.Task, "publication route request");
             var release = server.Serve(mode == "invalid" ? "{}" : Publication(mode == "physical-fact" ? "grounded-fact" :
                 mode == "wrong-language" ? "conversation" : "action-commitment", "もうすぐ行くわ", mode == "wrong-language" ? "zh" : "ja"), false, true);
-            first.Release.TrySetResult(true);
             yield return Await(release.Received.Task, "held independent publication gate");
+            File.WriteAllText(Path.Combine(directory, "publication-" + mode + ".request.json"), release.RequestJson);
             var wire = JObject.Parse(release.RequestJson);
             var words = JObject.Parse((string)wire["messages"][1]["content"]);
             Check(words.Count == 1 && (string)words["publicSpeech"] == promise &&

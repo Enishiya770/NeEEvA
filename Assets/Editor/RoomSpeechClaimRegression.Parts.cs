@@ -75,8 +75,25 @@ public static partial class RoomSpeechClaimRegression
                 // distinction. Reconsume its real verdict, but do not pretend it
                 // was generated with today's instructions. Current contracts get
                 // exported and replayed separately, including past-arrival cases.
-                int contractMessage = kind == "claim" ? 0 : 1;
-                actual["messages"][contractMessage]["content"] = expected["messages"][contractMessage]["content"].DeepClone();
+                // Both the general factual contract and the target/relationship
+                // contract now distinguish failure from role reversal. Only
+                // normalize those historical instructions; native schema,
+                // controls and every fact-bearing message still compare exactly.
+                foreach (int contractMessage in kind == "claim" ? new[] { 0 } : new[] { 0, 1 })
+                {
+                    Check((string)actual["messages"][contractMessage]["role"]=="system" &&
+                        (string)expected["messages"][contractMessage]["role"]=="system", "Historical contract slot remains a system instruction.");
+                    actual["messages"][contractMessage]["content"] = expected["messages"][contractMessage]["content"].DeepClone();
+                }
+                if(kind=="claim") {
+                    // This historical six-field schema predates independent
+                    // event tuples. Check the additive migration explicitly;
+                    // continue comparing every old field, fact and control.
+                    var schema=(JObject)actual.SelectToken("response_format.schema");
+                    Check(schema.SelectToken("properties.eventClaims")!=null && ((JArray)schema["required"]).Values<string>().Contains("eventClaims"),"Current claim schema requires event tuples.");
+                    ((JObject)schema["properties"]).Remove("eventClaims");
+                    ((JArray)schema["required"]).First(v=>(string)v=="eventClaims").Remove();
+                }
                 Check(JToken.DeepEquals(actual, expected), "Captured facts, schema and request controls remain unchanged (historical instructions retained): " + name + "/" + kind);
             }
         }

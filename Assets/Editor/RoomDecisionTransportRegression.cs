@@ -202,11 +202,12 @@ public static class RoomDecisionTransportRegression
             model.m_Backend = backend;
             var wire = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(), Image, false));
             var schema = backend == ChatQW.BackendType.Local ? SceneObjectProtocolRegression.ExpandNativeSchema(wire["response_format"]["schema"]) :
-                JObject.Parse(((string)wire["messages"][0]["content"]).Substring(RoomTaskProtocol.DecisionContract.Length + 1));
+                JObject.Parse(((string)wire["messages"][0]["content"]).Substring(AutonomyPremiseProtocol.Contract.Length + 1 + RoomTaskProtocol.DecisionContract.Length + 1));
             Require(JToken.DeepEquals(schema["properties"]["intent"]["enum"], new JArray("none")) &&
                 JToken.DeepEquals(schema["properties"]["origin"]["enum"], new JArray("none")) &&
                 JToken.DeepEquals(schema["properties"]["evidence"]["enum"], new JArray("")) &&
-                ((JObject)schema["properties"]).Count == 3 && (bool?)schema["additionalProperties"] == false,
+                ((JObject)schema["properties"]).Count == 4 && schema["properties"]["autonomyPremise"] is JObject &&
+                ((JArray)schema["required"]).Values<string>().Contains("autonomyPremise") && (bool?)schema["additionalProperties"] == false,
                 "Both backend contracts make no-action repair incapable of generating a physical action or a goal proposal.");
         }
     }

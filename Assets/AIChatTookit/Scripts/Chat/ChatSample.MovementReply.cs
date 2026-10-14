@@ -9,20 +9,22 @@ public partial class ChatSample
     private bool UseMovementReplyPacket(int generation)
     {
         string kind = (string)ReadMovementReplySemantics(generation)?["requestKind"];
-        return (kind == "action" || kind == "control" || ReadAutonomousBodyReplyPurpose(generation) != null) &&
+        return (kind == "action" || kind == "control" || ReadAutonomousReplyPurpose(generation) != null) &&
             (m_RoomTaskIntent == "approach" || m_RoomTaskIntent == "follow" || m_RoomTaskIntent == "stop-moving") &&
             !string.IsNullOrEmpty(m_RoomTaskActionId) && ReadRoomEvidenceReplyFacts(generation) == null &&
             generation != m_SpatialGoalTerminalReplyGeneration && (bool?)BuildRoomSearchReportRequirement()["required"] != true &&
             (!SpatialGoalUnfinished(m_SpatialDeviceGoal) || RoomTaskSequenceCurrent() && !SelectedRoomTaskSequenceIsDevice()) && !HasWorkToolInFlight();
     }
 
-    private JObject BuildBodyReplyFacts(int generation)
+    private JObject BuildFocusedReplyFacts(int generation)
     {
         var room = ReadCompactRoomTaskFacts(GetComponent<ArdyRoomDialogueBridge>());
-        var purpose = ReadAutonomousBodyReplyPurpose(generation);
+        var purpose = ReadAutonomousReplyPurpose(generation);
         return new JObject {
-            ["movementResultOnly"] = true,
+            ["movementResultOnly"] = m_RoomTaskIntent == "approach" || m_RoomTaskIntent == "follow" || m_RoomTaskIntent == "stop-moving",
             ["replyPurpose"] = purpose,
+            ["attentionState"] = ReadAttentionState("writer"),
+            ["interactionTime"] = purpose == null ? null : BuildAttentionInteractionTime(),
             ["humanInput"] = BuildCommittedReplyHumanInput(generation),
             ["originalUserRequest"] = m_ActionConstraints.CurrentUserText,
             ["originalUserRequestIsHistorical"] = purpose != null,
@@ -30,7 +32,8 @@ public partial class ChatSample
             ["pendingResults"] = CreateObservationReceipt()?.Facts,
             ["priorTaskResults"] = BuildMovementPriorResults(),
             ["historicalDeviceEvents"] = ReadHistoricalDeviceEvents(),
-            ["taskSequence"] = ReadRoomTaskSequence(),
+            ["eventContext"] = BuildReplyEventContext(generation),
+            ["taskSequence"] = purpose == null ? ReadRoomTaskSequence() : null,
             ["recentPublicReplies"] = ReadRecentRoomReplies(),
             ["currentActionReceipt"] = BuildCurrentReplyActionReceipt(),
             ["currentRoomFacts"] = room,
@@ -40,7 +43,7 @@ public partial class ChatSample
                 "generation", "userTurn", "workEpoch", "registered", "requestAssessment", "proposalDiscarded", "reason", "validationFailure"),
             ["previousReplyFailureReceipt"] = ReadPreviousReplyFailureReceipt(),
             ["scope"] = "Use replyPurpose when present; otherwise reply to the complete current movement request. Preserve conditions, failure causes and unmet requirements. " +
-                "No current visual description is requested; object catalogs and old search traces are not needed for this movement report. " +
+                "Object catalogs and old search traces are not needed for a receipt or ordinary conversation. Missing visual evidence cannot support a new visual claim. " +
                 "Only the owned execution receipt establishes whether an action was submitted. Neither drafting nor rewriting this reply submits, repeats or changes any action. " +
                 "Use a brief natural sentence in the authored persona/language; report only the phase evidenced here, not a future phase. " +
                 "Use priorTaskResults only for explicitly evidenced earlier steps; never claim the whole user request complete merely because this movement finished. " +
@@ -48,13 +51,13 @@ public partial class ChatSample
         };
     }
 
-    private string BuildMovementReplyContext(int generation)
+    private string BuildFocusedReplyContext(int generation)
     {
-        var facts = BuildBodyReplyFacts(generation);
+        var facts = BuildFocusedReplyFacts(generation);
         m_MovementReplyState = MovementPlaybackStamp(facts["currentRoomFacts"] as JObject, m_RoomTaskIntent, m_RoomTaskActionId);
         m_MovementReplyStateGeneration = generation;
-        string context = CommittedSpatialReplyProtocol.AppendReplyFacts("[Current movement reply]\n", facts);
-        UnityEngine.Debug.Log($"[Room/MovementReplyContext] generation={generation} action={m_RoomTaskActionId} characters={context.Length} state={(string)m_MovementReplyState?["expectedReport"]}", this);
+        string context = CommittedSpatialReplyProtocol.AppendReplyFacts("[Current focused reply]\n", facts);
+        UnityEngine.Debug.Log($"[Room/FocusedReplyContext] generation={generation} action={m_RoomTaskActionId} characters={context.Length} state={(string)m_MovementReplyState?["expectedReport"]}", this);
         return context;
     }
 }

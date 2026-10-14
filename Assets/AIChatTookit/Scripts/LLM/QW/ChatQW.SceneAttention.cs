@@ -27,13 +27,24 @@ public partial class ChatQW
         public bool currentPage;
     }
 
-    // This is a request-local attention window. Engine observations, the offered
-    // selection page, active bindings and unknown constraints are never deleted.
-    // The same selector serves planning, reply writing and speech review.
+    // Materialize the persistent runtime attention for this consumer. Legacy
+    // callers without a runtime snapshot keep bounded request-local selection.
+    // Offered pages, active bindings and unknown constraints remain protected.
     private static void ApplySceneAttention(IEnumerable<JObject> roots, int slots = SceneAttentionSlots,
         int units = SceneAttentionDetailUnits, bool reply = false)
     {
         var documents = roots.ToArray();
+        var state = documents.SelectMany(r => r.DescendantsAndSelf().OfType<JObject>())
+            .FirstOrDefault(r => (string)r["source"] == "runtime-attention-state-v1" && (bool?)r["actionAuthorization"] == false);
+        var attended = new HashSet<string>(StringComparer.Ordinal);
+        if (state != null)
+        {
+            slots = Math.Min(slots, Math.Max(1, Math.Min(12, (int?)state["ordinarySlots"] ?? slots)));
+            units = Math.Min(units, Math.Max(0, Math.Min(6500, (int?)state["optionalDetailUnits"] ?? units)));
+            if (state["selectedEntities"] is JArray entries)
+                foreach (JObject entry in entries.OfType<JObject>())
+                    if (!string.IsNullOrEmpty((string)entry["entityId"])) attended.Add((string)entry["entityId"]);
+        }
         string replyAction = documents.Select(r => (string)r.SelectToken("currentActionReceipt.requestedActionId"))
             .FirstOrDefault(v => !string.IsNullOrEmpty(v));
         string replyNeed = documents.Select(r => (string)r["replyEvidenceNeed"]).FirstOrDefault(v => v != null);
@@ -95,6 +106,7 @@ public partial class ChatQW
         foreach (var group in all.Where(SceneAttentionOptional).GroupBy(RoomWorkingMemoryObjectKey)
             .Where(group => !selected.Contains(group.Key))
             .OrderByDescending(group => group.Max(row => SceneAttentionRank(row, terms, referred) +
+                (attended.Contains((string)row["entityId"] ?? "") ? 40 : 0) +
                 (replyNeed == "current-visual" && (bool?)row["currentOpaquePixels"] == true ? 25 : 0) +
                 (replyNeed == "memory-or-direction" && (bool?)row["historical"] == true ? 25 : 0)))
             .ThenBy(group => group.Key, StringComparer.Ordinal))

@@ -31,6 +31,26 @@ public partial class ChatSample
             decision.next_intent_source == "current-work" && string.IsNullOrEmpty(m_WorkNextStepId));
         if (decision.next_intent_source == "autonomous" || decision.next_intent_source == "none")
             m_WorkReplyOnly = true; // Inconsistent source/status cannot acquire old-task action authority.
+        if (m_WorkReplyOnly)
+        {
+            // The executor's admitted next step also owns the writer's purpose.
+            // Retaining a rejected retry as prose used to invite promises of an
+            // adjustment/retry even though the action dispatcher correctly refused it.
+            UnityEngine.Debug.Log("[Work/ContinuationAdmission] " + new JObject {
+                ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
+                ["proposedIntent"] = decision.intent, ["proposedStepId"] = decision.next_step_id,
+                ["proposedSource"] = decision.next_intent_source,
+                ["effectiveMode"] = "deliver-result-or-answer", ["newActionAuthorized"] = false,
+                ["progress"] = WorkNextIntentProtocol.Progress(sequence)
+            }.ToString(Formatting.None), this);
+            m_WorkNextStepId = null;
+            decision.next_step_id = "";
+            decision.next_intent_source = "current-work";
+            decision.planning_focus = "other";
+            decision.intent = "根据完整原请求和各步骤真实回执，交付尚欠的结果、答案或失败说明。" +
+                "区分已完成部分与失败部分；此轮没有获准执行的步骤，不重试、不承诺正在调整或恢复。" +
+                "只有执行器实际处于恢复中才描述恢复；历史成功不重做，待交付的独立工具结果不能遗漏。";
+        }
         LogWorkNextIntent(decision, m_WorkReplyOnly ? "remaining-answer-or-diagnosis" : "current-work", sequence);
     }
 

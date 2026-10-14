@@ -26,7 +26,28 @@ public static class ArdyRoomStreamDiagnosticsRegression
         foreach (string invalid in new[] { null, "", "<html>gateway timeout</html>", "{}", new string('x', 32769),
             body.Replace("feature-wait", "UNTRUSTED_STAGE_TEXT"), body.Replace("5000", "-1"), body.Replace("5023", "-1") })
             if (Format(invalid) != "") throw new InvalidOperationException("Unverified error detail became a service-stage claim.");
-        return 10;
+        var quality = Newtonsoft.Json.Linq.JObject.Parse("{\"code\":\"stream_quality_rejected\",\"details\":{\"timings\":{\"qualityAttempts\":3,\"qualityCandidates\":[]}}}");
+        var candidates = (Newtonsoft.Json.Linq.JArray)quality.SelectToken("details.timings.qualityCandidates");
+        for (int i=1;i<=3;i++) candidates.Add(new Newtonsoft.Json.Linq.JObject {
+            ["attempt"]=i,["accepted"]=false,["seed"]=i,["reasons"]=new Newtonsoft.Json.Linq.JArray(
+                new Newtonsoft.Json.Linq.JObject { ["code"]="joint_step",["frame"]=0,["joint"]="LeftFoot",["value"]=38,["maximum"]=35 }) });
+        if (!ArdyStreamQualityFailure.SupportsFreshHistoryRecovery(quality)) throw new InvalidOperationException("Known finite quality evidence rejected.");
+        foreach (var mutate in new Action<Newtonsoft.Json.Linq.JObject>[] {
+            j=>j["code"]="other-error",j=>j.SelectToken("details.timings.qualityAttempts").Replace(2),
+            j=>j.SelectToken("details.timings.qualityCandidates[1].accepted").Replace(true),
+            j=>j.SelectToken("details.timings.qualityCandidates[0].reasons[0].code").Replace("nonfinite_prefix"),
+            j=>j.SelectToken("details.timings.qualityCandidates[0].reasons[0].frame").Replace(8),
+            j=>j.SelectToken("details.timings.qualityCandidates[0].reasons[0].value").Replace("unknown"),
+            j=>j.SelectToken("details.timings.qualityCandidates[0].reasons[0].joint").Replace("UnknownBone") })
+        {
+            var changed=(Newtonsoft.Json.Linq.JObject)quality.DeepClone();mutate(changed);
+            if (ArdyStreamQualityFailure.SupportsFreshHistoryRecovery(changed)) throw new InvalidOperationException("Unsafe/unknown failure granted recovery eligibility.");
+        }
+        string wrapped=new Newtonsoft.Json.Linq.JObject { ["error"]=quality.DeepClone() }.ToString();
+        if (!Newtonsoft.Json.Linq.JToken.DeepEquals(quality,ArdyStreamQualityFailure.Read(wrapped)) ||
+            ArdyStreamQualityFailure.Read("<html>proxy failure</html>")!=null)
+            throw new InvalidOperationException("Quality candidate evidence lost or malformed response accepted.");
+        return 19;
     }
     [Serializable] private sealed class Wire
     {
@@ -120,6 +141,52 @@ public static class ArdyRoomStreamDiagnosticsRegression
                 string.IsNullOrEmpty(controller.StreamSessionId) && controller.Stage == "stream-waiting" &&
                 controller.Avatar.transform.position == reachedRoot && player.LastAppliedSourceTimeSeconds <= .35f,
                 "Actual confirmed arrival failed to use the real smooth handoff or consumed an unconfirmed tail/root snap.");
+
+            player.RestorePreview(); player.Play(clip, null, 7); player.SampleAt(.34f);
+            Set(controller,"ownedClip",clip);Set(controller,"ownedPlayerRevision",player.PlaybackRevision);
+            Set(controller,"streamSessionId","rendered-near-arrival");Set(controller,"streamStepIndex",1);
+            Property(controller,"TargetGround",Call(controller,"AvatarGround"));
+            Property(controller,"IsContinuousFollowActive",true);Property(controller,"IsBusy",true);
+            Property(controller,"Stage","stream-following");
+            int beforeArrivalUnderruns=controller.StreamUnderrunCount;
+            Vector3 beforeArrivalRoot=controller.Avatar.transform.position;
+            Call(controller,"TickContinuousStream");
+            Check(controller.StreamUnderrunCount==beforeArrivalUnderruns && controller.Stage=="stream-waiting" &&
+                player.IsReturningToAnimation && controller.Avatar.transform.position==beforeArrivalRoot,
+                "Rendered stationary arrival was incorrectly counted as a supply failure outside stream-arriving stage.");
+
+            // A changed/moving target withdraws arrival immediately; no cached
+            // proximity may stop a new moving leg.
+            Set(controller,"streamUserMoving",true);
+            Check(!(bool)Call(controller,"StreamRenderedArrival"),"Moving again retained stationary arrival permission.");
+            Set(controller,"streamUserMoving",false);
+
+            // Drive the production arrival-wait coroutine with the real accepted
+            // prefix, then change only the target. No fabricated HTTP response is
+            // delivered: the insufficient budget must enter recovery before send.
+            player.RestorePreview(); player.Play(clip,null,7);player.SampleAt(.05f);
+            Set(controller,"ownedClip",clip);Set(controller,"ownedPlayerRevision",player.PlaybackRevision);
+            Set(controller,"streamSessionId","arrival-retarget-budget");Set(controller,"streamRecovering",false);
+            Set(controller,"streamConsecutiveRecoveries",0);Set(controller,"streamRecentStepCost",.247238f);
+            Set(controller,"streamRecentFramePeak",.03624f);
+            var capabilitiesType=controller.GetType().GetField("streamCapabilities",Private).FieldType;
+            Set(controller,"streamCapabilities",JsonUtility.FromJson("{\"streamProtocol\":\"ardy-room-stream-v1\",\"streamGenerationFrames\":40,\"streamCommitFrames\":8,\"sourceRootHeight\":"+
+                ((float)Get(controller,"sourceRootHeight")).ToString(System.Globalization.CultureInfo.InvariantCulture)+"}",capabilitiesType));
+            controller.ArrivalTolerance=.0001f;Property(controller,"TargetGround",confirmed);
+            int token=(int)Get(controller,"revision");Property(controller,"OperationRevision",token);
+            int priorRecoveries=controller.StreamRecoveryCount,priorUnderruns=controller.StreamUnderrunCount;
+            Vector3 beforeRetargetRoot=controller.Avatar.transform.position;
+            var waiting=(IEnumerator)Call(controller,"RunContinuousStream",token);
+            try {
+                Check(waiting.MoveNext() && controller.Stage=="stream-arriving","Real accepted prefix must enter arrival wait before target change.");
+                player.SampleAt(.20f);beforeRetargetRoot=controller.Avatar.transform.position;
+                Property(controller,"TargetGround",confirmed+Vector3.right*2);
+                Check(waiting.MoveNext() && controller.StreamIsRecovering && controller.StreamRecoveryCount==priorRecoveries+1 &&
+                    controller.StreamUnderrunCount==priorUnderruns && controller.OperationRevision==token &&
+                    controller.Avatar.transform.position==beforeRetargetRoot && Get(controller,"pending")==null,
+                    "Near-arrival target change must recover within the same operation before insufficient-budget dispatch, without root snap or false underrun.");
+            } finally {(waiting as IDisposable)?.Dispose();}
+            Set(controller,"streamRecovering",false);controller.ArrivalTolerance=.05f;
 
             player.RestorePreview(); player.Play(clip, null, 7); player.SampleAt(.35f);
             Set(controller, "ownedClip", clip); Set(controller, "ownedPlayerRevision", player.PlaybackRevision);

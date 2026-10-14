@@ -81,3 +81,31 @@ git apply -p1 <项目路径>/Server/GPT-SoVITS-patch/api_v2.streaming_mode.patch
 实测说明：模式 3 的固定分块在本机**没有测出相对模式 2 的首包优势**（TTS 片段本身
 就来得很快），但也没有变慢；保留该模式主要是为了兼容 Unity 端的既有配置。
 首次请求会有 2s 左右的冷启动，属正常现象。
+
+## 2026-10-13：混合文字前端与断流诊断
+
+`apply_frontend_diagnostics.py` 在上述整数流模式补丁基础上修正另一个故障：
+中文句子包含假名名字（例如 `ユウ`）时，旧前端会强制将该片段作为中文处理，
+产生空音素/BERT 列表，合成生成器在 HTTP 200 发出后异常退出。
+Unity 只能看到 `200 / Unknown Error`，并可能已播出前半句。
+
+补丁保留含明确假名、韩文字符的检测语言；纯汉字仍服从声明的句子语言。
+非空文本若仍没有音素，返回明确的前端错误，不制造静音、不吞掉失败。
+API 优先加载当前安装目录，避免附带 Python 的 `users.pth` 将导入重定向到旧安装。
+响应生命周期现在显式关闭被取消请求的音频生成器：客户端断开后，等待正在运行的原生生成步骤返回，再关闭本请求的生成器，不依赖垃圾回收，也不取消其他请求。`[TTS/ServerCancellation]` 分别记录断开与生成器关闭时间；`[TTS/ServerPreparedReceipt]` 为非流式预取记录独立合成结果。服务端产出字节数不能作为客户端已播放字节数。
+Unity 发送 `X-Request-ID`；服务端 `[TTS/ServerStreamReceipt]` 记录对应请求的
+完成、异常或取消及产出字节数。HTTP 成功、完整合成、AudioSource 播放完成分别记账。
+
+从项目根目录应用（参数均需显式指定）：
+
+```powershell
+python Server/GPT-SoVITS-patch/apply_frontend_diagnostics.py --root GPT-SoVITS --backup Logs/tts-patch-backup
+python Server/GPT-SoVITS-patch/test_frontend_diagnostics.py
+& Tools/neeeva_services.ps1 restart -Only tts
+```
+
+脚本先验证全部源码锚点，再保存备份、修改并记录 SHA256；可重复执行。
+不兼容的源码会拒绝应用。备份目录中的两个原文件可用于回退，回退后需重启 TTS。
+本次原句非流式与流式、其他假名名字、日语汉字和英文名字共 5 个实际合成用例
+均完整返回非空 PCM；录音存于 `Logs/conversation-repair-20261013/tts-after`。
+这些检查验证合成与传输完成，未把它等同于人工听感或完整 Unity 场景验收。

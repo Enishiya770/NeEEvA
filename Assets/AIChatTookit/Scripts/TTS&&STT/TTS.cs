@@ -61,6 +61,8 @@ public class TTS : MonoBehaviour
 
     /// <summary>True only after current synthesis has finished; playback may continue.</summary>
     public virtual bool CanPrefetchNextSpeech => false;
+    // Queue availability is not evidence that the preceding synthesis succeeded.
+    public virtual bool StreamingSynthesisSucceeded => false;
 
     /// <summary>
     /// 流式合成并直接播放。onStarted 在首批 PCM 开始播放时触发，
@@ -121,6 +123,9 @@ public class TTS : MonoBehaviour
 
     /// <summary>取消尚未完成的静默预合成请求。</summary>
     public virtual void CancelPreparedSpeech() { }
+
+    /// <summary>Consumer evidence for a prepared clip, separate from synthesis.</summary>
+    public virtual void ObservePreparedSpeech(AudioClip clip, string phase, int playedSamples = 0) { }
 
     /// <summary>
     /// 播放启动时预缓存的短回应，不发起新的TTS请求。

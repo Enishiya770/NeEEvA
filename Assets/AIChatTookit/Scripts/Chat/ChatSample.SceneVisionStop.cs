@@ -9,7 +9,9 @@ public partial class ChatSample
     private sealed class SceneVisionStopPreparation
     {
         public int generation, workEpoch, userTurn, operation;
-        public string text, taskId, actionId, dispatch;
+        public string text, taskId, actionId, dispatch, reviewInput, reviewJson;
+        public int inputRevision;
+        public UnityEngine.Object avatar, environment;
         public float deadline;
         public bool completed, ownsTransport, following;
         public LLM provider;
@@ -39,6 +41,7 @@ public partial class ChatSample
         var prepared = new SceneVisionStopPreparation {
             generation = generation, workEpoch = m_WorkEpoch, userTurn = m_ActionConstraints.CurrentUserTurn,
             operation = bridge.Controller.OperationRevision, taskId = bridge.ActiveTaskId, following = bridge.IsFollowing,
+            inputRevision = m_InputAudioRevision, avatar = bridge.avatar, environment = bridge.environmentRoot,
             provider = provider, bridge = bridge, text = text,
             deadline = Time.realtimeSinceStartup + 2.75f, ownsTransport = true
         };
@@ -48,11 +51,14 @@ public partial class ChatSample
             // No image, no scene-capture dependency, no dialogue history mutation.
             string input = RoomControlReviewProtocol.BodyInput(text, prepared.taskId, prepared.operation,
                 bridge.Phase, bridge.IsFollowing, false).ToString(Newtonsoft.Json.Formatting.None);
+            prepared.reviewInput = input;
             provider.PostRoomPreparationMessage(input, (ok, json, status) => {
                 if (!ReferenceEquals(m_SceneVisionStopPreparation, prepared) || prepared.completed) return;
                 CheckSceneVisionStopDeadline(prepared, Time.realtimeSinceStartup);
                 if (!ReferenceEquals(m_SceneVisionStopPreparation, prepared) || prepared.completed) return;
                 prepared.completed = true; prepared.ownsTransport = false;
+                if (ok && RoomControlReviewProtocol.TryBodyDecision(json, prepared.text, false, out _, out _))
+                    prepared.reviewJson = json;
                 if (!SceneVisionStopScopeIsCurrent(prepared) ||
                     prepared.bridge.ActiveTaskId != prepared.taskId ||
                     !prepared.following && prepared.bridge.Controller.OperationRevision != prepared.operation ||
@@ -79,6 +85,17 @@ public partial class ChatSample
         !m_AgentCurrentRoundIsTick && !m_UserSpeechActiveForAutonomy &&
         prepared.provider != null && prepared.provider.isActiveAndEnabled && m_ChatSettings?.m_ChatModel == prepared.provider &&
         prepared.bridge != null && prepared.bridge.IsConnected && GetComponent<ArdyRoomDialogueBridge>() == prepared.bridge;
+
+    private bool TryReusePreparedBodyReview(SceneVisionStopPreparation prepared, string currentInput, out string json)
+    {
+        json = null;
+        if (prepared == null || !prepared.completed || !SceneVisionStopScopeIsCurrent(prepared) ||
+            prepared.inputRevision != m_InputAudioRevision || prepared.avatar != prepared.bridge.avatar ||
+            prepared.environment != prepared.bridge.environmentRoot ||
+            !RoomControlReviewProtocol.SameBodyEvidence(prepared.reviewInput, currentInput, prepared.reviewJson)) return false;
+        json = prepared.reviewJson;
+        return true;
+    }
 
     private IEnumerator WatchSceneVisionStopPreparation(SceneVisionStopPreparation prepared)
     {

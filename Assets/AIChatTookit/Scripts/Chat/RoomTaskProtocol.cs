@@ -143,7 +143,15 @@ public static class RoomTaskProtocol
     public static string ProjectSpeechReviewInput(string input)
     {
         try {
-            var value = StrictObject(input);
+            var value = RoomSpeechEventEvidenceProtocol.Project(StrictObject(input));
+            if (SpeechEventBindingProtocol.Claims(value)?.Count > 0) value["eventEvidence"] = SpeechEventBindingProtocol.Evidence(value);
+            // A historical completion retains its event proof, but its former
+            // reporting obligation is not a fresh obligation for this reply.
+            if (value["historicalDeviceEvents"] is JArray historicalEvents)
+                foreach (var receipt in historicalEvents.OfType<JObject>()) {
+                    receipt.Remove("resultReportRequirement");
+                    receipt["historicalOnly"] = true;
+                }
             value.Remove("publicSpeechLanguage");
             value.Remove("configuredDialogueLanguage");
             if (RoomSpeechPartsProtocol.Required(value)) value["progressSpeechParts"] = RoomSpeechPartsProtocol.Fragments(value);
@@ -239,6 +247,20 @@ public static class RoomTaskProtocol
                 required.Add("taskRelation");
                 properties["otherClaimsComparison"] = new JObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 200 };
                 required.Add("otherClaimsComparison");
+                if (value["eventContext"] is JObject)
+                {
+                    properties["claimTemporalScope"] = new JObject { ["type"] = "string", ["enum"] =
+                        new JArray("past-event", "current-state", "future-action", "mixed", "none") };
+                    string extractedTime=RoomSpeechEventEvidenceProtocol.TemporalScope(claim);
+                    if(extractedTime!=null)properties["claimTemporalScope"]["enum"]=new JArray(extractedTime);
+                    required.Add("claimTemporalScope");
+                }
+                if (RoomSpeechEventEvidenceProtocol.AutonomousConversation(value))
+                {
+                    properties["eventOrderComparison"] = new JObject { ["type"]="string", ["minLength"]=1, ["maxLength"]=160 };
+                    properties["eventOrderConsistency"] = new JObject { ["type"]="string", ["enum"]=new JArray("matched", "contradicted", "not-applicable", "uncertain") };
+                    required.Add("eventOrderComparison"); required.Add("eventOrderConsistency");
+                }
                 foreach (string key in new[] { "resultReport", "actualLanguage" })
                 {
                     properties[key] = new JObject { ["type"] = "string", ["enum"] = new JArray((string)claim[key]) };
@@ -261,12 +283,16 @@ public static class RoomTaskProtocol
                 required.Add("conflict"); required.Add("conflictQuote");
                 // Claims and concrete conflict precede the verdict in constrained generation.
                 var ordered = new JObject();
+                if (properties["claimTemporalScope"] != null) ordered["claimTemporalScope"] = properties["claimTemporalScope"].DeepClone();
+                foreach (string key in new[] { "eventOrderComparison", "eventOrderConsistency" })
+                    if (properties[key] != null) ordered[key] = properties[key].DeepClone();
                 foreach (string key in new[] { "targetComparison", "targetConsistency", "otherClaimsComparison", "otherClaimsSupport", "taskRelationComparison", "taskRelation", "resultReport", "actualLanguage", "conflict", "conflictQuote" }) ordered[key] = properties[key].DeepClone();
                 foreach (var property in properties.Properties()) if (ordered[property.Name] == null) ordered[property.Name] = property.Value.DeepClone();
                 schema["properties"] = ordered;
                 schema["required"] = new JArray(ordered.Properties().Select(p => p.Name).Where(key => required.Values<string>().Contains(key)));
             }
             RoomSpeechPartsProtocol.AddSchema(schema, value);
+            SpeechEventBindingProtocol.AddReviewSchema(schema, value);
             return schema.ToString(Newtonsoft.Json.Formatting.None);
         }
         catch (Exception error) { throw new Newtonsoft.Json.JsonException("Invalid speech review input; schema downgrade refused.", error); }
@@ -591,10 +617,20 @@ public static class RoomTaskProtocol
         "推测仍不能凭空增加没有线索的实体、不可辨认的精确文字或确定个人状态；单加‘似乎’不能代替依据。移动情境本身不是障碍物存在或正在避让的证据。自身动作是否执行/完成以及执行方法、目标身份、设备实际状态及故障原因继续按对应事实和回执严格核验，不能靠推测补出成功或新的行动授权。";
 
     public const string TaskRelationReviewContract =
+        "Failure/negation of success does not reverse participants: I could not follow you still has CHARACTER as follower and USER as leader. " +
+        "I failed to play/check/open it describes an unsuccessful attempt at the requested action, not a substituted action. " +
+        "Judge these relations aligned (or not-applicable if absent); separately compare the failure with execution evidence. " +
+        "An unsupported promise to adjust/retry is an unsupported-claim; do not rewrite an evidenced failure into success to satisfy the request. " +
         "Before taskRelation, taskRelationComparison must briefly name the requested actor/action/recipient and the speech actor/action/recipient. Preserve negation. Imperatives in requestedUserText address CHARACTER (e.g. Stay there means CHARACTER stays); imperatives in publicSpeech address USER. Do not import roles from another task. Use only one short comparison, not a narrative. When reviewParticipants is present it names the actor and target of the current owned action. Keep that relationship explicit in the comparison. conflictQuote must contain ONLY a verbatim substring of publicSpeech, never labels or a comparison with the user's words. taskRelation separately checks whether any clause of publicSpeech reverses an assigned action. Resolve speakers FIRST: in requestedUserText, I/me is USER and you is CHARACTER; in publicSpeech, I/me is CHARACTER and you is USER. Inspect the complete speech, including invitations omitted from independentSpeechClaim. Following the user means USER leads and CHARACTER follows. Asking the user to go ahead preserves that relationship (aligned); asking the user to follow the character reverses it (contradicted). Coming back to the user means CHARACTER approaches USER; inviting USER to come to CHARACTER reverses it. An explicitly requested invitation/leading task must instead use its own requested roles. Compare these roles independently of completion: never invent an intermediate arrival to justify a reversed invitation. Device success proves no return movement. Only an actual reversal/substitution is contradicted. Courtesy, thanks for waiting, please wait, independent invitations to chat, and negated/quoted commands do NOT imply reversed movement. Thanks for waiting asserts no measured waiting event; do not infer a hidden stationary-user constraint. Omitting a later step is NOT a reversal: obey the separate result scope and runtime-owned progress reporting. A correct device result plus please wait is aligned/not-applicable when runtime reports return progress. Use taskRelation=aligned when an expressed relation agrees, not-applicable when no relevant relation is expressed, uncertain only for genuinely ambiguous roles. Contradicted requires verdict=inconsistent, conflict=task-relation and a literal conflictQuote; reason briefly contrasts the actual roles. Do not use taskRelation to waive target identity, result state, extra factual evidence or required answers. Keep all comparisons concise.";
 
-    public const string ReviewContract = TaskRelationReviewContract + VisualInferenceReviewContract +
+    public const string ReviewContract = SpeechEventBindingProtocol.ReviewContract + TaskRelationReviewContract + VisualInferenceReviewContract +
+        "When claimTemporalScope is requested, classify the PUBLIC WORDS FIRST: past-event describes a completed/failed earlier attempt, current-state asserts what is true now, future-action promises another action, mixed contains multiple such scopes, none contains no factual assertion. Then compare each clause to its corresponding event/current observation/authorized plan. Past-event needs its actual historical receipt, NEVER a new action authorization or current proximity. 'I came back earlier' remains true after the user moves away. targetComparison/targetConsistency compare target IDENTITY only: the same user is still the target after moving; success, timing, current distance and action authorization cannot turn that identity into contradicted. " +
+        "An evidenced failure explanation IS a delivered task result. If inspection/playback/any operation failed, saying it failed and the requested value/result could not be obtained answers that result obligation. Do not require fabricated successful data, an unauthorized retry or a promise in order to mark the reply consistent. Check independently owed questions separately. " +
+        "Present proximity claims ('I am beside you now/still') must use eventContext.currentUserRelation or currentRoomFacts.currentFacts, never a past arrived phase or completedPlaybackText. Compare actualUserDistance with desiredUserDistance and distinguish distance from facing; currentlyNearAndFacingUser=false alone may mean only facing is wrong. A user can move after a completed arrival. A past-tense arrival may remain true while a present-tense proximity claim is false. " +
+        "eventContext索引实际执行与已播放事件。先对齐陈述的时间和对象再判定：本轮intent=none/actionId为空/matchesRequestedAction=false只表示旧事件不授权本轮动作，不能据此否认有回执的过去到达、播放、检查或操作。对刚完成任务的收尾须对应最近的结果；若明确在回顾更早事件，可引用当时结果，但不能暗示仍是当前状态。" +
         "historicalDeviceEvents是跨用户轮次保留的实际事件，原请求、实体、时间和状态回读都带来源。不能因本轮没有重新开关而否认此前实际操作；可以报告‘刚才关过’，但不能仅凭历史回执断言‘现在仍关闭’。多条事件须按实体和时间分别核对，后来反向操作覆盖旧状态而不抹去旧事件；它们不提供本轮行动授权。" +
+        "结果汇报义务仅来自本轮顶层movementReportRequirement、sceneSearchReportRequirement或sceneActionFacts.resultReportRequirement中required=true的字段。历史事件、旧目标和最近对话中的旧请求不重新建立本轮汇报义务；没有上述当前义务的历史问答可以只报告有据的过去事件，无需附报当前状态。" +
+        "若本轮replyPurpose.kind=clarify-current-input，表示本轮输入尚无法可靠理解。角色可说明刚才未听清/未理解并请重复，无需另找过去的听力失败动作；仍不能编造麦克风故障、物理距离保证或新行动。" +
         "historicalResult=true的sceneActionFacts或priorTaskResults是已完成前一步的不可变回执：operationSummary/lastAction可证明当时实际执行，后续generation不同不否定历史事件；它不证明现在仍可见或当前状态未改变。operationAttempted=null只表示该范围未知，不是未执行；不得用null推翻明确performed历史回执。" +
         "若提供taskSequence，completed步骤的实际回执可以汇报，pending/running/failed的后续步骤不能说已经完成。recentPublicReplies只是旧公开台词，不能作为事实来源；当前回复应交付本轮结果，不能用无关旧段落复读代替。合理的简短惯用表达或用户要求重述本身不违规。" +
         "区分硬事实与主观语气：纯粹的心情、审美或氛围感想、礼貌表达不要求执行回执，不应据此否决本来正确的回答。若把感想用作具体故障归因、声称实际位置/事件/设备状态或承诺行动，仍须核验。角色向用户提出的真正问题不产生一个必须由角色自己回答的新任务；只评原用户请求。" +
@@ -1080,11 +1116,24 @@ public static class RoomTaskProtocol
         try
         {
             JObject value = StrictObject(json);
-            if (value.Count < 2 || value.Count > 16 || value.Properties().Any(p => !new[] { "verdict", "reason", "factScope", "resultReport", "requestDisposition", "planningFailureReport", "actualLanguage", "conflict", "conflictQuote", "targetComparison", "targetConsistency", "otherClaimsComparison", "otherClaimsSupport", "taskRelation", "taskRelationComparison", "speechParts", "bodyProgressParts" }.Contains(p.Name)) ||
+            if (value.Count < 2 || value.Count > 21 || value.Properties().Any(p => !new[] { "verdict", "reason", "factScope", "resultReport", "requestDisposition", "planningFailureReport", "actualLanguage", "conflict", "conflictQuote", "targetComparison", "targetConsistency", "otherClaimsComparison", "otherClaimsSupport", "taskRelation", "taskRelationComparison", "speechParts", "bodyProgressParts", "claimTemporalScope", "eventOrderComparison", "eventOrderConsistency", "eventBindings" }.Contains(p.Name)) ||
                 value["verdict"]?.Type != JTokenType.String ||
                 !new[] { "consistent", "inconsistent", "uncertain" }.Contains((string)value["verdict"]) ||
                 value["reason"]?.Type != JTokenType.String || ((string)value["reason"]).Length > 160) return false;
             if (value["speechParts"] != null && !(value["speechParts"] is JArray)) return false;
+            if (value["eventBindings"] != null && (!(value["eventBindings"] is JArray bindings) || bindings.Count>4 ||
+                bindings.Any(b=>!(b is JObject row) || row.Count!=2 || row["eventId"]?.Type!=JTokenType.String ||
+                    row["targetMatch"]?.Type!=JTokenType.String || !new[]{"matched","uncertain","contradicted"}.Contains((string)row["targetMatch"])))) return false;
+            if (value["eventOrderConsistency"] != null || value["eventOrderComparison"] != null)
+            {
+                if (value["eventOrderComparison"]?.Type != JTokenType.String || string.IsNullOrWhiteSpace((string)value["eventOrderComparison"]) ||
+                    ((string)value["eventOrderComparison"]).Length > 160 || value["eventOrderConsistency"]?.Type != JTokenType.String ||
+                    !new[] { "matched", "contradicted", "not-applicable", "uncertain" }.Contains((string)value["eventOrderConsistency"])) return false;
+                if ((string)value["eventOrderConsistency"] == "contradicted" && (string)value["verdict"] != "inconsistent" ||
+                    (string)value["eventOrderConsistency"] == "uncertain" && (string)value["verdict"] == "consistent") return false;
+            }
+            if (value["claimTemporalScope"] != null && (value["claimTemporalScope"].Type != JTokenType.String ||
+                !new[] { "past-event", "current-state", "future-action", "mixed", "none" }.Contains((string)value["claimTemporalScope"]))) return false;
             if (value["conflict"] != null)
             {
                 string conflict = (string)value["conflict"], verdict = (string)value["verdict"];

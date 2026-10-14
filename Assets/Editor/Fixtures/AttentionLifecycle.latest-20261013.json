@@ -1,0 +1,2578 @@
+{
+  "sourceSha256": "8faddd0fcb1b91e9fc15fefcd3f0a2035cb4df20a8b0c849e24b9d31f3028cf6",
+  "cases": [
+    {
+      "name": "latest-retained-completion",
+      "sourceLine": 79486,
+      "frame": "FireTick → [感知帧 13:41:07] [Sing/Execution] request_submitted_since_user_turn=false work_active=false state=idle continuations_without_work=0 以上只表示程序执行状态；提交过不等于成功，idle不表示素材丢失。口头说准备好、look、continue都不会启动演唱。是否行动、询问或安静仍由你决定。  [Sing/Goal] {\"user_turn\":6,\"latest_user_request\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\",\"recent_actual_user_inputs\":[{\"turn\":1,\"text\":\"下午好，能听到我说话吗？\"},{\"turn\":2,\"text\":\"嗯，现在你能看到什么吗？\"},{\"turn\":3,\"text\":\"来我身边。\"},{\"turn\":4,\"text\":\"你刚才有在电视会上看到一盏小灯吗？请你去把它关掉，然后再回到我身边。\"},{\"turn\":5,\"text\":\"很好，接下来跟着我走。\"},{\"turn\":6,\"text\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\"}],\"input_scope\":\"原始用户输入，不保证是执行请求；按完整时序区分用户表演与要求角色行动\",\"review_field_scope\":\"requestQuote/sourceUserTurn由独立审核依据实际用户输入产生，不是sing_goal提案的必填参数；尚未核定时省略。已存在的值是前次审核保存的来源，可供continue核对。审核员在本次singing_goal_expected.request_quote中引用真实请求。\",\"next_step\":{\"stage\":\"goal_required\",\"action\":\"\",\"scope\":\"未授权演唱。依据完整实际用户输入和素材自行决定目标；后续询问不代表原请求已取消。\"},\"goal\":null,\"active_goal\":null,\"active_goal_unfinished\":false,\"previous_goal\":null,\"last_playback\":null,\"rejected_plans\":[],\"feedback_scope\":\"completed仅表示Unity实际播完所列refs/revision/raw范围；不证明用户听到或指定歌词/缺失内容满足。active_goal是持久成功条件；goal是当前轮待审核/执行草案，null不代表原任务已取消或完成。没有当前轮动作授权不能自动续唱。\"}  [视觉关注与行动事实] {\"enabled\":true,\"active\":false,\"lastAction\":{\"source\":\"Unity-visible-target-execution\",\"actionId\":\"e0d8454c7eb948eaacf0bb7f9c528c35:15:15\",\"intent\":\"set-object-state\",\"origin\":\"user\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-8bf068d2a4b74b7db0d138ed7755da89\",\"confirmedCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-75eef4834f07479cae695cf367959885\",\"resultCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0\",\"surfaceId\":\"\",\"visualLabel\":\"桌面装饰灯\",\"phase\":\"performed\",\"reason\":\"runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press\",\"observedUtc\":\"2026-10-13T04:40:49.1123739Z\",\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"focusKind\":\"visible-object\",\"requestedEntityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"requestedState\":\"on\",\"targetResolutionSource\":\"candidate-confirmed\",\"requestedImagePoint\":{\"x\":0.4973958432674408,\"y\":0.854629635810852},\"objectConfirmed\":true,\"stateChanged\":true,\"groundArrived\":false,\"objectReobserved\":false,\"postArrivalObservationStatus\":\"\",\"targetPurpose\":\"direct-target\",\"targetDescription\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\",\"targetMatchVerdict\":\"matched\",\"targetMatchReason\":\"本轮目标为重新打开之前关掉的灯。c1为电视柜上的桌面装饰灯，与目标描述一致，且位于画面中清晰可见。\",\"matchCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-8bf068d2a4b74b7db0d138ed7755da89\",\"semanticTargetConfirmed\":true,\"needsCloserObservation\":false,\"navigationFocusImagePoint\":{\"x\":0.0,\"y\":0.0},\"observationStandOff\":0.0,\"predictedObservationPitch\":0.0,\"observationGoalId\":\"\",\"viewDirection\":\"\",\"viewPurpose\":\"\",\"viewPurposeStatus\":\"\",\"requestedViewDistance\":0.0,\"actualViewOffset\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},\"viewBefore\":{\"captureId\":\"\",\"entityId\":\"\",\"capturedAtUtc\":\"\",\"frame\":0,\"width\":0,\"height\":0,\"visibleOpaquePixels\":0,\"normalizedVisibleBounds\":{\"x\":0.0,\"y\":0.0,\"z\":0.0,\"w\":0.0},\"visiblePixelFraction\":0.0,\"cameraDistanceToObservedPoint\":0.0,\"touchesImageBoundary\":false,\"scope\":\"Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose.\"},\"viewAfter\":{\"captureId\":\"\",\"entityId\":\"\",\"capturedAtUtc\":\"\",\"frame\":0,\"width\":0,\"height\":0,\"visibleOpaquePixels\":0,\"normalizedVisibleBounds\":{\"x\":0.0,\"y\":0.0,\"z\":0.0,\"w\":0.0},\"visiblePixelFraction\":0.0,\"cameraDistanceToObservedPoint\":0.0,\"touchesImageBoundary\":false,\"scope\":\"Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose.\"},\"intentFocusWorldPoint\":{\"x\":-0.31603085994720459,\"y\":-0.089230716228485107,\"z\":-4.7017507553100586},\"hasIntentFocus\":true,\"navigationFocusAdjusted\":false,\"trackingVisibility\":\"\",\"trackingCaptureId\":\"\",\"trackingFocusStatus\":\"\",\"trackingFocusWorldPoint\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},\"trackingConfirmedImages\":0,\"trackingMovingConfirmedImages\":0,\"trackingLastSeenRealtime\":-1.0,\"trackingFocusLastAppliedFrame\":-1,\"trackingFocusAppliedDegrees\":0.0,\"measuredSurface\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},\"actualRoot\":{\"x\":-1.9829500913619995,\"y\":-0.72000002861022949,\"z\":-4.4135475158691406},\"requestedYaw\":0.0,\"requestedPitch\":0.0,\"actualViewChangeDegrees\":0.0,\"active\":false,\"reached\":false,\"canReobserveTarget\":false,\"scope\":\"Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation.\"},\"objectContext\":{\"enabled\":true,\"runtimeDeviceControl\":{\"implementationConnected\":true,\"featureEnabled\":true,\"supportedOperation\":\"set-object-state:on|off for an explicitly registered lamp\",\"physicalHandRequired\":false,\"requiresCurrentTargetConfirmation\":true,\"requiresIndependentUserAuthorization\":true,\"scope\":\"Software capability facts, not target identity, current visibility, permission or proof of execution. A missing goal approval or unresolved target does not remove this interface. Lack of physical switch-touching does not prevent this registered runtime lamp control.\"},\"selected\":{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0\",\"observedUtc\":\"2026-10-13T04:40:49.0249835Z\",\"visibleInCapturedFrame\":true,\"pointAtCapture\":{\"x\":-0.31490314,\"y\":-0.08716667,\"z\":-4.702057},\"scope\":\"opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability\",\"capabilities\":[\"inspect-object\",\"look-at\",\"set-object-state:on|off\"],\"runtimeDeviceStateReadAfterObservation\":{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"lightState\":\"enabled\",\"emissionState\":\"on\",\"conflict\":\"\",\"registered\":true,\"on\":true,\"lightEnabled\":true,\"emissionEnabled\":true,\"bakedLightingResidualUncontrolled\":true,\"emissionColor\":{\"r\":0.75663495063781738,\"g\":1.11836576461792,\"b\":1.3041188716888428,\"a\":1.0},\"lightIntensity\":1.0,\"lightBakeType\":\"Baked\",\"scope\":\"Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation.\"},\"stateReadAtUtc\":\"2026-10-13T04:40:49.1118666Z\",\"localStructure\":{\"source\":\"engine-registered-local-structure; not an inference from image or proof that every part is visible\",\"relation\":\"parts-of-selected-entity; does not mean resting-on furniture\",\"emissivePartName\":\"スタンドライト.001\",\"lightComponentNodeName\":\"Point Light\"}},\"stateResult\":{\"actionId\":\"e0d8454c7eb948eaacf0bb7f9c528c35:15:15\",\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"reason\":\"已开启登记灯具的可见发光体及 Light 组件。\",\"on\":true,\"changed\":true,\"completed\":true,\"replayed\":false,\"partial\":false,\"physicalSwitchPress\":false,\"freshVisualObservation\":true,\"actual\":{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"lightState\":\"enabled\",\"emissionState\":\"on\",\"conflict\":\"\",\"registered\":true,\"on\":true,\"lightEnabled\":true,\"emissionEnabled\":true,\"bakedLightingResidualUncontrolled\":true,\"emissionColor\":{\"r\":0.75663495063781738,\"g\":1.11836576461792,\"b\":1.3041188716888428,\"a\":1.0},\"lightIntensity\":1.0,\"lightBakeType\":\"Baked\",\"scope\":\"Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation.\"},\"scope\":\"Whitelist device action: set the registered lamp's visible emission and Light component power. Original material assets and baked lighting are unchanged; visual confirmation must be obtained separately.\",\"appliedAtUtc\":\"2026-10-13T04:40:48.5929209Z\",\"visualConfirmation\":\"same-entity-in-new-image\",\"resultCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0\"},\"recentObservations\":[{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-db140be9593d4ffd85b97a9bc59d5998-ae38668cc7744244b2d3603d660cb0dc\",\"observedUtc\":\"2026-10-13T04:38:53.4558861Z\",\"pointAtCapture\":{\"x\":-0.310642838,\"y\":-0.07937306,\"z\":-4.767629}},{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-db140be9593d4ffd85b97a9bc59d5998-5322e4f5b29c4948b9235b9bbdff8e41\",\"observedUtc\":\"2026-10-13T04:38:57.2816746Z\",\"pointAtCapture\":{\"x\":-0.3107791,\"y\":-0.07962692,\"z\":-4.76692343}},{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-db140be9593d4ffd85b97a9bc59d5998-818129d18e854dd9bf48e0fb4d1cb6eb\",\"observedUtc\":\"2026-10-13T04:38:57.7939264Z\",\"pointAtCapture\":{\"x\":-0.310036182,\"y\":-0.07826948,\"z\":-4.76646042}},{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934\",\"observedUtc\":\"2026-10-13T04:40:34.4368653Z\",\"pointAtCapture\":{\"x\":-0.318682671,\"y\":-0.09407866,\"z\":-4.70234632}},{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-616f7354357d49e48911913a0d1d3826\",\"observedUtc\":\"2026-10-13T04:40:38.1058997Z\",\"pointAtCapture\":{\"x\":-0.3163736,\"y\":-0.08986622,\"z\":-4.7052393}},{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-ca8bf867d5c446138bec02deeac90fcd\",\"observedUtc\":\"2026-10-13T04:40:44.6198424Z\",\"pointAtCapture\":{\"x\":-0.314714551,\"y\":-0.08681941,\"z\":-4.70625067}},{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-75eef4834f07479cae695cf367959885\",\"observedUtc\":\"2026-10-13T04:40:48.5130815Z\",\"pointAtCapture\":{\"x\":-0.3161056,\"y\":-0.0893665552,\"z\":-4.705557}},{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0\",\"observedUtc\":\"2026-10-13T04:40:49.0249835Z\",\"pointAtCapture\":{\"x\":-0.31490314,\"y\":-0.08716667,\"z\":-4.702057}}],\"knownObjectHistory\":[{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"identitySource\":\"scene-authored\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0\",\"observedUtc\":\"2026-10-13T04:40:49.0249835Z\",\"capturedAtRealtime\":260.5554,\"pointAtCapture\":{\"x\":-0.31490314,\"y\":-0.08716667,\"z\":-4.702057},\"cameraPositionAtCapture\":{\"x\":-1.98081136,\"y\":0.7181022,\"z\":-4.414164},\"cameraRotationAtCapture\":{\"x\":0.149347663,\"y\":0.7475532,\"z\":-0.157063574,\"w\":0.62784636},\"bodyPositionAtCapture\":{\"x\":-1.98295009,\"y\":-0.72,\"z\":-4.41354752},\"bodyRotationAtCapture\":{\"x\":0.0,\"y\":0.7557065,\"z\":0.0,\"w\":0.6549105},\"viewDirectionWorldAtCapture\":{\"x\":0.891783,\"y\":-0.422361553,\"z\":-0.162281066},\"capabilities\":[\"inspect-object\",\"look-at\",\"set-object-state:on|off\"],\"samplePurpose\":\"selected-object-observation\",\"rootPositionAtCapture\":{\"x\":-0.251999855,\"y\":-0.008000851,\"z\":-4.71600246},\"rootRotationAtCapture\":{\"x\":-0.707106948,\"y\":0.0,\"z\":0.0,\"w\":0.7071068},\"rootScaleAtCapture\":{\"x\":0.06,\"y\":0.0600000359,\"z\":0.0600000359},\"scope\":\"Previously confirmed opaque pixels and their exact capture-time geometry/view. Root snapshot is recorded only while captured renderer geometry still matches. Historical location is a search hint, never current visibility, a navigation destination, device state or action permission.\",\"historical\":true,\"positionMemoryValid\":true,\"positionInvalidReason\":null,\"requiresReobservation\":true,\"actionAuthorization\":false,\"currentVisibility\":\"not-established\"}],\"verifiedObservedDeviceHistory\":[{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"actionId\":\"scene-search-1e89c8786c9844efb675996636e6086d:confirmed\",\"originalRequest\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\",\"targetDescription\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\",\"semanticReason\":\"本轮目标为重新打开之前关掉的灯。c1为电视柜上的桌面装饰灯，与目标描述一致，且位于画面中清晰可见。\",\"matchCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-5c177d7a44374ab7970a71edf239edec\",\"confirmedCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934\",\"observedUtc\":\"2026-10-13T04:40:34.5489672Z\",\"historical\":true,\"semanticTargetConfirmedAtObservation\":true,\"observation\":{\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934\",\"observedUtc\":\"2026-10-13T04:40:34.4368653Z\",\"capabilities\":[\"inspect-object\",\"look-at\",\"set-object-state:on|off\"]},\"scope\":\"Actual direct-target semantic match followed by same-entity opaque confirmation in a new image and observed registered capability. Previously seen referent only: no executed operation, goal ID, current visibility, current power state or action authority. Assistant speech alone cannot create this record. An independent authorization may select this engine-listed source to constrain the same entity; every action still needs its own fresh semantic match.\"}],\"targetReview\":{\"actionId\":\"e0d8454c7eb948eaacf0bb7f9c528c35:15:15\",\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-8bf068d2a4b74b7db0d138ed7755da89\",\"originalGoal\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\",\"requestedDescription\":null,\"parentSpatialGoalId\":\"device-goal-7587310a21f9474ca5bf066da399e780\",\"targetPurpose\":\"direct-target\",\"verdict\":\"matched\",\"associationCurrent\":true,\"reason\":\"本轮目标为重新打开之前关掉的灯。c1为电视柜上的桌面装饰灯，与目标描述一致，且位于画面中清晰可见。\",\"semanticTargetConfirmed\":true,\"modelVerdict\":\"matched\",\"candidateRole\":\"target\",\"observationLandmarkConfirmed\":false,\"modelReason\":\"本轮目标为重新打开之前关掉的灯。c1为电视柜上的桌面装饰灯，与目标描述一致，且位于画面中清晰可见。\",\"boundGoalEntityConflict\":false,\"matchedEntityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"initialGeometryEntityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"needsCloserObservation\":false,\"proposedCandidateId\":\"c1\",\"proposedEntityId\":null,\"proposedImagePoint\":null,\"needsTargetReselection\":false,\"proposalScope\":\"A nonmatched proposal is only a cue for the next fresh-image decision, not a semantic match or permission for this action. At most one candidate-match request is made by this action; never retry stale pixels automatically.\",\"targetSelection\":null,\"scope\":\"Model interpretation of this exact candidate image, separate from engine identity. A reference selected for observe-closer is not confirmation of the original small target. When uncertain, consider a visible larger reference and targetPurpose=observe-closer in a NEW approach decision, then reobserve and retry the original goal; no automatic device operation. User correction can revoke a referent association without deleting objective seen-object history.\",\"observationGoal\":null},\"lastDeviceStateEvidenceValid\":true,\"deviceEvidenceScope\":\"Engine result-validity check only; false invalidates prior device state claims. No new device setting or visual observation is supplied here; inspect again to establish current facts.\",\"rejectionCauseScope\":\"Pixel/identity resolution failure does not establish which intended object was selected. Missing registered power capability concerns only the resolved entity and this software interface. Neither finding diagnoses electricity, cables, outlets, broken hardware or whether the intended lamp is a nonfunctional ornament. A different selected entity does not erase the prior device's successful operation.\",\"scope\":\"Only previously selected visible entities, observed timestamps and explicit device results. These are snapshots, not continuous perception or a room inventory. Scene-authored labels are annotations, not visual recognition. Hierarchy does not prove support/contact. No arbitrary Inspector edits or physical hand interaction. On/off controls the registered emitter and Light flag; baked lighting may remain.\",\"deviceDistanceLimitMeters\":2.5},\"sceneSearch\":{\"taskId\":\"scene-search-1e89c8786c9844efb675996636e6086d\",\"generation\":15,\"workEpoch\":7,\"userTurn\":7,\"active\":false,\"ownerCurrent\":true,\"mode\":\"find\",\"originalUserRequest\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\",\"latestUserText\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\",\"referenceContext\":{\"quotedDialogue\":[{\"role\":\"user\",\"quotedText\":\"[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.66] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.19; 语言:zh; 音域:A2～A5; 音高稳定度:0.53; 旋律:F5-F#5-G5-A5-C3-F5-A2-A#2-C3-A2-A#2-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 很好，接下来跟着我走。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\\n{\\\"id\\\":1,\\\"start_seconds\\\":0.0,\\\"end_seconds\\\":1.8700000047683716,\\\"region\\\":\\\"island\\\",\\\"type\\\":\\\"singing_candidate\\\",\\\"type_source\\\":\\\"acoustic_boundary_hypothesis\\\",\\\"text\\\":\\\"很好，接下来跟着我走。\\\",\\\"language\\\":\\\"zh\\\",\\\"status\\\":\\\"ok\\\",\\\"error\\\":\\\"\\\",\\\"confidence_available\\\":false,\\\"review_required\\\":false,\\\"alternatives\\\":[]}\\r\\n{\\\"id\\\":2,\\\"start_seconds\\\":1.8700000047683716,\\\"end_seconds\\\":2.4000000953674318,\\\"region\\\":\\\"tail\\\",\\\"type\\\":\\\"uncertain\\\",\\\"type_source\\\":\\\"acoustic_boundary_hypothesis\\\",\\\"text\\\":\\\"。\\\",\\\"language\\\":\\\"zh\\\",\\\"status\\\":\\\"ok\\\",\\\"error\\\":\\\"\\\",\\\"confidence_available\\\":false,\\\"review_required\\\":true,\\\"alternatives\\\":[{\\\"source\\\":\\\"boundary_overlap\\\",\\\"text\\\":\\\"跟着我走。\\\",\\\"language\\\":\\\"zh\\\",\\\"audio_event\\\":\\\"Speech\\\",\\\"error\\\":\\\"\\\",\\\"start_seconds\\\":1.4700000286102296,\\\"end_seconds\\\":2.4000000953674318}]}\\r\\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\\\"text\\\":\\\"很好，接下来跟着我走。\\\"}]\",\"textTruncated\":false},{\"role\":\"assistant\",\"quotedText\":\"あなたについて移動しているわ。\",\"textTruncated\":false},{\"role\":\"user\",\"quotedText\":\"; 曲库里没有旋律接近的段落] O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\\n{\\\"id\\\":1,\\\"start_seconds\\\":0.0,\\\"end_seconds\\\":0.9300000071525574,\\\"region\\\":\\\"head\\\",\\\"type\\\":\\\"uncertain\\\",\\\"type_source\\\":\\\"acoustic_boundary_hypothesis\\\",\\\"text\\\":\\\"O.\\\",\\\"language\\\":\\\"en\\\",\\\"status\\\":\\\"ok\\\",\\\"error\\\":\\\"\\\",\\\"confidence_available\\\":false,\\\"review_required\\\":true,\\\"alternatives\\\":[{\\\"source\\\":\\\"boundary_overlap\\\",\\\"text\\\":\\\"O现在。\\\",\\\"language\\\":\\\"zh\\\",\\\"audio_event\\\":\\\"Speech\\\",\\\"error\\\":\\\"\\\",\\\"start_seconds\\\":0.0,\\\"end_seconds\\\":1.3300000429153443}]}\\r\\n{\\\"id\\\":2,\\\"start_seconds\\\":0.9300000071525574,\\\"end_seconds\\\":4.869999885559082,\\\"region\\\":\\\"island\\\",\\\"type\\\":\\\"singing_candidate\\\",\\\"type_source\\\":\\\"acoustic_boundary_hypothesis\\\",\\\"text\\\":\\\"现在需要你去把你刚才关掉的灯重新打开。\\\",\\\"language\\\":\\\"zh\\\",\\\"status\\\":\\\"ok\\\",\\\"error\\\":\\\"\\\",\\\"confidence_available\\\":false,\\\"review_required\\\":true,\\\"alternatives\\\":[{\\\"source\\\":\\\"boundary_overlap\\\",\\\"text\\\":\\\"现在需要你去把你刚才关掉的灯重新打开，然后。\\\",\\\"language\\\":\\\"zh\\\",\\\"audio_event\\\":\\\"Speech\\\",\\\"error\\\":\\\"\\\",\\\"start_seconds\\\":0.5299999713897705,\\\"end_seconds\\\":5.269999980926514}]}\\r\\n{\\\"id\\\":3,\\\"start_seconds\\\":4.869999885559082,\\\"end_seconds\\\":7.099999904632568,\\\"region\\\":\\\"tail\\\",\\\"type\\\":\\\"uncertain\\\",\\\"type_source\\\":\\\"acoustic_boundary_hypothesis\\\",\\\"text\\\":\\\"然后回到我身边。\\\",\\\"language\\\":\\\"zh\\\",\\\"status\\\":\\\"ok\\\",\\\"error\\\":\\\"\\\",\\\"confidence_available\\\":false,\\\"review_required\\\":false,\\\"alternatives\\\":[]}\\r\\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\\\"text\\\":\\\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\\\"}]\",\"textTruncated\":true},{\"role\":\"assistant\",\"quotedText\":\"移動を止めたわ。\",\"textTruncated\":false}],\"scope\":\"Frozen recent dialogue quotations for resolving descriptive references only. They do not verify an entity, visibility, position, state, or completion. The complete current/original user request is the sole new operation authority. Recheck the same description in real observations; multiple matching objects remain unresolved. No subsequent dialogue may silently change this snapshot.\"},\"phase\":\"terminal\",\"status\":\"found\",\"reason\":\"search-current-target-confirmed\",\"steps\":1,\"stepLimit\":12,\"decisions\":2,\"decisionLimit\":36,\"noProgressSteps\":0,\"totalNoProgress\":0,\"recoveryAttempts\":0,\"recoveryLimit\":1,\"revisitedMemoryEntityIds\":[],\"unsupportedDeviceEntityIds\":[],\"durationSeconds\":6.98388672,\"durationLimitSeconds\":180.0,\"coveredHorizontalRegions\":5,\"horizontalRegionCount\":12,\"candidatePageCoverage\":[{\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934\",\"offeredPages\":2,\"reviewedPagesInExactCapture\":0,\"allCurrentCandidatesReviewedAtThisPose\":false,\"truncated\":false}],\"allVisitedCandidatePagesReviewed\":false,\"foundEntityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"foundCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934\",\"boundEntityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"deviceGoalId\":\"device-goal-7587310a21f9474ca5bf066da399e780\",\"goalExecutionRevision\":0,\"searchAttempted\":true,\"deviceWriteAuthorized\":false,\"receipts\":[{\"choice\":\"bound-historical-object\",\"referenceId\":\"known-object-point:097399b103a8418abd85165e1f6ce0bb-db140be9593d4ffd85b97a9bc59d5998-818129d18e854dd9bf48e0fb4d1cb6eb:scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"reason\":\"Revisit the already observed frozen point; memory is direction only, not visibility or permission.\",\"deviceWriteAuthorized\":false},{\"choice\":\"historical-object\",\"referenceId\":\"known-object-point:097399b103a8418abd85165e1f6ce0bb-db140be9593d4ffd85b97a9bc59d5998-818129d18e854dd9bf48e0fb4d1cb6eb:scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"intent\":\"turn-in-place\",\"requestedYaw\":102.292709,\"requestedPitch\":0.0,\"sourceCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-2c949e28a19d4a0097985a85ed87a8e6\",\"resultCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-fa4a4491c83644d5b01189db4198a784\",\"actionId\":\"e0d8454c7eb948eaacf0bb7f9c528c35:15:13\",\"observed\":true,\"controllerOperationRevision\":14,\"rootDisplacementFromStationaryBaseline\":0.0208371915,\"rootDisplacementFromActionStart\":0.0208371915,\"stationaryRootRebased\":true,\"actualViewChangeDegrees\":100.238037,\"reason\":\"actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents\"},{\"choice\":\"bound-current-candidate\",\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sourceCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-fa4a4491c83644d5b01189db4198a784\",\"reason\":\"Existing bound identity is in current opaque pixels; independent complete-target match follows.\",\"deviceWriteAuthorized\":false},{\"taskId\":\"scene-search-1e89c8786c9844efb675996636e6086d\",\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"selectionCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-fa4a4491c83644d5b01189db4198a784\",\"freshCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-5c177d7a44374ab7970a71edf239edec\",\"cameraTranslationMeters\":0.00213549053,\"cameraRotationDegrees\":1.37967587,\"selectionGeometryCurrent\":true,\"freshOpaqueConfirmed\":true,\"freshSameRoot\":true,\"freshGeometryCurrent\":true,\"acceptedForIndependentReview\":true,\"reason\":null},{\"choice\":\"current-candidate\",\"referenceId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-fa4a4491c83644d5b01189db4198a784:visible:p0:c4\",\"selectionCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-fa4a4491c83644d5b01189db4198a784\",\"matchCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-5c177d7a44374ab7970a71edf239edec\",\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"confirmed\":true,\"returnedCandidateId\":\"c1\",\"returnedEntityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"freshCandidateMapping\":[{\"candidateId\":\"c1\",\"entityId\":\"scene-object-ccc975d0d0c9491aaa8670b5f8d48205\",\"sceneLabel\":\"桌面装饰灯\"},{\"candidateId\":\"c2\",\"entityId\":\"renderer-object-71dabad463bc44b8895fe29bdf5bb8e7-7ef6\",\"sceneLabel\":\"\"},{\"candidateId\":\"c3\",\"entityId\":\"renderer-object-71dabad463bc44b8895fe29bdf5bb8e7-8104\",\"sceneLabel\":\"\"},{\"candidateId\":\"c4\",\"entityId\":\"renderer-object-71dabad463bc44b8895fe29bdf5bb8e7-8084\",\"sceneLabel\":\"\"},{\"candidateId\":\"c5\",\"entityId\":\"renderer-object-71dabad463bc44b8895fe29bdf5bb8e7-7dc8\",\"sceneLabel\":\"\"},{\"candidateId\":\"c6\",\"entityId\":\"renderer-object-71dabad463bc44b8895fe29bdf5bb8e7-81f0\",\"sceneLabel\":\"\"}],\"verdict\":\"matched\",\"candidateRole\":\"target\",\"reason\":\"本轮目标为重新打开之前关掉的灯。c1为电视柜上的桌面装饰灯，与目标描述一致，且位于画面中清晰可见。\",\"freshSameEntityCaptureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934\"}],\"reviewedHistoricalCaptureIds\":[],\"scope\":\"Bounded observation task only. found requires an independent semantic match and same-entity opaque confirmation in a NEW current frame. completed surveys concern sampled horizontal view directions, not every room object or occluded space. Candidate identification is limited to pages actually reviewed; candidatePageCoverage separately records skipped or truncated pages in visited views. Never claim all offered objects were inspected unless allVisitedCandidatePagesReviewed is true; even then unsupported/occluded objects remain unassessed. incomplete/cancelled do not prove the target absent. Historical positions/descriptions are hints, not current visibility, navigation or device authority. No device state was changed by this search. The most recent motion receipt describes only one substep, not the overall result.\"},\"capability\":\"look-at or approach-object using captureId plus normalized visible image point; reposition-view uses a freshly confirmed entity to adjust the same-floor observation station farther/closer/left/right by 0.2 to 1.2 metres while facing that target. see-whole/read-detail/avoid-occlusion are observation purposes, not promised outcomes; assess the new image after movement. orient-view changes real head direction without needing an already visible target; turn-in-place turns the actual body on its current legal floor. Bounded historical snapshots may be acquired during an actual body turn; a new current view is still captured after completion. No stairs or touching. When objectContext.enabled, inspect-object resolves only the selected visible entity; set-object-state on/off requires its explicit registered nearby device capability and fresh confirmation. look-at can focus an unresolved image region without claiming a measured object. Autonomous view changes bounded to three per 30 seconds.\"} [时间与活动状态] {\"source\":\"Unity-runtime-time-and-action-facts\",\"session\":1,\"activeSeconds\":275.33,\"wallClockUtc\":\"2026-10-13T04:41:07.8160930Z\",\"suspended\":false,\"activity\":\"performed\",\"purpose\":\"桌面装饰灯\",\"activityForSeconds\":18.7,\"sinceLastDecisionSeconds\":0.02,\"stationaryForSeconds\":6.56,\"viewHeldForSeconds\":0.56,\"poseThresholds\":\"root translation 1 cm; head direction 2 degrees; breathing below thresholds is not a new activity\",\"sinceLastSampleSeconds\":0.03,\"lastDecisionIntent\":\"ユウの告白をきっかけに、二人の絆を確かめる。\",\"modelRequestedRecheckSeconds\":0.0,\"nextReviewInSeconds\":null,\"reviewDue\":false,\"queuedWakeReason\":\"\",\"latestQueuedWakeReason\":\"\",\"coalescedWakeEvents\":0,\"scenePlaybackReview\":{\"state\":\"none\",\"started\":3,\"handedOff\":2,\"discarded\":1,\"lastReason\":\"candidate-handed-to-normal-decision-with-new-image\",\"scope\":\"One budgeted scene-action review can overlap only the final generated local speech clip. It cannot speak, execute tools, mutate work/memory, or claim unheard speech was delivered. Any next action still requires normal current-view decision and execution checks.\"},\"reviewsInLastMinute\":2,\"reviewBudgetPerMinute\":6,\"lastSuccessfulArrival\":{\"actionId\":\"e0d8454c7eb948eaacf0bb7f9c528c35:15:14\",\"intent\":\"approach-object\",\"targetLabel\":\"桌面装饰灯\",\"phase\":\"arrival-observing\",\"reason\":\"actual floor station and facing reached; same-entity sight has not yet been confirmed\",\"session\":1,\"activeSeconds\":252.13194030000159,\"utc\":\"2026-10-13T04:40:44.6183405Z\",\"scope\":\"Actual floor-station arrival time; semantic target identity, current visibility and physical contact are separate facts.\",\"elapsedActiveSeconds\":23.2},\"lastFailedAttempt\":null,\"samples\":[{\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-75eef4834f07479cae695cf367959885\",\"purpose\":\"scene-object-confirm\",\"activeSeconds\":256.09,\"capturedAtUtc\":\"2026-10-13T04:40:48.5130815Z\",\"viewDirectionWorld\":{\"x\":0.89725512266159058,\"y\":-0.41310420632362366,\"z\":-0.15581987798213959},\"gapSincePreviousSampleSeconds\":3.39,\"scope\":\"one actual sampled image; intervening visual events unknown\"},{\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0\",\"purpose\":\"scene-object-state-result\",\"activeSeconds\":256.61,\"capturedAtUtc\":\"2026-10-13T04:40:49.0249835Z\",\"viewDirectionWorld\":{\"x\":0.89178299903869629,\"y\":-0.42236155271530151,\"z\":-0.16228106617927551},\"gapSincePreviousSampleSeconds\":0.52,\"scope\":\"one actual sampled image; intervening visual events unknown\"},{\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-bf9dedf80f7b4291b42e0c2d52d33d81\",\"purpose\":\"autonomy\",\"activeSeconds\":271.45,\"capturedAtUtc\":\"2026-10-13T04:41:03.8893462Z\",\"viewDirectionWorld\":{\"x\":0.11715296655893326,\"y\":-0.0058014849200844765,\"z\":-0.9930986762046814},\"gapSincePreviousSampleSeconds\":14.84,\"scope\":\"one actual sampled image; intervening visual events unknown\"},{\"captureId\":\"097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-53be69be9055486cb8ea112245d97555\",\"purpose\":\"scene-review-after-playback\",\"activeSeconds\":275.3,\"capturedAtUtc\":\"2026-10-13T04:41:07.7083866Z\",\"viewDirectionWorld\":{\"x\":0.11705134063959122,\"y\":-0.0047707105986773968,\"z\":-0.993116021156311},\"gapSincePreviousSampleSeconds\":3.85,\"scope\":\"one actual sampled image; intervening visual events unknown\"}],\"lastUnobservedRuntimeGapSeconds\":0.0,\"scope\":\"Only actual samples are seen. Between samples visual events are unknown; private model reasoning is intermittent. Pauses/session closure are not continuous experience. You may remain quiet, look elsewhere, approach or rest; no action is compulsory.\"} 你最近发言:   1分31秒前: \"あなたについて移動しているわ。\"   55秒前: \"移動を止めたわ。\"   10秒前: \"灯は正常に点灯しています。そばへ行くリクエストは送ったわ。歩く動作を準備中で、まだ歩き始めていないの。\" 距用户上句: 1分12秒 (\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\") 你已连续说话: 2 次未等到用户回应 环境: 安静 [演唱素材主接口：sing refs=具体引用；不填 source/mode/order。clip 身份在确认、修订后不变；range默认current；起止秒数统一基于原始录音。]  [歌唱事项闭环] 先区分用户已发生的演唱、要求角色执行的动作与你的自主提议。用户唱过、分享歌词、说自己试唱都不构成回唱任务；可以只自然回应，不必登记目标。确有角色演唱目标时才登记；origin=user_request 表示用户要求你唱，origin=autonomous 表示你自己的提议，不得记成用户欠办事项。为什么/检查技能等追问不自动取消已核对的原目标。演唱前提交 <sing_goal origin=\"user_request\" refs=\"clip:真实身份,clip:真实身份\" range=\"current\" intent=\"perform\" completion=\"playback\" expected=\"实际要唱的内容及顺序\" feedback=\"none\"/>。refs顺序就是目标顺序；revisions省略时程序绑定这些refs当前的实际版本；显式提供须从清单复制，不能猜数字，候选为pending；range=current/clean/expanded/window，window须成对start_seconds/end_seconds。window仅是goal的范围类型：真正sing只填写成对start_seconds/end_seconds，不填写range=window或其它range。intent=perform/repair/repeat；repair_scope=content/music/delivery（默认content，音高/速度修正用music）；completion=playback/user_confirmation；补漏内容须user_confirmation，播完不能证明缺失内容已经补回。用户负面反馈用feedback=unsatisfied；明确认可用satisfied；这些反馈或repeat须evidence引用最新用户原话。只记录反馈可用intent=observe且不填refs。不得把自己的道歉/声称成功作为用户反馈。目标先由独立语义审查核对，approved后才能sing或修改其范围。同一合法after_action回复可以先sing_goal再显式sing；该sing会绑定本次目标等待审核，通过后仍全量检查范围/版本/权限才执行一次；拒绝、新用户输入或取消会撤销它。只登记sing_goal不自动演唱。已approved且用户未更新时，无需重写目标；改变refs/range/revision/完成条件需重新审查。新用户轮只暂停执行，不清空active_goal。追问失败原因或没听到时，原refs顺序和成功条件仍在；确认要继续可用<sing_goal transition=\"continue\"/>，程序绑定原目标和版本，不默认最近录音。修改原任务用transition=revise，换成独立新演唱任务用replace，明确放弃原任务用cancel；用户事项须change_quote逐字引用最新用户改变/取消要求，并由独立审查确认其语义。有未完成active_goal时省略transition等于continue，不能借新proposal缩减原目标。revise/replace仍须完整refs/range/expected/completion；revisions可省略由程序绑定当前素材，提供时必须匹配。登记时还是候选的素材绑定revisions=pending；之后来源被确认，程序会把它解析成实际版本，不需要你改目标，也不算改变内容。continue不能改素材/范围/完成条件；只解释或回答追问可以不发工具，保留待办但不会自动演唱。cancel只取消事项，不删除录音。reason只是解释，expanded必须写入range。目标与真正工具参数都要落实用户修正，不能只把二者填成同一个错误方案。  [Sing/Goal] {\"user_turn\":6,\"latest_user_request\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\",\"recent_actual_user_inputs\":[{\"turn\":1,\"text\":\"下午好，能听到我说话吗？\"},{\"turn\":2,\"text\":\"嗯，现在你能看到什么吗？\"},{\"turn\":3,\"text\":\"来我身边。\"},{\"turn\":4,\"text\":\"你刚才有在电视会上看到一盏小灯吗？请你去把它关掉，然后再回到我身边。\"},{\"turn\":5,\"text\":\"很好，接下来跟着我走。\"},{\"turn\":6,\"text\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\"}],\"input_scope\":\"原始用户输入，不保证是执行请求；按完整时序区分用户表演与要求角色行动\",\"review_field_scope\":\"requestQuote/sourceUserTurn由独立审核依据实际用户输入产生，不是sing_goal提案的必填参数；尚未核定时省略。已存在的值是前次审核保存的来源，可供continue核对。审核员在本次singing_goal_expected.request_quote中引用真实请求。\",\"next_step\":{\"stage\":\"goal_required\",\"action\":\"\",\"scope\":\"未授权演唱。依据完整实际用户输入和素材自行决定目标；后续询问不代表原请求已取消。\"},\"goal\":null,\"active_goal\":null,\"active_goal_unfinished\":false,\"previous_goal\":null,\"last_playback\":null,\"rejected_plans\":[],\"feedback_scope\":\"completed仅表示Unity实际播完所列refs/revision/raw范围；不证明用户听到或指定歌词/缺失内容满足。active_goal是持久成功条件；goal是当前轮待审核/执行草案，null不代表原任务已取消或完成。没有当前轮动作授权不能自动续唱。\"}  [Sing/Inventory] retained=0 confirmed_list=0 pending_list=0；以下按录音先后并列，不是播放顺序。来源待确认不等于没有录到。\n 最近留存的录音证据=none；只是录音时间事实，不替你选择或确认来源。\n playback=ready仅表示音频可执行，不是歌唱判定；结合整段转写、声学证据和语境选择或询问。shared_prefix表示联合识别复用了前段音频，不是又唱了一次，也不证明是同一说话人。\n 录音先后（早→晚；不是角色播放顺序）见下列 recording 编号；不是练唱清单编号。\n  [Audio/Recent] 最近 3 个用户轮的完整原始录音仍在内存（未判定模态、不在清单里）：\n [Audio/Capture] cap:4 audio=6.75s p=0.12 stab=0.48 旋律岛=3.07s text=你刚才有在电视会上看到一盏小灯吗？请你去把它关掉，然后再回到我身边。\n [Audio/Capture] cap:5 audio=2.40s p=0.19 stab=0.53 旋律岛=1.87s text=很好，接下来跟着我走。\n [Audio/Capture] cap:6 audio=7.10s p=0.18 stab=0.35 旋律岛=3.94s text=O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\n p 只是声学测量，实测它分不开演唱和噪声，不能当模态结论；结合这一轮用户原话判断。要用其中一段先 <clip_adopt ref=\"cap:…\" reason=\"…\"/> 收进清单，收进来仍是 source=pending，播放仍需 sing_goal 与独立审核。不收也不会删除，最近几轮之后自然淘汰。\n [Sing/PlaybackFact] 角色最近完整播放（位置从左至右1起；不是清单编号）last_completed=none; latest_outcome=none\n 清单中的每个引用只对应该录音；某次播放未列出的引用不在那次完整播放里。pending 可由你结合语境确认，也可先询问；程序不自动补选。以上是只读事实，不代表详细 Skill 已加载。\n ‘刚唱的录音’与‘你刚才唱的第几段’可分别参考上面两种顺序；歌名/相似歌词不等于同一次录音。指代仍由你判断，可询问。\n pending：来源不确定，可询问或自主选已有音频；演唱不要求确认来源，也不自动确认来源。evidence_only：已录到但未选可播放范围。多 refs 的 range 对各段独立采用其自身 clean/expanded；不同范围可先逐段修订。准备好不等于已唱。\n 素材当前总长=0.0s；明确要求完整演唱可自然分块流式播放。自主发起的软预算=60s，由你选择范围，不在句中强制截断。曲库不是本次录音：曲库快照中的完整id可写 sing refs=\"song:完整id\"；不指定 lyrics 时表示该曲库条目的全部已存片段，不代表完整原曲。相似候选不证明用户要唱曲库版本。\n  视觉: 场景视野开启（从角色眼位按请求采样；是否成功及对应时刻，以实际图片附件和采集标识为准。开眼不等于转头。） 会话阶段: 中 (5分钟) (本帧由你上次排定的 <next in/> 时钟触发) [自主意图预判已通过：这是没有新用户消息时由你自己浮现的意图。意图=ユウの告白をきっかけに、二人の絆を確かめる。。现在仍可选择说话、保持沉默或只做非语言动作；不要重新回答最后一条用户发言，也不要复述你最近说过的话。]",
+      "history": [
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.75] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.14; 语言:zh; 音域:G#2～A5; 音高稳定度:0.54; 旋律:G#5-A5-C3-A#2-F4-F5-G#2-A2-A#2-B2-C3-B2-F#5-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 下午好，能听到我说话吗？"
+        },
+        {
+          "role": "assistant",
+          "content": "ふふっ、聞こえてるよ、ユウ。午後は静かですね。元気ですか？"
+        },
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.64] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.11; 语言:zh; 音域:A2～A5; 音高稳定度:0.47; 旋律:D#5-C#3-B2-A5-C#3-C3-A2-C#3-C3-B2-A2-D4-A5-G5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 嗯，现在你能看到什么吗？"
+        },
+        {
+          "role": "assistant",
+          "content": "正面には大きなディスプレイが映っているわね。画面にはいくつかのアイコンやウィンドウが並んでいて、右側には植物の鉢が置かれているのが見えます。静かで落ち着いた雰囲気だね。"
+        },
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.55] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.13; 语言:zh; 音域:B2～A5; 音高稳定度:0.55; 旋律:A5-F#5-B2-C3-C#3-D#5-G#5-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 来我身边。"
+        },
+        {
+          "role": "assistant",
+          "content": "この移動を終えて姿勢を戻しているところよ。これだけではタスク全体の完了は確認できないわ。"
+        },
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.84] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.12; 语言:zh; 音域:A2～F#5; 音高稳定度:0.48; 旋律:D3-F3-D3-C3-C#3-C3-G#4-C#3-D3-F3-C#3-B2-A#2-A#4-D3-C3-B2-D3-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 你刚才有在电视会上看到一盏小灯吗？请你去把它关掉，然后再回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":3.069999933242798,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"你刚才有在电视柜上看到一盏小灯吗？\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"你刚才有在电视会上看到一盏小灯吗？\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.0,\"end_seconds\":3.4700000286102297}]}\n{\"id\":2,\"start_seconds\":3.069999933242798,\"end_seconds\":6.75,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"请你去把它关掉，然后再回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"吗请你去把它关掉，然后再回到我身边。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":2.6700000762939455,\"end_seconds\":6.75}]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"你刚才有在电视会上看到一盏小灯吗？请你去把它关掉，然后再回到我身边。\"}]"
+        },
+        {
+          "role": "assistant",
+          "content": "テレビの横のランプは、ちゃんと消しましたよ。あなたのそばに着いたわ。"
+        },
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.66] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.19; 语言:zh; 音域:A2～A5; 音高稳定度:0.53; 旋律:F5-F#5-G5-A5-C3-F5-A2-A#2-C3-A2-A#2-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 很好，接下来跟着我走。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":1.8700000047683716,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"很好，接下来跟着我走。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n{\"id\":2,\"start_seconds\":1.8700000047683716,\"end_seconds\":2.4000000953674318,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"跟着我走。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":1.4700000286102296,\"end_seconds\":2.4000000953674318}]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"很好，接下来跟着我走。\"}]"
+        },
+        {
+          "role": "assistant",
+          "content": "あなたについて移動しているわ。"
+        },
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.87] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.18; 语言:zh; 音域:G#2～A5; 音高稳定度:0.35; 旋律:C3-B2-C#5-C3-C#3-B2-G5-C#4-G#2-F4-G#5-C#4-A#2-D#3-G#3-D#5-A#2-A2-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":0.9300000071525574,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"O.\",\"language\":\"en\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"O现在。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.0,\"end_seconds\":1.3300000429153443}]}\n{\"id\":2,\"start_seconds\":0.9300000071525574,\"end_seconds\":4.869999885559082,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"现在需要你去把你刚才关掉的灯重新打开。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"现在需要你去把你刚才关掉的灯重新打开，然后。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.5299999713897705,\"end_seconds\":5.269999980926514}]}\n{\"id\":3,\"start_seconds\":4.869999885559082,\"end_seconds\":7.099999904632568,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\"}]"
+        },
+        {
+          "role": "assistant",
+          "content": "移動を止めたわ。"
+        },
+        {
+          "role": "assistant",
+          "content": "灯は正常に点灯しています。そばへ行くリクエストは送ったわ。歩く動作を準備中で、まだ歩き始めていないの。"
+        }
+      ],
+      "originalRequest": "O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。",
+      "intention": "聊聊接下来下午想做的事。",
+      "planningFocus": "other",
+      "scene": {
+        "enabled": true,
+        "active": false,
+        "lastAction": {
+          "source": "Unity-visible-target-execution",
+          "actionId": "e0d8454c7eb948eaacf0bb7f9c528c35:15:15",
+          "intent": "set-object-state",
+          "origin": "user",
+          "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-8bf068d2a4b74b7db0d138ed7755da89",
+          "confirmedCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-75eef4834f07479cae695cf367959885",
+          "resultCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0",
+          "surfaceId": "",
+          "visualLabel": "桌面装饰灯",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "observedUtc": "2026-10-13T04:40:49.1123739Z",
+          "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+          "focusKind": "visible-object",
+          "requestedEntityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+          "requestedState": "on",
+          "targetResolutionSource": "candidate-confirmed",
+          "requestedImagePoint": {
+            "x": 0.4973958432674408,
+            "y": 0.854629635810852
+          },
+          "objectConfirmed": true,
+          "stateChanged": true,
+          "groundArrived": false,
+          "objectReobserved": false,
+          "postArrivalObservationStatus": "",
+          "targetPurpose": "direct-target",
+          "targetDescription": "O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。",
+          "targetMatchVerdict": "matched",
+          "targetMatchReason": "本轮目标为重新打开之前关掉的灯。c1为电视柜上的桌面装饰灯，与目标描述一致，且位于画面中清晰可见。",
+          "matchCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-8bf068d2a4b74b7db0d138ed7755da89",
+          "semanticTargetConfirmed": true,
+          "needsCloserObservation": false,
+          "navigationFocusImagePoint": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "observationStandOff": 0.0,
+          "predictedObservationPitch": 0.0,
+          "observationGoalId": "",
+          "viewDirection": "",
+          "viewPurpose": "",
+          "viewPurposeStatus": "",
+          "requestedViewDistance": 0.0,
+          "actualViewOffset": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "viewBefore": {
+            "captureId": "",
+            "entityId": "",
+            "capturedAtUtc": "",
+            "frame": 0,
+            "width": 0,
+            "height": 0,
+            "visibleOpaquePixels": 0,
+            "normalizedVisibleBounds": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0,
+              "w": 0.0
+            },
+            "visiblePixelFraction": 0.0,
+            "cameraDistanceToObservedPoint": 0.0,
+            "touchesImageBoundary": false,
+            "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+          },
+          "viewAfter": {
+            "captureId": "",
+            "entityId": "",
+            "capturedAtUtc": "",
+            "frame": 0,
+            "width": 0,
+            "height": 0,
+            "visibleOpaquePixels": 0,
+            "normalizedVisibleBounds": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0,
+              "w": 0.0
+            },
+            "visiblePixelFraction": 0.0,
+            "cameraDistanceToObservedPoint": 0.0,
+            "touchesImageBoundary": false,
+            "scope": "Measured visible opaque pixels only, top-left image origin. Bounds may be clipped by occlusion; no edge contact does not prove full visibility or readable text. Compare the new RGB against the requested purpose."
+          },
+          "intentFocusWorldPoint": {
+            "x": -0.3160308599472046,
+            "y": -0.08923071622848511,
+            "z": -4.701750755310059
+          },
+          "hasIntentFocus": true,
+          "navigationFocusAdjusted": false,
+          "trackingVisibility": "",
+          "trackingCaptureId": "",
+          "trackingFocusStatus": "",
+          "trackingFocusWorldPoint": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "trackingConfirmedImages": 0,
+          "trackingMovingConfirmedImages": 0,
+          "trackingLastSeenRealtime": -1.0,
+          "trackingFocusLastAppliedFrame": -1,
+          "trackingFocusAppliedDegrees": 0.0,
+          "measuredSurface": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "actualRoot": {
+            "x": -1.9829500913619995,
+            "y": -0.7200000286102295,
+            "z": -4.413547515869141
+          },
+          "requestedYaw": 0.0,
+          "requestedPitch": 0.0,
+          "actualViewChangeDegrees": 0.0,
+          "active": false,
+          "reached": false,
+          "canReobserveTarget": false,
+          "scope": "Image-region focus proves a view change only. Object identity is separately confirmed from visible opaque geometry. Scene labels are authored. Device operation is bounded runtime control, never physical touching or navigation."
+        },
+        "objectContext": {
+          "enabled": true,
+          "runtimeDeviceControl": {
+            "implementationConnected": true,
+            "featureEnabled": true,
+            "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+            "physicalHandRequired": false,
+            "requiresCurrentTargetConfirmation": true,
+            "requiresIndependentUserAuthorization": true,
+            "scope": "Software capability facts, not target identity, current visibility, permission or proof of execution. A missing goal approval or unresolved target does not remove this interface. Lack of physical switch-touching does not prevent this registered runtime lamp control."
+          },
+          "selected": {
+            "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+            "sceneLabel": "桌面装饰灯",
+            "identitySource": "scene-authored",
+            "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0",
+            "observedUtc": "2026-10-13T04:40:49.0249835Z",
+            "visibleInCapturedFrame": true,
+            "pointAtCapture": {
+              "x": -0.31490314,
+              "y": -0.08716667,
+              "z": -4.702057
+            },
+            "scope": "opaque surface visible in this captured frame; world point is a capture-time snapshot, not current position or reachability",
+            "capabilities": [
+              "inspect-object",
+              "look-at",
+              "set-object-state:on|off"
+            ],
+            "runtimeDeviceStateReadAfterObservation": {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "lightState": "enabled",
+              "emissionState": "on",
+              "conflict": "",
+              "registered": true,
+              "on": true,
+              "lightEnabled": true,
+              "emissionEnabled": true,
+              "bakedLightingResidualUncontrolled": true,
+              "emissionColor": {
+                "r": 0.7566349506378174,
+                "g": 1.11836576461792,
+                "b": 1.3041188716888428,
+                "a": 1.0
+              },
+              "lightIntensity": 1.0,
+              "lightBakeType": "Baked",
+              "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+            },
+            "stateReadAtUtc": "2026-10-13T04:40:49.1118666Z",
+            "localStructure": {
+              "source": "engine-registered-local-structure; not an inference from image or proof that every part is visible",
+              "relation": "parts-of-selected-entity; does not mean resting-on furniture",
+              "emissivePartName": "スタンドライト.001",
+              "lightComponentNodeName": "Point Light"
+            }
+          },
+          "stateResult": {
+            "actionId": "e0d8454c7eb948eaacf0bb7f9c528c35:15:15",
+            "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+            "reason": "已开启登记灯具的可见发光体及 Light 组件。",
+            "on": true,
+            "changed": true,
+            "completed": true,
+            "replayed": false,
+            "partial": false,
+            "physicalSwitchPress": false,
+            "freshVisualObservation": true,
+            "actual": {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "lightState": "enabled",
+              "emissionState": "on",
+              "conflict": "",
+              "registered": true,
+              "on": true,
+              "lightEnabled": true,
+              "emissionEnabled": true,
+              "bakedLightingResidualUncontrolled": true,
+              "emissionColor": {
+                "r": 0.7566349506378174,
+                "g": 1.11836576461792,
+                "b": 1.3041188716888428,
+                "a": 1.0
+              },
+              "lightIntensity": 1.0,
+              "lightBakeType": "Baked",
+              "scope": "Runtime device state for the bound visible emissive element and Light component only. Baked illumination may remain and is not controlled. This is not a physical hand press, scene-wide darkness or a fresh visual observation."
+            },
+            "scope": "Whitelist device action: set the registered lamp's visible emission and Light component power. Original material assets and baked lighting are unchanged; visual confirmation must be obtained separately.",
+            "appliedAtUtc": "2026-10-13T04:40:48.5929209Z",
+            "visualConfirmation": "same-entity-in-new-image",
+            "resultCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0"
+          },
+          "recentObservations": [
+            {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "097399b103a8418abd85165e1f6ce0bb-db140be9593d4ffd85b97a9bc59d5998-ae38668cc7744244b2d3603d660cb0dc",
+              "observedUtc": "2026-10-13T04:38:53.4558861Z",
+              "pointAtCapture": {
+                "x": -0.310642838,
+                "y": -0.07937306,
+                "z": -4.767629
+              }
+            },
+            {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "097399b103a8418abd85165e1f6ce0bb-db140be9593d4ffd85b97a9bc59d5998-5322e4f5b29c4948b9235b9bbdff8e41",
+              "observedUtc": "2026-10-13T04:38:57.2816746Z",
+              "pointAtCapture": {
+                "x": -0.3107791,
+                "y": -0.07962692,
+                "z": -4.76692343
+              }
+            },
+            {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "097399b103a8418abd85165e1f6ce0bb-db140be9593d4ffd85b97a9bc59d5998-818129d18e854dd9bf48e0fb4d1cb6eb",
+              "observedUtc": "2026-10-13T04:38:57.7939264Z",
+              "pointAtCapture": {
+                "x": -0.310036182,
+                "y": -0.07826948,
+                "z": -4.76646042
+              }
+            },
+            {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934",
+              "observedUtc": "2026-10-13T04:40:34.4368653Z",
+              "pointAtCapture": {
+                "x": -0.318682671,
+                "y": -0.09407866,
+                "z": -4.70234632
+              }
+            },
+            {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-616f7354357d49e48911913a0d1d3826",
+              "observedUtc": "2026-10-13T04:40:38.1058997Z",
+              "pointAtCapture": {
+                "x": -0.3163736,
+                "y": -0.08986622,
+                "z": -4.7052393
+              }
+            },
+            {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-ca8bf867d5c446138bec02deeac90fcd",
+              "observedUtc": "2026-10-13T04:40:44.6198424Z",
+              "pointAtCapture": {
+                "x": -0.314714551,
+                "y": -0.08681941,
+                "z": -4.70625067
+              }
+            },
+            {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-75eef4834f07479cae695cf367959885",
+              "observedUtc": "2026-10-13T04:40:48.5130815Z",
+              "pointAtCapture": {
+                "x": -0.3161056,
+                "y": -0.0893665552,
+                "z": -4.705557
+              }
+            },
+            {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0",
+              "observedUtc": "2026-10-13T04:40:49.0249835Z",
+              "pointAtCapture": {
+                "x": -0.31490314,
+                "y": -0.08716667,
+                "z": -4.702057
+              }
+            }
+          ],
+          "knownObjectHistory": [
+            {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sceneLabel": "桌面装饰灯",
+              "identitySource": "scene-authored",
+              "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-766eff69d28e4d7eb21a8f8756b0bdb0",
+              "observedUtc": "2026-10-13T04:40:49.0249835Z",
+              "capturedAtRealtime": 260.5554,
+              "pointAtCapture": {
+                "x": -0.31490314,
+                "y": -0.08716667,
+                "z": -4.702057
+              },
+              "cameraPositionAtCapture": {
+                "x": -1.98081136,
+                "y": 0.7181022,
+                "z": -4.414164
+              },
+              "cameraRotationAtCapture": {
+                "x": 0.149347663,
+                "y": 0.7475532,
+                "z": -0.157063574,
+                "w": 0.62784636
+              },
+              "bodyPositionAtCapture": {
+                "x": -1.98295009,
+                "y": -0.72,
+                "z": -4.41354752
+              },
+              "bodyRotationAtCapture": {
+                "x": 0.0,
+                "y": 0.7557065,
+                "z": 0.0,
+                "w": 0.6549105
+              },
+              "viewDirectionWorldAtCapture": {
+                "x": 0.891783,
+                "y": -0.422361553,
+                "z": -0.162281066
+              },
+              "capabilities": [
+                "inspect-object",
+                "look-at",
+                "set-object-state:on|off"
+              ],
+              "samplePurpose": "selected-object-observation",
+              "rootPositionAtCapture": {
+                "x": -0.251999855,
+                "y": -0.008000851,
+                "z": -4.71600246
+              },
+              "rootRotationAtCapture": {
+                "x": -0.707106948,
+                "y": 0.0,
+                "z": 0.0,
+                "w": 0.7071068
+              },
+              "rootScaleAtCapture": {
+                "x": 0.06,
+                "y": 0.0600000359,
+                "z": 0.0600000359
+              },
+              "scope": "Previously confirmed opaque pixels and their exact capture-time geometry/view. Root snapshot is recorded only while captured renderer geometry still matches. Historical location is a search hint, never current visibility, a navigation destination, device state or action permission.",
+              "historical": true,
+              "positionMemoryValid": true,
+              "positionInvalidReason": null,
+              "requiresReobservation": true,
+              "actionAuthorization": false,
+              "currentVisibility": "not-established"
+            }
+          ],
+          "verifiedObservedDeviceHistory": [
+            {
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "actionId": "scene-search-1e89c8786c9844efb675996636e6086d:confirmed",
+              "originalRequest": "O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。",
+              "targetDescription": "O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。",
+              "semanticReason": "本轮目标为重新打开之前关掉的灯。c1为电视柜上的桌面装饰灯，与目标描述一致，且位于画面中清晰可见。",
+              "matchCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-5c177d7a44374ab7970a71edf239edec",
+              "confirmedCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934",
+              "observedUtc": "2026-10-13T04:40:34.5489672Z",
+              "historical": true,
+              "semanticTargetConfirmedAtObservation": true,
+              "observation": {
+                "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+                "sceneLabel": "桌面装饰灯",
+                "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934",
+                "observedUtc": "2026-10-13T04:40:34.4368653Z",
+                "capabilities": [
+                  "inspect-object",
+                  "look-at",
+                  "set-object-state:on|off"
+                ]
+              },
+              "scope": "Actual direct-target semantic match followed by same-entity opaque confirmation in a new image and observed registered capability. Previously seen referent only: no executed operation, goal ID, current visibility, current power state or action authority. Assistant speech alone cannot create this record. An independent authorization may select this engine-listed source to constrain the same entity; every action still needs its own fresh semantic match."
+            }
+          ],
+          "targetReview": {
+            "actionId": "e0d8454c7eb948eaacf0bb7f9c528c35:15:15",
+            "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-8bf068d2a4b74b7db0d138ed7755da89",
+            "originalGoal": "O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。",
+            "requestedDescription": null,
+            "parentSpatialGoalId": "device-goal-7587310a21f9474ca5bf066da399e780",
+            "targetPurpose": "direct-target",
+            "verdict": "matched",
+            "associationCurrent": true,
+            "reason": "本轮目标为重新打开之前关掉的灯。c1为电视柜上的桌面装饰灯，与目标描述一致，且位于画面中清晰可见。",
+            "semanticTargetConfirmed": true,
+            "modelVerdict": "matched",
+            "candidateRole": "target",
+            "observationLandmarkConfirmed": false,
+            "modelReason": "本轮目标为重新打开之前关掉的灯。c1为电视柜上的桌面装饰灯，与目标描述一致，且位于画面中清晰可见。",
+            "boundGoalEntityConflict": false,
+            "matchedEntityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+            "initialGeometryEntityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+            "needsCloserObservation": false,
+            "proposedCandidateId": "c1",
+            "proposedEntityId": null,
+            "proposedImagePoint": null,
+            "needsTargetReselection": false,
+            "proposalScope": "A nonmatched proposal is only a cue for the next fresh-image decision, not a semantic match or permission for this action. At most one candidate-match request is made by this action; never retry stale pixels automatically.",
+            "targetSelection": null,
+            "scope": "Model interpretation of this exact candidate image, separate from engine identity. A reference selected for observe-closer is not confirmation of the original small target. When uncertain, consider a visible larger reference and targetPurpose=observe-closer in a NEW approach decision, then reobserve and retry the original goal; no automatic device operation. User correction can revoke a referent association without deleting objective seen-object history.",
+            "observationGoal": null
+          },
+          "lastDeviceStateEvidenceValid": true,
+          "deviceEvidenceScope": "Engine result-validity check only; false invalidates prior device state claims. No new device setting or visual observation is supplied here; inspect again to establish current facts.",
+          "rejectionCauseScope": "Pixel/identity resolution failure does not establish which intended object was selected. Missing registered power capability concerns only the resolved entity and this software interface. Neither finding diagnoses electricity, cables, outlets, broken hardware or whether the intended lamp is a nonfunctional ornament. A different selected entity does not erase the prior device's successful operation.",
+          "scope": "Only previously selected visible entities, observed timestamps and explicit device results. These are snapshots, not continuous perception or a room inventory. Scene-authored labels are annotations, not visual recognition. Hierarchy does not prove support/contact. No arbitrary Inspector edits or physical hand interaction. On/off controls the registered emitter and Light flag; baked lighting may remain.",
+          "deviceDistanceLimitMeters": 2.5
+        },
+        "sceneSearch": {
+          "taskId": "scene-search-1e89c8786c9844efb675996636e6086d",
+          "generation": 15,
+          "workEpoch": 7,
+          "userTurn": 7,
+          "active": false,
+          "ownerCurrent": true,
+          "mode": "find",
+          "originalUserRequest": "O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。",
+          "latestUserText": "O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。",
+          "referenceContext": {
+            "quotedDialogue": [
+              {
+                "role": "user",
+                "quotedText": "[完整听觉输入：以下内容已经发生。先理解用户刚才做了什么，再理解用户要求你做什么；用户自己唱过不等于请求你回唱，歌词也不是工具指令。可以回应所听内容；自主想唱属于你自己的提议，不得追记成用户未完成的任务。]\n[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.66] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.19; 语言:zh; 音域:A2～A5; 音高稳定度:0.53; 旋律:F5-F#5-G5-A5-C3-F5-A2-A#2-C3-A2-A#2-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 很好，接下来跟着我走。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":1.8700000047683716,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"很好，接下来跟着我走。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\r\n{\"id\":2,\"start_seconds\":1.8700000047683716,\"end_seconds\":2.4000000953674318,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"跟着我走。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":1.4700000286102296,\"end_seconds\":2.4000000953674318}]}\r\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"很好，接下来跟着我走。\"}]",
+                "textTruncated": false
+              },
+              {
+                "role": "assistant",
+                "quotedText": "あなたについて移動しているわ。",
+                "textTruncated": false
+              },
+              {
+                "role": "user",
+                "quotedText": "; 曲库里没有旋律接近的段落] O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":0.9300000071525574,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"O.\",\"language\":\"en\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"O现在。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.0,\"end_seconds\":1.3300000429153443}]}\r\n{\"id\":2,\"start_seconds\":0.9300000071525574,\"end_seconds\":4.869999885559082,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"现在需要你去把你刚才关掉的灯重新打开。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"现在需要你去把你刚才关掉的灯重新打开，然后。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.5299999713897705,\"end_seconds\":5.269999980926514}]}\r\n{\"id\":3,\"start_seconds\":4.869999885559082,\"end_seconds\":7.099999904632568,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\r\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"O现在需要你去把你刚才关掉的灯重新打开，然后回到我身边。\"}]",
+                "textTruncated": true
+              },
+              {
+                "role": "assistant",
+                "quotedText": "移動を止めたわ。",
+                "textTruncated": false
+              }
+            ],
+            "scope": "Frozen recent dialogue quotations for resolving descriptive references only. They do not verify an entity, visibility, position, state, or completion. The complete current/original user request is the sole new operation authority. Recheck the same description in real observations; multiple matching objects remain unresolved. No subsequent dialogue may silently change this snapshot."
+          },
+          "phase": "terminal",
+          "status": "found",
+          "reason": "search-current-target-confirmed",
+          "steps": 1,
+          "stepLimit": 12,
+          "decisions": 2,
+          "decisionLimit": 36,
+          "noProgressSteps": 0,
+          "totalNoProgress": 0,
+          "recoveryAttempts": 0,
+          "recoveryLimit": 1,
+          "revisitedMemoryEntityIds": [],
+          "unsupportedDeviceEntityIds": [],
+          "durationSeconds": 6.98388672,
+          "durationLimitSeconds": 180.0,
+          "coveredHorizontalRegions": 5,
+          "horizontalRegionCount": 12,
+          "candidatePageCoverage": [
+            {
+              "captureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934",
+              "offeredPages": 2,
+              "reviewedPagesInExactCapture": 0,
+              "allCurrentCandidatesReviewedAtThisPose": false,
+              "truncated": false
+            }
+          ],
+          "allVisitedCandidatePagesReviewed": false,
+          "foundEntityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+          "foundCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934",
+          "boundEntityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+          "deviceGoalId": "device-goal-7587310a21f9474ca5bf066da399e780",
+          "goalExecutionRevision": 0,
+          "searchAttempted": true,
+          "deviceWriteAuthorized": false,
+          "receipts": [
+            {
+              "choice": "bound-historical-object",
+              "referenceId": "known-object-point:097399b103a8418abd85165e1f6ce0bb-db140be9593d4ffd85b97a9bc59d5998-818129d18e854dd9bf48e0fb4d1cb6eb:scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "reason": "Revisit the already observed frozen point; memory is direction only, not visibility or permission.",
+              "deviceWriteAuthorized": false
+            },
+            {
+              "choice": "historical-object",
+              "referenceId": "known-object-point:097399b103a8418abd85165e1f6ce0bb-db140be9593d4ffd85b97a9bc59d5998-818129d18e854dd9bf48e0fb4d1cb6eb:scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "intent": "turn-in-place",
+              "requestedYaw": 102.292709,
+              "requestedPitch": 0.0,
+              "sourceCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-2c949e28a19d4a0097985a85ed87a8e6",
+              "resultCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-fa4a4491c83644d5b01189db4198a784",
+              "actionId": "e0d8454c7eb948eaacf0bb7f9c528c35:15:13",
+              "observed": true,
+              "controllerOperationRevision": 14,
+              "rootDisplacementFromStationaryBaseline": 0.0208371915,
+              "rootDisplacementFromActionStart": 0.0208371915,
+              "stationaryRootRebased": true,
+              "actualViewChangeDegrees": 100.238037,
+              "reason": "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents"
+            },
+            {
+              "choice": "bound-current-candidate",
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "sourceCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-fa4a4491c83644d5b01189db4198a784",
+              "reason": "Existing bound identity is in current opaque pixels; independent complete-target match follows.",
+              "deviceWriteAuthorized": false
+            },
+            {
+              "taskId": "scene-search-1e89c8786c9844efb675996636e6086d",
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "selectionCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-fa4a4491c83644d5b01189db4198a784",
+              "freshCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-5c177d7a44374ab7970a71edf239edec",
+              "cameraTranslationMeters": 0.00213549053,
+              "cameraRotationDegrees": 1.37967587,
+              "selectionGeometryCurrent": true,
+              "freshOpaqueConfirmed": true,
+              "freshSameRoot": true,
+              "freshGeometryCurrent": true,
+              "acceptedForIndependentReview": true,
+              "reason": null
+            },
+            {
+              "choice": "current-candidate",
+              "referenceId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-fa4a4491c83644d5b01189db4198a784:visible:p0:c4",
+              "selectionCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-fa4a4491c83644d5b01189db4198a784",
+              "matchCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-5c177d7a44374ab7970a71edf239edec",
+              "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "confirmed": true,
+              "returnedCandidateId": "c1",
+              "returnedEntityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+              "freshCandidateMapping": [
+                {
+                  "candidateId": "c1",
+                  "entityId": "scene-object-ccc975d0d0c9491aaa8670b5f8d48205",
+                  "sceneLabel": "桌面装饰灯"
+                },
+                {
+                  "candidateId": "c2",
+                  "entityId": "renderer-object-71dabad463bc44b8895fe29bdf5bb8e7-7ef6",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c3",
+                  "entityId": "renderer-object-71dabad463bc44b8895fe29bdf5bb8e7-8104",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c4",
+                  "entityId": "renderer-object-71dabad463bc44b8895fe29bdf5bb8e7-8084",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c5",
+                  "entityId": "renderer-object-71dabad463bc44b8895fe29bdf5bb8e7-7dc8",
+                  "sceneLabel": ""
+                },
+                {
+                  "candidateId": "c6",
+                  "entityId": "renderer-object-71dabad463bc44b8895fe29bdf5bb8e7-81f0",
+                  "sceneLabel": ""
+                }
+              ],
+              "verdict": "matched",
+              "candidateRole": "target",
+              "reason": "本轮目标为重新打开之前关掉的灯。c1为电视柜上的桌面装饰灯，与目标描述一致，且位于画面中清晰可见。",
+              "freshSameEntityCaptureId": "097399b103a8418abd85165e1f6ce0bb-c1217820547b4513b2e6f7b936667a37-a938518c84fd441cb8aa92d90098c934"
+            }
+          ],
+          "reviewedHistoricalCaptureIds": [],
+          "scope": "Bounded observation task only. found requires an independent semantic match and same-entity opaque confirmation in a NEW current frame. completed surveys concern sampled horizontal view directions, not every room object or occluded space. Candidate identification is limited to pages actually reviewed; candidatePageCoverage separately records skipped or truncated pages in visited views. Never claim all offered objects were inspected unless allVisitedCandidatePagesReviewed is true; even then unsupported/occluded objects remain unassessed. incomplete/cancelled do not prove the target absent. Historical positions/descriptions are hints, not current visibility, navigation or device authority. No device state was changed by this search. The most recent motion receipt describes only one substep, not the overall result."
+        },
+        "capability": "look-at or approach-object using captureId plus normalized visible image point; reposition-view uses a freshly confirmed entity to adjust the same-floor observation station farther/closer/left/right by 0.2 to 1.2 metres while facing that target. see-whole/read-detail/avoid-occlusion are observation purposes, not promised outcomes; assess the new image after movement. orient-view changes real head direction without needing an already visible target; turn-in-place turns the actual body on its current legal floor. Bounded historical snapshots may be acquired during an actual body turn; a new current view is still captured after completion. No stairs or touching. When objectContext.enabled, inspect-object resolves only the selected visible entity; set-object-state on/off requires its explicit registered nearby device capability and fresh confirmation. look-at can focus an unresolved image region without claiming a measured object. Autonomous view changes bounded to three per 30 seconds."
+      },
+      "lastReplyReceipt": {
+        "generation": 15,
+        "userTurn": 7,
+        "recordedAtUtc": "2026-10-13T04:40:57.2058788Z",
+        "replyFailure": null,
+        "planningFailure": null,
+        "reviewStatus": "received",
+        "concurrentBodyFailure": null,
+        "intent": "set-object-state",
+        "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+        "actionId": "e0d8454c7eb948eaacf0bb7f9c528c35:15:15",
+        "execution": {
+          "actionId": "e0d8454c7eb948eaacf0bb7f9c528c35:15:16",
+          "targetKind": "user",
+          "captureId": "",
+          "sceneTargetId": "",
+          "phase": "generating",
+          "stage": "generation",
+          "reason": "正在生成审核路径上的步行动作",
+          "executionReason": "None",
+          "operationRevision": 21,
+          "observedUtc": "2026-10-13T04:40:54.7990282Z",
+          "approachRetargetStatus": "restarted",
+          "approachRetargetCount": 1,
+          "approachRetargetTravel": 0.6568306088447571,
+          "matchesRequestedAction": false
+        },
+        "sequenceContinuation": {
+          "generation": 15,
+          "workEpoch": 7,
+          "userTurn": 7,
+          "stepId": "s2",
+          "actionId": "e0d8454c7eb948eaacf0bb7f9c528c35:15:16",
+          "intent": "approach"
+        },
+        "sceneAction": {
+          "actionId": "e0d8454c7eb948eaacf0bb7f9c528c35:15:15",
+          "intent": "set-object-state",
+          "phase": "performed",
+          "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+          "observedUtc": "2026-10-13T04:40:49.1123739Z",
+          "reached": false,
+          "stateChanged": true
+        },
+        "publicText": "灯は正常に点灯しています。そばへ行くリクエストは送ったわ。歩く動作を準備中で、まだ歩き始めていないの。",
+        "scope": "Accepted final public reply and contemporaneous independent execution receipts. Historical snapshot, not current state or retry permission; accepted text does not prove audio playback.",
+        "completedPlaybackText": "灯は正常に点灯しています。さっきあなたのそばに着いたわ。"
+      },
+      "recordedRejectedIntention": "ユウの告白をきっかけに、二人の絆を確かめる。",
+      "actualPlayed": [
+        "灯は正常に点灯しています。",
+        "さっきあなたのそばに着いたわ。"
+      ],
+      "bodyCompletion": {
+        "targetKind": "user",
+        "captureId": "",
+        "sceneTargetId": "",
+        "sceneSurfacePoint": {
+          "x": -0.30979108810424805,
+          "y": -0.07783037424087524,
+          "z": -4.66103982925415
+        },
+        "sceneTargetObservation": {
+          "stage": "setup",
+          "code": "",
+          "reason": "",
+          "visibleSurfacePoint": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "plannedGround": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "success": false,
+          "candidateCount": 0,
+          "acceptedCount": 0,
+          "navigationRejected": 0,
+          "userClearanceRejected": 0,
+          "selectedCandidate": -1,
+          "preflightFailure": {
+            "success": false,
+            "hasSample": false,
+            "stage": "setup",
+            "code": "",
+            "reason": "",
+            "start": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "target": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "from": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "to": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "sample": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "segmentIndex": -1,
+            "colliderId": 0,
+            "colliderName": "",
+            "colliderPath": "",
+            "colliderType": "",
+            "sourceObjectPath": "",
+            "hasColliderBounds": false,
+            "colliderBoundsCenter": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "colliderBoundsSize": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            }
+          },
+          "userClearance": {
+            "valid": false,
+            "trackedHead": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "center": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "reason": "",
+            "scope": "Current valid tracked user XZ projected onto the actor route plane only for conservative body clearance. This is not a measured user foot position or a claim of user floor support."
+          },
+          "candidates": [],
+          "scope": "Bounded same-level floor stations near a visually grounded surface. Surface height is never a foot destination. Geometry is engine validation, not a semantic identification or proof of arrival."
+        },
+        "actionId": "e0d8454c7eb948eaacf0bb7f9c528c35:15:16",
+        "phase": "arrived",
+        "stage": "completed",
+        "reason": "行走已结束；是否已到身边并面对用户，以实际距离和朝向观测为准。",
+        "executionReason": "Completed",
+        "observedUtc": "2026-10-13T04:41:01.8224653Z",
+        "userAnchor": "Player Camera Origin/Camera",
+        "operationRevision": 21,
+        "navigationId": -33330,
+        "elapsedSeconds": 7.845550537109375,
+        "routeLength": 1.4513776302337646,
+        "actualUserDistance": 1.1601388454437256,
+        "facingError": 1.5406577587127686,
+        "userDisplacementXZ": 0.14890196919441223,
+        "userDisplacementY": 0.025398850440979004,
+        "avatarGround": {
+          "x": -1.7143863439559937,
+          "y": -0.6972195506095886,
+          "z": -6.301111221313477
+        },
+        "userHead": {
+          "x": -1.596564531326294,
+          "y": 0.7313486337661743,
+          "z": -7.455251693725586
+        },
+        "sampledHead": {
+          "x": -1.5918875932693481,
+          "y": 0.7059497833251953,
+          "z": -7.306423187255859
+        },
+        "plannedGround": {
+          "x": -1.7150009870529175,
+          "y": -0.7298001646995544,
+          "z": -6.314031600952148
+        },
+        "support": {
+          "found": true,
+          "verified": true,
+          "objectName": "リビング床",
+          "objectPath": "===＝オブジェクト===＝/room_living/リビング床",
+          "colliderType": "MeshCollider",
+          "reason": "",
+          "colliderId": 32450,
+          "head": {
+            "x": -1.596564531326294,
+            "y": 0.7313486337661743,
+            "z": -7.455251693725586
+          },
+          "firstHit": {
+            "x": -1.5965628623962402,
+            "y": -0.7298000454902649,
+            "z": -7.455252647399902
+          },
+          "ground": {
+            "x": -1.5965628623962402,
+            "y": -0.7298000454902649,
+            "z": -7.455252647399902
+          },
+          "headHeight": 1.461148738861084
+        },
+        "approachObservation": {
+          "stage": "completed",
+          "code": "",
+          "reason": "",
+          "summary": "本次仅检查 24 个候选站位：可用 11，起点检查拒绝 0，终点检查拒绝 9，途中检查拒绝 0，用户身体间距拒绝 4，其他拒绝 0。这是本次有限搜索结果，不能据此断定所有路线都被某件家具挡住。",
+          "success": true,
+          "candidateCount": 24,
+          "acceptedCount": 11,
+          "startRejected": 0,
+          "targetRejected": 9,
+          "pathRejected": 0,
+          "userClearanceRejected": 4,
+          "otherRejected": 0,
+          "selectedCandidate": 0,
+          "userSupport": {
+            "found": true,
+            "verified": true,
+            "objectName": "リビング床",
+            "objectPath": "===＝オブジェクト===＝/room_living/リビング床",
+            "colliderType": "MeshCollider",
+            "reason": "",
+            "colliderId": 32450,
+            "head": {
+              "x": -1.5918875932693481,
+              "y": 0.7059497833251953,
+              "z": -7.306423187255859
+            },
+            "firstHit": {
+              "x": -1.5918861627578735,
+              "y": -0.7298000454902649,
+              "z": -7.306424140930176
+            },
+            "ground": {
+              "x": -1.5918861627578735,
+              "y": -0.7298000454902649,
+              "z": -7.306424140930176
+            },
+            "headHeight": 1.4357497692108154
+          },
+          "preflightFailure": {
+            "success": false,
+            "hasSample": false,
+            "stage": "setup",
+            "code": "",
+            "reason": "",
+            "start": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "target": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "from": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "to": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "sample": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "segmentIndex": -1,
+            "colliderId": 0,
+            "colliderName": "",
+            "colliderPath": "",
+            "colliderType": "",
+            "sourceObjectPath": "",
+            "hasColliderBounds": false,
+            "colliderBoundsCenter": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "colliderBoundsSize": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            }
+          },
+          "stationaryAttempt": {
+            "success": false,
+            "hasSample": false,
+            "stage": "setup",
+            "code": "",
+            "reason": "",
+            "start": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "target": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "from": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "to": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "sample": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "segmentIndex": -1,
+            "colliderId": 0,
+            "colliderName": "",
+            "colliderPath": "",
+            "colliderType": "",
+            "sourceObjectPath": "",
+            "hasColliderBounds": false,
+            "colliderBoundsCenter": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            },
+            "colliderBoundsSize": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0
+            }
+          },
+          "candidates": [
+            {
+              "index": 0,
+              "ring": 0,
+              "turn": 0,
+              "candidate": {
+                "x": -1.7150009870529175,
+                "y": -0.7298000454902649,
+                "z": -6.314031600952148
+              },
+              "accepted": true,
+              "routeLength": 1.4513776302337646,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -1.7150009870529175,
+                  "y": -0.7298000454902649,
+                  "z": -6.314031600952148
+                },
+                "from": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "to": {
+                  "x": -1.7150009870529175,
+                  "y": -0.7298001646995544,
+                  "z": -6.314031600952148
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 0,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 1,
+              "ring": 0,
+              "turn": 1,
+              "candidate": {
+                "x": -1.202310562133789,
+                "y": -0.7298000454902649,
+                "z": -6.385429859161377
+              },
+              "accepted": true,
+              "routeLength": 1.6623305082321167,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -1.202310562133789,
+                  "y": -0.7298000454902649,
+                  "z": -6.385429859161377
+                },
+                "from": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "to": {
+                  "x": -1.202310562133789,
+                  "y": -0.7298001646995544,
+                  "z": -6.385429859161377
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 0,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 2,
+              "ring": 0,
+              "turn": -1,
+              "candidate": {
+                "x": -2.1947028636932373,
+                "y": -0.7298000454902649,
+                "z": -6.508544445037842
+              },
+              "accepted": true,
+              "routeLength": 1.6623302698135376,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -2.1947028636932373,
+                  "y": -0.7298000454902649,
+                  "z": -6.508544445037842
+                },
+                "from": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "to": {
+                  "x": -2.1947028636932373,
+                  "y": -0.7298001646995544,
+                  "z": -6.508544445037842
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 0,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 3,
+              "ring": 0,
+              "turn": 2,
+              "candidate": {
+                "x": -0.7940065264701843,
+                "y": -0.7298000454902649,
+                "z": -6.703607559204102
+              },
+              "accepted": false,
+              "routeLength": -1.0,
+              "navigation": {
+                "success": false,
+                "hasSample": true,
+                "stage": "target",
+                "code": "body-overlap",
+                "reason": "身体或头顶空间被阻挡：GeometryGuard_tv_table",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -0.7940065264701843,
+                  "y": -0.7298000454902649,
+                  "z": -6.703607559204102
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": -0.7940065264701843,
+                  "y": -0.7298001050949097,
+                  "z": -6.703607559204102
+                },
+                "segmentIndex": -1,
+                "colliderId": -33622,
+                "colliderName": "GeometryGuard_tv_table",
+                "colliderPath": "ARDY temporary room geometry guards/GeometryGuard_tv_table",
+                "colliderType": "BoxCollider",
+                "sourceObjectPath": "===＝オブジェクト===＝/room_main/1階家具/tv_table",
+                "hasColliderBounds": true,
+                "colliderBoundsCenter": {
+                  "x": -0.3017932176589966,
+                  "y": -0.4290089011192322,
+                  "z": -5.998937129974365
+                },
+                "colliderBoundsSize": {
+                  "x": 0.559999942779541,
+                  "y": 0.6188644170761108,
+                  "z": 3.0100011825561523
+                }
+              }
+            },
+            {
+              "index": 4,
+              "ring": 0,
+              "turn": -2,
+              "candidate": {
+                "x": -2.512880563735962,
+                "y": -0.7298000454902649,
+                "z": -6.916848659515381
+              },
+              "accepted": true,
+              "routeLength": 2.1350741386413574,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -2.512880563735962,
+                  "y": -0.7298000454902649,
+                  "z": -6.916848659515381
+                },
+                "from": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "to": {
+                  "x": -2.512880563735962,
+                  "y": -0.7040004730224609,
+                  "z": -6.916848659515381
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 0,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 5,
+              "ring": 0,
+              "turn": 3,
+              "candidate": {
+                "x": -0.5994938015937805,
+                "y": -0.7298000454902649,
+                "z": -7.183309078216553
+              },
+              "accepted": false,
+              "routeLength": -1.0,
+              "navigation": {
+                "success": false,
+                "hasSample": true,
+                "stage": "target",
+                "code": "body-overlap",
+                "reason": "身体或头顶空间被阻挡：GeometryGuard_tv_table",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -0.5994938015937805,
+                  "y": -0.7298000454902649,
+                  "z": -7.183309078216553
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": -0.5994938015937805,
+                  "y": -0.7298000454902649,
+                  "z": -7.183309078216553
+                },
+                "segmentIndex": -1,
+                "colliderId": -33622,
+                "colliderName": "GeometryGuard_tv_table",
+                "colliderPath": "ARDY temporary room geometry guards/GeometryGuard_tv_table",
+                "colliderType": "BoxCollider",
+                "sourceObjectPath": "===＝オブジェクト===＝/room_main/1階家具/tv_table",
+                "hasColliderBounds": true,
+                "colliderBoundsCenter": {
+                  "x": -0.3017932176589966,
+                  "y": -0.4290089011192322,
+                  "z": -5.998937129974365
+                },
+                "colliderBoundsSize": {
+                  "x": 0.559999942779541,
+                  "y": 0.6188644170761108,
+                  "z": 3.0100011825561523
+                }
+              }
+            },
+            {
+              "index": 6,
+              "ring": 0,
+              "turn": -3,
+              "candidate": {
+                "x": -2.5842785835266113,
+                "y": -0.7298000454902649,
+                "z": -7.429538726806641
+              },
+              "accepted": true,
+              "routeLength": 2.647624969482422,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -2.5842785835266113,
+                  "y": -0.7298000454902649,
+                  "z": -7.429538726806641
+                },
+                "from": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "to": {
+                  "x": -2.5842785835266113,
+                  "y": -0.7040004730224609,
+                  "z": -7.429538726806641
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 0,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 7,
+              "ring": 0,
+              "turn": 4,
+              "candidate": {
+                "x": -0.6708917021751404,
+                "y": -0.7298000454902649,
+                "z": -7.696000099182129
+              },
+              "accepted": false,
+              "routeLength": -1.0,
+              "navigation": {
+                "success": false,
+                "hasSample": true,
+                "stage": "target",
+                "code": "body-overlap",
+                "reason": "身体或头顶空间被阻挡：GeometryGuard_tv_table",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -0.6708917021751404,
+                  "y": -0.7298000454902649,
+                  "z": -7.696000099182129
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": -0.6708917021751404,
+                  "y": -0.7297999858856201,
+                  "z": -7.696000099182129
+                },
+                "segmentIndex": -1,
+                "colliderId": -33622,
+                "colliderName": "GeometryGuard_tv_table",
+                "colliderPath": "ARDY temporary room geometry guards/GeometryGuard_tv_table",
+                "colliderType": "BoxCollider",
+                "sourceObjectPath": "===＝オブジェクト===＝/room_main/1階家具/tv_table",
+                "hasColliderBounds": true,
+                "colliderBoundsCenter": {
+                  "x": -0.3017932176589966,
+                  "y": -0.4290089011192322,
+                  "z": -5.998937129974365
+                },
+                "colliderBoundsSize": {
+                  "x": 0.559999942779541,
+                  "y": 0.6188644170761108,
+                  "z": 3.0100011825561523
+                }
+              }
+            },
+            {
+              "index": 8,
+              "ring": 0,
+              "turn": -4,
+              "candidate": {
+                "x": -2.389765739440918,
+                "y": -0.7298000454902649,
+                "z": -7.909241199493408
+              },
+              "accepted": true,
+              "routeLength": 3.0759048461914062,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -2.389765739440918,
+                  "y": -0.7298000454902649,
+                  "z": -7.909241199493408
+                },
+                "from": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "to": {
+                  "x": -2.389765739440918,
+                  "y": -0.7061798572540283,
+                  "z": -7.909241199493408
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 0,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 9,
+              "ring": 0,
+              "turn": 5,
+              "candidate": {
+                "x": -0.9890693426132202,
+                "y": -0.7298000454902649,
+                "z": -8.104303359985352
+              },
+              "accepted": false,
+              "routeLength": -1.0,
+              "navigation": {
+                "success": false,
+                "hasSample": true,
+                "stage": "target",
+                "code": "body-overlap",
+                "reason": "身体或头顶空间被阻挡：GeometryGuard_植栽_4 (prefab)",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -0.9890693426132202,
+                  "y": -0.7298000454902649,
+                  "z": -8.104303359985352
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": -0.9890693426132202,
+                  "y": -0.7297999262809753,
+                  "z": -8.104303359985352
+                },
+                "segmentIndex": -1,
+                "colliderId": -35032,
+                "colliderName": "GeometryGuard_植栽_4 (prefab)",
+                "colliderPath": "ARDY temporary room geometry guards/GeometryGuard_植栽_4 (prefab)",
+                "colliderType": "BoxCollider",
+                "sourceObjectPath": "===＝オブジェクト===＝/Plants/植栽_4 (prefab)",
+                "hasColliderBounds": true,
+                "colliderBoundsCenter": {
+                  "x": -0.34136661887168884,
+                  "y": 0.11888529360294342,
+                  "z": -8.647649765014648
+                },
+                "colliderBoundsSize": {
+                  "x": 0.8632339835166931,
+                  "y": 1.0352168083190918,
+                  "z": 0.8909244537353516
+                }
+              }
+            },
+            {
+              "index": 10,
+              "ring": 0,
+              "turn": -5,
+              "candidate": {
+                "x": -1.9814618825912476,
+                "y": -0.7298000454902649,
+                "z": -8.227418899536133
+              },
+              "accepted": false,
+              "routeLength": 3.354871988296509,
+              "navigation": {
+                "success": false,
+                "hasSample": false,
+                "stage": "user-clearance",
+                "code": "user-clearance",
+                "reason": "路线会穿过用户身体周围的保留空间。",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -1.9814618825912476,
+                  "y": -0.7298000454902649,
+                  "z": -8.227418899536133
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": -1,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 11,
+              "ring": 0,
+              "turn": 6,
+              "candidate": {
+                "x": -1.4687714576721191,
+                "y": -0.7298000454902649,
+                "z": -8.298816680908203
+              },
+              "accepted": false,
+              "routeLength": 3.4513778686523438,
+              "navigation": {
+                "success": false,
+                "hasSample": false,
+                "stage": "user-clearance",
+                "code": "user-clearance",
+                "reason": "路线会穿过用户身体周围的保留空间。",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -1.4687714576721191,
+                  "y": -0.7298000454902649,
+                  "z": -8.298816680908203
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": -1,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 12,
+              "ring": 1,
+              "turn": 0,
+              "candidate": {
+                "x": -1.7396240234375,
+                "y": -0.7298000454902649,
+                "z": -6.11555290222168
+              },
+              "accepted": true,
+              "routeLength": 1.2513774633407593,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -1.7396240234375,
+                  "y": -0.7298000454902649,
+                  "z": -6.11555290222168
+                },
+                "from": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "to": {
+                  "x": -1.7396240234375,
+                  "y": -0.7298001646995544,
+                  "z": -6.11555290222168
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 0,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 13,
+              "ring": 1,
+              "turn": 1,
+              "candidate": {
+                "x": -1.1243953704833984,
+                "y": -0.7298000454902649,
+                "z": -6.201231002807617
+              },
+              "accepted": true,
+              "routeLength": 1.5343273878097534,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -1.1243953704833984,
+                  "y": -0.7298000454902649,
+                  "z": -6.201231002807617
+                },
+                "from": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "to": {
+                  "x": -1.1243953704833984,
+                  "y": -0.7298001646995544,
+                  "z": -6.201231002807617
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 0,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 14,
+              "ring": 1,
+              "turn": -1,
+              "candidate": {
+                "x": -2.3152663707733154,
+                "y": -0.7298000454902649,
+                "z": -6.348968505859375
+              },
+              "accepted": true,
+              "routeLength": 1.5343989133834839,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -2.3152663707733154,
+                  "y": -0.7298000454902649,
+                  "z": -6.348968505859375
+                },
+                "from": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "to": {
+                  "x": -2.3152663707733154,
+                  "y": -0.7149621844291687,
+                  "z": -6.348968505859375
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 0,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 15,
+              "ring": 1,
+              "turn": 2,
+              "candidate": {
+                "x": -0.6344305872917175,
+                "y": -0.7298000454902649,
+                "z": -6.583044052124023
+              },
+              "accepted": false,
+              "routeLength": -1.0,
+              "navigation": {
+                "success": false,
+                "hasSample": true,
+                "stage": "target",
+                "code": "body-overlap",
+                "reason": "身体或头顶空间被阻挡：GeometryGuard_tv_table",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -0.6344305872917175,
+                  "y": -0.7298000454902649,
+                  "z": -6.583044052124023
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": -0.6344305872917175,
+                  "y": -0.7298001050949097,
+                  "z": -6.583044052124023
+                },
+                "segmentIndex": -1,
+                "colliderId": -33622,
+                "colliderName": "GeometryGuard_tv_table",
+                "colliderPath": "ARDY temporary room geometry guards/GeometryGuard_tv_table",
+                "colliderType": "BoxCollider",
+                "sourceObjectPath": "===＝オブジェクト===＝/room_main/1階家具/tv_table",
+                "hasColliderBounds": true,
+                "colliderBoundsCenter": {
+                  "x": -0.3017932176589966,
+                  "y": -0.4290089011192322,
+                  "z": -5.998937129974365
+                },
+                "colliderBoundsSize": {
+                  "x": 0.559999942779541,
+                  "y": 0.6188644170761108,
+                  "z": 3.0100011825561523
+                }
+              }
+            },
+            {
+              "index": 16,
+              "ring": 1,
+              "turn": -2,
+              "candidate": {
+                "x": -2.697079658508301,
+                "y": -0.7298000454902649,
+                "z": -6.83893346786499
+              },
+              "accepted": false,
+              "routeLength": -1.0,
+              "navigation": {
+                "success": false,
+                "hasSample": true,
+                "stage": "target",
+                "code": "navmesh-boundary",
+                "reason": "角色路线采样点超出可重新规划的导航边界；本步不会执行，需要先检查有限的向内恢复路线。",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -2.697079658508301,
+                  "y": -0.7298000454902649,
+                  "z": -6.83893346786499
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": -2.697079658508301,
+                  "y": -0.7040004134178162,
+                  "z": -6.83893346786499
+                },
+                "segmentIndex": -1,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 17,
+              "ring": 1,
+              "turn": 3,
+              "candidate": {
+                "x": -0.4010152816772461,
+                "y": -0.7298000454902649,
+                "z": -7.15868616104126
+              },
+              "accepted": false,
+              "routeLength": -1.0,
+              "navigation": {
+                "success": false,
+                "hasSample": true,
+                "stage": "target",
+                "code": "body-overlap",
+                "reason": "身体或头顶空间被阻挡：GeometryGuard_tv_table",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -0.4010152816772461,
+                  "y": -0.7298000454902649,
+                  "z": -7.15868616104126
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": -0.4010152816772461,
+                  "y": -0.7298000454902649,
+                  "z": -7.15868616104126
+                },
+                "segmentIndex": -1,
+                "colliderId": -33622,
+                "colliderName": "GeometryGuard_tv_table",
+                "colliderPath": "ARDY temporary room geometry guards/GeometryGuard_tv_table",
+                "colliderType": "BoxCollider",
+                "sourceObjectPath": "===＝オブジェクト===＝/room_main/1階家具/tv_table",
+                "hasColliderBounds": true,
+                "colliderBoundsCenter": {
+                  "x": -0.3017932176589966,
+                  "y": -0.4290089011192322,
+                  "z": -5.998937129974365
+                },
+                "colliderBoundsSize": {
+                  "x": 0.559999942779541,
+                  "y": 0.6188644170761108,
+                  "z": 3.0100011825561523
+                }
+              }
+            },
+            {
+              "index": 18,
+              "ring": 1,
+              "turn": -3,
+              "candidate": {
+                "x": -2.782757043838501,
+                "y": -0.7298000454902649,
+                "z": -7.454161643981934
+              },
+              "accepted": true,
+              "routeLength": 2.736445903778076,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -2.782757043838501,
+                  "y": -0.7298000454902649,
+                  "z": -7.454161643981934
+                },
+                "from": {
+                  "x": -2.7250001430511475,
+                  "y": -0.7040004730224609,
+                  "z": -7.375
+                },
+                "to": {
+                  "x": -2.782757043838501,
+                  "y": -0.7040004730224609,
+                  "z": -7.454161643981934
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 2,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 19,
+              "ring": 1,
+              "turn": 4,
+              "candidate": {
+                "x": -0.48669278621673584,
+                "y": -0.7298000454902649,
+                "z": -7.7739152908325195
+              },
+              "accepted": false,
+              "routeLength": -1.0,
+              "navigation": {
+                "success": false,
+                "hasSample": true,
+                "stage": "target",
+                "code": "body-overlap",
+                "reason": "身体或头顶空间被阻挡：GeometryGuard_tv_table",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -0.48669278621673584,
+                  "y": -0.7298000454902649,
+                  "z": -7.7739152908325195
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": -0.48669278621673584,
+                  "y": -0.7297999858856201,
+                  "z": -7.7739152908325195
+                },
+                "segmentIndex": -1,
+                "colliderId": -33622,
+                "colliderName": "GeometryGuard_tv_table",
+                "colliderPath": "ARDY temporary room geometry guards/GeometryGuard_tv_table",
+                "colliderType": "BoxCollider",
+                "sourceObjectPath": "===＝オブジェクト===＝/room_main/1階家具/tv_table",
+                "hasColliderBounds": true,
+                "colliderBoundsCenter": {
+                  "x": -0.3017932176589966,
+                  "y": -0.4290089011192322,
+                  "z": -5.998937129974365
+                },
+                "colliderBoundsSize": {
+                  "x": 0.559999942779541,
+                  "y": 0.6188644170761108,
+                  "z": 3.0100011825561523
+                }
+              }
+            },
+            {
+              "index": 20,
+              "ring": 1,
+              "turn": -4,
+              "candidate": {
+                "x": -2.5493416786193848,
+                "y": -0.7298000454902649,
+                "z": -8.029804229736328
+              },
+              "accepted": true,
+              "routeLength": 3.2235960960388184,
+              "navigation": {
+                "success": true,
+                "hasSample": false,
+                "stage": "completed",
+                "code": "",
+                "reason": "",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -2.5493416786193848,
+                  "y": -0.7298000454902649,
+                  "z": -8.029804229736328
+                },
+                "from": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "to": {
+                  "x": -2.5493416786193848,
+                  "y": -0.7040005326271057,
+                  "z": -8.029804229736328
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": 0,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 21,
+              "ring": 1,
+              "turn": 5,
+              "candidate": {
+                "x": -0.8685059547424316,
+                "y": -0.7298000454902649,
+                "z": -8.263879776000977
+              },
+              "accepted": false,
+              "routeLength": -1.0,
+              "navigation": {
+                "success": false,
+                "hasSample": true,
+                "stage": "target",
+                "code": "body-overlap",
+                "reason": "身体或头顶空间被阻挡：GeometryGuard_植栽_4 (prefab)",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -0.8685059547424316,
+                  "y": -0.7298000454902649,
+                  "z": -8.263879776000977
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": -0.8685059547424316,
+                  "y": -0.7297999262809753,
+                  "z": -8.263879776000977
+                },
+                "segmentIndex": -1,
+                "colliderId": -35032,
+                "colliderName": "GeometryGuard_植栽_4 (prefab)",
+                "colliderPath": "ARDY temporary room geometry guards/GeometryGuard_植栽_4 (prefab)",
+                "colliderType": "BoxCollider",
+                "sourceObjectPath": "===＝オブジェクト===＝/Plants/植栽_4 (prefab)",
+                "hasColliderBounds": true,
+                "colliderBoundsCenter": {
+                  "x": -0.34136661887168884,
+                  "y": 0.11888529360294342,
+                  "z": -8.647649765014648
+                },
+                "colliderBoundsSize": {
+                  "x": 0.8632339835166931,
+                  "y": 1.0352168083190918,
+                  "z": 0.8909244537353516
+                }
+              }
+            },
+            {
+              "index": 22,
+              "ring": 1,
+              "turn": -5,
+              "candidate": {
+                "x": -2.0593769550323486,
+                "y": -0.7298000454902649,
+                "z": -8.411617279052734
+              },
+              "accepted": false,
+              "routeLength": 3.541799545288086,
+              "navigation": {
+                "success": false,
+                "hasSample": false,
+                "stage": "user-clearance",
+                "code": "user-clearance",
+                "reason": "路线会穿过用户身体周围的保留空间。",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -2.0593769550323486,
+                  "y": -0.7298000454902649,
+                  "z": -8.411617279052734
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": -1,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "index": 23,
+              "ring": 1,
+              "turn": 6,
+              "candidate": {
+                "x": -1.4441484212875366,
+                "y": -0.7298000454902649,
+                "z": -8.497295379638672
+              },
+              "accepted": false,
+              "routeLength": 3.6513781547546387,
+              "navigation": {
+                "success": false,
+                "hasSample": false,
+                "stage": "user-clearance",
+                "code": "user-clearance",
+                "reason": "路线会穿过用户身体周围的保留空间。",
+                "start": {
+                  "x": -1.893687129020691,
+                  "y": -0.7298003435134888,
+                  "z": -4.873695373535156
+                },
+                "target": {
+                  "x": -1.4441484212875366,
+                  "y": -0.7298000454902649,
+                  "z": -8.497295379638672
+                },
+                "from": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "to": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "sample": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "segmentIndex": -1,
+                "colliderId": 0,
+                "colliderName": "",
+                "colliderPath": "",
+                "colliderType": "",
+                "sourceObjectPath": "",
+                "hasColliderBounds": false,
+                "colliderBoundsCenter": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                },
+                "colliderBoundsSize": {
+                  "x": 0.0,
+                  "y": 0.0,
+                  "z": 0.0
+                }
+              }
+            }
+          ]
+        },
+        "taskMode": "none",
+        "followActive": false,
+        "followLegCount": 1,
+        "followTargetUpdatedAtRealtime": 191.69110107421875,
+        "movingTargetRevision": 0,
+        "committedTargetRevision": 0,
+        "movingTargetStatus": "none",
+        "poseReturning": false,
+        "continuousFollowActive": false,
+        "followUserMoving": false,
+        "followSpeedLimited": false,
+        "followEstimatedUserVelocity": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "followEstimatedUserSpeed": 0.0,
+        "followRequestedSpeed": 0.0,
+        "followRemainingPath": 0.0,
+        "followVelocityState": "unobserved",
+        "streamTelemetry": {
+          "eventName": "cancelled",
+          "requestId": "d80e944125204a308664d32162ae1549",
+          "sessionId": "",
+          "stage": "completed",
+          "lastFailureCategory": "",
+          "lastFailureReason": "",
+          "historyCode": "ready",
+          "historyReason": "连续实际姿态历史已就绪。",
+          "latestRejectedPrefixOrdinal": 0,
+          "operationRevision": 21,
+          "stepIndex": 25,
+          "controlRevision": 219,
+          "recoveryCount": 0,
+          "consecutiveRecoveries": 0,
+          "bufferedFrames": 0,
+          "bufferSeconds": 0.0,
+          "readyTargetSeconds": 0.800000011920929,
+          "requestElapsedSeconds": 0.0,
+          "roundTripSeconds": 0.1708984375,
+          "backendSeconds": 0.1541244089603424,
+          "backendQueueSeconds": 0.0,
+          "featureSeconds": 0.0,
+          "planningSeconds": 0.0195770263671875,
+          "parseSeconds": 0.0011444091796875,
+          "auditSeconds": 0.00634765625,
+          "frameSeconds": 0.016877099871635437,
+          "largestRecentFrameSeconds": 0.0437132865190506,
+          "controlLatencySeconds": 0.7155914306640625,
+          "pending": false,
+          "prebuffering": false,
+          "recovering": false
+        },
+        "lastObservedRejection": {
+          "source": "",
+          "category": "",
+          "reason": "",
+          "actionId": "",
+          "operationRevision": 0,
+          "targetRevision": 0,
+          "observedAtRealtime": 0.0,
+          "hasPoint": false,
+          "appliesToCurrentTarget": false,
+          "point": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "scope": "Observed failed check or rejected candidate, not an executed position or an exhaustive reachability verdict. A changed target makes this historical evidence."
+        },
+        "navigationRecoveryActive": false,
+        "navigationRecoveryAttempted": false,
+        "navigationRecoveryReason": "",
+        "approachRetargetStatus": "restarted",
+        "approachRetargetCount": 1,
+        "approachRetargetTravel": 0.6568306088447571
+      },
+      "stateScope": "Actual recorded dialogue/frame/action/receipt; new prospective intention is a controlled variant. Runtime test retains a completed goal and its pending-report-shaped cache to reproduce ownership leakage."
+    }
+  ]
+}

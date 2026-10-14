@@ -7,7 +7,7 @@ public partial class ChatSample
     private sealed class AutonomousReplyOwner
     {
         public int generation, epoch, userTurn;
-        public string intention, intent, actionId;
+        public string intention, intent, actionId, evidenceFocus;
         public LLM model;
         public ArdyRoomDialogueBridge bridge;
         public UnityEngine.Object avatar, environment;
@@ -19,16 +19,18 @@ public partial class ChatSample
         m_AutonomousReplyOwner = null;
         var attention = ReadAutonomyAttention();
         if (!autonomous || !accepted || bridge == null ||
-            (string)attention?["kind"] != "current-user-body" ||
+            attention == null || string.IsNullOrWhiteSpace((string)attention["intention"]) ||
+            (string)attention["kind"] == "scene" ||
             (bool?)attention?["actionAuthorization"] != false) return;
         m_AutonomousReplyOwner = new AutonomousReplyOwner {
             generation = generation, epoch = m_WorkEpoch, userTurn = m_ActionConstraints.CurrentUserTurn,
             intention = m_SceneAutonomyIntention, intent = m_RoomTaskIntent, actionId = m_RoomTaskActionId,
+            evidenceFocus = (string)attention["kind"],
             model = m_ChatSettings?.m_ChatModel, bridge = bridge, avatar = bridge.avatar, environment = bridge.environmentRoot
         };
     }
 
-    private JObject ReadAutonomousBodyReplyPurpose(int generation)
+    private JObject ReadAutonomousReplyPurpose(int generation)
     {
         var owner = m_AutonomousReplyOwner;
         if (owner == null || generation != m_FormalResponseGeneration || generation != m_RoomTaskGeneration ||
@@ -36,7 +38,8 @@ public partial class ChatSample
             !m_AgentCurrentRoundIsTick || m_WorkReviewOpen || m_UserSpeechActiveForAutonomy || m_SceneTimePaused || !isActiveAndEnabled ||
             owner.model == null || owner.model != m_ChatSettings?.m_ChatModel || owner.bridge == null || !owner.bridge.IsConnected ||
             owner.bridge != GetComponent<ArdyRoomDialogueBridge>() || owner.avatar != owner.bridge.avatar || owner.environment != owner.bridge.environmentRoot ||
-            owner.intention != m_SceneAutonomyIntention || (string)ReadAutonomyAttention()?["kind"] != "current-user-body" ||
+            owner.intention != m_SceneAutonomyIntention || ReadAutonomyAttention() == null ||
+            owner.evidenceFocus != (string)ReadAutonomyAttention()["kind"] ||
             ReadCompactCurrentRequestSemantics(generation) != null ||
             owner.intent != m_RoomTaskIntent || owner.actionId != m_RoomTaskActionId ||
             ReadRoomEvidenceReplyFacts(generation) != null || CurrentGenerationRequiresReviewedGoalAnswer(generation) ||
@@ -51,16 +54,17 @@ public partial class ChatSample
             ["workEpoch"] = owner.epoch, ["userTurn"] = owner.userTurn,
             ["purpose"] = string.IsNullOrEmpty(owner.actionId) ? "autonomous-conversation" : "action-result",
             ["intention"] = owner.intention, ["intent"] = owner.intent, ["actionId"] = owner.actionId,
+            ["evidenceFocus"] = owner.evidenceFocus,
             ["actionAuthorization"] = false,
             ["scope"] = "This is a new autonomous intention, not an unfinished historical command. " +
                 "Speak naturally about this intention and its owned execution, or remain silent. " +
                 "Historical user text retains constraints and context only; do not repeat its completed operations. " +
-                "No current visual description is requested. This reporting purpose grants no action or retry permission."
+                "Use only the supplied observations for perceptual claims; missing evidence is unknown. This reporting purpose grants no action or retry permission."
         };
     }
 
-    private bool UseBodyReplyPacket(int generation) => UseMovementReplyPacket(generation) ||
-        ((m_RoomTaskIntent == "none" || m_RoomTaskIntent == "inspect") && ReadAutonomousBodyReplyPurpose(generation) != null);
+    private bool UseFocusedReplyPacket(int generation) => UseMovementReplyPacket(generation) ||
+        ((m_RoomTaskIntent == "none" || m_RoomTaskIntent == "inspect") && ReadAutonomousReplyPurpose(generation) != null);
 
-    private bool UseReceiptOnlySpeechReview(int generation) => UseBodyReplyPacket(generation) || UseWorkResultReplyPacket(generation);
+    private bool UseReceiptOnlySpeechReview(int generation) => UseFocusedReplyPacket(generation) || UseWorkResultReplyPacket(generation);
 }

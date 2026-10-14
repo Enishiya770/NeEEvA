@@ -9,6 +9,10 @@ using UnityEngine;
 public partial class ChatQW
 {
     private string ProjectAutonomyIntentPacket(List<SendData> resident, string prompt, out JObject diagnostic)
+        => ProjectAutonomyIntentWirePacket(resident, prompt, null, out diagnostic);
+
+    private string ProjectAutonomyIntentWirePacket(List<SendData> resident, string prompt,
+        Func<string, JObject> measureWire, out JObject diagnostic)
     {
         int human = prompt.IndexOf(k_FrameUserMarker, StringComparison.Ordinal);
         string tail = human < 0 ? "" : prompt.Substring(human);
@@ -27,12 +31,13 @@ public partial class ChatQW
                 CommittedSpatialReplyProtocol.ProducerContextMarker + "\n" + facts;
             projected = ProjectReplyFacts(source, Math.Min(pressure, 2), out var fields) + tail;
             long totalText = other + EstimateRoomDecisionTextUnits(projected);
+            var wireBudget = measureWire?.Invoke(projected);
             attempts.Add(new JObject { ["pressure"] = pressure, ["otherMessageTextUnits"] = other,
                 ["currentPacketTextUnits"] = EstimateRoomDecisionTextUnits(projected), ["totalTextUnits"] = totalText,
-                ["textCeiling"] = ceiling, ["fields"] = fields, ["attention"] = attention });
-            if (totalText <= ceiling) break;
+                ["textCeiling"] = ceiling, ["fields"] = fields, ["attention"] = attention, ["wireBudget"] = wireBudget });
+            if (wireBudget != null ? (bool?)wireBudget["allowed"] == true : totalText <= ceiling) break;
         }
-        diagnostic = new JObject { ["version"] = "autonomy-joint-budget-v1", ["attempts"] = attempts,
+        diagnostic = new JObject { ["version"] = "autonomy-joint-budget-v2", ["finalWireMeasured"] = measureWire != null, ["attempts"] = attempts,
             ["protectedHumanTailCharacters"] = tail.Length, ["engineMemoryMutated"] = false,
             ["scope"] = "All selected messages share one text budget. Full-wire admission remains authoritative. Unknown constraints and literal human input are retained even when they force rejection." };
         return projected;

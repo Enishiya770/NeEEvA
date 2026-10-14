@@ -112,6 +112,10 @@ public partial class ChatSample
 
     private JObject BuildMovementPriorResults()
     {
+        // A new accepted autonomous purpose may recall completed events, but
+        // cannot inherit the former task's still-mandatory reporting contract.
+        // Pending work prevents this purpose from being bound in the first place.
+        if (ReadAutonomousReplyPurpose(m_FormalResponseGeneration) != null) return null;
         if (m_SpatialDeviceGoal == null || !SpatialGoalOwnerCurrent(m_SpatialDeviceGoal) ||
             m_SpatialDeviceGoal.latestUserText != m_ActionConstraints.CurrentUserText) return null;
         if (m_WorkDeviceResult != null && ReferenceEquals(m_WorkDeviceResultGoal, m_SpatialDeviceGoal) &&

@@ -2355,6 +2355,11 @@ public class RTSpeechHandler : MonoBehaviour
         bool speech = !m_LikelySinging && !m_MelodicEouProtectionActive &&
             m_PendingSemanticEouObservedMode != "singing" &&
             m_PendingSemanticEouSource != "background" && m_PendingSemanticEouSource != "ai";
+        if (m_ClosedSpeechTracker.TryComparison(CurrentCaptureSerial, Time.realtimeSinceStartup,
+            Mathf.RoundToInt(m_StreamSubmittedSeconds * 1000f), closed,
+            HasFreshStreamingCoverage && m_TurnActivity.CoversQuietTail,
+            m_TurnActivity.PendingText, speech, out var comparison))
+            m_NeuralVadClient?.RetainTranscriptComparison(comparison);
         if (!m_ClosedSpeechTracker.TrySeal(CurrentCaptureSerial, Time.realtimeSinceStartup,
                 Mathf.RoundToInt(m_StreamSubmittedSeconds * 1000f), closed,
                 HasFreshStreamingCoverage && m_TurnActivity.CoversQuietTail,

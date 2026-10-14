@@ -180,7 +180,12 @@ public static class RoomControlReviewRegression
             void Add(string name, JObject input, string expected)
             {
                 var wire = JObject.Parse((string)builder.Invoke(model, new object[] { input.ToString(Formatting.None) }));
-                Check(((JArray)wire["messages"]).Count == 2 && (int)wire["max_tokens"] == 256, "Small bounded request: " + name);
+                bool bodyReview = (string)input["roomControlReview"] == RoomControlReviewProtocol.BodyStop;
+                Check(((JArray)wire["messages"]).Count == (bodyReview ? 3 : 2) && (int)wire["max_tokens"] == 256,
+                    "Small bounded request with only the body-stop semantic reminder when applicable: " + name);
+                if (bodyReview) Check((string)wire["messages"][2]["role"] == "system" &&
+                    ((string)wire["messages"][2]["content"]).Length < 300,
+                    "The body-stop reminder is bounded contract text, not another scene/history copy: " + name);
                 Check((string)wire["messages"][1]["content"] == input.ToString(Formatting.None), "Exact input preserved: " + name);
                 if ((string)input["roomControlReview"] == RoomControlReviewProtocol.Continuation) {
                     var schema = wire["response_format"]["schema"];

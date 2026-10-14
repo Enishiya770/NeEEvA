@@ -5,6 +5,7 @@ public partial class ChatQW
 {
     private static void FocusRoomStepContext(JObject input)
     {
+        FocusRuntimeAutonomousContext(input);
         FocusRoomPlanningEvidence(input);
         if (input["taskSequence"] is JObject sequence) input["taskSequence"] = RoomTaskContextPolicy.Sequence(sequence);
         var intents = RoomTaskContextPolicy.ReadyUserIntents(input);
@@ -31,6 +32,29 @@ public partial class ChatQW
             ["source"] = autonomousBody ? "current-autonomous-intent-attention" : initialBody ? "current-turn-semantic-attention" : "approved-ready-step", ["omittedObservedRows"] = omitted,
             ["engineMemoryMutated"] = false,
             ["scope"] = "Current-user movement attention. Original request, dependencies, user pose/route/support, failures and unknown constraints remain. Object records stay in runtime for a fresh search/match when needed. An initial semantic focus does NOT narrow the action menu or authorize a move. Omission proves neither absence nor permission." };
+    }
+
+    private static void FocusRuntimeAutonomousContext(JObject input)
+    {
+        var state = input["attentionState"] as JObject;
+        if ((bool?)input["autonomous"] != true || (string)state?["source"] != "runtime-attention-state-v1" ||
+            !new[] { "dialogue", "idle" }.Contains((string)state["mode"]) ||
+            (bool?)state["actionAuthorization"] != false) return;
+        // Release diagnostic traces of settled work, for every capability. Keep
+        // outcomes, references, current offered pixels and the full action menu.
+        foreach (string path in new[] { "sceneSearch", "sceneActionFacts.objectContext" })
+        {
+            if (!(input.SelectToken(path) is JObject record) || (bool?)record["active"] == true) continue;
+            foreach (string name in new[] { "referenceContext", "searchProgress", "failedCandidates" })
+                if (record[name] != null && RoomWorkingMemoryKnownArchiveField(name, record[name])) record.Remove(name);
+        }
+        var omitted = new JObject();
+        FocusInitialBodyHistory(input, omitted);
+        input["runtimeAttentionProjection"] = new JObject {
+            ["revision"] = state["revision"]?.DeepClone(), ["mode"] = state["mode"]?.DeepClone(),
+            ["releasedHistory"] = omitted, ["engineMemoryMutated"] = false,
+            ["scope"] = "Current attention releases completed-work detail. A new decision still requires its own authority and fresh target validation."
+        };
     }
 
     private static void FocusInitialBodyHistory(JObject input, JObject omitted)

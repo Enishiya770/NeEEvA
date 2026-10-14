@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -20,7 +20,7 @@ public static partial class RoomDecisionBudgetRegression
         string focusedWire = Wire(provider, untouched);
         var focused = Input(focusedWire);
         Require(focused["stepAttention"] != null &&
-            !((JArray)focused.SelectToken("visibleObjectCatalog.current.candidates")).Any(),
+            !((JArray)focused.SelectToken("visibleObjectCatalog.current.candidates") ?? new JArray()).Any(),
             "Current-turn pure user movement removes optional object rows before the initial HTTP.");
         Require(untouched == source.ToString(Formatting.None) &&
             (string)focused["currentUserText"] == (string)source["currentUserText"],
@@ -55,6 +55,7 @@ public static partial class RoomDecisionBudgetRegression
         LastReport["initialBodyAttention"] = new JObject { ["status"] = "passed",
             ["general"] = Call(null, "BuildRoomTaskRequestDiagnostic", generalWire) as JObject,
             ["focused"] = budget["diagnostic"], ["scope"] = "Real serializer; controlled semantic attention, unchanged menu and protected constraints." };
+        CheckLatestAccumulatedAttention(provider, "TaskBudget.latest-2309-20261013.json", "latest2309Attention");
         CheckLatestAccumulatedAttention(provider);
         CheckLatestAccumulatedAttention(provider, "TaskBudget.latest-2123-20261012.json", "latest2123Attention");
         CheckLatestAccumulatedAttention(provider, "TaskBudget.latest-2252-20261012.json", "latest2252Attention");
@@ -81,9 +82,9 @@ public static partial class RoomDecisionBudgetRegression
                 "Only the pure approach/follow turns use body attention in the accumulated load.");
             if ((string)row["name"] == "latest-2123-gen8")
             {
-                Require(((JArray)sent.SelectToken("visibleObjectCatalog.historicalViews")).Count == 0,
+                Require(((JArray)sent.SelectToken("visibleObjectCatalog.historicalViews") ?? new JArray()).Count == 0,
                     "New follow request does not preload historical object viewpoint directions.");
-                Require(((JArray)sent.SelectToken("sceneSpatialMemory.dialogueViews")).Count == 0,
+                Require(((JArray)sent.SelectToken("sceneSpatialMemory.dialogueViews") ?? new JArray()).Count == 0,
                     "Pure follow does not retain a historical dialogue RGB/pose packet.");
                 var canonical = (JObject)Call(null, "ReadRoomTaskRecoveryJson", original);
                 Require(JToken.DeepEquals(sent["currentFacts"], canonical["currentFacts"]), "Current body facts survive historical-detail projection.");

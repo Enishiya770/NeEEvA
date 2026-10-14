@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using NeEEvA.Motion;
 using NeEEvA.Player;
@@ -53,6 +53,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
     private ArdyRoomApproachObservation attemptObservation;
     private Transform boundUser;
     private string actionId = "", phase = "disconnected", reason = "尚未启用对话房间移动";
+    private string actionIntent = "";
     private string lastBodyRejection = "";
     private bool activeAction;
     private int operationRevision;
@@ -165,7 +166,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         public string targetKind, captureId, sceneTargetId;
         public Vector3 sceneSurfacePoint;
         public ArdyRoomObjectApproachObservation sceneTargetObservation;
-        public string actionId, phase, stage, reason, executionReason, observedUtc, userAnchor;
+        public string actionId, intent, phase, stage, reason, executionReason, observedUtc, userAnchor;
         public int operationRevision, navigationId;
         public float elapsedSeconds, routeLength = -1, actualUserDistance = -1, facingError = -1,
             userDisplacementXZ, userDisplacementY;
@@ -288,6 +289,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
     {
         RefreshTargetSnapshot();
         actionId = id ?? "";
+        actionIntent = followActive ? "follow" : "approach";
         lastAttemptActionId = actionId;
         lastAttemptTargetRevision = currentTargetRevision;
         lastAttemptPhase = "preparing"; lastAttemptReason = "正在验证本次实际走近请求。";
@@ -385,6 +387,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         ResetNavigationRecovery();
         ResetApproachRetarget();
         actionId = id ?? "";
+        actionIntent = "follow";
         lastAttemptActionId = actionId; lastAttemptTargetRevision = currentTargetRevision;
         actionStartedAt = Time.realtimeSinceStartup; lastAttemptTime = actionStartedAt;
         plan = null; attemptObservation = null; hasControllerOperation = false;
@@ -413,6 +416,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
     public void StopForTask(string id)
     {
         actionId = id ?? "";
+        actionIntent = "stop-moving";
         StopMovement();
     }
 
@@ -798,10 +802,11 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
             if (controller.ExecutionReason == ArdyRoomExecutionReason.NavigationRejected ||
                 controller.ExecutionReason == ArdyRoomExecutionReason.TerrainBlocked) return "navigation";
             var telemetry = controller.StreamTelemetry;
-            if (telemetry != null && !string.IsNullOrEmpty(telemetry.lastFailureReason) &&
+            if (telemetry != null && telemetry.failureAppliesToCurrentOperation &&
+                telemetry.failureOperationRevision == controller.OperationRevision && !string.IsNullOrEmpty(telemetry.lastFailureReason) &&
                 controller.Status.EndsWith(telemetry.lastFailureReason, StringComparison.Ordinal) &&
                 (telemetry.lastFailureCategory == "navigation" || telemetry.lastFailureCategory == "user-clearance" ||
-                 telemetry.lastFailureCategory == "motion-quality")) return telemetry.lastFailureCategory;
+                 telemetry.lastFailureCategory == "motion-quality" || telemetry.lastFailureCategory == "motion-control")) return telemetry.lastFailureCategory;
             return CurrentRejectionMatches(controller.Status) ? lastObservedRejection.category : "navigation";
         }
         return lastObservedRejection != null && lastObservedRejection.actionId == actionId &&
@@ -1117,7 +1122,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         var value = new RoomDiagnostic {
             targetKind = executionTargetKind, captureId = sceneCaptureId, sceneTargetId = sceneSurfaceId,
             sceneSurfacePoint = sceneSurfacePoint, sceneTargetObservation = sceneTargetObservation,
-            actionId = actionId, phase = phase, reason = reason,
+            actionId = actionId, intent = actionIntent, phase = phase, reason = reason,
             stage = hasControllerOperation && controller != null ? controller.Stage : executionTargetKind == "scene-object" ? "scene-target-validation" : "user-target-validation",
             executionReason = hasControllerOperation && controller != null ? controller.ExecutionReason.ToString() : "NotSubmittedToController",
             observedUtc = DateTime.UtcNow.ToString("o"), elapsedSeconds = Mathf.Max(0, Time.realtimeSinceStartup - actionStartedAt),

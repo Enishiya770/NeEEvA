@@ -76,7 +76,8 @@ namespace NeEEvA.Motion
         private sealed class ExecutionException : InvalidOperationException
         {
             public readonly ArdyRoomExecutionReason Reason;
-            public ExecutionException(string message, ArdyRoomExecutionReason reason) : base(message) { Reason = reason; }
+            public ExecutionException(string message, ArdyRoomExecutionReason reason) : this(message, reason, null) { }
+            public ExecutionException(string message, ArdyRoomExecutionReason reason, Exception cause) : base(message, cause) { Reason = reason; }
         }
 
         public string Endpoint = "http://127.0.0.1:8093";
@@ -934,7 +935,7 @@ namespace NeEEvA.Motion
                 if (request.result != UnityWebRequest.Result.Success)
                 {
                     LastErrorResponseJson = request.downloadHandler?.text;
-                    throw new ServiceRequestException("ARDY 服务请求失败（" + request.responseCode + "）：" + request.error, LastErrorResponseJson);
+                    throw new ServiceRequestException("ARDY 服务请求失败（" + request.responseCode + "）：" + request.error, LastErrorResponseJson, request.responseCode);
                 }
                 if (request.downloadedBytes > 8 * 1024 * 1024) throw new InvalidOperationException("ARDY 响应超出本阶段大小限制。");
                 return request.downloadHandler.text;

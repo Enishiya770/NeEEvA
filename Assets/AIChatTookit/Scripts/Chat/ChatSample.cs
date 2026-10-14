@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -215,6 +215,7 @@ public partial class ChatSample : MonoBehaviour
     private void LateUpdate()
     {
         UpdateSceneTimePose();
+        TickSceneAttention();
         StepUrge();
 
         bool playing = IsVoiceOutputPlaying;
@@ -458,6 +459,8 @@ public partial class ChatSample : MonoBehaviour
 
         //这一轮起，在回应他之前不许自主开口
         MarkUserTurnAwaitingReply();
+
+        if (TryStartTranscriptClarification(_postWord)) return;
 
         //只要整段被判为唱歌就并行复核一次，不等到 SVC 转换才问。
         //挂在转换上时，"声学误判成唱歌但没触发回哼"的轮次永远不会被复核：
@@ -3360,6 +3363,7 @@ public partial class ChatSample : MonoBehaviour
 
     private void DealingTextCallback(string _msg, bool streamingExitAtSubmission)
     {
+        if (!string.IsNullOrWhiteSpace(_msg) && TryResolveTranscriptConflict(_msg, streamingExitAtSubmission)) return;
         ConfirmClosedRoomSpeechFinal(_msg);
         // VAD / ASR 拒识会返回空字符串。不要把空用户消息继续送给 LLM，
         // 否则一次碰桌子也可能触发一整轮无意义回复。
@@ -4262,6 +4266,7 @@ public partial class ChatSample : MonoBehaviour
         public string LanguageCode;
         public RoomSpeechPlaybackLease RoomState;
         public int RoomStateVersion;
+        public bool RoomPrefixOnly;
     }
 
     private sealed class PendingSpeechClip
@@ -4272,6 +4277,7 @@ public partial class ChatSample : MonoBehaviour
         public AudioClip Clip;
         public RoomSpeechPlaybackLease RoomState;
         public int RoomStateVersion;
+        public bool RoomPrefixOnly;
     }
 
     private static bool MatchesPreparedSpeech(PendingSpeechClip clip, PendingSpeechChunk chunk, string text)
@@ -4525,6 +4531,8 @@ public partial class ChatSample : MonoBehaviour
             StartCoroutine(StreamAudioPlayer(responseGeneration));
         }
 
+        if (TryPublishTranscriptClarification(_postWord, responseGeneration)) return;
+
         //发起LLM流式请求
         if (m_LogStreamTimings)
         {
@@ -4627,7 +4635,7 @@ public partial class ChatSample : MonoBehaviour
         imageUrl = ResolveFormalSceneImage(responseGeneration);
         if (!roomTaskPrepared && TryDispatchFirstReply(prompt, imageUrl, responseGeneration, recordAssistantHistory, transientSystemContext)) return;
         if (!roomTaskPrepared && TryPlanRoomTask(prompt, imageUrl, responseGeneration, recordAssistantHistory, transientSystemContext)) return;
-        bool bodyReply = roomTaskPrepared && UseBodyReplyPacket(responseGeneration);
+        bool bodyReply = roomTaskPrepared && UseFocusedReplyPacket(responseGeneration);
         if (bodyReply) { imageUrl = null; ClearStagedFormalObservation(); }
         Debug.Log($"[Vision/Consumer] consumer=formal generation={responseGeneration} capture={GetFormalSceneObservation(responseGeneration)?.CaptureId ?? "none"} image={!string.IsNullOrEmpty(imageUrl)}", this);
         PublishSpokenPrefixToLlm();
@@ -5032,8 +5040,9 @@ public partial class ChatSample : MonoBehaviour
     {
         if (!m_LatencyFillerPlayed || string.IsNullOrEmpty(m_LatencyFillerText)) return;
 
-        float played = Mathf.Max(0f, Time.realtimeSinceStartup - m_LatencyFillerStartedAt);
-        float fraction = Mathf.Clamp01(played / Mathf.Max(0.1f, m_LatencyFillerDuration));
+        ObserveLatencyFillerProgress();
+        float fraction = m_LatencyProgressClip != m_LatencyFillerClip || m_LatencyFillerClip == null ? 0f :
+            m_LatencyProgressComplete ? 1f : Mathf.Clamp01((float)m_LatencyProgressSamples / Math.Max(1,m_LatencyFillerClip.samples));
         int charsHeard = Mathf.Clamp(
             Mathf.FloorToInt(m_LatencyFillerText.Length * fraction),
             0,
@@ -5047,6 +5056,7 @@ public partial class ChatSample : MonoBehaviour
         m_LatencyFillerStartedAt = -1f;
         m_LatencyFillerDuration = 0f;
         m_LatencyFillerClip = null;
+        m_LatencyProgressClip = null; m_LatencyProgressSamples = 0; m_LatencyProgressComplete = false;
     }
 
     //首 token 诊断：上次是否已记录
@@ -5905,7 +5915,7 @@ public partial class ChatSample : MonoBehaviour
     /// <summary>
     /// 扫描缓冲区，把已成句的段落推入TTS队列。
     /// 首块用"首个任意标点 或 超长强切"的激进策略抢首音；
-    /// 其余块用"最后一个句末标点"批量切分。
+    /// 其余块也按有界语义句切分，避免把整个段落放进下一次预取。
     /// flushAll=true时把残余整条推入（用于最后收尾）。
     /// </summary>
     private void FlushCompleteSentences(bool flushAll)
@@ -5927,6 +5937,8 @@ public partial class ChatSample : MonoBehaviour
             string speakable = buf.Substring(0, available);
             bool languageEnded = languageBoundary >= 0 && available == languageBoundary;
             int boundary = FindFlushBoundary(speakable, !m_FirstChunkFlushed);
+            int resultBoundary = RoomSpeechPrefixBoundary(speakable);
+            if (resultBoundary >= 0) boundary = resultBoundary;
             if (!m_FirstChunkFlushed && m_PreparedSingingBridgeClip != null &&
                 language == m_PreparedSingingBridgeLanguage)
             {
@@ -5949,8 +5961,10 @@ public partial class ChatSample : MonoBehaviour
                 Text = completed,
                 LanguageCode = language,
                 RoomState = m_RoomSpeechPlayback?.roundId == m_CurrentSpeechRoundId ? m_RoomSpeechPlayback : null,
-                RoomStateVersion = m_RoomSpeechPlayback?.roundId == m_CurrentSpeechRoundId ? m_RoomSpeechPlayback.version : 0
+                RoomStateVersion = m_RoomSpeechPlayback?.roundId == m_CurrentSpeechRoundId ? m_RoomSpeechPlayback.version : 0,
+                RoomPrefixOnly = resultBoundary >= 0 && boundary == resultBoundary
             });
+            if (resultBoundary >= 0 && boundary == resultBoundary) m_RoomSpeechPlayback.prefixQueued = true;
             if (m_SubtitleOverlay != null && m_RoomSpeechPlayback?.roundId != m_CurrentSpeechRoundId)
             {
                 string probe = completed.TrimEnd();
@@ -5971,44 +5985,10 @@ public partial class ChatSample : MonoBehaviour
     /// <summary>
     /// 寻找切分位置。
     /// aggressive=true（首块）：优先找首个强标点；若无且超阈值，用首个弱标点强切；
-    /// aggressive=false（后续）：找最后一个强标点以批量切。
+    /// aggressive=false（后续）：保持有界的语义句块。
     /// </summary>
     private int FindFlushBoundary(string buf, bool aggressive)
-    {
-        if (string.IsNullOrEmpty(buf)) return -1;
-
-        if (aggressive)
-        {
-            //首块：见到任何强标点立即切
-            for (int i = 0; i < buf.Length; i++)
-            {
-                if (IsStrongBoundary(buf[i])) return i;
-            }
-            // Avoid splitting a tiny preamble (e.g. a laugh/name) into its own
-            // synthesis request while its substantive clause is already buffered.
-            if (buf.Length >= m_FirstChunkMaxChars)
-            {
-                int minimumClauseCharacters = Mathf.Min(6, Mathf.Max(1, m_FirstChunkMaxChars / 2));
-                for (int i = minimumClauseCharacters; i < buf.Length; i++)
-                {
-                    if (IsWeakBoundary(buf[i])) return i;
-                }
-                //实在没有弱标点就在阈值处硬切
-                return Mathf.Min(m_FirstChunkMaxChars, buf.Length) - 1;
-            }
-            return -1;
-        }
-        else
-        {
-            //后续块：找最后一个强标点
-            int last = -1;
-            for (int i = 0; i < buf.Length; i++)
-            {
-                if (IsStrongBoundary(buf[i])) last = i;
-            }
-            return last;
-        }
-    }
+        => SpeechChunkPolicy.Boundary(buf ?? "", aggressive, m_FirstChunkMaxChars);
 
     private bool IsStrongBoundary(char c)
     {
@@ -6106,7 +6086,7 @@ public partial class ChatSample : MonoBehaviour
                     {
                         RoundId = speechChunk.RoundId,
                         RoomState = speechChunk.RoomState,
-                        RoomStateVersion = speechChunk.RoomStateVersion,
+                        RoomStateVersion = speechChunk.RoomStateVersion, RoomPrefixOnly = speechChunk.RoomPrefixOnly,
                         Text = chunk,
                         LanguageCode = speechChunk.LanguageCode,
                         Clip = pending
@@ -6134,6 +6114,7 @@ public partial class ChatSample : MonoBehaviour
         TTS tts = m_ChatSettings.m_TextToSpeech;
         PendingSpeechClip next = null;
         bool nextDone = false, alive = true;
+        float lastAudioCompletedAt = -1f, nextRefreshAt = 0f;
         float nextRequestedAt = 0f;
         AudioClip ownedClip = null;
 
@@ -6143,20 +6124,27 @@ public partial class ChatSample : MonoBehaviour
             next = null;
             if (old == null) return;
             if (!nextDone && responseGeneration == m_FormalResponseGeneration) tts.CancelPreparedSpeech();
-            if (old.Clip != null) Destroy(old.Clip);
+            if (old.Clip != null) { tts.ObservePreparedSpeech(old.Clip, "discarded"); Destroy(old.Clip); }
         }
         void PrefetchNext()
         {
-            if (next != null || !tts.CanPrefetchNextSpeech || m_PendingChunks.Count == 0) return;
+            if (m_PendingChunks.Count == 0) { if (next != null) ClearNext(); return; }
             PendingSpeechChunk queued = m_PendingChunks.Peek();
-            if (m_SilencedSpeechRoundIds.Contains(queued.RoundId)) return;
+            if (Time.realtimeSinceStartup >= nextRefreshAt)
+            {
+                nextRefreshAt = Time.realtimeSinceStartup + .1f;
+                var check = RefreshQueuedRoomSpeech(responseGeneration);
+                if (check != RoomPlaybackCheck.Current) ClearNext();
+                if (check == RoomPlaybackCheck.Drop) return;
+            }
+            if (next != null || !tts.CanPrefetchNextSpeech) return;
             string future = StripAgentTagsForTTS(queued.Text);
             // Long paragraphs keep the PCM-streaming path; waiting for an entire
             // long WAV could cost more than the lookahead saves. No text is truncated.
-            if (string.IsNullOrWhiteSpace(future) || future.Length > 64 || IsPurePunctuation(future)) return;
+            if (string.IsNullOrWhiteSpace(future) || !SpeechChunkPolicy.Bounded(future) || IsPurePunctuation(future)) return;
             SpeechText preparedSpeech = tts.ResolveSpeech(new SpeechText(future, queued.LanguageCode));
             var slot = new PendingSpeechClip { RoundId = queued.RoundId, Text = future, LanguageCode = preparedSpeech.LanguageCode,
-                RoomState = queued.RoomState, RoomStateVersion = queued.RoomStateVersion };
+                RoomState = queued.RoomState, RoomStateVersion = queued.RoomStateVersion, RoomPrefixOnly = queued.RoomPrefixOnly };
             next = slot; nextDone = false; nextRequestedAt = Time.realtimeSinceStartup;
             Debug.Log($"[TTS/Lookahead] 当前句合成已完成，播放期间预取下一句: \"{future}\"");
             tts.PrepareSpeech(preparedSpeech, (clip, ignored) =>
@@ -6164,7 +6152,7 @@ public partial class ChatSample : MonoBehaviour
                 if (!alive || responseGeneration != m_FormalResponseGeneration ||
                     !ReferenceEquals(next, slot) || m_SilencedSpeechRoundIds.Contains(slot.RoundId))
                 {
-                    if (clip != null) Destroy(clip);
+                    if (clip != null) { tts.ObservePreparedSpeech(clip, "discarded"); Destroy(clip); }
                     if (ReferenceEquals(next, slot)) nextDone = true;
                     return;
                 }
@@ -6204,9 +6192,13 @@ public partial class ChatSample : MonoBehaviour
                 bool completed = false;
                 bool succeeded = false;
                 float audioDuration = 0f;
+                int preparedLastSample = 0;
+                float preparedPlayAt = 0f;
                 AudioClip directClip = null;
                 RoomPlaybackCheck playbackCheck = RoomPlaybackCheck.Current;
 
+                float prepareWaitAt = Time.realtimeSinceStartup;
+                bool refreshedWhileWaiting = false;
                 if (next != null && !MatchesPreparedSpeech(next, speechChunk, text)) ClearNext();
                 if (next != null)
                 {
@@ -6214,8 +6206,17 @@ public partial class ChatSample : MonoBehaviour
                     {
                         if (responseGeneration != m_FormalResponseGeneration) yield break;
                         if (m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId)) break;
+                        var refresh = RefreshRoomSpeechForPlayback(speechChunk, responseGeneration);
+                        if (refresh != RoomPlaybackCheck.Current)
+                        {
+                            ClearNext();
+                            if (refresh == RoomPlaybackCheck.Replaced) PrependSpeechChunk(speechChunk);
+                            refreshedWhileWaiting = true;
+                            break;
+                        }
                         yield return null;
                     }
+                    if (refreshedWhileWaiting) continue;
                     if (nextDone)
                     {
                         ownedClip = next.Clip; next.Clip = null; next = null;
@@ -6223,9 +6224,10 @@ public partial class ChatSample : MonoBehaviour
                     }
                     else ClearNext();
                 }
+                float prepareWaitSeconds = Time.realtimeSinceStartup - prepareWaitAt;
                 if (m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId))
                 {
-                    if (ownedClip != null) Destroy(ownedClip);
+                    if (ownedClip != null) { tts.ObservePreparedSpeech(ownedClip, "discarded"); Destroy(ownedClip); }
                     ownedClip = null;
                     continue;
                 }
@@ -6244,7 +6246,7 @@ public partial class ChatSample : MonoBehaviour
                     playbackCheck = RefreshRoomSpeechForPlayback(speechChunk, responseGeneration);
                     if (playbackCheck != RoomPlaybackCheck.Current)
                     {
-                        Destroy(ownedClip); ownedClip = null;
+                        tts.ObservePreparedSpeech(ownedClip, "discarded"); Destroy(ownedClip); ownedClip = null;
                         if (playbackCheck == RoomPlaybackCheck.Replaced) PrependSpeechChunk(speechChunk);
                         continue;
                     }
@@ -6253,6 +6255,7 @@ public partial class ChatSample : MonoBehaviour
                     m_AudioSource.clip = ownedClip;
                     m_AudioSource.loop = false;
                     m_AudioSource.Play();
+                    preparedPlayAt = Time.realtimeSinceStartup;
                     started = true;
                 }
                 else
@@ -6318,14 +6321,23 @@ public partial class ChatSample : MonoBehaviour
                     if (ownedClip != null)
                     {
                         if (m_AudioSource != null && m_AudioSource.clip == ownedClip) m_AudioSource.Stop();
-                        Destroy(ownedClip); ownedClip = null; m_FormalBufferedClip = null;
+                        tts.ObservePreparedSpeech(ownedClip, "interrupted"); Destroy(ownedClip); ownedClip = null; m_FormalBufferedClip = null;
                     }
                     if (!m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId))
                         ReportTtsFailureOnce("tts_failed", "部分语音未能播放。", "playback did not advance after Play was issued");
                     continue;
                 }
 
+                Debug.Log("[TTS/ChunkPlayback] " + new Newtonsoft.Json.Linq.JObject {
+                    ["generation"] = responseGeneration, ["roundId"] = speechChunk.RoundId,
+                    ["characters"] = text.Length, ["speechUnits"] = SpeechChunkPolicy.Units(text),
+                    ["prepared"] = ownedClip != null, ["preparedWaitSeconds"] = prepareWaitSeconds,
+                    ["interChunkGapSeconds"] = lastAudioCompletedAt < 0 ? (float?)null : Time.realtimeSinceStartup - lastAudioCompletedAt,
+                    ["stateVersion"] = speechChunk.RoomStateVersion,
+                    ["scope"] = "Unity playback advancement; gaps exclude sentence-internal silence and are frame-granular."
+                }.ToString(Newtonsoft.Json.Formatting.None));
                 RegisterActuallySpokenRound(responseGeneration, speechChunk.RoundId);
+                if (ownedClip != null) tts.ObservePreparedSpeech(ownedClip, "advanced", m_AudioSource.timeSamples);
                 QueueRoomSpeechTranslation(speechChunk.RoomState, responseGeneration, text);
                 if (firstChunk) MarkRealFirstAudioStarted();
                 m_CurrentlyPlayingText = text;
@@ -6381,18 +6393,24 @@ public partial class ChatSample : MonoBehaviour
                     }
                     PrefetchNext();
                     ObserveFinalScenePlayback(responseGeneration, tts, ownedClip != null ? ownedClip : m_AudioSource.clip,
-                        ownedClip != null, next == null && (ownedClip != null || tts.CanPrefetchNextSpeech));
+                        ownedClip != null, next == null && (ownedClip != null || tts.StreamingSynthesisSucceeded));
+                    if (ownedClip != null && m_AudioSource.isPlaying)
+                        preparedLastSample = Math.Max(preparedLastSample, m_AudioSource.timeSamples);
                     if (ownedClip != null && !m_AudioSource.isPlaying)
                     {
-                        succeeded = true;
+                        // Stop/clip replacement is not whole-clip delivery. Unity
+                        // resets timeSamples on natural completion; retain progress.
+                        succeeded = preparedLastSample >= ownedClip.samples - ownedClip.frequency * .1f &&
+                            Time.realtimeSinceStartup - preparedPlayAt >= ownedClip.length - .05f;
                         completed = true;
-                        CompleteFinalScenePlayback(responseGeneration, ownedClip, true);
+                        CompleteFinalScenePlayback(responseGeneration, ownedClip, succeeded);
                     }
                     yield return null;
                 }
 
+                lastAudioCompletedAt = succeeded ? Time.realtimeSinceStartup : -1f;
                 StopDirectStreamingSubtitle();
-                if (IsAISpeaking)
+                if (IsAISpeaking && succeeded)
                 {
                     if (m_SubtitleOverlay != null &&
                         m_DirectStreamingSubtitleRevealedChars < text.Length)
@@ -6416,9 +6434,10 @@ public partial class ChatSample : MonoBehaviour
                         Debug.Log($"[Stream] T+{Elapsed():F2}s TTS流播放完成(音频{audioDuration:F2}s): \"{text}\"");
                     }
                 }
-                else if (m_LogStreamTimings)
+                else
                 {
-                    Debug.LogWarning($"[Stream] T+{Elapsed():F2}s TTS流中断/失败: \"{text}\"");
+                    RecordSpeechDeliveryFailure(responseGeneration, text);
+                    if (m_LogStreamTimings) Debug.LogWarning($"[Stream] T+{Elapsed():F2}s TTS流中断/失败: \"{text}\"");
                 }
                 if (!succeeded)
                 {
@@ -6430,6 +6449,7 @@ public partial class ChatSample : MonoBehaviour
                 m_CurrentlyPlayingText = "";
                 if (ownedClip != null)
                 {
+                    tts.ObservePreparedSpeech(ownedClip, succeeded ? "completed" : "interrupted", preparedLastSample);
                     if (m_AudioSource.clip == ownedClip) m_AudioSource.clip = null;
                     if (m_FormalBufferedClip == ownedClip) m_FormalBufferedClip = null;
                     Destroy(ownedClip); ownedClip = null;
@@ -6445,6 +6465,7 @@ public partial class ChatSample : MonoBehaviour
             ClearNext();
             if (ownedClip != null)
             {
+                tts.ObservePreparedSpeech(ownedClip, "interrupted");
                 if (m_AudioSource != null && m_AudioSource.clip == ownedClip)
                 {
                     m_AudioSource.Stop(); m_AudioSource.clip = null;
@@ -6504,7 +6525,7 @@ public partial class ChatSample : MonoBehaviour
                 if (responseGeneration != m_FormalResponseGeneration) yield break;
             }
             var guardedChunk = new PendingSpeechChunk { RoundId = pendingClip.RoundId, Text = pendingClip.Text,
-                LanguageCode = pendingClip.LanguageCode, RoomState = pendingClip.RoomState, RoomStateVersion = pendingClip.RoomStateVersion };
+                LanguageCode = pendingClip.LanguageCode, RoomState = pendingClip.RoomState, RoomStateVersion = pendingClip.RoomStateVersion, RoomPrefixOnly = pendingClip.RoomPrefixOnly };
             var playbackCheck = RefreshRoomSpeechForPlayback(guardedChunk, responseGeneration);
             if (playbackCheck != RoomPlaybackCheck.Current)
             {
@@ -9015,7 +9036,9 @@ public partial class ChatSample : MonoBehaviour
             "重复表示正在等待、重复追问用户尚未回答的问题、为用户没有听见的内部复读道歉。\n" +
             "proceed=true 只表示值得让正式角色再判断一次说话/沉默/动作，不表示必须开口。" +
             "如果既无未完成事项也无新东西，proceed=false，并给出下一次重新考虑的秒数。\n\n" +
-            frame + BuildWorkReviewContext() + "\n\n" +
+            frame + BuildSingingGoalContext() + "\n\n" +
+            "先核对speech.lastPublicPlayback.completedPlaybackText中的实际外放；临时缓冲清空不代表没说过，旧生成稿可被播放前修正取代。" +
+            "结果汇报要求是原回复应覆盖的内容，已经实际说清就已履行，不能仅因required仍被保存而重复汇报或重开动作。独立的新结果另行判断。\n" +
             "先在work_evidence用一句话对照用户问题与已完成回复，指出已经给了什么答案或缺哪一步，再选择状态。" +
             "仅有礼貌回应、点头、承诺稍后检查，没有实际检查或问题答案时必须是continue，不能因回复已播完而closed。\n" +
             WorkNextIntentProtocol.Contract +
@@ -9136,7 +9159,7 @@ public partial class ChatSample : MonoBehaviour
             m_ChatSettings.m_ChatModel.SetActiveSkills();
         }
         bool reviewingWork = ShouldReviewUserWork();
-        string frame = reviewingWork ? BuildWorkReviewFrame(triggerReason) : BuildPerceptionFrame(triggerReason);
+        string frame = reviewingWork ? BuildWorkReviewFrame(triggerReason) : BuildAutonomyIntentFrame(triggerReason);
         if (!playbackReadOnly) HarvestSongIds(frame);
         int generation = ++m_AutonomyProbeGeneration;
         int workEpoch = m_WorkEpoch;
@@ -9265,10 +9288,10 @@ public partial class ChatSample : MonoBehaviour
             if (playbackReadOnly && (!ScenePlaybackReviewCurrent(playbackReview) || observed?.HasImage != true))
             { m_AutonomyProbeInFlight = false; if (m_ScenePlaybackReview == playbackReview) ClearScenePlaybackReview("private-capture-unavailable-or-superseded"); return; }
             sceneObservation = observed;
-            frame = reviewingWork ? BuildWorkReviewFrame(triggerReason) : BuildPerceptionFrame(triggerReason);
+            frame = reviewingWork ? BuildWorkReviewFrame(triggerReason) : BuildAutonomyIntentFrame(triggerReason);
             if (playbackReadOnly) playbackReview.factStamp = CaptureScenePlaybackFactStamp();
             string prompt = BuildAutonomyIntentProbePrompt(triggerReason, frame) +
-                (reviewingWork ? BuildWorkReviewObservationContext(observed) : BuildSceneObservationContext(observed));
+                BuildWorkReviewObservationContext(observed);
             if (playbackReadOnly) prompt += "\n[本次是最后一段已生成语音播放期间的只读私人复查。公开回复已经生成，音频尚未全部播放；不可把未播部分说成已被用户听到。本次只形成待选意图，不会发声、执行动作/工具、写记忆或提交事项状态。音频结束后仍需当前图和正常决策核验，新用户、新动作或事件会使本次候选失效。]";
             string image = observed?.HasImage == true ? observed.ImageDataUrl : null;
             Debug.Log($"[Vision/Consumer] consumer=autonomy generation={generation} capture={observed?.CaptureId ?? "none"} image={!string.IsNullOrEmpty(image)}", this);

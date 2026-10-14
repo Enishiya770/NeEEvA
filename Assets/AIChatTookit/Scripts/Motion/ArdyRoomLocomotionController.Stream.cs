@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -98,10 +98,15 @@ namespace NeEEvA.Motion
             StreamAcceptedControlRevision = 0; StreamControlLatencySeconds = 0;
             StreamGenerationSeconds = StreamMeasuredSpeed = 0;
             StreamRecoveryCount = streamConsecutiveRecoveries = 0; streamRecovering = false;
+            StreamQualityRecoveryCount = 0; LastQualityFailureEvidencePath = null;
+            StreamControlRecoveryCount = 0; LastControlFailureEvidencePath = null;
+            controlFailureRequest = null; controlFailureOperation = -1;
             streamPreparedClip = null; streamCapabilities = null; streamRequestPending = false;
             streamRecentFramePeak = streamRecentStepCost = 0;
             streamRoundTrip = streamBackend = streamBackendQueue = streamFeature = streamPlanning = streamParse = streamAudit = 0;
             streamEventName = "begin"; streamLastFailureReason = streamLastFailureCategory = null;
+            streamFailureOperationRevision = -1;
+            streamFailureRequestId = streamFailureSessionId = streamFailureObservedUtc = null;
             segmentPlan = null; ownedClip = null; nextSeamFrame = -1; timelineFinal = false;
             segmentEvidence.Clear(); DiscardedSegmentEvidenceCount = 0;
             LastErrorResponseJson = LastRequestJson = LastResponseJson = null;
@@ -205,17 +210,26 @@ namespace NeEEvA.Motion
                 // prefix runs out; the remaining prediction has not been acknowledged.
                 while (Current(token) && StreamBufferSeconds > StreamLeadSeconds) yield return null;
                 if (!Current(token)) yield break;
+                if (StreamRenderedArrival()) { FinishStreamArrival(); continue; }
                 if (StreamPrefixReachesGoal())
                 {
                     // The accepted future prefix already reaches a stationary target.
                     // Consume it instead of replanning a centimetre-sized final turn while
                     // the rendered avatar is still catching up with that prefix.
                     Stage = "stream-arriving";
-                    while (Current(token) && streamSessionId != null && StreamPrefixReachesGoal() &&
-                        (StreamBufferSeconds > .10f || HorizontalDistance(AvatarGround(), TargetGround) > ArrivalTolerance))
+                    int waitingControl = StreamControlRevision;
+                    RecordStreamArrivalBoundary("wait-enter", waitingControl);
+                    while (Current(token) && streamSessionId != null && StreamPrefixReachesGoal() && !StreamRenderedArrival())
                         yield return null;
                     if (!Current(token)) yield break;
-                    if (streamSessionId != null && StreamPrefixReachesGoal()) FinishStreamArrival();
+                    RecordStreamArrivalBoundary(StreamRenderedArrival() ? "rendered-arrival" : "target-changed", waitingControl);
+                    if (streamSessionId != null && StreamRenderedArrival()) FinishStreamArrival();
+                    else if (streamSessionId != null && ArrivalRetargetBudgetInsufficient(StreamBufferSeconds, streamRecentStepCost, streamRecentFramePeak))
+                    {
+                        RecordStreamArrivalBoundary("retarget-insufficient-dispatch-budget", waitingControl);
+                        if (!PrepareStreamRecovery("收尾时目标改变，剩余已审核片段不足以等待新动作，先平滑停稳再有限恢复。",
+                            "motion-supply", "arrival-retarget", false)) yield break;
+                    }
                     continue;
                 }
                 if (!streamUserMoving && StreamDesiredSpeed < .04f && StreamMeasuredSpeed < .10f)
@@ -244,7 +258,19 @@ namespace NeEEvA.Motion
 
         private void FinishStreamArrival()
         {
-            if (!StreamPrefixReachesGoal() || HorizontalDistance(AvatarGround(), TargetGround) > ArrivalTolerance) return;
+            if (!StreamRenderedArrival()) return;
+            bool restartWait = streamRequestPending;
+            if (restartWait)
+            {
+                if (work != null) { StopCoroutine(work); work = null; }
+                if (pending != null) { pending.Abort(); pending.Dispose(); pending = null; }
+                streamRequestPending = false;
+                foreach (var evidence in segmentEvidence)
+                    if (evidence.outcome == "generating") {
+                        evidence.outcome = "stream-arrival-discarded";
+                        evidence.completedAtRealtime = Time.realtimeSinceStartup;
+                    }
+            }
             // No unconfirmed frame is consumed and no root is projected to the goal.
             // The normal smooth stop preserves the currently rendered pose and position.
             try
@@ -261,6 +287,36 @@ namespace NeEEvA.Motion
             Stage = "stream-waiting"; IsBusy = false;
             SetStatus("已接近目标，平滑停下并持续等待用户移动", ArdyRoomExecutionState.Moving);
             RecordStreamEvent("arriving");
+            if (restartWait) work = StartCoroutine(GuardedStreamRun(RunContinuousStream(OperationRevision), OperationRevision));
+        }
+
+        private bool StreamRenderedArrival() => IsContinuousFollowActive && !streamUserMoving &&
+            ownedClip != null && OwnsPlayingTimeline() &&
+            HorizontalDistance(AvatarGround(), TargetGround) <= ArrivalTolerance;
+
+        private static bool ArrivalRetargetBudgetInsufficient(float buffer, float recentRequest, float framePeak)
+            => buffer < Mathf.Max(.15f, recentRequest) + framePeak * 2f + .05f;
+
+        private void RecordStreamArrivalBoundary(string reason, int enteredControl)
+        {
+            Debug.Log("[ARDY room/arrival-boundary] " + JsonUtility.ToJson(new StreamArrivalBoundary {
+                reason = reason, operationRevision = OperationRevision, enteredControlRevision = enteredControl,
+                currentControlRevision = StreamControlRevision, bufferSeconds = StreamBufferSeconds,
+                dispatchLeadSeconds = StreamLeadSeconds, targetDistance = HorizontalDistance(AvatarGround(), TargetGround),
+                estimatedRequestSeconds = streamRecentStepCost, recentFramePeakSeconds = streamRecentFramePeak,
+                recoveryCount = StreamRecoveryCount, recoveryLimit = StreamRecoveryLimit,
+                arrivalTolerance = ArrivalTolerance, userMoving = streamUserMoving,
+                prefixReachesGoal = StreamPrefixReachesGoal(), pending = streamRequestPending,
+                observedUtc = DateTime.UtcNow.ToString("o") }), this);
+        }
+        [Serializable] private sealed class StreamArrivalBoundary
+        {
+            public string reason, observedUtc;
+            public int operationRevision, enteredControlRevision, currentControlRevision;
+            public int recoveryCount, recoveryLimit;
+            public float estimatedRequestSeconds, recentFramePeakSeconds;
+            public float bufferSeconds, dispatchLeadSeconds, targetDistance, arrivalTolerance;
+            public bool userMoving, prefixReachesGoal, pending;
         }
 
         // IEnumerable permits the outer guarded coroutine to observe all exceptions; a nested
@@ -351,8 +407,12 @@ namespace NeEEvA.Motion
                 streamPlanning = Time.realtimeSinceStartup - planningStarted;
                 var observation = lastControlRejection ?? new ArdyRoomRouteDiagnostic { stage = "control-target", code = "control-corridor-infeasible",
                     reason = error.Message, start = seamGround, target = goal, from = seamGround, to = seamGround };
-                throw RejectGeneratedPrefix(null, -1, seamGround, seamGround, "转弯或制动目标没有可验证的安全空间 · " + error.Message,
-                    observation, "navigation", evidence, route, "control-corridor");
+                SaveControlFailure(error, route, sourcePosition, heading, speed, terminalSpeed, seamGround);
+                string explanation = error is ArdyRoomStreamTrajectory.KinematicsException ?
+                    "当前速度不能安全衔接这段转弯或停止目标；尚不能据此判断整个房间不可达 · " : "动作控制轨迹未通过审核 · ";
+                var rejection = RejectGeneratedPrefix(null, -1, seamGround, seamGround, explanation + error.Message,
+                    observation, error is ArdyRoomStreamTrajectory.KinematicsException ? "motion-control" : "navigation", evidence, route, "control-corridor");
+                throw new ExecutionException(rejection.Message, rejection.Reason, error);
             }
             LastRequestJson = evidence.requestJson = JsonUtility.ToJson(request);
             Vector3 controlPrevious = seamGround;
@@ -532,6 +592,11 @@ namespace NeEEvA.Motion
                 (!player.HasPoseOwnership && !player.ReturnedToAnimation))
             { Fail("持续跟随身体控制已被释放或替换", ArdyRoomExecutionReason.OwnershipLost); return; }
             if (player.IsReturningToAnimation || player.ReturnedToAnimation) return;
+            // Arrival uses the rendered root and newest target, not a future
+            // prefix's old endpoint. Do not turn a completed approach into a
+            // supply failure while a centimetre-sized endpoint update arrives.
+            if (streamSessionId != null && StreamRenderedArrival())
+            { RecordStreamArrivalBoundary("rendered-arrival-before-supply-check", StreamControlRevision); FinishStreamArrival(); return; }
             if (streamConsecutiveRecoveries > 0 && now - streamHealthyPlaySince >= 10f)
             {
                 streamConsecutiveRecoveries = 0;
@@ -559,16 +624,23 @@ namespace NeEEvA.Motion
         private void RecoverStreamSupply()
         {
             const string reason = "下一段已审核动作未及时接上，已停止位移并平滑衔接待机。";
+            if (!PrepareStreamRecovery(reason, "motion-supply", "underrun", true)) return;
+            int token = OperationRevision;
+            work = StartCoroutine(GuardedStreamRun(RunContinuousStream(token), token));
+        }
+
+        private bool PrepareStreamRecovery(string reason, string category, string trigger, bool stopRunningCoroutine)
+        {
             if (streamConsecutiveRecoveries >= StreamRecoveryLimit)
             {
-                RecordStreamEvent("recovery-exhausted", reason + "连续恢复次数已达到上限，跟随已结束。", "motion-supply");
+                RecordStreamEvent("recovery-exhausted", reason + "连续恢复次数已达到上限，跟随已结束。", category);
                 Fail(reason + "连续恢复次数已达到上限，跟随已结束。", ArdyRoomExecutionReason.GenerationFailed);
-                return;
+                return false;
             }
             streamConsecutiveRecoveries++; StreamRecoveryCount++;
             // Capture the pending request and buffer state BEFORE clearing that generation.
-            RecordStreamEvent("underrun", reason, "motion-supply");
-            if (work != null) { StopCoroutine(work); work = null; }
+            RecordStreamEvent(trigger, reason, category);
+            if (stopRunningCoroutine && work != null) { StopCoroutine(work); work = null; }
             if (pending != null) { pending.Abort(); pending.Dispose(); pending = null; }
             streamRequestPending = false;
             foreach (var item in segmentEvidence)
@@ -585,17 +657,18 @@ namespace NeEEvA.Motion
                 catch (Exception error)
                 {
                     Fail("持续跟随恢复无法完成身体交接 · " + error.Message, ArdyRoomExecutionReason.OwnershipLost);
-                    return;
+                    return false;
                 }
             }
             streamRecovering = true; streamRecoverAfter = Time.realtimeSinceStartup + .35f * streamConsecutiveRecoveries;
             Stage = "stream-recovering"; IsBusy = true;
-            SetStatus($"动作供给暂时不足，平滑等待后重新准备（{streamConsecutiveRecoveries}/{StreamRecoveryLimit}）", ArdyRoomExecutionState.Preparing);
+            SetStatus(category == "motion-quality" ? $"动作质量拒绝，正在从实际姿态有限恢复（{StreamQualityRecoveryCount}/{StreamQualityRecoveryLimit}）" :
+                category == "motion-control" ? $"原续段无法安全衔接，停稳后从实际姿态重新检查（{StreamControlRecoveryCount}/{StreamControlRecoveryLimit}）" :
+                $"动作供给暂时不足，平滑等待后重新准备（{streamConsecutiveRecoveries}/{StreamRecoveryLimit}）", ArdyRoomExecutionState.Preparing);
             RecordStreamEvent("recovering");
             // Same parent operation, but a fresh native session/history after the return.
             // Explicit Cancel increments revision and stops this work, so it cannot revive.
-            int token = OperationRevision;
-            work = StartCoroutine(GuardedStreamRun(RunContinuousStream(token), token));
+            return true;
         }
 
         private void ObserveWarmStreamPose()

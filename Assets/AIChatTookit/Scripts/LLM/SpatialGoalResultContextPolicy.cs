@@ -11,11 +11,12 @@ public static class SpatialGoalResultContextPolicy
     public const int MaximumSpeechCharacters = 180;
     // A terminal correction has one source of result/human evidence: BuildContext.
     // Keep the independent verdict verbatim, including future/custom constraints.
-    public static string BuildRepairFeedback(string rejectedSpeech, JObject review, string guardReason, string language) =>
+    public static string BuildRepairFeedback(string rejectedSpeech, JObject review, string guardReason, string language, string factualBaseline = null) =>
         new JObject {
             ["kind"] = "terminal-result-speech-repair", ["attempt"] = 1, ["maximumAttempts"] = 1,
             ["rejectedPublicSpeech"] = rejectedSpeech, ["actualReview"] = review?.DeepClone(),
             ["guardRejectedReason"] = guardReason, ["requiredOutputLanguage"] = language,
+            ["factualBaseline"] = factualBaseline,
             ["evidenceSource"] = "spatialGoalResult.originalUserRequest and latestFacts in this request",
             ["scope"] = "Rewrite this unreleased result once. Use the current result evidence, not the rejected candidate, as fact. Match both lang tag and actual sentence to requiredOutputLanguage. Preserve the reported outcome and uncertainty. No new action or promise. The new candidate remains private pending independent review."
         }.ToString(Formatting.None);

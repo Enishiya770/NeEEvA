@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using AIChat.Agent;
 using NeEEvA.Motion;
@@ -32,9 +33,14 @@ public static class SceneReviewQueueRegression
         {
             Call(chat, "CancelAutonomyIntentProbe"); clock.Clear(true); audio.Stop();
             Set(chat, "m_AgentRunning", true); Set(chat, "m_AgentGracefulShutdownPending", false);
+            Set(chat, "m_PrivateDecisionFailure", null); // Earlier failure fixtures do not own this completed-playback scenario.
             Set(chat, "m_UserSpeechActiveForAutonomy", false); Set(chat, "m_LastStreamingPartialRealtime", -999f);
             Set(chat, "m_FormalResponseInFlight", false); Set(chat, "m_AgentRoundInFlight", true);
             Set(chat, "m_StreamComplete", true); Set(chat, "m_TTSSenderDone", true);
+            // This case owns a final local clip; earlier speech fixtures may
+            // leave unconsumed text. Isolate both queues and restore them later.
+            foreach (string field in new[] { "m_PendingChunks", "m_PendingClips" })
+                Set(chat, field, Activator.CreateInstance(Get(chat, field).GetType()));
             Set(chat, "m_TextOutputDrainedGeneration", -1);
             Set(chat, "m_WorkReviewOpen", false); Set(chat, "m_UserTurnAwaitingReplySince", -1f);
             Set(chat, "m_EnableAutonomyIntentProbe", true); Set(chat, "m_SceneTimePaused", false);
@@ -100,6 +106,10 @@ public static class SceneReviewQueueRegression
         try
         {
             c.Check(bridge.IsConnected&&!bridge.ReservesBody&&!bridge.IsFollowing,"Actual room bridge is connected and idle.");
+            // Earlier controlled speech cases can leave a player coroutine
+            // that clears IsAISpeaking on its next frame. It owns no part of
+            // this isolated PCM fixture or its new playback lifecycle.
+            chat.StopAllCoroutines();
             c.Set(chat,"m_AudioSource",c.audio); c.Set(chat,"m_LogAgentLoop",false);
             settings.m_ChatModel=c.model;
             stack.Push(Cases(c));
@@ -133,21 +143,31 @@ public static class SceneReviewQueueRegression
         }
     }
 
-    private static IEnumerator StartProbe(Context c,string label)
+    private static IEnumerator StartProbe(Context c,string label, Action prepare = null)
     {
         int count=c.model.probes.Count;
-        c.Arm(label); yield return null;
+        c.Arm(label); prepare?.Invoke(); yield return null;
         c.Check(c.audio.isPlaying && c.chat.IsVoiceOutputPlaying,"A real AudioSource is playing the controlled clip.");
         // Update may already have started this same due wake; it must not duplicate it.
         if(!(bool)Get(c.chat,"m_AutonomyProbeInFlight") && c.model.probes.Count==count) Call(c.chat,"StepUrge");
+        LastReport["probeStart"] = new JObject { ["label"]=label, ["eligibility"]=JObject.Parse((string)Call(c.chat,"ScenePlaybackEligibility")),
+            ["privateFailurePresent"]=Get(c.chat,"m_PrivateDecisionFailure")!=null,
+            ["reviewsPerMinute"]=Convert.ToInt32(Get(c.chat,"m_AutonomyReviewsPerMinute")),
+            ["minimumSpacing"]=Convert.ToDouble(Get(c.chat,"m_AutonomyReviewMinimumSpacing")) };
         yield return Until(()=>c.model.probes.Count==count+1,5,"private scene review capture");
     }
 
     private static IEnumerator Cases(Context c)
     {
         c.Arm("guard-matrix");
-        c.Check((bool)Call(c.chat,"CanBeginScenePlaybackReview","scene-action-observed"),"Final local clip can host a read-only scene-result review.");
+        c.Check((bool)Call(c.chat,"CanBeginScenePlaybackReview","scene-action-observed"),"Final local clip can host a read-only scene-result review: " + Call(c.chat,"ScenePlaybackEligibility"));
         c.Check(!(bool)Call(c.chat,"CanBeginScenePlaybackReview","default"),"Ordinary speech without an action event cannot start parallel review.");
+        foreach (string field in new[] { "m_PendingChunks", "m_PendingClips" }) {
+            var queue=Get(c.chat,field);
+            queue.GetType().GetMethod("Enqueue").Invoke(queue,new[]{Activator.CreateInstance(queue.GetType().GetGenericArguments()[0],true)});
+            c.Check(!(bool)Call(c.chat,"CanBeginScenePlaybackReview","scene-action-observed"),"Queued output blocks private overlap: "+field);
+            queue.GetType().GetMethod("Clear").Invoke(queue,null);
+        }
         foreach(string name in new[]{"m_FormalResponseInFlight","m_UserSpeechActiveForAutonomy","m_SceneActionActive","m_SongSearchInFlight"})
         {
             c.Set(c.chat,name,true);
@@ -231,7 +251,64 @@ public static class SceneReviewQueueRegression
         c.Set(c.chat,"m_SceneActionFact",originalFact);
         Add("same action / corrected evidence / old closed candidate discarded");
 
+        yield return CompletedGoalChecks(c);
         yield return DirectPlaybackChecks(c);
+    }
+
+    private static IEnumerator CompletedGoalChecks(Context c)
+    {
+        var row=(JObject)PrivatePreflightRegression.Fixture()["cases"].Last;
+        var priorGoal=Get(c.chat,"m_SpatialDeviceGoal"); var priorFact=Get(c.chat,"m_SceneActionFact");
+        var priorTerminal=Get(c.chat,"m_SpatialGoalTerminalReplyGeneration");
+        var responses=(Queue<string>)Get(c.chat,"m_WorkResponses");var savedResponses=responses.ToArray();
+        Vector3 oldUser=c.bridge.userHead.position;
+        try {
+            c.model.m_DataList.Clear();
+            foreach(JObject message in row["history"]) c.model.m_DataList.Add(new LLM.SendData((string)message["role"],(string)message["content"]));
+            c.Set(c.chat,"m_SpatialDeviceGoal",PrivatePreflightRegression.Goal(c.chat,c.bridge,c.model,(JObject)row["goal"]));
+            c.Set(c.chat,"m_SpatialGoalTerminalReplyGeneration",Get(c.chat,"m_FormalResponseGeneration"));
+            c.Set(c.chat,"m_SceneActionFact",JsonUtility.FromJson(row["sceneAction"].ToString(),typeof(ChatSample).GetField("m_SceneActionFact",Flags).FieldType));
+            responses.Clear();responses.Enqueue((string)row["receipt"]["publicText"]);
+            foreach(string change in new[]{"none","user-target","nonmovement-inspection","device-proof"})
+            {
+                yield return StartProbe(c,"completed-goal-"+change,()=>{
+                    c.Set(c.chat,"m_WorkReviewOpen",true);c.Set(c.chat,"m_WorkStatus","substep-result-pending");
+                    c.Set(c.chat,"m_PendingSelfInspection","");
+                });
+                c.Check((bool)((JObject)Call(c.chat,"BuildSpatialGoalContext"))["completionEvidenceValid"],"Actual isolated device readback validates the retained completed goal.");
+                var review=Get(c.chat,"m_ScenePlaybackReview");
+                var before=(JObject)Get(review,"factStamp");
+                int handed=(int)Get(c.chat,"m_ScenePlaybackReviewsHandedOff");
+                float end=Time.realtimeSinceStartup+3.6f;yield return Until(()=>Time.realtimeSinceStartup>=end,5,"real inference-length delay");
+                c.model.probes[c.model.probes.Count-1].done("{\"proceed\":false,\"work_status\":\"closed\",\"wait_seconds\":30}");
+                if(change=="user-target")c.bridge.userHead.position+=Vector3.right*.2f;
+                if(change=="nonmovement-inspection")c.Set(c.chat,"m_PendingSelfInspection","New microphone inspection failed; old review cannot acknowledge this result.");
+                if(change=="device-proof") {
+                    var goal=Get(c.chat,"m_SpatialDeviceGoal");
+                    ((JObject)Get(goal,"completionEvidence"))["actual"]["on"]=!((bool)((JObject)Get(goal,"completionEvidence"))["actual"]["on"]);
+                }
+                c.audio.time=c.clip.length-.08f;yield return Until(()=>!c.audio.isPlaying,2,"completed-goal actual drain");
+                Call(c.chat,"FinishSpeakingNaturally");Call(c.chat,"StepUrge");
+                yield return Until(()=>Get(c.chat,"m_ScenePlaybackReview")==null,5,"completed-goal review released");
+                var result=new JObject{["change"]=change,["before"]=before,["after"]=(JObject)Call(c.chat,"CaptureScenePlaybackFactStamp"),
+                    ["diagnostic"]=(JObject)Get(c.chat,"m_ScenePlaybackFactChanges"),["handedOff"]=(int)Get(c.chat,"m_ScenePlaybackReviewsHandedOff")>handed};
+                if(LastReport["completedGoalReplays"]==null)LastReport["completedGoalReplays"]=new JArray();
+                ((JArray)LastReport["completedGoalReplays"]).Add(result);
+                c.Check((bool)result["handedOff"]==(change=="none"),"Real audio drain with completed goal: only unchanged dependencies can hand off ("+change+"). "+result["diagnostic"]);
+                c.Check(change=="none" ? result["diagnostic"].Type==JTokenType.Null :
+                    (int?)result["diagnostic"]?["probe"]==(int)Get(review,"probeGeneration") && result["diagnostic"]?["changes"] is JArray differences && differences.Count>0,
+                    "The diagnostic belongs to this exact probe, never a previous candidate's rejection.");
+                if(change=="nonmovement-inspection")c.Check(result["diagnostic"]["changes"].Any(x=>(string)x["path"]=="/work/pendingInspection"),
+                    "New inspection records its own changed evidence even when the priority event invalidates ownership first.");
+                c.bridge.userHead.position=oldUser;
+                c.Set(c.chat,"m_SpatialDeviceGoal",PrivatePreflightRegression.Goal(c.chat,c.bridge,c.model,(JObject)row["goal"]));
+            }
+        } finally {
+            c.bridge.userHead.position=oldUser;c.Set(c.chat,"m_SpatialDeviceGoal",priorGoal);c.Set(c.chat,"m_SceneActionFact",priorFact);
+            c.Set(c.chat,"m_SpatialGoalTerminalReplyGeneration",priorTerminal);c.Set(c.chat,"m_PendingSelfInspection","");
+            responses.Clear();foreach(string response in savedResponses)responses.Enqueue(response);
+        }
+        Add("latest complete dialogue / retained device completion / real audio drain / actual target and cross-domain evidence changes");
     }
 
     private static IEnumerator DirectPlaybackChecks(Context c)
@@ -331,6 +408,7 @@ public sealed class SceneReviewQueuePcmTTS : TTS
     public bool SynthesisComplete, Started, DestroyedOwnedClip;
     private AudioClip owned; private AudioSource output; private int generation;
     public override bool SupportsStreamingPlayback=>true;
+    public override bool StreamingSynthesisSucceeded=>SynthesisComplete;
     public override bool CanPrefetchNextSpeech=>SynthesisComplete;
     public override void SpeakStreamingWithPlaybackGate(SpeechText speech,AudioSource target,Action<string> started,
         Action<bool,string,float> completed,Func<StreamingPlaybackPermission> gate)

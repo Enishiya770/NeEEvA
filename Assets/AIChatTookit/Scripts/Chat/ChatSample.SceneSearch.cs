@@ -168,6 +168,7 @@ public partial class ChatSample
         m_SceneSearch = lease; m_SceneSearchLastReport = null;
         AcceptSceneSearchObservation(lease, observation);
         Debug.Log("[SceneSearch/Started] " + BuildSceneSearchContext().ToString(Formatting.None), this);
+        if (origin == "user") AcknowledgeAcceptedTask(generation, lease.id);
         StartCoroutine(WatchSceneSearchTask(lease));
         StartCoroutine(RunSceneSearchSafely(lease, RunSceneSearchTask(lease)));
     }
@@ -312,6 +313,7 @@ public partial class ChatSample
         }
         return new JObject {
             ["task"] = SceneSearchReport(lease), ["imageRole"] = "current", ["currentCaptureId"] = lease.observation.CaptureId,
+            ["attentionState"] = ReadAttentionState("search"),
             ["visualObservation"] = JObject.Parse(lease.observation.MetadataJson), ["visibleCatalog"] = catalog,
             ["selfPose"] = BuildSceneSelfPoseContext(lease.observation),
             ["explorationRegions"] = regions, ["lastStep"] = lease.lastStep?.DeepClone(),

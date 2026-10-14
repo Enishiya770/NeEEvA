@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using NeEEvA.Motion;
 using NeEEvA.Perception;
 using Newtonsoft.Json.Linq;
@@ -21,7 +22,7 @@ public partial class ChatSample
         public Action<SceneVisionObservation> resume;
         public bool resuming;
         public SceneFinalPlaybackWindow finalPlayback;
-        public JObject factStamp;
+        public JObject factStamp, ownerStamp;
     }
     private sealed class SceneFinalPlaybackWindow
     {
@@ -37,6 +38,7 @@ public partial class ChatSample
     private ScenePlaybackReview m_ScenePlaybackReview;
     private int m_ScenePlaybackReviewsStarted, m_ScenePlaybackReviewsHandedOff, m_ScenePlaybackReviewsDiscarded;
     private string m_ScenePlaybackReviewLastReason = "not-started";
+    private JObject m_ScenePlaybackFactChanges;
 
     private static bool IsSceneActionReviewReason(string reason) =>
         (reason ?? "").StartsWith("scene-action-", StringComparison.Ordinal);
@@ -161,12 +163,61 @@ public partial class ChatSample
 
     private bool DiscardChangedScenePlaybackFacts(ScenePlaybackReview value)
     {
-        if (value.factStamp != null && JToken.DeepEquals(value.factStamp, CaptureScenePlaybackFactStamp())) return false;
+        var current = CaptureScenePlaybackFactStamp();
+        if (value.factStamp != null && JToken.DeepEquals(value.factStamp, current)) return false;
+        var changes = new JArray();
+        CollectScenePlaybackFactChanges(value.factStamp, current, "", changes);
+        m_ScenePlaybackFactChanges = new JObject {
+            ["generation"] = value.formalGeneration, ["probe"] = value.probeGeneration,
+            ["stage"] = value.resuming ? "after-fresh-capture" : "before-fresh-capture",
+            ["changes"] = changes, ["truncated"] = changes.Count >= 48,
+            ["scope"] = "Differences in dependency evidence, not a claim of user motion or action failure. Values over 256 characters are summarized."
+        };
+        Debug.Log("[Agent/ReviewFactChanges] " + m_ScenePlaybackFactChanges.ToString(Newtonsoft.Json.Formatting.None), this);
         ClearScenePlaybackReview("objective-facts-changed-before-handoff");
         if (value.probeGeneration == m_AutonomyProbeGeneration) m_AutonomyProbeInFlight = false;
         ScheduleNextTick(2f, "scene-action-facts-changed");
         Debug.Log($"[Agent/Review] private-playback-discard generation={value.formalGeneration} reason=objective-facts-changed new_private_review_required=True", this);
         return true;
+    }
+
+    private JObject ScenePlaybackOwnerStamp(ScenePlaybackReview value) => new JObject {
+        ["probeGeneration"] = m_AutonomyProbeGeneration, ["formalGeneration"] = m_FormalResponseGeneration,
+        ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
+        ["inputRevision"] = m_InputAudioRevision, ["activityRevision"] = m_SceneActivityRevision,
+        ["eventRevision"] = m_SceneReviewEventRevision, ["visionEpoch"] = m_SceneVisionEpoch,
+        ["actionId"] = m_SceneActivityAction, ["agentRunning"] = m_AgentRunning,
+        ["shutdown"] = m_AgentGracefulShutdownPending, ["userSpeaking"] = m_UserSpeechActiveForAutonomy,
+        ["eyesOpen"] = SceneEyesOpen, ["paused"] = m_SceneTimePaused || m_SceneTimeSuspended || Time.timeScale <= 0,
+        ["audioOwnerCurrent"] = ScenePlaybackAudioCurrent(value),
+        ["modelOwnerCurrent"] = value.model == m_ChatSettings?.m_ChatModel,
+        ["roomOwnerCurrent"] = value.bridge != null && value.bridge.IsConnected && value.bridge.environmentRoot == value.environment && value.bridge.avatar == value.avatar,
+        ["controllerOperation"] = value.bridge?.Controller != null ? value.bridge.Controller.OperationRevision : -1
+    };
+
+    private static void CollectScenePlaybackFactChanges(JToken before, JToken after, string path, JArray changes)
+    {
+        if (changes.Count >= 48 || JToken.DeepEquals(before, after)) return;
+        if (before is JObject oldObject && after is JObject newObject)
+        {
+            foreach (string key in oldObject.Properties().Select(p => p.Name).Union(newObject.Properties().Select(p => p.Name)).OrderBy(k => k))
+                CollectScenePlaybackFactChanges(oldObject[key], newObject[key], path + "/" + key.Replace("~", "~0").Replace("/", "~1"), changes);
+            return;
+        }
+        if (before is JArray oldArray && after is JArray newArray && oldArray.Count == newArray.Count)
+        {
+            for (int i = 0; i < oldArray.Count; i++) CollectScenePlaybackFactChanges(oldArray[i], newArray[i], path + "/" + i, changes);
+            return;
+        }
+        JToken Describe(JToken value)
+        {
+            if (value == null) return new JObject { ["missing"] = true };
+            string text = value.ToString(Newtonsoft.Json.Formatting.None);
+            return text.Length <= 256 ? value.DeepClone() : new JObject {
+                ["type"] = value.Type.ToString(), ["characters"] = text.Length, ["preview"] = text.Substring(0, 256)
+            };
+        }
+        changes.Add(new JObject { ["path"] = path, ["before"] = Describe(before), ["after"] = Describe(after) });
     }
 
     private bool CanBeginScenePlaybackReview(string reason)
@@ -222,6 +273,8 @@ public partial class ChatSample
             bridge = room, environment = room.environmentRoot, avatar = room.avatar, controllerOperation = room.Controller.OperationRevision
         };
         if (HasCurrentFinalPlaybackWindow()) value.finalPlayback = m_SceneFinalPlayback;
+        value.ownerStamp = ScenePlaybackOwnerStamp(value);
+        m_ScenePlaybackFactChanges = null;
         m_ScenePlaybackReview = value; m_ScenePlaybackReviewsStarted++;
         m_ScenePlaybackReviewLastReason = "read-only-review-during-final-local-clip";
         Debug.Log($"[Agent/Review] private-playback-start generation={value.formalGeneration} probe={probeGeneration} action={value.actionId} final_direct={value.finalPlayback != null}", this);
@@ -251,6 +304,22 @@ public partial class ChatSample
     private void ClearScenePlaybackReview(string reason)
     {
         if (m_ScenePlaybackReview == null) return;
+        var value = m_ScenePlaybackReview;
+        if ((int?)m_ScenePlaybackFactChanges?["probe"] != value.probeGeneration)
+        {
+            var changes = new JArray();
+            CollectScenePlaybackFactChanges(value.ownerStamp, ScenePlaybackOwnerStamp(value), "/owner", changes);
+            // On a live unchanged binding also expose new objective evidence,
+            // even when a newer event already invalidated the candidate owner.
+            if (value.factStamp != null && value.bridge != null && value.bridge.IsConnected &&
+                value.bridge.environmentRoot == value.environment && value.model == m_ChatSettings?.m_ChatModel &&
+                m_AgentRunning && !m_AgentGracefulShutdownPending)
+                CollectScenePlaybackFactChanges(value.factStamp, CaptureScenePlaybackFactStamp(), "", changes);
+            m_ScenePlaybackFactChanges = new JObject { ["generation"] = value.formalGeneration, ["probe"] = value.probeGeneration,
+                ["stage"] = "owner-or-lifecycle-invalidation", ["reason"] = reason, ["changes"] = changes,
+                ["truncated"] = changes.Count >= 48 };
+            Debug.Log("[Agent/ReviewFactChanges] " + m_ScenePlaybackFactChanges.ToString(Newtonsoft.Json.Formatting.None), this);
+        }
         m_ScenePlaybackReview = null; m_ScenePlaybackReviewsDiscarded++;
         m_ScenePlaybackReviewLastReason = reason ?? "discarded";
     }

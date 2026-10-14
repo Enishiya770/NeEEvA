@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
@@ -15,7 +15,7 @@ public partial class ChatSample
     {
         public int generation, userTurn, workEpoch, roundId, version, refreshes, heardStart, prefixCursor;
         public string actionId, intent, language, failureNotice, prefix = "", played = "";
-        public bool neutral, cancelled, compound, progressHeard;
+        public bool neutral, cancelled, compound, progressHeard, prefixQueued;
         public ArdyRoomDialogueBridge bridge;
         public UnityEngine.Object avatar, environment;
         public JObject state;
@@ -23,6 +23,9 @@ public partial class ChatSample
         public LLM.SendData history;
     }
     private RoomSpeechPlaybackLease m_RoomSpeechPlayback;
+    private LLM.SendData m_DeliveryHistory;
+    private LLM m_DeliveryModel;
+    private int m_DeliveryGeneration = -1, m_DeliveryHeardStart, m_FailedDeliveryGeneration = -1;
 
     private static JObject ReadMovementPlaybackFacts(ArdyRoomDialogueBridge bridge)
     {
@@ -62,6 +65,8 @@ public partial class ChatSample
     private void BindRoomSpeechPlayback(int generation, string language, ArdyRoomDialogueBridge bridge,
         LLM model, LLM.SendData history)
     {
+        m_DeliveryHistory = history; m_DeliveryModel = model;
+        m_DeliveryGeneration = generation; m_DeliveryHeardStart = m_AssistantHeardText.Length;
         m_RoomSpeechPlayback = null;
         if (bridge == null) return;
         bool compound = m_RequestProgressSpeechGeneration == generation && m_RequestProgressSpeechPrefix != null;
@@ -88,22 +93,32 @@ public partial class ChatSample
         lease.bridge == GetComponent<ArdyRoomDialogueBridge>() && lease.bridge.avatar == lease.avatar &&
         lease.bridge.environmentRoot == lease.environment;
 
-    private void RemoveQueuedRoomSpeech(RoomSpeechPlaybackLease lease)
+    private void RemoveQueuedRoomSpeech(RoomSpeechPlaybackLease lease, bool keepPrefix = false)
     {
-        m_PendingChunks = new Queue<PendingSpeechChunk>(m_PendingChunks.Where(c => c.RoomState != lease));
+        m_PendingChunks = new Queue<PendingSpeechChunk>(m_PendingChunks.Where(c => c.RoomState != lease || keepPrefix && c.RoomPrefixOnly));
         var keep = new Queue<PendingSpeechClip>();
         foreach (var clip in m_PendingClips)
-            if (clip.RoomState != lease) keep.Enqueue(clip);
+            if (clip.RoomState != lease || keepPrefix && clip.RoomPrefixOnly) keep.Enqueue(clip);
             else if (clip.Clip != null) Destroy(clip.Clip);
         m_PendingClips = keep;
         if (lease.roundId == m_CurrentSpeechRoundId) m_SentenceBuffer.Length = 0;
+    }
+
+    private RoomPlaybackCheck RefreshQueuedRoomSpeech(int generation)
+    {
+        if (m_PendingChunks.Count == 0) return RoomPlaybackCheck.Drop;
+        var chunk = m_PendingChunks.Dequeue();
+        var result = m_SilencedSpeechRoundIds.Contains(chunk.RoundId) ? RoomPlaybackCheck.Drop :
+            RefreshRoomSpeechForPlayback(chunk, generation);
+        if (result != RoomPlaybackCheck.Drop) PrependSpeechChunk(chunk);
+        return result;
     }
 
     private RoomPlaybackCheck RefreshRoomSpeechForPlayback(PendingSpeechChunk chunk, int generation)
     {
         var lease = chunk.RoomState;
         if (lease == null) return RoomPlaybackCheck.Current;
-        if (!RoomSpeechLeaseCurrent(lease, generation) || chunk.RoomStateVersion != lease.version)
+        if (!RoomSpeechLeaseCurrent(lease, generation) || !chunk.RoomPrefixOnly && chunk.RoomStateVersion != lease.version)
             return RoomPlaybackCheck.Drop;
         if (lease.compound && (!ValidateSpatialGoalTerminalProof(generation) ||
             !RoomRequestProgressOwnerCurrent(lease.actionId, generation)))
@@ -119,6 +134,9 @@ public partial class ChatSample
             }.ToString(Formatting.None));
             return RoomPlaybackCheck.Drop;
         }
+        // The audited independent answer stays a separate audio segment. Body
+        // phase changes only replace the still-unplayed progress segment.
+        if (chunk.RoomPrefixOnly) return RoomPlaybackCheck.Current;
         bool terminal = RoomMovementResultPolicy.IsTerminalFailure((string)state["phase"]) ||
             (string)state["phase"] == "arrived" || (string)state["expectedReport"] == "stopped";
         if (SameMovementReport(lease.state, state) || lease.neutral && !terminal) return RoomPlaybackCheck.Current;
@@ -150,12 +168,12 @@ public partial class ChatSample
         // Keep every unplayed word of the audited result/answer. A changed body
         // phase replaces only its progress segment, never an independent answer.
         string pendingPrefix = lease.prefix.Substring(lease.prefixCursor).TrimStart();
-        if (pendingPrefix.Length > 0) text = pendingPrefix + (lease.language == "en" ? " " : "") + text;
+        if (pendingPrefix.Length > 0 && !lease.prefixQueued) text = pendingPrefix + (lease.language == "en" ? " " : "") + text;
         if (!string.IsNullOrEmpty(lease.failureNotice) && !lease.played.Contains(lease.failureNotice)) text += (lease.language == "en" ? " " : "") + lease.failureNotice;
-        RemoveQueuedRoomSpeech(lease);
+        RemoveQueuedRoomSpeech(lease, true);
         chunk.Text = text; chunk.LanguageCode = lease.language; chunk.RoomStateVersion = lease.version;
         if (lease.history != null && lease.model != null && lease.model.m_DataList.Contains(lease.history))
-            lease.history.content = lease.played + text;
+            lease.history.content = lease.played + (lease.prefixQueued ? pendingPrefix : "") + text;
         var receipt = new JObject {
             ["generation"] = generation, ["userTurn"] = lease.userTurn, ["actionId"] = lease.actionId,
             ["revision"] = lease.version, ["observedUtc"] = DateTime.UtcNow.ToString("o"),
@@ -171,6 +189,14 @@ public partial class ChatSample
         return RoomPlaybackCheck.Replaced;
     }
 
+    private int RoomSpeechPrefixBoundary(string text)
+    {
+        var lease = m_RoomSpeechPlayback;
+        if (lease == null || lease.roundId != m_CurrentSpeechRoundId || !lease.compound || lease.prefixQueued) return -1;
+        string prefix = lease.prefix.Trim();
+        return prefix.Length > 0 && text.StartsWith(prefix, StringComparison.Ordinal) ? prefix.Length - 1 : -1;
+    }
+
     private void PrependSpeechChunk(PendingSpeechChunk chunk)
     {
         var queue = new Queue<PendingSpeechChunk>(); queue.Enqueue(chunk);
@@ -181,6 +207,8 @@ public partial class ChatSample
 
     private void RecordRoomSpeechPlayed(RoomSpeechPlaybackLease lease, string text)
     {
+        if (lease == null && (int?)m_LastFormalReplyReceipt?["generation"] == m_FormalResponseGeneration)
+            m_LastFormalReplyReceipt["completedPlaybackText"] = ((string)m_LastFormalReplyReceipt["completedPlaybackText"] ?? "") + text;
         if (lease == null) return;
         // The sentence queue trims inter-sentence whitespace. Track the exact
         // remaining prefix independently of concatenated played chunk lengths.
@@ -206,6 +234,18 @@ public partial class ChatSample
 
     private void FinishRoomSpeechPlaybackHistory(string heard)
     {
+        if (m_DeliveryGeneration == m_FormalResponseGeneration && m_DeliveryHistory != null &&
+            m_DeliveryModel != null && m_DeliveryModel.m_DataList.Contains(m_DeliveryHistory))
+        {
+            string completed = heard != null && heard.Length >= m_DeliveryHeardStart ? heard.Substring(m_DeliveryHeardStart) : "";
+            if (string.IsNullOrWhiteSpace(completed)) m_DeliveryModel.m_DataList.Remove(m_DeliveryHistory);
+            else m_DeliveryHistory.content = completed;
+            if ((int?)m_LastFormalReplyReceipt?["generation"] == m_DeliveryGeneration) {
+                m_LastFormalReplyReceipt["completedPlaybackText"] = completed;
+                m_LastFormalReplyReceipt["playbackStatus"] = m_FailedDeliveryGeneration == m_DeliveryGeneration ? "partial-or-failed" : "drained";
+            }
+        }
+        m_DeliveryHistory = null; m_DeliveryModel = null; m_DeliveryGeneration = -1;
         var lease = m_RoomSpeechPlayback;
         if (lease == null) return;
         m_RoomSpeechPlayback = null;
@@ -213,5 +253,17 @@ public partial class ChatSample
         string spoken = heard != null && heard.Length >= lease.heardStart ? heard.Substring(lease.heardStart) : lease.played;
         if (string.IsNullOrWhiteSpace(spoken)) lease.model.m_DataList.Remove(lease.history);
         else lease.history.content = spoken;
+    }
+
+    private void RecordSpeechDeliveryFailure(int generation, string text)
+    {
+        if (generation != m_FormalResponseGeneration) return;
+        m_FailedDeliveryGeneration = generation;
+        var receipt = new JObject { ["generation"] = generation, ["failedSentence"] = text,
+            ["completedPlaybackText"] = m_AssistantHeardText.ToString(), ["completePlaybackConfirmed"] = false,
+            ["scope"] = "The sentence may have been partly audible. Generated text is not a completed playback receipt; do not automatically repeat the whole answer." };
+        if ((int?)m_LastFormalReplyReceipt?["generation"] == generation)
+            m_LastFormalReplyReceipt["playbackFailure"] = receipt.DeepClone();
+        Debug.Log("[Speech/DeliveryFailure] " + receipt.ToString(Formatting.None), this);
     }
 }

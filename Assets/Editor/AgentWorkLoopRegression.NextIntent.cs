@@ -67,6 +67,15 @@ public static partial class AgentWorkLoopRegression
                 // be a captured HTTP request or an actual character interaction.
                 string prompt = (string)Call(f.chat, "BuildDedicatedWorkReviewPrompt", "\n[本测试的当前执行与实际播放事实]\n" + item[2]);
                 var wire = JObject.Parse((string)typeof(ChatQW).GetMethod("BuildWorkReviewRequestJson", Flags).Invoke(f.model.builder, new object[] { prompt }));
+                Check(prompt.Contains("[Runtime work review domain: general]") && !prompt.Contains("独立核验歌唱目标"),
+                    "Ordinary review retains the task and omits unrelated detailed singing arbitration.");
+                var old=Get(f.chat,"m_SingingGoal");
+                var pendingGoal=Activator.CreateInstance(typeof(ChatSample).GetField("m_SingingGoal",Flags).FieldType,true);
+                Set(f.chat,"m_SingingGoal",pendingGoal);
+                string goalPrompt=(string)Call(f.chat,"BuildDedicatedWorkReviewPrompt",item[2]);
+                Check(!goalPrompt.Contains("[Runtime work review domain: general]") && goalPrompt.Contains("独立核验歌唱目标"),
+                    "Pending singing work still receives the full domain-specific checks.");
+                Set(f.chat,"m_SingingGoal",old);
                 rows.Add(new JObject { ["name"] = item[0], ["expectedStatus"] = item[3], ["request"] = wire });
             }
         }
@@ -88,9 +97,15 @@ public static partial class AgentWorkLoopRegression
             Call(f.chat, "SelectWorkContinuationScope", NextDecision(NextReview("continue", "current-work", "完成剩余步骤", "next")), sequence);
             Check(!(bool)Get(f.chat, "m_WorkReplyOnly") && sequence.ToString() == original, "A valid generic successor lost its step or mutated proof: " + kind);
             steps[1]["status"] = "failed";
-            Call(f.chat, "SelectWorkContinuationScope", NextDecision(NextReview("continue", "current-work", "诊断失败", "next")), sequence);
+            var failedDecision=NextDecision(NextReview("continue", "current-work", "立刻再次执行失败步骤并告诉用户正在调整", "next", "current-user-body"));
+            Call(f.chat, "SelectWorkContinuationScope", failedDecision, sequence);
             Check((bool)Get(f.chat, "m_WorkReplyOnly") && (string)steps[1]["status"] == "failed" && Call(f.chat, "CreateWorkRoomStepRequest") == null,
                 "Failed step became an unbounded replay: " + kind);
+            var admitted=JObject.Parse(JsonUtility.ToJson(failedDecision));
+            Check((string)admitted["next_step_id"]=="" && (string)admitted["planning_focus"]=="other" &&
+                (string)admitted["next_intent_source"]=="current-work" &&
+                !((string)admitted["intent"]).Contains("立刻再次执行") && ((string)admitted["intent"]).Contains("待交付"),
+                "Rejected retry intention leaked to the result writer or lost independent answer obligations: "+kind);
             var autonomous = NextDecision(NextReview("closed", "autonomous", "提出一个新的交流意图"));
             Check(!(bool)Call(f.chat, "AcceptWorkAutonomousHandoff", autonomous, sequence), "Unfinished generic step was erased: " + kind);
             steps[1]["status"] = "completed";

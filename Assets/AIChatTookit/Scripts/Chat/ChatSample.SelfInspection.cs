@@ -92,12 +92,13 @@ public partial class ChatSample
                 previousUnfinishedWork = m_PreviousUnfinishedWork,
                 responses = m_WorkResponses.ToArray(), status = m_WorkStatus,
                 taskSequence = ReadRoomTaskSequence(),
+                attentionState = ReadAttentionState("work-review"),
                 nextIntentFacts = WorkNextIntentProtocol.Progress(ReadRoomTaskSequence()),
                 continuationCount = m_WorkContinuations, maximumContinuations = MaxWorkContinuations,
                 lastInspection = m_LastSelfInspection,
                 lastMotionExecution = m_LastMotionExecutionFeedback == null ? null : MotionFeedbackJson(m_LastMotionExecutionFeedback),
-                currentRoomTask = BuildWorkRoomCompletionObservation(),
-                deviceSubstepResult = BuildMovementPriorResults(),
+                currentRoomTask = PrivateProgressResultFacts(BuildWorkRoomCompletionObservation()),
+                deviceSubstepResult = PrivateProgressResultFacts(BuildMovementPriorResults()),
                 pendingSubstepReview = m_WorkSubstepReviewPending,
                 toolInFlight = HasWorkToolInFlight()
             }) +
@@ -135,9 +136,15 @@ public partial class ChatSample
         return status == "continue" || status == "waiting_tool" || status == "waiting_user" || status == "closed" || status == "none";
     }
 
+    private bool NeedsSingingReviewDetails() => HasPendingSingingGoalReview() || IsSingingGoalAwaitingExecution() ||
+        IsSingingGoalAwaitingConfirmation() || HasAutonomousSingingGoal() || IsActiveSingingGoalUnfinished();
+
     private string BuildDedicatedWorkReviewPrompt(string frame) =>
         "[内部事项进度判定；不生成角色台词，不调用工具]\n" +
+        (NeedsSingingReviewDetails() ? "" : "[Runtime work review domain: general]\n") +
         (m_WorkReviewOpen ? "先判断原用户请求的进度，再独立判断当前是否有新的自主意图。不能为继续行动而把已完成任务改成未完成。\n" :
+            !NeedsSingingReviewDetails() ? "当前没有打开的用户事项续接；program_work_status=" + m_WorkStatus +
+            "。独立核对当前是否有新的自主意图；保留完整用户要求、实际结果与限制，不能重新打开已完成、取消、等待用户或预算耗尽的事项。\n" :
             "当前没有打开的用户事项续接；program_work_status=" + m_WorkStatus + "。这次独立审核当前歌唱草案。" +
             "goal.origin/autonomous是角色对来源的提案，不证明原用户要求已完成。先按recent_actual_user_inputs、实际播放和取消事实核对是否仍是原用户目标，" +
             "只有初始来源标签误写时可在expected中如实填写原用户请求与逐字引文；不能附和错误autonomous标签。" +
@@ -148,7 +155,7 @@ public partial class ChatSample
         "waiting_user=已经询问必要信息，等用户回答；closed=已经实质回答、说明无法完成或用户取消。" +
         "只说稍等或点头没有回答问题，属于continue。已给出有依据的能力列表就完成了能力问答，无需演示。" +
         WorkNextIntentProtocol.Contract + "\n" +
-        "\n独立核验歌唱目标：sing_goal 是角色提出的草案，不是用户要求的权威来源。" +
+        (NeedsSingingReviewDetails() ? "\n独立核验歌唱目标：sing_goal 是角色提出的草案，不是用户要求的权威来源。" +
         "首先从完整时序区分用户已经唱过什么、用户是否要求角色唱。singing_goal_expected.origin=user_request/autonomous/none/uncertain；" +
         "user_request须用request_quote逐字引用用户要求角色演唱的原话；用户说自己试唱、实际歌词和角色自己的承诺不能充当该请求。" +
         "request_quote是你这次独立审核填写的输出；goal.requestQuote/sourceUserTurn是审核通过后程序保存的结果，不是角色提案必填项。待审草案未有这些结果属于正常，不能据此revise或让角色自行补写引文。" +
@@ -180,7 +187,8 @@ public partial class ChatSample
         "evidence指出需改的具体约束，不得因为草案和sing参数一致就通过。需要用户澄清用waiting_user；" +
         "用户明确取消用cancelled；没有待核验的目标用none。" +
         "已播完但用户要求的内容/范围未满足时仍未完成；不要把旧请求覆盖最新修正。" +
-        "responses中的台词、工具标签与reason是生成记录，不是动作已经执行的证据；只有当前目标匹配的实际播放完成记录才支持已演唱，旧播放也不满足本次新范围。" +
+        "responses中的台词、工具标签与reason是生成记录，不是动作已经执行的证据；只有当前目标匹配的实际播放完成记录才支持已演唱，旧播放也不满足本次新范围。" :
+        "当前没有待审核或未结算的歌唱目标，singing_goal_status=none，expected用origin=none、空refs/request_quote、range=none、时间null。仍须按完整请求核对所有欠办事项，不能据此忽略用户尚未满足的演唱要求；缺少提案不等于完成。") +
         "\n只输出紧凑JSON：{\"work_evidence\":\"简短对照\",\"work_status\":\"continue|waiting_tool|waiting_user|closed\"," +
         "\"proceed\":false,\"intent\":\"必要下一步；没有则留空\",\"wait_seconds\":45," +
         "\"next_intent_source\":\"none|current-work|autonomous\",\"next_step_id\":\"\",\"planning_focus\":\"unknown\"," +

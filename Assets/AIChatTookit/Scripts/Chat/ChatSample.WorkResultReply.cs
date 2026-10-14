@@ -17,12 +17,14 @@ public partial class ChatSample
     // losing an independent answer. Runtime memory is never changed here.
     private JObject BuildWorkResultReplyFacts(int generation) => new JObject {
         ["workResultOnly"] = true,
+        ["attentionState"] = ReadAttentionState("work-result"),
         ["humanInput"] = BuildCommittedReplyHumanInput(generation),
         ["originalUserRequest"] = m_ActionConstraints.CurrentUserText,
         ["currentRequestSemantics"] = ReadMovementReplySemantics(generation),
         ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
         ["taskSequence"] = ReadRoomTaskSequence(),
         ["currentExecution"] = BuildWorkResultExecution(),
+        ["eventContext"] = BuildReplyEventContext(generation),
         ["priorTaskResults"] = BuildMovementPriorResults(),
         ["pendingResults"] = CreateObservationReceipt()?.Facts,
         ["workProgress"] = m_WorkProgressFact,

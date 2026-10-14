@@ -71,8 +71,9 @@ public partial class ChatSample
             required |= RoomSpeechDependencies.SceneAction;
         // A no-action spatial answer and a whole-search result cannot be downgraded
         // to generic chatter by a reviewer choosing factScope=none.
-        bool evidenceOnly = ReadRoomEvidenceReplyFacts(m_FormalResponseGeneration) != null || UseBodyReplyPacket(m_FormalResponseGeneration);
-        if (ReadAutonomousBodyReplyPurpose(m_FormalResponseGeneration) != null) required |= RoomSpeechDependencies.UserTarget;
+        bool evidenceOnly = ReadRoomEvidenceReplyFacts(m_FormalResponseGeneration) != null || UseFocusedReplyPacket(m_FormalResponseGeneration);
+        if ((string)ReadAutonomousReplyPurpose(m_FormalResponseGeneration)?["evidenceFocus"] == "current-user-body")
+            required |= RoomSpeechDependencies.UserTarget;
         if ((m_RoomTaskSpatialAnswer && !evidenceOnly) || intent == "search-scene") required |= RoomSpeechDependencies.SceneAction;
         if (m_RoomTaskSpatialAnswer && !evidenceOnly && SceneEyesOpen) required |= RoomSpeechDependencies.VisualObservation;
         if (reviewedScope == "legacy")

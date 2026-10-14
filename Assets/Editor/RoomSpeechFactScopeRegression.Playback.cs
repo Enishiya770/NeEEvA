@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -90,7 +90,8 @@ public static partial class RoomSpeechFactScopeRegression
             {
                 var history = Bind(); var lease = Get(chat, "m_RoomSpeechPlayback"); var chunk = Chunk(lease, history.content);
                 var late = Chunk(lease, history.content); Phase(phase);
-                Require(Call(chat, "RefreshRoomSpeechForPlayback", chunk, generation).ToString() == "Replaced" &&
+                Call(chat, "PrependSpeechChunk", chunk);
+                Require(Call(chat, "RefreshQueuedRoomSpeech", generation).ToString() == "Replaced" &&
                     history.content == (string)Get(chunk, "Text") && history.content != "我正在尝试走近你。",
                     "Queued speech follows actual execution at playback: " + phase);
                 Require(Call(chat, "RefreshRoomSpeechForPlayback", late, generation).ToString() == "Drop",

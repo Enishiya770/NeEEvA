@@ -35,6 +35,21 @@ public static partial class RoomDecisionBudgetRegression
         var result = Budget(Wire(provider, source.ToString(Formatting.None)), false);
         Require((bool)result["ok"], "Dense current view after a completed task fits the unchanged full planning budget.");
 
+        var dialogueState = new SceneAttentionState();
+        dialogueState.Update("attention-fixture", "talk", "recent question", false, false, true, Array.Empty<JObject>(), null, 10);
+        var attendedSource = (JObject)source.DeepClone();
+        attendedSource["attentionState"] = dialogueState.Snapshot("planner", 10);
+        var dialogueProjection = (JObject)Call(null, "ProjectRoomWorkingMemory", attendedSource);
+        dialogueState.Update("attention-fixture", "task-failed", "find another observed candidate", true, true, false, Array.Empty<JObject>(), null, 11);
+        attendedSource["attentionState"] = dialogueState.Snapshot("planner", 11);
+        var investigationProjection = (JObject)Call(null, "ProjectRoomWorkingMemory", attendedSource);
+        Require(((JArray)dialogueProjection["sceneCognitionSummary"]["currentObjects"]).Count <
+            ((JArray)investigationProjection["sceneCognitionSummary"]["currentObjects"]).Count,
+            "Actual planner projection expands relevant evidence for investigation and shrinks ordinary conversation.");
+        Require(((JArray)dialogueProjection.SelectToken("visibleObjectCatalog.current.candidates")).Count == 6 &&
+            (string)dialogueProjection["currentUserText"] == (string)source["currentUserText"],
+            "Adaptive budgets never hide offered selectable candidates or the current user request.");
+
         var guarded = (JObject)source.DeepClone();
         var protectedRows = (JArray)cognition["currentObjects"];
         protectedRows[23]["futureConstraint"] = new JObject { ["allow"] = false };

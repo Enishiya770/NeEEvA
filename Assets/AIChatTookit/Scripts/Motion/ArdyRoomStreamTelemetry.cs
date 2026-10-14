@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using UnityEngine;
 
@@ -11,6 +11,14 @@ namespace NeEEvA.Motion
         public string historyCode, historyReason;
         public int latestRejectedPrefixOrdinal;
         public int operationRevision, stepIndex, controlRevision, recoveryCount, consecutiveRecoveries, bufferedFrames;
+        public int qualityRecoveryCount, qualityRecoveryLimit;
+        public string qualityFailureEvidencePath;
+        public int controlRecoveryCount, controlRecoveryLimit;
+        public string controlFailureEvidencePath, controlPlanningMode, warmContinuationReason;
+        public float controlHardInitialSpeed, controlNominalInitialSpeed, controlTrackingError, controlRemainingDistance;
+        public string failureRequestId, failureSessionId, failureObservedUtc;
+        public int failureOperationRevision;
+        public bool failureAppliesToCurrentOperation;
         public float bufferSeconds, readyTargetSeconds, requestElapsedSeconds, roundTripSeconds, backendSeconds,
             backendQueueSeconds, featureSeconds, planningSeconds, parseSeconds, auditSeconds, frameSeconds, largestRecentFrameSeconds,
             controlLatencySeconds;
@@ -53,8 +61,12 @@ namespace NeEEvA.Motion
         private sealed class ServiceRequestException : InvalidOperationException
         {
             public readonly string Code;
-            public ServiceRequestException(string message, string response) : base(message + DescribeServiceFailure(response))
+            public readonly string Response;
+            public readonly long HttpStatus;
+            public ServiceRequestException(string message, string response) : this(message, response, 0) { }
+            public ServiceRequestException(string message, string response, long httpStatus) : base(message + DescribeServiceFailure(response))
             {
+                Response = response; HttpStatus = httpStatus;
                 // Error bodies can be empty or non-JSON (proxy/transport failures).
                 // Only the machine-readable code is used for diagnosis, never execution.
                 try { if (!string.IsNullOrEmpty(response)) Code = JsonUtility.FromJson<ServiceErrorEnvelope>(response)?.error?.code; }
@@ -67,6 +79,8 @@ namespace NeEEvA.Motion
             public int qualityAttempts;
         }
         private string streamEventName, streamLastFailureCategory, streamLastFailureReason;
+        private string streamFailureRequestId, streamFailureSessionId, streamFailureObservedUtc;
+        private int streamFailureOperationRevision = -1;
         private float streamRoundTrip, streamBackend, streamBackendQueue, streamFeature, streamPlanning, streamParse, streamAudit;
         private float streamRecentFramePeak, streamRecentStepCost;
         private bool streamRequestPending;
@@ -74,10 +88,21 @@ namespace NeEEvA.Motion
         public ArdyRoomStreamTelemetry StreamTelemetry => new ArdyRoomStreamTelemetry {
             eventName = streamEventName, requestId = requestId, sessionId = streamSessionId, stage = Stage,
             lastFailureCategory = streamLastFailureCategory, lastFailureReason = streamLastFailureReason,
+            failureRequestId = streamFailureRequestId, failureSessionId = streamFailureSessionId,
+            failureObservedUtc = streamFailureObservedUtc, failureOperationRevision = streamFailureOperationRevision,
+            failureAppliesToCurrentOperation = streamFailureOperationRevision == OperationRevision &&
+                !string.IsNullOrEmpty(streamLastFailureCategory),
             historyCode = warmHistoryObservation?.code, historyReason = warmHistoryObservation?.reason,
             latestRejectedPrefixOrdinal = LatestRejectedPrefixOrdinal,
             operationRevision = OperationRevision, stepIndex = streamStepIndex, controlRevision = StreamControlRevision,
             recoveryCount = StreamRecoveryCount, consecutiveRecoveries = streamConsecutiveRecoveries,
+            qualityRecoveryCount = StreamQualityRecoveryCount, qualityRecoveryLimit = StreamQualityRecoveryLimit,
+            qualityFailureEvidencePath = LastQualityFailureEvidencePath,
+            controlRecoveryCount = StreamControlRecoveryCount, controlRecoveryLimit = StreamControlRecoveryLimit,
+            controlFailureEvidencePath = LastControlFailureEvidencePath, controlPlanningMode = streamControlPath.LastPlanningMode,
+            warmContinuationReason = streamControlPath.LastWarmExitReason, controlHardInitialSpeed = streamControlPath.LastHardInitialSpeed,
+            controlNominalInitialSpeed = streamControlPath.LastNominalInitialSpeed, controlTrackingError = streamControlPath.LastTrackingError,
+            controlRemainingDistance = streamControlPath.LastRemainingDistance,
             bufferedFrames = Mathf.Max(0, Mathf.CeilToInt(StreamBufferSeconds * 20f)),
             bufferSeconds = StreamBufferSeconds, readyTargetSeconds = StreamReadyTargetSeconds,
             requestElapsedSeconds = streamRequestPending ? Mathf.Max(0, Time.realtimeSinceStartup - streamDispatchTime) : 0,
@@ -98,12 +123,17 @@ namespace NeEEvA.Motion
         private void RecordStreamEvent(string name, string reason = null, string category = null)
         {
             streamEventName = name;
-            if (reason != null) { streamLastFailureReason = reason; streamLastFailureCategory = category; }
+            if (reason != null) {
+                streamLastFailureReason = reason; streamLastFailureCategory = category;
+                streamFailureRequestId = requestId; streamFailureSessionId = streamSessionId;
+                streamFailureOperationRevision = OperationRevision; streamFailureObservedUtc = DateTime.UtcNow.ToString("o");
+            }
             Debug.Log("[ARDY room/stream] " + JsonUtility.ToJson(StreamTelemetry), this);
         }
 
         private static string StreamFailureCategory(Exception error)
         {
+            if (error.InnerException is ArdyRoomStreamTrajectory.KinematicsException) return "motion-control";
             if (error is PoseHistoryException) return "pose-history";
             var execution = error as ExecutionException;
             if ((error as ServiceRequestException)?.Code == "stream_quality_rejected") return "motion-quality";
@@ -126,6 +156,16 @@ namespace NeEEvA.Motion
                     catch (Exception error) { failure = error; }
                     if (failure != null)
                     {
+                        bool recovering = false;
+                        try { recovering = TryPrepareQualityRecovery(failure, token) || TryPrepareControlRecovery(failure, token); }
+                        catch (Exception recoveryFailure) { failure = recoveryFailure; }
+                        if (recovering)
+                        {
+                            (routine as IDisposable)?.Dispose();
+                            routine = RunContinuousStream(token);
+                            yield return null;
+                            continue;
+                        }
                         RecordStreamEvent("failed", failure.Message, StreamFailureCategory(failure));
                         Fail(failure.Message, (failure as ExecutionException)?.Reason ?? ArdyRoomExecutionReason.GenerationFailed);
                         yield break;

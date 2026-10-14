@@ -20,7 +20,7 @@ public static partial class RoomSpeechClaimRegression
     private static object Call(object target, string method, params object[] args) => typeof(ChatQW).GetMethod(method, Flags).Invoke(target, args);
     private static void Check(bool condition, string message) { ++checks; if (!condition) throw new InvalidOperationException(message); }
     private static JObject Claim(string state, string quote, string language = "ja") => new JObject {
-        ["pendingSameResultQuote"] = "", ["targetQuote"] = "", ["otherClaims"] = new JArray(), ["resultReport"] = state, ["evidence"] = quote, ["actualLanguage"] = language };
+        ["pendingSameResultQuote"] = "", ["targetQuote"] = "", ["otherClaims"] = new JArray(), ["eventClaims"] = new JArray(), ["resultReport"] = state, ["evidence"] = quote, ["actualLanguage"] = language };
     private static JObject Input(string speech, string state, string domain = "movement", string language = "ja")
     {
         var room = new JObject { ["execution"] = new JObject { ["actionId"] = "owned", ["targetKind"] = "user", ["phase"] = state,
@@ -62,7 +62,9 @@ public static partial class RoomSpeechClaimRegression
     public static IEnumerator RunChecks(string output)
     {
         checks = 0; string directory = Path.Combine(output, "speech-claim"); Directory.CreateDirectory(directory);
+        yield return CheckAutonomyPremiseTransport(directory);
         CheckSpeechParts();
+        CheckEventEvidence();
         var directionConflict = new JObject { ["verdict"] = "inconsistent", ["reason"] = "Direction contradicts approach.",
             ["targetConsistency"] = "contradicted", ["conflict"] = "claim-state", ["conflictQuote"] = "walking away" };
         Check(RoomTaskProtocol.TryReviewScope(directionConflict.ToString(), out _), "Concrete direction denial remains eligible for repair despite overlapping conflict categories.");
@@ -87,6 +89,13 @@ public static partial class RoomSpeechClaimRegression
         Check(quoteSchema.SelectToken("properties.taskRelationComparison.pattern") == null,
             "A stale owner cannot pin the requested relation in native generation.");
         roles["actionId"] = "owned";
+        var timed=(JObject)roles.DeepClone();timed["eventContext"]=new JObject();
+        var timedSchema=JObject.Parse(RoomTaskProtocol.BuildSpeechReviewSchemaForInput(timed.ToString()));
+        Check(((JObject)timedSchema["properties"]).Properties().First().Name=="claimTemporalScope" &&
+            ((JArray)timedSchema["required"]).Values<string>().Contains("claimTemporalScope"),
+            "Event-aware review must classify the sentence's time before comparing target identity/current state.");
+        var invalidTime=new JObject{["verdict"]="consistent",["reason"]="controlled",["claimTemporalScope"]="invented"};
+        Check(!RoomTaskProtocol.TryReviewScope(invalidTime.ToString(),out _),"Unknown temporal classifications fail closed.");
         var relationSchema = JObject.Parse(RoomTaskProtocol.BuildSpeechReviewSchemaForInput(roles.ToString()));
         string relationPattern = (string)relationSchema.SelectToken("properties.taskRelationComparison.pattern");
         Check(System.Text.RegularExpressions.Regex.IsMatch("USER leads; CHARACTER follows USER; speech preserves this.", relationPattern) &&
@@ -218,6 +227,7 @@ public static partial class RoomSpeechClaimRegression
             yield return Until(() => done, "invalid conversation state rejected");
             Check(!ok && server.Count == 10, "Repeated invalid conversation output exhausts exactly one extraction repair, without factual follow-up.");
             yield return RecoveryAndReuseChecks(model, server, directory);
+            yield return CheckEarlyConnectionRecovery(model);
             ExportModelCases(model, directory);
             LastReport = new JObject { ["passed"] = true, ["checks"] = checks, ["httpRequests"] = server.Count,
                 ["scope"] = "Production words-only serializer and public two-stage review over controlled loopback. Counterfactual leakage, literal evidence, immutable classification, cancellation and work-review admission. Real semantic accuracy is a separate model replay." };
@@ -562,6 +572,42 @@ public static partial class RoomSpeechClaimRegression
 
     private static IEnumerator Until(Func<bool> ready,string reason)
     { float deadline=Time.realtimeSinceStartup+10; while(!ready()){ if(Time.realtimeSinceStartup>deadline)throw new TimeoutException(reason); yield return null; } }
+    private static IEnumerator CheckEarlyConnectionRecovery(ChatQW model)
+    {
+        var urlField=typeof(LLM).GetField("url",Flags);string original=(string)urlField.GetValue(model);
+        foreach(bool persistent in new[]{false,true}) {
+            var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();var bodies=new List<string>();
+            urlField.SetValue(model,"http://127.0.0.1:"+((IPEndPoint)listener.LocalEndpoint).Port+"/v1/chat/completions");
+            var wire=Task.Run(async()=> {
+                for(int attempt=0;attempt<2;attempt++) using(var client=await listener.AcceptTcpClientAsync()) using(var stream=client.GetStream()) {
+                    stream.ReadTimeout=4000;var header=new StringBuilder();int b;
+                    while((b=stream.ReadByte())>=0){header.Append((char)b);if(header.ToString().EndsWith("\r\n\r\n"))break;}
+                    int count=0;foreach(string line in header.ToString().Split('\n'))
+                        if(line.StartsWith("Content-Length:",StringComparison.OrdinalIgnoreCase))int.TryParse(line.Substring(15).Trim(),out count);
+                    var body=new byte[count];int read=0,n;
+                    while(read<count && (n=stream.Read(body,read,count-read))>0)read+=n;
+                    lock(bodies)bodies.Add(Encoding.UTF8.GetString(body,0,read));
+                    if(attempt==0 || persistent){client.Client.LingerState=new LingerOption(true,0);continue;}
+                    var envelope=new JObject{["choices"]=new JArray(new JObject{["finish_reason"]="stop",["message"]=new JObject{
+                        ["role"]="assistant",["content"]=Claim("moving","I am walking toward you.","en").ToString()}})};
+                    byte[] data=Encoding.UTF8.GetBytes(envelope.ToString());
+                    byte[] response=Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "+data.Length+"\r\nConnection: close\r\n\r\n");
+                    await stream.WriteAsync(response,0,response.Length);await stream.WriteAsync(data,0,data.Length);
+                }
+            });
+            bool done=false,ok=false;string result=null;
+            try {
+                model.PostRoomTaskMessage(Input("I am walking toward you.","arrived","movement","en").ToString(),true,
+                    (a,b,c)=>{done=true;ok=a;result=b;});
+                yield return Until(()=>done,"bounded early connection recovery");
+                yield return Until(()=>wire.IsCompleted,"connection fixture completed");
+                if(wire.IsFaulted)throw wire.Exception;
+                Check(bodies.Count==2 && bodies[0]==bodies[1] && ok!=persistent &&
+                    (persistent || !RoomTaskProtocol.ReviewAllows(result)),
+                    "Early connection failure rebuilds identical words-only input once; persistent failure stays closed and moving cannot become arrived.");
+            } finally {listener.Stop();urlField.SetValue(model,original);}
+        }
+    }
     private sealed class Exchange
     { public Task Finished; public string Request; public readonly TaskCompletionSource<bool> Received=new TaskCompletionSource<bool>(), Release=new TaskCompletionSource<bool>(); }
     private sealed class Server:IDisposable

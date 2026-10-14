@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -13,7 +13,7 @@ using UnityEngine.LowLevel;
 
 /// <summary>Real ARDY delay/fencing regression in the existing disposable batch project.</summary>
 [InitializeOnLoad]
-public static class ArdyRoomStreamDelayRegression
+public static partial class ArdyRoomStreamDelayRegression
 {
     private const string Key = "NeEEvA.ARDY.StreamDelay.";
     private const string RootName = "ARDY delayed stream fixture avatar", FloorName = "ARDY delayed stream fixture floor";
@@ -136,7 +136,64 @@ public static class ArdyRoomStreamDelayRegression
         controller.Configure(avatar, reference, navigation);
         bones = Enumerable.Range(0, (int)HumanBodyBones.LastBone).Select(i => avatar.Humanoid.GetBoneTransform((HumanBodyBones)i)).Where(b => b != null).ToArray();
         QualitySettings.vSyncCount = 0; Application.targetFrameRate = 60;
-        routine = Scenarios(); lastFrame = -1; observationError = null; InstallObserver(true);
+        bool qualityOnly=Environment.GetCommandLineArgs().Contains("-ardyQualityRecoveryOnly");
+        if(qualityOnly) {
+            report.scope="Production controller, actual native locomotion replies and real imported avatar. Explicit proxy-injected 422 quality diagnostics test recovery, exhaustion and cancellation; rejected synthetic diagnostics never contain a pose.";
+            report.limits="Injected faults do not reproduce the original missing quality measurements or prove naturalness. Accepted motion remains native service output.";
+        }
+        bool controlOnly=Environment.GetCommandLineArgs().Contains("-ardyControlRecoveryOnly");
+        if(controlOnly) {
+            report.scope="Real native ARDY motion and imported avatar. Controlled target becomes 2 cm beyond the committed future seam while prior control continuity is cleared. Production planner must reject braking, persist diagnostics and recover with fresh rendered history.";
+            report.limits="Mechanism replay; original failed room trajectory was not retained. No native pose is synthesized by the harness and no kinematic or geometry threshold is relaxed.";
+        }
+        routine = controlOnly ? ControlScenarios() : qualityOnly ? QualityScenarios() : Scenarios(); lastFrame = -1; observationError = null; InstallObserver(true);
+    }
+
+    private static IEnumerator QualityScenarios()
+    {
+        report.checks+=ArdyRoomStreamDiagnosticsRegression.RunServiceErrorChecks();
+        foreach(string mode in new[]{"once","exhaust","cancel"})
+        {
+            var wait=Reset();while(wait.MoveNext())yield return wait.Current;
+            BeginCase("quality-"+mode,3,0,mode=="exhaust");
+            proxy.ConfigureQuality(current.name,3,mode=="exhaust");
+            BeginStream();wait=WaitForMotion(20);while(wait.MoveNext())yield return wait.Current;
+            current.initialSession=controller.StreamSessionId;current.operation=controller.OperationRevision;
+            float deadline=Time.realtimeSinceStartup+20;
+            while(!controller.StreamIsRecovering) {
+                Check(Time.realtimeSinceStartup<deadline && !Failed(),"Quality failure did not start finite recovery: "+controller.Status);
+                Drive();yield return null;
+            }
+            Check(controller.StreamQualityRecoveryCount==1 && controller.StreamRecoveryCount==1 && controller.StreamUnderrunCount==0,
+                "Quality recovery must be distinct from supply underflow and limited to one parent-owned attempt.");
+            Check(Requests().Any(r=>r.injectedQualityFailure && r.status==422),"Expected explicit quality fault missing.");
+            Check(File.Exists(controller.LastQualityFailureEvidencePath),"Full quality evidence was not persisted before cancellation.");
+            var evidence=Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(controller.LastQualityFailureEvidencePath));
+            Check((string)evidence["sessionId"]==current.initialSession && (string)evidence.SelectToken("request.requestId")== (string)evidence["requestId"] &&
+                (int)evidence.SelectToken("error.details.timings.qualityAttempts")==3 && ((Newtonsoft.Json.Linq.JArray)evidence["renderedPoseHistory"]).Count>0,
+                "Failure identity, all candidate reasons or actual rendered pose history was lost.");
+            string output=SessionState.GetString(Key+"Output","");Directory.CreateDirectory(output);
+            File.Copy(controller.LastQualityFailureEvidencePath,Path.Combine(output,current.name+"-failure.json"),true);
+            current.observedRecovery=true;
+            if(mode=="cancel") { wait=StopAndHold(2);while(wait.MoveNext())yield return wait.Current; }
+            else if(mode=="once") {
+                wait=WaitForResumedMotion(25);while(wait.MoveNext())yield return wait.Current;
+                Check(controller.StreamQualityRecoveryCount==1 && current.initialSession!=controller.StreamSessionId,"Recovery replayed the rejected native session.");
+                wait=RunHealthyFor(2);while(wait.MoveNext())yield return wait.Current;
+                wait=StopAndHold(1);while(wait.MoveNext())yield return wait.Current;
+            } else {
+                deadline=Time.realtimeSinceStartup+30;
+                while(controller.IsContinuousFollowActive || controller.Player.HasPoseOwnership) {
+                    Check(Time.realtimeSinceStartup<deadline && controller.OperationRevision==current.operation && controller.StreamQualityRecoveryCount<=1,
+                        "Repeated quality failure escaped the fixed operation budget.");Drive();yield return null;
+                }
+                Check(Failed() && controller.StreamQualityRecoveryCount==1 && Requests().Count(r=>r.injectedQualityFailure && r.status==422)==2,
+                    "Second quality rejection did not terminate after one recovery.");
+                current.observedExplicitFailure=true;current.terminalStatus=controller.Status;
+                wait=HoldInactive(2);while(wait.MoveNext())yield return wait.Current;
+            }
+            EndCase();
+        }
     }
 
     private static IEnumerator Scenarios()

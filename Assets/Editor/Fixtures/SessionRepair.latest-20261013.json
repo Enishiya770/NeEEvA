@@ -1,0 +1,2934 @@
+{
+  "source": {
+    "log": "Logs/unity-review-20261013-212458/Editor.snapshot.log",
+    "eventLines": [
+      159608,
+      166993,
+      167503
+    ],
+    "scope": "Actual completed/failed receipts and full spoken conversation. HTTP input reconstructed; no actions will be executed."
+  },
+  "roleConfiguration": {
+    "m_Backend": 1,
+    "m_LocalModelName": "antoneva",
+    "m_EnableThinking": false,
+    "m_KeepRecentImages": 2,
+    "m_MaxPromptTokens": 42000,
+    "m_EphemeralMaxTokens": 128,
+    "m_EphemeralHistoryMessages": 0,
+    "m_PromptFiles": [
+      {
+        "path": "Assets/AIChatTookit/Prompts/persona.txt",
+        "sha256": "e2d5d4ab26a2cfb396e5beda8afb73116267a991b541076d88a662106f5b58c3"
+      },
+      {
+        "path": "Assets/AIChatTookit/Prompts/language.txt",
+        "sha256": "2a404a6b503ae1297861a086b68258563251675d02dc2bb7a52a06bbaf25db1d"
+      },
+      {
+        "path": "Assets/AIChatTookit/Prompts/behavior.txt",
+        "sha256": "4b87d2db8d7b87b11c1915d0499ce2981e715d771547a59d508fd5f498d2c889"
+      }
+    ],
+    "m_SkillFiles": [
+      {
+        "path": "Assets/AIChatTookit/Prompts/Skills/singing.txt",
+        "sha256": "b785843653304745d49d9b2705beb4c1844b8c67f26eaa0671191347602459c4"
+      }
+    ]
+  },
+  "history": [
+    {
+      "role": "user",
+      "content": "现在能看到什么？"
+    },
+    {
+      "role": "assistant",
+      "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+    },
+    {
+      "role": "assistant",
+      "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+    },
+    {
+      "role": "user",
+      "content": "来我身边。"
+    },
+    {
+      "role": "assistant",
+      "content": "あなたのそばに着いたわ。"
+    },
+    {
+      "role": "user",
+      "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+    },
+    {
+      "role": "assistant",
+      "content": "テレビ台のランプは正常に消灯しました。"
+    },
+    {
+      "role": "assistant",
+      "content": "あなたのそばに着いたわ。"
+    },
+    {
+      "role": "user",
+      "content": "好，接下来跟着我走。"
+    },
+    {
+      "role": "assistant",
+      "content": "あなたについて移動しているわ。"
+    },
+    {
+      "role": "user",
+      "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+    },
+    {
+      "role": "assistant",
+      "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+    },
+    {
+      "role": "assistant",
+      "content": "あなたのそばに着いたわ。"
+    }
+  ],
+  "comparisons": [],
+  "repairs": [
+    {
+      "name": "actual-gen11-actor-repair",
+      "terminal": true,
+      "language": "ja",
+      "rejected": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。",
+      "review": {
+        "verdict": "inconsistent",
+        "reason": "event-actor-mismatch",
+        "actualLanguage": "ja",
+        "conflict": "unsupported-claim",
+        "conflictQuote": "先ほどお消しになった"
+      },
+      "reason": "event-actor-mismatch",
+      "humanInput": {
+        "currentHumanTurnPresent": true,
+        "primaryUtterance": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+        "fullInputEvidence": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+      },
+      "context": "{\"spatialGoalResult\": {\"originalUserRequest\": \"OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。\", \"latestFacts\": {\"goal\": {\"goalId\": \"device-goal-5da16b3f8f7e4be791f6bf1c29980b29\", \"status\": \"satisfied\", \"ownerCurrent\": true, \"executionSuspended\": false, \"reason\": \"same-target-fresh-device-readback-matches-request\", \"originalRequest\": \"OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。\", \"latestUserText\": \"OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。\", \"targetDescription\": \"OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。\", \"desiredState\": \"on\", \"boundEntityId\": \"scene-object-7b45e5290cb04962b71a00cf6526239e\", \"completionEvidenceValid\": true, \"targetKnowledge\": {\"identityKnown\": true, \"historicalPositionKnown\": true, \"currentVisibility\": \"not-established\"}, \"operationSummary\": {\"operationAttempted\": true, \"stateWriteObserved\": true, \"lastOperationPhase\": \"performed\", \"scope\": \"Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state.\"}, \"completionEvidence\": {\"actionId\": \"146dd87634bb4a7598f3f09dd0e42fc7:11:14\", \"entityId\": \"scene-object-7b45e5290cb04962b71a00cf6526239e\", \"desiredState\": \"on\", \"resultCaptureId\": \"3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a\", \"observedUtc\": \"2026-10-13T12:24:36.2802587Z\", \"readAtUtc\": \"2026-10-13T12:24:36.3703123Z\", \"actual\": {\"entityId\": \"scene-object-7b45e5290cb04962b71a00cf6526239e\", \"sceneLabel\": \"桌面装饰灯\", \"registered\": true, \"on\": true, \"lightEnabled\": true, \"emissionEnabled\": true, \"lightState\": \"enabled\", \"emissionState\": \"on\", \"conflict\": \"\", \"bakedLightingResidualUncontrolled\": true}}, \"searchSummary\": {\"searchAttempted\": true, \"completedStepCount\": 3, \"completedStepCountScope\": \"Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.\", \"observedViewCount\": 6, \"failedCandidateCount\": 0, \"latestSearchTaskId\": \"scene-search-755a81215eba46b09682371c3fe5726e\", \"latestSearchStatus\": \"found\", \"latestSearchReason\": \"search-current-target-confirmed\", \"latestSearchDecisions\": 2, \"latestSearchMotionSteps\": 1, \"latestSearchFailureReason\": null, \"allVisitedCandidatePagesReviewed\": false}}, \"taskSequence\": null, \"lastAction\": {\"actionId\": \"146dd87634bb4a7598f3f09dd0e42fc7:11:14\", \"intent\": \"set-object-state\", \"entityId\": \"scene-object-7b45e5290cb04962b71a00cf6526239e\", \"requestedEntityId\": \"scene-object-7b45e5290cb04962b71a00cf6526239e\", \"requestedState\": \"on\", \"phase\": \"performed\", \"reason\": \"runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press\", \"captureId\": \"3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870\", \"confirmedCaptureId\": \"3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7\", \"resultCaptureId\": \"3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a\", \"objectConfirmed\": true, \"semanticTargetConfirmed\": true, \"groundArrived\": false, \"objectReobserved\": false, \"stateChanged\": true, \"active\": false, \"reached\": false, \"observedUtc\": \"2026-10-13T12:24:36.3713113Z\"}, \"latestGoalReview\": {\"verdict\": \"approved\", \"reason\": \"用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。\", \"validationFailure\": null, \"registered\": true, \"pendingRetained\": false, \"requestAssessment\": \"requested\", \"proposalDiscarded\": false, \"proposal\": {\"operation\": \"set\", \"requestQuote\": \"去把你刚才关掉的那盏灯重新打开\", \"targetDescription\": \"你刚才关掉的那盏灯\", \"desiredState\": \"on\"}}, \"objectContext\": {\"runtimeDeviceControl\": {\"implementationConnected\": true, \"featureEnabled\": true, \"supportedOperation\": \"set-object-state:on|off for an explicitly registered lamp\", \"physicalHandRequired\": false, \"requiresCurrentTargetConfirmation\": true, \"requiresIndependentUserAuthorization\": true}}, \"roomDecision\": {\"intent\": \"set-object-state\", \"dispatch\": \"performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press\"}, \"scope\": \"Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.\", \"resultReportRequirement\": {\"required\": true, \"expectedReport\": \"on\", \"failureReason\": \"same-target-fresh-device-readback-matches-request\", \"searchAttempted\": true, \"operationAttempted\": true, \"operationDistance\": null, \"outcomeScope\": \"State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.\", \"scope\": \"Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority.\"}, \"historicalResult\": true, \"recordedGeneration\": 11, \"recordedAtUtc\": \"2026-10-13T12:24:36.3823725Z\"}}}",
+      "reviewInput": {
+        "configuredDialogueLanguage": "Japanese",
+        "publicSpeechLanguage": "ja",
+        "intendedAction": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "declaredMotion": "none",
+        "currentRequestSemantics": {
+          "requestKind": "answer-only",
+          "responseDemand": "short-conversation"
+        },
+        "requestedUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+        "historicalDeviceEvents": [
+          {
+            "goal": {
+              "goalId": "device-goal-a2405afca0634e96b4ac63695a9f74a9",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "latestUserText": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "targetDescription": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "desiredState": "off",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "off",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+                "observedUtc": "2026-10-13T12:23:07.0763853Z",
+                "readAtUtc": "2026-10-13T12:23:07.1713000Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": false,
+                  "lightEnabled": false,
+                  "emissionEnabled": false,
+                  "lightState": "disabled",
+                  "emissionState": "off",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-b6be5a47479645f5b32724f34f2b8771",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "off",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-86e782b6fa4d42a4b9eb34da05e50e02",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-385bfbeef4664e65bad2d6b086ee0029",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:23:07.1768625Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确请求关闭电视柜上的小灯，属肯定操作。目标有明确位置描述，为described。提案目标、状态与用户原话一致，故匹配。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把它关掉",
+                "targetDescription": "电视柜上的小灯",
+                "desiredState": "off"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "off",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 7,
+            "recordedAtUtc": "2026-10-13T12:23:07.1894344Z"
+          },
+          {
+            "goal": {
+              "goalId": "device-goal-5da16b3f8f7e4be791f6bf1c29980b29",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "latestUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "targetDescription": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "desiredState": "on",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "on",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+                "observedUtc": "2026-10-13T12:24:36.2802587Z",
+                "readAtUtc": "2026-10-13T12:24:36.3703123Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": true,
+                  "lightEnabled": true,
+                  "emissionEnabled": true,
+                  "lightState": "enabled",
+                  "emissionState": "on",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-755a81215eba46b09682371c3fe5726e",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "on",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:24:36.3713113Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把你刚才关掉的那盏灯重新打开",
+                "targetDescription": "你刚才关掉的那盏灯",
+                "desiredState": "on"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "on",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 11,
+            "recordedAtUtc": "2026-10-13T12:24:36.3823725Z"
+          }
+        ],
+        "sceneActionFacts": {
+          "goal": {
+            "goalId": "device-goal-5da16b3f8f7e4be791f6bf1c29980b29",
+            "status": "satisfied",
+            "ownerCurrent": true,
+            "executionSuspended": false,
+            "reason": "same-target-fresh-device-readback-matches-request",
+            "originalRequest": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "latestUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "targetDescription": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "desiredState": "on",
+            "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "completionEvidenceValid": true,
+            "targetKnowledge": {
+              "identityKnown": true,
+              "historicalPositionKnown": true,
+              "currentVisibility": "not-established"
+            },
+            "operationSummary": {
+              "operationAttempted": true,
+              "stateWriteObserved": true,
+              "lastOperationPhase": "performed",
+              "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+            },
+            "completionEvidence": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "desiredState": "on",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+              "observedUtc": "2026-10-13T12:24:36.2802587Z",
+              "readAtUtc": "2026-10-13T12:24:36.3703123Z",
+              "actual": {
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "sceneLabel": "桌面装饰灯",
+                "registered": true,
+                "on": true,
+                "lightEnabled": true,
+                "emissionEnabled": true,
+                "lightState": "enabled",
+                "emissionState": "on",
+                "conflict": "",
+                "bakedLightingResidualUncontrolled": true
+              }
+            },
+            "searchSummary": {
+              "searchAttempted": true,
+              "completedStepCount": 3,
+              "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+              "observedViewCount": 6,
+              "failedCandidateCount": 0,
+              "latestSearchTaskId": "scene-search-755a81215eba46b09682371c3fe5726e",
+              "latestSearchStatus": "found",
+              "latestSearchReason": "search-current-target-confirmed",
+              "latestSearchDecisions": 2,
+              "latestSearchMotionSteps": 1,
+              "latestSearchFailureReason": null,
+              "allVisitedCandidatePagesReviewed": false
+            }
+          },
+          "taskSequence": null,
+          "lastAction": {
+            "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+            "intent": "set-object-state",
+            "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "requestedState": "on",
+            "phase": "performed",
+            "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+            "captureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870",
+            "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7",
+            "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+            "objectConfirmed": true,
+            "semanticTargetConfirmed": true,
+            "groundArrived": false,
+            "objectReobserved": false,
+            "stateChanged": true,
+            "active": false,
+            "reached": false,
+            "observedUtc": "2026-10-13T12:24:36.3713113Z"
+          },
+          "latestGoalReview": {
+            "verdict": "approved",
+            "reason": "用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。",
+            "validationFailure": null,
+            "registered": true,
+            "pendingRetained": false,
+            "requestAssessment": "requested",
+            "proposalDiscarded": false,
+            "proposal": {
+              "operation": "set",
+              "requestQuote": "去把你刚才关掉的那盏灯重新打开",
+              "targetDescription": "你刚才关掉的那盏灯",
+              "desiredState": "on"
+            }
+          },
+          "objectContext": {
+            "runtimeDeviceControl": {
+              "implementationConnected": true,
+              "featureEnabled": true,
+              "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+              "physicalHandRequired": false,
+              "requiresCurrentTargetConfirmation": true,
+              "requiresIndependentUserAuthorization": true
+            }
+          },
+          "roomDecision": {
+            "intent": "set-object-state",
+            "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+          },
+          "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+          "resultReportRequirement": {
+            "required": true,
+            "expectedReport": "on",
+            "failureReason": "same-target-fresh-device-readback-matches-request",
+            "searchAttempted": true,
+            "operationAttempted": true,
+            "operationDistance": null,
+            "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+            "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+          },
+          "historicalResult": true,
+          "recordedGeneration": 11,
+          "recordedAtUtc": "2026-10-13T12:24:36.3823725Z"
+        },
+        "recentDialogue": [
+          {
+            "role": "user",
+            "content": "现在能看到什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+          },
+          {
+            "role": "assistant",
+            "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+          },
+          {
+            "role": "user",
+            "content": "来我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "テレビ台のランプは正常に消灯しました。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "好，接下来跟着我走。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたについて移動しているわ。"
+          },
+          {
+            "role": "user",
+            "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          }
+        ]
+      },
+      "history": [
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.75] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.11; 语言:zh; 音域:G2～A5; 音高稳定度:0.53; 旋律:G#5-C3-B2-G#2-A5-B2-A#2-G#3-G2-C#4-G5-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 现在能看到什么吗？"
+        },
+        {
+          "role": "assistant",
+          "content": "我这边能看到正前方的电视屏幕和下方的桌子，左边还有空荡荡的书架。"
+        },
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.60] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.14; 语言:zh; 音域:B2～A5; 音高稳定度:0.55; 旋律:A5-F#5-C3-C#3-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 来我身边。"
+        },
+        {
+          "role": "assistant",
+          "content": "我正在尝试走近你。"
+        },
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.84] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.14; 语言:zh; 音域:G#2～G5; 音高稳定度:0.47; 旋律:D#3-D3-C3-B2-G4-B2-C3-A#2-C3-G5-D3-C3-A#2-G#2-D#3-C#3-C3-D5-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 现在去把你刚才看到的电视柜上的小灯关掉，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":4.269999980926514,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"现在去把你刚才看到的电视柜上的小灯关掉。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n{\"id\":2,\"start_seconds\":4.269999980926514,\"end_seconds\":6.429999828338623,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"现在去把你刚才看到的电视柜上的小灯关掉，然后回到我身边。\"}]\n[同一录音的较早 ASR 观测：不是额外发言，也不表示最终结果必然更准确。可用于补漏和判断冲突，不要重复拼接；有歧义时可以询问。\n覆盖录音前 4.69s：现在去把你刚才看到的电视柜上的小灯关掉。]"
+        },
+        {
+          "role": "assistant",
+          "content": "テレビ台のランプは、正常にオフになりました。あなたのそばに着いたわ。"
+        },
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.69] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.41; 语言:ko; 音域:B2～A5; 音高稳定度:0.55; 旋律:A5-C#3-C3-B2-C#3-D5-A5-G5-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 근데워서."
+        },
+        {
+          "role": "assistant",
+          "content": "今回は、あなたの質問にきちんと答えられなかったわ。"
+        },
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.71] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.15; 语言:zh; 音域:A2～A5; 音高稳定度:0.52; 旋律:B4-B2-A#2-F#5-C#4-B2-G5-F#5-C#5-C#3-D3-A#2-B2-C#5-F5-G5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] ，再来一遍，跟着我走。"
+        },
+        {
+          "role": "assistant",
+          "content": "あなたについて移動しているわ。"
+        },
+        {
+          "role": "user",
+          "content": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.85] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.17; 语言:zh; 音域:G#2～A5; 音高稳定度:0.46; 旋律:A5-A#4-D5-C#3-G#4-C#3-F5-F#5-E5-C#3-C3-A#2-A2-G5-G#2-G#3-B2-B4-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":1.5299999713897706,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"O.\",\"language\":\"en\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"OK现在。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.0,\"end_seconds\":1.9299999475479127}]}\n{\"id\":2,\"start_seconds\":1.5299999713897706,\"end_seconds\":5.46999979019165,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"现在去把你刚才关掉的那盏灯重新打开，然后。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"现在去把你刚才关掉的那盏灯重新打开，然后回到我。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":1.1299999952316285,\"end_seconds\":5.869999885559082}]}\n{\"id\":3,\"start_seconds\":5.46999979019165,\"end_seconds\":6.559999942779541,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":5.070000171661377,\"end_seconds\":6.559999942779541}]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。\"}]\n[同一录音的较早 ASR 观测：不是额外发言，也不表示最终结果必然更准确。可用于补漏和判断冲突，不要重复拼接；有歧义时可以询问。\n覆盖录音前 1.54s：ok.]"
+        }
+      ]
+    }
+  ],
+  "eventReviews": [
+    {
+      "name": "actual-gen11-honorific-wrong-actor",
+      "input": {
+        "configuredDialogueLanguage": "Japanese",
+        "publicSpeechLanguage": "ja",
+        "intendedAction": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "declaredMotion": "none",
+        "currentRequestSemantics": {
+          "requestKind": "answer-only",
+          "responseDemand": "short-conversation"
+        },
+        "requestedUserText": "请根据实际发生过的事情回答。",
+        "historicalDeviceEvents": [
+          {
+            "goal": {
+              "goalId": "device-goal-a2405afca0634e96b4ac63695a9f74a9",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "latestUserText": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "targetDescription": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "desiredState": "off",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "off",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+                "observedUtc": "2026-10-13T12:23:07.0763853Z",
+                "readAtUtc": "2026-10-13T12:23:07.1713000Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": false,
+                  "lightEnabled": false,
+                  "emissionEnabled": false,
+                  "lightState": "disabled",
+                  "emissionState": "off",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-b6be5a47479645f5b32724f34f2b8771",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "off",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-86e782b6fa4d42a4b9eb34da05e50e02",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-385bfbeef4664e65bad2d6b086ee0029",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:23:07.1768625Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确请求关闭电视柜上的小灯，属肯定操作。目标有明确位置描述，为described。提案目标、状态与用户原话一致，故匹配。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把它关掉",
+                "targetDescription": "电视柜上的小灯",
+                "desiredState": "off"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "off",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 7,
+            "recordedAtUtc": "2026-10-13T12:23:07.1894344Z"
+          },
+          {
+            "goal": {
+              "goalId": "device-goal-5da16b3f8f7e4be791f6bf1c29980b29",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "latestUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "targetDescription": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "desiredState": "on",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "on",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+                "observedUtc": "2026-10-13T12:24:36.2802587Z",
+                "readAtUtc": "2026-10-13T12:24:36.3703123Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": true,
+                  "lightEnabled": true,
+                  "emissionEnabled": true,
+                  "lightState": "enabled",
+                  "emissionState": "on",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-755a81215eba46b09682371c3fe5726e",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "on",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:24:36.3713113Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把你刚才关掉的那盏灯重新打开",
+                "targetDescription": "你刚才关掉的那盏灯",
+                "desiredState": "on"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "on",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 11,
+            "recordedAtUtc": "2026-10-13T12:24:36.3823725Z"
+          }
+        ],
+        "sceneActionFacts": {
+          "goal": {
+            "goalId": "device-goal-5da16b3f8f7e4be791f6bf1c29980b29",
+            "status": "satisfied",
+            "ownerCurrent": true,
+            "executionSuspended": false,
+            "reason": "same-target-fresh-device-readback-matches-request",
+            "originalRequest": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "latestUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "targetDescription": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "desiredState": "on",
+            "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "completionEvidenceValid": true,
+            "targetKnowledge": {
+              "identityKnown": true,
+              "historicalPositionKnown": true,
+              "currentVisibility": "not-established"
+            },
+            "operationSummary": {
+              "operationAttempted": true,
+              "stateWriteObserved": true,
+              "lastOperationPhase": "performed",
+              "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+            },
+            "completionEvidence": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "desiredState": "on",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+              "observedUtc": "2026-10-13T12:24:36.2802587Z",
+              "readAtUtc": "2026-10-13T12:24:36.3703123Z",
+              "actual": {
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "sceneLabel": "桌面装饰灯",
+                "registered": true,
+                "on": true,
+                "lightEnabled": true,
+                "emissionEnabled": true,
+                "lightState": "enabled",
+                "emissionState": "on",
+                "conflict": "",
+                "bakedLightingResidualUncontrolled": true
+              }
+            },
+            "searchSummary": {
+              "searchAttempted": true,
+              "completedStepCount": 3,
+              "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+              "observedViewCount": 6,
+              "failedCandidateCount": 0,
+              "latestSearchTaskId": "scene-search-755a81215eba46b09682371c3fe5726e",
+              "latestSearchStatus": "found",
+              "latestSearchReason": "search-current-target-confirmed",
+              "latestSearchDecisions": 2,
+              "latestSearchMotionSteps": 1,
+              "latestSearchFailureReason": null,
+              "allVisitedCandidatePagesReviewed": false
+            }
+          },
+          "taskSequence": null,
+          "lastAction": {
+            "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+            "intent": "set-object-state",
+            "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "requestedState": "on",
+            "phase": "performed",
+            "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+            "captureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870",
+            "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7",
+            "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+            "objectConfirmed": true,
+            "semanticTargetConfirmed": true,
+            "groundArrived": false,
+            "objectReobserved": false,
+            "stateChanged": true,
+            "active": false,
+            "reached": false,
+            "observedUtc": "2026-10-13T12:24:36.3713113Z"
+          },
+          "latestGoalReview": {
+            "verdict": "approved",
+            "reason": "用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。",
+            "validationFailure": null,
+            "registered": true,
+            "pendingRetained": false,
+            "requestAssessment": "requested",
+            "proposalDiscarded": false,
+            "proposal": {
+              "operation": "set",
+              "requestQuote": "去把你刚才关掉的那盏灯重新打开",
+              "targetDescription": "你刚才关掉的那盏灯",
+              "desiredState": "on"
+            }
+          },
+          "objectContext": {
+            "runtimeDeviceControl": {
+              "implementationConnected": true,
+              "featureEnabled": true,
+              "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+              "physicalHandRequired": false,
+              "requiresCurrentTargetConfirmation": true,
+              "requiresIndependentUserAuthorization": true
+            }
+          },
+          "roomDecision": {
+            "intent": "set-object-state",
+            "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+          },
+          "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+          "resultReportRequirement": {
+            "required": true,
+            "expectedReport": "on",
+            "failureReason": "same-target-fresh-device-readback-matches-request",
+            "searchAttempted": true,
+            "operationAttempted": true,
+            "operationDistance": null,
+            "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+            "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+          },
+          "historicalResult": true,
+          "recordedGeneration": 11,
+          "recordedAtUtc": "2026-10-13T12:24:36.3823725Z"
+        },
+        "recentDialogue": [
+          {
+            "role": "user",
+            "content": "现在能看到什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+          },
+          {
+            "role": "assistant",
+            "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+          },
+          {
+            "role": "user",
+            "content": "来我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "テレビ台のランプは正常に消灯しました。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "好，接下来跟着我走。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたについて移動しているわ。"
+          },
+          {
+            "role": "user",
+            "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          }
+        ],
+        "publicSpeech": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+      },
+      "allowed": false
+    },
+    {
+      "name": "actual-gen11-correct-actor",
+      "input": {
+        "configuredDialogueLanguage": "Japanese",
+        "publicSpeechLanguage": "ja",
+        "intendedAction": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "declaredMotion": "none",
+        "currentRequestSemantics": {
+          "requestKind": "answer-only",
+          "responseDemand": "short-conversation"
+        },
+        "requestedUserText": "请根据实际发生过的事情回答。",
+        "historicalDeviceEvents": [
+          {
+            "goal": {
+              "goalId": "device-goal-a2405afca0634e96b4ac63695a9f74a9",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "latestUserText": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "targetDescription": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "desiredState": "off",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "off",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+                "observedUtc": "2026-10-13T12:23:07.0763853Z",
+                "readAtUtc": "2026-10-13T12:23:07.1713000Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": false,
+                  "lightEnabled": false,
+                  "emissionEnabled": false,
+                  "lightState": "disabled",
+                  "emissionState": "off",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-b6be5a47479645f5b32724f34f2b8771",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "off",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-86e782b6fa4d42a4b9eb34da05e50e02",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-385bfbeef4664e65bad2d6b086ee0029",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:23:07.1768625Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确请求关闭电视柜上的小灯，属肯定操作。目标有明确位置描述，为described。提案目标、状态与用户原话一致，故匹配。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把它关掉",
+                "targetDescription": "电视柜上的小灯",
+                "desiredState": "off"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "off",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 7,
+            "recordedAtUtc": "2026-10-13T12:23:07.1894344Z"
+          },
+          {
+            "goal": {
+              "goalId": "device-goal-5da16b3f8f7e4be791f6bf1c29980b29",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "latestUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "targetDescription": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "desiredState": "on",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "on",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+                "observedUtc": "2026-10-13T12:24:36.2802587Z",
+                "readAtUtc": "2026-10-13T12:24:36.3703123Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": true,
+                  "lightEnabled": true,
+                  "emissionEnabled": true,
+                  "lightState": "enabled",
+                  "emissionState": "on",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-755a81215eba46b09682371c3fe5726e",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "on",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:24:36.3713113Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把你刚才关掉的那盏灯重新打开",
+                "targetDescription": "你刚才关掉的那盏灯",
+                "desiredState": "on"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "on",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 11,
+            "recordedAtUtc": "2026-10-13T12:24:36.3823725Z"
+          }
+        ],
+        "sceneActionFacts": {
+          "goal": {
+            "goalId": "device-goal-5da16b3f8f7e4be791f6bf1c29980b29",
+            "status": "satisfied",
+            "ownerCurrent": true,
+            "executionSuspended": false,
+            "reason": "same-target-fresh-device-readback-matches-request",
+            "originalRequest": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "latestUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "targetDescription": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "desiredState": "on",
+            "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "completionEvidenceValid": true,
+            "targetKnowledge": {
+              "identityKnown": true,
+              "historicalPositionKnown": true,
+              "currentVisibility": "not-established"
+            },
+            "operationSummary": {
+              "operationAttempted": true,
+              "stateWriteObserved": true,
+              "lastOperationPhase": "performed",
+              "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+            },
+            "completionEvidence": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "desiredState": "on",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+              "observedUtc": "2026-10-13T12:24:36.2802587Z",
+              "readAtUtc": "2026-10-13T12:24:36.3703123Z",
+              "actual": {
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "sceneLabel": "桌面装饰灯",
+                "registered": true,
+                "on": true,
+                "lightEnabled": true,
+                "emissionEnabled": true,
+                "lightState": "enabled",
+                "emissionState": "on",
+                "conflict": "",
+                "bakedLightingResidualUncontrolled": true
+              }
+            },
+            "searchSummary": {
+              "searchAttempted": true,
+              "completedStepCount": 3,
+              "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+              "observedViewCount": 6,
+              "failedCandidateCount": 0,
+              "latestSearchTaskId": "scene-search-755a81215eba46b09682371c3fe5726e",
+              "latestSearchStatus": "found",
+              "latestSearchReason": "search-current-target-confirmed",
+              "latestSearchDecisions": 2,
+              "latestSearchMotionSteps": 1,
+              "latestSearchFailureReason": null,
+              "allVisitedCandidatePagesReviewed": false
+            }
+          },
+          "taskSequence": null,
+          "lastAction": {
+            "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+            "intent": "set-object-state",
+            "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "requestedState": "on",
+            "phase": "performed",
+            "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+            "captureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870",
+            "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7",
+            "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+            "objectConfirmed": true,
+            "semanticTargetConfirmed": true,
+            "groundArrived": false,
+            "objectReobserved": false,
+            "stateChanged": true,
+            "active": false,
+            "reached": false,
+            "observedUtc": "2026-10-13T12:24:36.3713113Z"
+          },
+          "latestGoalReview": {
+            "verdict": "approved",
+            "reason": "用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。",
+            "validationFailure": null,
+            "registered": true,
+            "pendingRetained": false,
+            "requestAssessment": "requested",
+            "proposalDiscarded": false,
+            "proposal": {
+              "operation": "set",
+              "requestQuote": "去把你刚才关掉的那盏灯重新打开",
+              "targetDescription": "你刚才关掉的那盏灯",
+              "desiredState": "on"
+            }
+          },
+          "objectContext": {
+            "runtimeDeviceControl": {
+              "implementationConnected": true,
+              "featureEnabled": true,
+              "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+              "physicalHandRequired": false,
+              "requiresCurrentTargetConfirmation": true,
+              "requiresIndependentUserAuthorization": true
+            }
+          },
+          "roomDecision": {
+            "intent": "set-object-state",
+            "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+          },
+          "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+          "resultReportRequirement": {
+            "required": true,
+            "expectedReport": "on",
+            "failureReason": "same-target-fresh-device-readback-matches-request",
+            "searchAttempted": true,
+            "operationAttempted": true,
+            "operationDistance": null,
+            "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+            "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+          },
+          "historicalResult": true,
+          "recordedGeneration": 11,
+          "recordedAtUtc": "2026-10-13T12:24:36.3823725Z"
+        },
+        "recentDialogue": [
+          {
+            "role": "user",
+            "content": "现在能看到什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+          },
+          {
+            "role": "assistant",
+            "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+          },
+          {
+            "role": "user",
+            "content": "来我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "テレビ台のランプは正常に消灯しました。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "好，接下来跟着我走。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたについて移動しているわ。"
+          },
+          {
+            "role": "user",
+            "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          }
+        ],
+        "publicSpeech": "私が先ほど消したデスクランプを、もう一度つけました。"
+      },
+      "allowed": true
+    },
+    {
+      "name": "actual-gen11-courtesy-correct-actor",
+      "input": {
+        "configuredDialogueLanguage": "Japanese",
+        "publicSpeechLanguage": "ja",
+        "intendedAction": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "declaredMotion": "none",
+        "currentRequestSemantics": {
+          "requestKind": "answer-only",
+          "responseDemand": "short-conversation"
+        },
+        "requestedUserText": "请根据实际发生过的事情回答。",
+        "historicalDeviceEvents": [
+          {
+            "goal": {
+              "goalId": "device-goal-a2405afca0634e96b4ac63695a9f74a9",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "latestUserText": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "targetDescription": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "desiredState": "off",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "off",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+                "observedUtc": "2026-10-13T12:23:07.0763853Z",
+                "readAtUtc": "2026-10-13T12:23:07.1713000Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": false,
+                  "lightEnabled": false,
+                  "emissionEnabled": false,
+                  "lightState": "disabled",
+                  "emissionState": "off",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-b6be5a47479645f5b32724f34f2b8771",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "off",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-86e782b6fa4d42a4b9eb34da05e50e02",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-385bfbeef4664e65bad2d6b086ee0029",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:23:07.1768625Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确请求关闭电视柜上的小灯，属肯定操作。目标有明确位置描述，为described。提案目标、状态与用户原话一致，故匹配。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把它关掉",
+                "targetDescription": "电视柜上的小灯",
+                "desiredState": "off"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "off",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 7,
+            "recordedAtUtc": "2026-10-13T12:23:07.1894344Z"
+          },
+          {
+            "goal": {
+              "goalId": "device-goal-5da16b3f8f7e4be791f6bf1c29980b29",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "latestUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "targetDescription": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "desiredState": "on",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "on",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+                "observedUtc": "2026-10-13T12:24:36.2802587Z",
+                "readAtUtc": "2026-10-13T12:24:36.3703123Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": true,
+                  "lightEnabled": true,
+                  "emissionEnabled": true,
+                  "lightState": "enabled",
+                  "emissionState": "on",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-755a81215eba46b09682371c3fe5726e",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "on",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:24:36.3713113Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把你刚才关掉的那盏灯重新打开",
+                "targetDescription": "你刚才关掉的那盏灯",
+                "desiredState": "on"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "on",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 11,
+            "recordedAtUtc": "2026-10-13T12:24:36.3823725Z"
+          }
+        ],
+        "sceneActionFacts": {
+          "goal": {
+            "goalId": "device-goal-5da16b3f8f7e4be791f6bf1c29980b29",
+            "status": "satisfied",
+            "ownerCurrent": true,
+            "executionSuspended": false,
+            "reason": "same-target-fresh-device-readback-matches-request",
+            "originalRequest": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "latestUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "targetDescription": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+            "desiredState": "on",
+            "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "completionEvidenceValid": true,
+            "targetKnowledge": {
+              "identityKnown": true,
+              "historicalPositionKnown": true,
+              "currentVisibility": "not-established"
+            },
+            "operationSummary": {
+              "operationAttempted": true,
+              "stateWriteObserved": true,
+              "lastOperationPhase": "performed",
+              "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+            },
+            "completionEvidence": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "desiredState": "on",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+              "observedUtc": "2026-10-13T12:24:36.2802587Z",
+              "readAtUtc": "2026-10-13T12:24:36.3703123Z",
+              "actual": {
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "sceneLabel": "桌面装饰灯",
+                "registered": true,
+                "on": true,
+                "lightEnabled": true,
+                "emissionEnabled": true,
+                "lightState": "enabled",
+                "emissionState": "on",
+                "conflict": "",
+                "bakedLightingResidualUncontrolled": true
+              }
+            },
+            "searchSummary": {
+              "searchAttempted": true,
+              "completedStepCount": 3,
+              "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+              "observedViewCount": 6,
+              "failedCandidateCount": 0,
+              "latestSearchTaskId": "scene-search-755a81215eba46b09682371c3fe5726e",
+              "latestSearchStatus": "found",
+              "latestSearchReason": "search-current-target-confirmed",
+              "latestSearchDecisions": 2,
+              "latestSearchMotionSteps": 1,
+              "latestSearchFailureReason": null,
+              "allVisitedCandidatePagesReviewed": false
+            }
+          },
+          "taskSequence": null,
+          "lastAction": {
+            "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+            "intent": "set-object-state",
+            "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+            "requestedState": "on",
+            "phase": "performed",
+            "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+            "captureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870",
+            "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7",
+            "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+            "objectConfirmed": true,
+            "semanticTargetConfirmed": true,
+            "groundArrived": false,
+            "objectReobserved": false,
+            "stateChanged": true,
+            "active": false,
+            "reached": false,
+            "observedUtc": "2026-10-13T12:24:36.3713113Z"
+          },
+          "latestGoalReview": {
+            "verdict": "approved",
+            "reason": "用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。",
+            "validationFailure": null,
+            "registered": true,
+            "pendingRetained": false,
+            "requestAssessment": "requested",
+            "proposalDiscarded": false,
+            "proposal": {
+              "operation": "set",
+              "requestQuote": "去把你刚才关掉的那盏灯重新打开",
+              "targetDescription": "你刚才关掉的那盏灯",
+              "desiredState": "on"
+            }
+          },
+          "objectContext": {
+            "runtimeDeviceControl": {
+              "implementationConnected": true,
+              "featureEnabled": true,
+              "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+              "physicalHandRequired": false,
+              "requiresCurrentTargetConfirmation": true,
+              "requiresIndependentUserAuthorization": true
+            }
+          },
+          "roomDecision": {
+            "intent": "set-object-state",
+            "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+          },
+          "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+          "resultReportRequirement": {
+            "required": true,
+            "expectedReport": "on",
+            "failureReason": "same-target-fresh-device-readback-matches-request",
+            "searchAttempted": true,
+            "operationAttempted": true,
+            "operationDistance": null,
+            "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+            "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+          },
+          "historicalResult": true,
+          "recordedGeneration": 11,
+          "recordedAtUtc": "2026-10-13T12:24:36.3823725Z"
+        },
+        "recentDialogue": [
+          {
+            "role": "user",
+            "content": "现在能看到什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+          },
+          {
+            "role": "assistant",
+            "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+          },
+          {
+            "role": "user",
+            "content": "来我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "テレビ台のランプは正常に消灯しました。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "好，接下来跟着我走。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたについて移動しているわ。"
+          },
+          {
+            "role": "user",
+            "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          }
+        ],
+        "publicSpeech": "確認しました。私が先ほど消したデスクランプは、正常に点灯していますよ。"
+      },
+      "allowed": true
+    },
+    {
+      "name": "actual-gen11-earlier-closing",
+      "input": {
+        "configuredDialogueLanguage": "Japanese",
+        "publicSpeechLanguage": "ja",
+        "intendedAction": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "declaredMotion": "none",
+        "currentRequestSemantics": {
+          "requestKind": "answer-only",
+          "responseDemand": "short-conversation"
+        },
+        "requestedUserText": "请根据实际发生过的事情回答。",
+        "historicalDeviceEvents": [
+          {
+            "goal": {
+              "goalId": "device-goal-a2405afca0634e96b4ac63695a9f74a9",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "latestUserText": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "targetDescription": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "desiredState": "off",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "off",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+                "observedUtc": "2026-10-13T12:23:07.0763853Z",
+                "readAtUtc": "2026-10-13T12:23:07.1713000Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": false,
+                  "lightEnabled": false,
+                  "emissionEnabled": false,
+                  "lightState": "disabled",
+                  "emissionState": "off",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-b6be5a47479645f5b32724f34f2b8771",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "off",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-86e782b6fa4d42a4b9eb34da05e50e02",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-385bfbeef4664e65bad2d6b086ee0029",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:23:07.1768625Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确请求关闭电视柜上的小灯，属肯定操作。目标有明确位置描述，为described。提案目标、状态与用户原话一致，故匹配。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把它关掉",
+                "targetDescription": "电视柜上的小灯",
+                "desiredState": "off"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "off",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 7,
+            "recordedAtUtc": "2026-10-13T12:23:07.1894344Z"
+          },
+          {
+            "goal": {
+              "goalId": "device-goal-5da16b3f8f7e4be791f6bf1c29980b29",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "latestUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "targetDescription": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "desiredState": "on",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "on",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+                "observedUtc": "2026-10-13T12:24:36.2802587Z",
+                "readAtUtc": "2026-10-13T12:24:36.3703123Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": true,
+                  "lightEnabled": true,
+                  "emissionEnabled": true,
+                  "lightState": "enabled",
+                  "emissionState": "on",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-755a81215eba46b09682371c3fe5726e",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "on",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:24:36.3713113Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把你刚才关掉的那盏灯重新打开",
+                "targetDescription": "你刚才关掉的那盏灯",
+                "desiredState": "on"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "on",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 11,
+            "recordedAtUtc": "2026-10-13T12:24:36.3823725Z"
+          }
+        ],
+        "sceneActionFacts": null,
+        "recentDialogue": [
+          {
+            "role": "user",
+            "content": "现在能看到什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+          },
+          {
+            "role": "assistant",
+            "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+          },
+          {
+            "role": "user",
+            "content": "来我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "テレビ台のランプは正常に消灯しました。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "好，接下来跟着我走。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたについて移動しているわ。"
+          },
+          {
+            "role": "user",
+            "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          }
+        ],
+        "publicSpeech": "さっき私がテレビ台のランプを消しました。"
+      },
+      "allowed": true
+    },
+    {
+      "name": "actual-gen11-latest-opposite-operation",
+      "input": {
+        "configuredDialogueLanguage": "Japanese",
+        "publicSpeechLanguage": "ja",
+        "intendedAction": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "declaredMotion": "none",
+        "currentRequestSemantics": {
+          "requestKind": "answer-only",
+          "responseDemand": "short-conversation"
+        },
+        "requestedUserText": "请根据实际发生过的事情回答。",
+        "historicalDeviceEvents": [
+          {
+            "goal": {
+              "goalId": "device-goal-a2405afca0634e96b4ac63695a9f74a9",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "latestUserText": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "targetDescription": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。",
+              "desiredState": "off",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "off",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+                "observedUtc": "2026-10-13T12:23:07.0763853Z",
+                "readAtUtc": "2026-10-13T12:23:07.1713000Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": false,
+                  "lightEnabled": false,
+                  "emissionEnabled": false,
+                  "lightState": "disabled",
+                  "emissionState": "off",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-b6be5a47479645f5b32724f34f2b8771",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:7:6",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "off",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-86e782b6fa4d42a4b9eb34da05e50e02",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-385bfbeef4664e65bad2d6b086ee0029",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-e736103eb4a547b1805909b00bbedf8d-1a09a3e4ed824e138ab55442e0e70602",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:23:07.1768625Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确请求关闭电视柜上的小灯，属肯定操作。目标有明确位置描述，为described。提案目标、状态与用户原话一致，故匹配。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把它关掉",
+                "targetDescription": "电视柜上的小灯",
+                "desiredState": "off"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "off",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 7,
+            "recordedAtUtc": "2026-10-13T12:23:07.1894344Z"
+          },
+          {
+            "goal": {
+              "goalId": "device-goal-5da16b3f8f7e4be791f6bf1c29980b29",
+              "status": "satisfied",
+              "ownerCurrent": true,
+              "executionSuspended": false,
+              "reason": "same-target-fresh-device-readback-matches-request",
+              "originalRequest": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "latestUserText": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "targetDescription": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。",
+              "desiredState": "on",
+              "boundEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "completionEvidenceValid": true,
+              "targetKnowledge": {
+                "identityKnown": true,
+                "historicalPositionKnown": true,
+                "currentVisibility": "not-established"
+              },
+              "operationSummary": {
+                "operationAttempted": true,
+                "stateWriteObserved": true,
+                "lastOperationPhase": "performed",
+                "scope": "Only this owned execution attempt. false operationAttempted means the device operation was never dispatched, not merely that success is uncertain. Null is unknown. Search/approach/readiness are not operations; a performed write can still lack valid final proof. No claim about earlier attempts or current unseen state."
+              },
+              "completionEvidence": {
+                "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+                "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                "desiredState": "on",
+                "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+                "observedUtc": "2026-10-13T12:24:36.2802587Z",
+                "readAtUtc": "2026-10-13T12:24:36.3703123Z",
+                "actual": {
+                  "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+                  "sceneLabel": "桌面装饰灯",
+                  "registered": true,
+                  "on": true,
+                  "lightEnabled": true,
+                  "emissionEnabled": true,
+                  "lightState": "enabled",
+                  "emissionState": "on",
+                  "conflict": "",
+                  "bakedLightingResidualUncontrolled": true
+                }
+              },
+              "searchSummary": {
+                "searchAttempted": true,
+                "completedStepCount": 3,
+                "completedStepCountScope": "Goal action-ledger receipts only, not total search movements. latestSearchMotionSteps separately counts the current search's physical steps; page decisions are not movements.",
+                "observedViewCount": 6,
+                "failedCandidateCount": 0,
+                "latestSearchTaskId": "scene-search-755a81215eba46b09682371c3fe5726e",
+                "latestSearchStatus": "found",
+                "latestSearchReason": "search-current-target-confirmed",
+                "latestSearchDecisions": 2,
+                "latestSearchMotionSteps": 1,
+                "latestSearchFailureReason": null,
+                "allVisitedCandidatePagesReviewed": false
+              }
+            },
+            "taskSequence": null,
+            "lastAction": {
+              "actionId": "146dd87634bb4a7598f3f09dd0e42fc7:11:14",
+              "intent": "set-object-state",
+              "entityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedEntityId": "scene-object-7b45e5290cb04962b71a00cf6526239e",
+              "requestedState": "on",
+              "phase": "performed",
+              "reason": "runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press",
+              "captureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-e289eb86064b4cf486829599c2fa6870",
+              "confirmedCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-56164285a4bb4e6c9e80f33b8acf52a7",
+              "resultCaptureId": "3eded2dec6614e90a64684447622bba6-3206421e37234230bd030c79f16b7609-eeb8addee3b14dd7bd22ebcdb07e817a",
+              "objectConfirmed": true,
+              "semanticTargetConfirmed": true,
+              "groundArrived": false,
+              "objectReobserved": false,
+              "stateChanged": true,
+              "active": false,
+              "reached": false,
+              "observedUtc": "2026-10-13T12:24:36.3713113Z"
+            },
+            "latestGoalReview": {
+              "verdict": "approved",
+              "reason": "用户明确要求打开刚才关掉的灯，proposal忠实于s1步骤的引用与状态。历史已核验同一实体，选择operated-goal来源约束身份。",
+              "validationFailure": null,
+              "registered": true,
+              "pendingRetained": false,
+              "requestAssessment": "requested",
+              "proposalDiscarded": false,
+              "proposal": {
+                "operation": "set",
+                "requestQuote": "去把你刚才关掉的那盏灯重新打开",
+                "targetDescription": "你刚才关掉的那盏灯",
+                "desiredState": "on"
+              }
+            },
+            "objectContext": {
+              "runtimeDeviceControl": {
+                "implementationConnected": true,
+                "featureEnabled": true,
+                "supportedOperation": "set-object-state:on|off for an explicitly registered lamp",
+                "physicalHandRequired": false,
+                "requiresCurrentTargetConfirmation": true,
+                "requiresIndependentUserAuthorization": true
+              }
+            },
+            "roomDecision": {
+              "intent": "set-object-state",
+              "dispatch": "performed: runtime lamp emission and Light component state read back; same entity captured in a new image, without a visual brightness judgment; baked illumination may remain; no physical hand press"
+            },
+            "scope": "Immutable result of this user's earlier step. operationSummary and lastAction describe what actually happened then, not current visibility/state or permission to repeat it. Null is unknown, never false. Current movement receipts are separate.",
+            "resultReportRequirement": {
+              "required": true,
+              "expectedReport": "on",
+              "failureReason": "same-target-fresh-device-readback-matches-request",
+              "searchAttempted": true,
+              "operationAttempted": true,
+              "operationDistance": null,
+              "outcomeScope": "State the verified current on/off result for the bound device. Use the actual requested target or a neutral object reference, never substitute a lamp or another object category. If no operation was dispatched, the verified state was already correct; distinguish that readback from changing it. Do not replace the result with finding, readiness or a promise; do not add speculative visual changes, room-wide effects or a physical button press.",
+              "scope": "Engine-derived terminal reporting obligation. Explicitly state the verified current on/off state, or the unfinished outcome and its observed cause. If searchAttempted=false, searching has not started; never claim searched/not-found. Empty sources or an unregistered goal do not mean the user refused authorization. Cancellation must reflect actual applied engine state. No generic acknowledgement, future promise or silence. This is not new action authority."
+            },
+            "historicalResult": true,
+            "recordedGeneration": 11,
+            "recordedAtUtc": "2026-10-13T12:24:36.3823725Z"
+          }
+        ],
+        "sceneActionFacts": null,
+        "recentDialogue": [
+          {
+            "role": "user",
+            "content": "现在能看到什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+          },
+          {
+            "role": "assistant",
+            "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+          },
+          {
+            "role": "user",
+            "content": "来我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "テレビ台のランプは正常に消灯しました。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "好，接下来跟着我走。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたについて移動しているわ。"
+          },
+          {
+            "role": "user",
+            "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          }
+        ],
+        "publicSpeech": "最後に私がテレビ台のランプを消しました。"
+      },
+      "allowed": false
+    },
+    {
+      "name": "save-correct-actor",
+      "input": {
+        "requestedUserText": "Tell me what happened.",
+        "intendedAction": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "declaredMotion": "none",
+        "configuredDialogueLanguage": "English",
+        "currentRequestSemantics": {
+          "requestKind": "answer-only",
+          "responseDemand": "short-conversation"
+        },
+        "eventContext": {
+          "engineEvents": [
+            {
+              "actionId": "save-report-1",
+              "intent": "save",
+              "entityId": "report",
+              "entityName": "report",
+              "entityKind": "text-document",
+              "targetDescription": "the project report document",
+              "phase": "completed",
+              "observedUtc": "2026-10-13T12:24:30Z"
+            }
+          ]
+        },
+        "recentDialogue": [
+          {
+            "role": "user",
+            "content": "现在能看到什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+          },
+          {
+            "role": "assistant",
+            "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+          },
+          {
+            "role": "user",
+            "content": "来我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "テレビ台のランプは正常に消灯しました。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "好，接下来跟着我走。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたについて移動しているわ。"
+          },
+          {
+            "role": "user",
+            "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          }
+        ],
+        "publicSpeech": "I saved the report.",
+        "publicSpeechLanguage": "en"
+      },
+      "allowed": true
+    },
+    {
+      "name": "save-wrong-actor",
+      "input": {
+        "requestedUserText": "Tell me what happened.",
+        "intendedAction": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "declaredMotion": "none",
+        "configuredDialogueLanguage": "English",
+        "currentRequestSemantics": {
+          "requestKind": "answer-only",
+          "responseDemand": "short-conversation"
+        },
+        "eventContext": {
+          "engineEvents": [
+            {
+              "actionId": "save-report-1",
+              "intent": "save",
+              "entityId": "report",
+              "entityName": "report",
+              "entityKind": "text-document",
+              "targetDescription": "the project report document",
+              "phase": "completed",
+              "observedUtc": "2026-10-13T12:24:30Z"
+            }
+          ]
+        },
+        "recentDialogue": [
+          {
+            "role": "user",
+            "content": "现在能看到什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+          },
+          {
+            "role": "assistant",
+            "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+          },
+          {
+            "role": "user",
+            "content": "来我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "テレビ台のランプは正常に消灯しました。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "好，接下来跟着我走。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたについて移動しているわ。"
+          },
+          {
+            "role": "user",
+            "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          }
+        ],
+        "publicSpeech": "You saved the report.",
+        "publicSpeechLanguage": "en"
+      },
+      "allowed": false
+    },
+    {
+      "name": "save-is-not-delete",
+      "input": {
+        "requestedUserText": "Tell me what happened.",
+        "intendedAction": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "declaredMotion": "none",
+        "configuredDialogueLanguage": "English",
+        "currentRequestSemantics": {
+          "requestKind": "answer-only",
+          "responseDemand": "short-conversation"
+        },
+        "eventContext": {
+          "engineEvents": [
+            {
+              "actionId": "save-report-1",
+              "intent": "save",
+              "entityId": "report",
+              "entityName": "report",
+              "entityKind": "text-document",
+              "targetDescription": "the project report document",
+              "phase": "completed",
+              "observedUtc": "2026-10-13T12:24:30Z"
+            }
+          ]
+        },
+        "recentDialogue": [
+          {
+            "role": "user",
+            "content": "现在能看到什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+          },
+          {
+            "role": "assistant",
+            "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+          },
+          {
+            "role": "user",
+            "content": "来我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "テレビ台のランプは正常に消灯しました。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "好，接下来跟着我走。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたについて移動しているわ。"
+          },
+          {
+            "role": "user",
+            "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          }
+        ],
+        "publicSpeech": "I deleted the report.",
+        "publicSpeechLanguage": "en"
+      },
+      "allowed": false
+    },
+    {
+      "name": "save-wrong-target",
+      "input": {
+        "requestedUserText": "Tell me what happened.",
+        "intendedAction": "none",
+        "dispatch": "read-only-evidence",
+        "actionId": "",
+        "declaredMotion": "none",
+        "configuredDialogueLanguage": "English",
+        "currentRequestSemantics": {
+          "requestKind": "answer-only",
+          "responseDemand": "short-conversation"
+        },
+        "eventContext": {
+          "engineEvents": [
+            {
+              "actionId": "save-report-1",
+              "intent": "save",
+              "entityId": "report",
+              "entityName": "report",
+              "entityKind": "text-document",
+              "targetDescription": "the project report document",
+              "phase": "completed",
+              "observedUtc": "2026-10-13T12:24:30Z"
+            }
+          ]
+        },
+        "recentDialogue": [
+          {
+            "role": "user",
+            "content": "现在能看到什么？"
+          },
+          {
+            "role": "assistant",
+            "content": "正面にはユウのデスクトップが映るテレビと、その左にある棚が見えますね。"
+          },
+          {
+            "role": "assistant",
+            "content": "少し静かな時間、一緒に過ごしませんか？ふふっ。"
+          },
+          {
+            "role": "user",
+            "content": "来我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "你刚才有在电视柜上看到一盏小灯吗？去把它关掉，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "テレビ台のランプは正常に消灯しました。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          },
+          {
+            "role": "user",
+            "content": "好，接下来跟着我走。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたについて移動しているわ。"
+          },
+          {
+            "role": "user",
+            "content": "OK现在去把你刚才关掉的那盏灯重新打开，然后回到我身边。"
+          },
+          {
+            "role": "assistant",
+            "content": "確認しました。先ほどお消しになったデスクランプは、正常に点灯していますよ。"
+          },
+          {
+            "role": "assistant",
+            "content": "あなたのそばに着いたわ。"
+          }
+        ],
+        "publicSpeech": "I saved the recording.",
+        "publicSpeechLanguage": "en"
+      },
+      "allowed": false
+    }
+  ]
+}

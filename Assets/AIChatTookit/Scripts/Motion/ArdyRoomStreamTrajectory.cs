@@ -17,10 +17,22 @@ namespace NeEEvA.Motion
             public string LastPlanningMode { get; internal set; }
             public float LastHardInitialSpeed { get; internal set; }
             public float LastNominalInitialSpeed { get; internal set; }
+            public string LastWarmExitReason { get; internal set; }
+            public float LastTrackingError { get; internal set; }
+            public float LastRemainingDistance { get; internal set; }
             public bool HasPlan => path != null && path.Count > 0;
             public void Clear() { path = null; resumeDistance = 0; CommittedSpeed = 0; LastPlanningMode = null;
-                LastHardInitialSpeed = LastNominalInitialSpeed = 0; }
+                LastHardInitialSpeed = LastNominalInitialSpeed = LastTrackingError = LastRemainingDistance = 0; LastWarmExitReason = null; }
         }
+
+        public sealed class KinematicsException : InvalidOperationException
+        {
+            public readonly string Code;
+            public KinematicsException(string code, string message) : base(message) { Code = code; }
+        }
+
+        private static List<Knot> NoWarmPath(PathState state, string reason)
+        { if (state != null) state.LastWarmExitReason = reason; return null; }
 
         public static ArdyLocomotionTarget[] Build(ArdyRoomRoute route, Vector3 sourcePosition,
             float sourceHeading, float worldSpeed, float desiredSpeed, Quaternion anchorRotation,
@@ -55,6 +67,11 @@ namespace NeEEvA.Motion
             desiredSpeed = Mathf.Clamp(desiredSpeed, 0, limit);
             terminalSpeed = Mathf.Clamp(terminalSpeed, 0, desiredSpeed);
             int geometryBudget = 96;
+            if (continuity != null) {
+                continuity.LastHardInitialSpeed = continuity.LastNominalInitialSpeed = 0;
+                continuity.LastTrackingError = continuity.LastRemainingDistance = 0;
+                continuity.LastWarmExitReason = "not-evaluated";
+            }
             // A NavMesh projection can introduce a very short first waypoint. Remove it only
             // when the same root guard certifies the replacement segment; never silently snap.
             if (corners.Count > 2 && Vector3.Distance(corners[0], corners[1]) < .08f &&
@@ -99,8 +116,10 @@ namespace NeEEvA.Motion
         private static List<Knot> WarmPath(PathState state, List<Vector3> corners, float initialHeading, float initialSpeed,
             Quaternion anchorRotation, Func<Vector3, Vector3, bool> validator, ref int budget)
         {
-            if (state == null || !state.HasPlan || state.path.Count < 2 || initialSpeed <= .000001f || validator == null ||
-                Quaternion.Angle(state.anchorRotation, anchorRotation) > .001f) return null;
+            if (state == null || !state.HasPlan || state.path.Count < 2) return NoWarmPath(state, "no-continuation");
+            if (initialSpeed <= .000001f) return NoWarmPath(state, "stationary-seam");
+            if (validator == null) return NoWarmPath(state, "guard-unavailable");
+            if (Quaternion.Angle(state.anchorRotation, anchorRotation) > .001f) return NoWarmPath(state, "anchor-changed");
             var old = state.path;
             // Continue from the committed control time, not the nearest point to the
             // model's root. Projecting a centimetre of forward tracking error onto the
@@ -108,9 +127,11 @@ namespace NeEEvA.Motion
             Vector3 root = corners[0];
             float near = Mathf.Clamp(state.resumeDistance, 0, old[old.Count - 1].distance);
             AtDistance(old, near, out Vector3 originalRoot, out float originalHeading);
-            if (Vector3.Distance(root, originalRoot) > .08f) return null;
+            state.LastTrackingError = Vector3.Distance(root, originalRoot);
+            if (state.LastTrackingError > .08f) return NoWarmPath(state, "tracking-error");
             float remaining = old[old.Count - 1].distance - near;
-            if (remaining < .04f) return null;
+            state.LastRemainingDistance = remaining;
+            if (remaining < .04f) return NoWarmPath(state, "continuation-too-short");
             float keepLength = Mathf.Min(remaining, Mathf.Max(.4f, initialSpeed * .7f));
             float keepDistance = near + keepLength;
             int endIndex = old.Count - 1;
@@ -139,13 +160,14 @@ namespace NeEEvA.Motion
             {
                 if (old[i].distance <= near + .00001f) continue;
                 Vector3 point = root + correction * (old[i].point - originalRoot);
-                if (!Checked(path[path.Count - 1].point, point, validator, ref budget)) return null;
+                if (!Checked(path[path.Count - 1].point, point, validator, ref budget))
+                    return NoWarmPath(state, budget <= 0 ? "continuation-query-budget" : "continuation-guard-rejected");
                 path.Add(new Knot { point = point, heading = old[i].heading + headingCorrection, stop = old[i].stop });
             }
-            if (path.Count < 2) return null;
+            if (path.Count < 2) return NoWarmPath(state, "continuation-empty");
             Vector3 join = path[path.Count - 1].point;
             Vector3 goal = corners[corners.Count - 1];
-            if (Vector3.Distance(join, goal) < .001f) return path;
+            if (Vector3.Distance(join, goal) < .001f) { state.LastWarmExitReason = "continued-to-goal"; return path; }
 
             // Goals may move every update. Keep the current safe bend and attach the newly
             // planned route beyond it. The connector itself must be accepted by the same guard.
@@ -163,7 +185,7 @@ namespace NeEEvA.Motion
                 if (Vector3.Distance(join, corners[i]) < .005f) continue;
                 if (Checked(join, corners[i], validator, ref budget)) { selected = i; break; }
             }
-            if (selected < 0) return null;
+            if (selected < 0) return NoWarmPath(state, budget <= 0 ? "connector-query-budget" : "connector-guard-rejected");
             var tailCorners = new List<Vector3> { join };
             for (int i = selected; i < corners.Count; i++) tailCorners.Add(corners[i]);
             List<Knot> tail;
@@ -180,6 +202,7 @@ namespace NeEEvA.Motion
             }
             path[path.Count - 1].stop |= tail[0].stop;
             for (int i = 1; i < tail.Count; i++) path.Add(tail[i]);
+            state.LastWarmExitReason = "continued-with-connector";
             return path;
         }
 
@@ -372,7 +395,7 @@ namespace NeEEvA.Motion
             // feasible. Only the independently computed hard envelope may reject it.
             if (diagnostics != null) { diagnostics.LastHardInitialSpeed = hard[0]; diagnostics.LastNominalInitialSpeed = nominal[0]; }
             if (initialSpeed > hard[0] + .0001f)
-                throw new InvalidOperationException($"route-control-braking-distance: current speed {initialSpeed:F3} m/s exceeds safe initial speed {hard[0]:F3} m/s for this turning/stopping corridor ({diagnostics?.LastPlanningMode ?? "new-path"}, nominal {nominal[0]:F3}).");
+                throw new KinematicsException("braking-distance", $"route-control-braking-distance: current speed {initialSpeed:F3} m/s exceeds safe initial speed {hard[0]:F3} m/s for this turning/stopping corridor ({diagnostics?.LastPlanningMode ?? "new-path"}, nominal {nominal[0]:F3}).");
             path[0].speed = initialSpeed;
             for (int i = 1; i < path.Count; i++)
             {

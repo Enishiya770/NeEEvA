@@ -9,6 +9,26 @@ public partial class ChatSample
     private AudioClip m_LatencyFillerClip;
     private AudioSource m_FirstAudioProgressSource;
     private AudioClip m_FirstAudioProgressClip;
+    private AudioClip m_LatencyProgressClip;
+    private int m_LatencyProgressSamples;
+    private double m_LatencyProgressDsp;
+    private bool m_LatencyProgressComplete;
+
+    private void ObserveLatencyFillerProgress()
+    {
+        if(m_LatencyFillerClip==null)return;
+        if(m_LatencyProgressClip!=m_LatencyFillerClip) {
+            m_LatencyProgressClip=m_LatencyFillerClip;m_LatencyProgressSamples=0;m_LatencyProgressComplete=false;
+        }
+        if(m_AudioSource==null||m_AudioSource.clip!=m_LatencyProgressClip)return;
+        if(m_AudioSource.isPlaying) {
+            m_LatencyProgressSamples=Math.Max(m_LatencyProgressSamples,m_AudioSource.timeSamples);
+            m_LatencyProgressDsp=AudioSettings.dspTime;
+        } else if(m_LatencyProgressSamples>0 &&
+            (m_LatencyProgressClip.samples-m_LatencyProgressSamples)/(double)Math.Max(1,m_LatencyProgressClip.frequency)<=
+                Math.Min(.10,Math.Max(0,AudioSettings.dspTime-m_LatencyProgressDsp))+.05)
+            m_LatencyProgressComplete=true;
+    }
 
     private static bool SourceHasSampleProgress(AudioSource source)
         => source != null && source.clip != null && source.isPlaying && source.timeSamples > 0;
@@ -18,6 +38,7 @@ public partial class ChatSample
 
     private void ObserveVoiceOutputFirstAudio(bool playing, bool began)
     {
+        ObserveLatencyFillerProgress();
         if (began)
         {
             m_FirstAudioProgressSource = m_AudioSource != null && m_AudioSource.isPlaying && m_AudioSource.clip != null

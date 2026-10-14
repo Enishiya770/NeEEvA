@@ -283,6 +283,13 @@ public static class NevaSceneVisionIntegrationRegression
         int operation = bridge.Controller.OperationRevision;
         Vector3 root = avatar.transform.position;
 
+        if (!string.IsNullOrEmpty(Argument("-qualitySpeechInput", "")))
+        {
+            yield return QualitySpeechLiveRegression.Run(Argument("-qualitySpeechInput", ""), Output);
+            report["qualitySpeechLive"] = QualitySpeechLiveRegression.LastReport;
+            Check((bool)QualitySpeechLiveRegression.LastReport["passed"], "Native quality speech semantic cases failed; see retained report.");
+            Finish(null); yield break;
+        }
         if (RoomSpeechViewRegressionEnabled)
         {
             report["focus"] = "room-speech-view-preparation";
@@ -291,6 +298,15 @@ public static class NevaSceneVisionIntegrationRegression
             Finish(null); yield break;
         }
 
+        if (Argument("-privateReviewRegression", "0") == "1")
+        {
+            Set(chat,"m_EnableSceneObjectAwareness",true);
+            yield return RoomSpeechFactScopeRegression.RunPrivatePreflightChecks(chat,bridge,model,Output);
+            report["privatePreflightChecks"]=RoomSpeechFactScopeRegression.LastDecisionFailureReport;
+            yield return SceneReviewQueueRegression.RunChecks(chat,bridge,Output);
+            report["sceneReviewQueueChecks"]=SceneReviewQueueRegression.LastReport;
+            Finish(null);yield break;
+        }
         if (RoomDecisionFailureRegressionEnabled || RoomCognitionRegressionEnabled)
         {
             Set(chat, "m_EnableSceneObjectAwareness", true);
@@ -298,6 +314,8 @@ public static class NevaSceneVisionIntegrationRegression
             report["focus"] = RoomCognitionRegressionEnabled ? "room-cognition-and-decision-failure" : "room-decision-failure-only";
             yield return RoomSpeechFactScopeRegression.RunDecisionFailureChecks(chat, bridge, model, Output);
             report["roomDecisionFailureEvidence"] = RoomSpeechFactScopeRegression.LastDecisionFailureReport;
+            yield return SceneReviewQueueRegression.RunChecks(chat, bridge, Output);
+            report["sceneReviewQueueChecks"] = SceneReviewQueueRegression.LastReport;
             Check((string)RoomSpeechFactScopeRegression.LastDecisionFailureReport["status"] == "passed",
                 "Room decision failures lost their current reply/ownership boundary.");
             if (RoomCognitionRegressionEnabled)

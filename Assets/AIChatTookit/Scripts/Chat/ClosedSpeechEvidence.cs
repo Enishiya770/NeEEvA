@@ -79,6 +79,25 @@ public sealed class ClosedSpeechEvidenceTracker
         return true;
     }
 
+    // A disagreement may withhold interpretation, but can NEVER authorize the
+    // partial text. This deliberately has different limits from empty-ASR recovery.
+    public bool TryComparison(int captureSerial, float now, int submittedAudioMs,
+        bool closed, bool quietTailCovered, bool pendingText, bool ordinarySpeech,
+        out ClosedSpeechEvidence evidence)
+    {
+        evidence = null;
+        if (capture <= 0 || captureSerial != capture || !closed || !quietTailCovered ||
+            pendingText || !ordinarySpeech || !voiced || key.Length == 0 || text.Length > 2048 ||
+            submittedAudioMs < audioMs || submittedAudioMs - audioMs > 1500 || audioMs < 160 ||
+            !Finite(now) || now < observedAt || now - observedAt > 4f ||
+            stableSince < 0 || now - stableSince < .35f) return false;
+        evidence = new ClosedSpeechEvidence { CaptureSessionSerial = capture, Revision = revision,
+            AudioMs = audioMs, SubmittedAudioMs = submittedAudioMs, CapturedAt = capturedAt,
+            ObservedAt = observedAt, ClosedAt = now, StableForSeconds = now - stableSince,
+            Text = text, NormalizedText = key, Source = "closed-stream-comparison" };
+        return true;
+    }
+
     public static bool MayRecover(ClosedSpeechEvidence evidence, int currentCapture, int requestCapture,
         bool terminal, string rejectionReason, string rawFinalText, float now,
         string rejectedText = "", bool rawVadHasSpeech = false, int rawVadSpeechMs = 0)
