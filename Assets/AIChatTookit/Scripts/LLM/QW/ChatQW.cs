@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -2011,6 +2013,16 @@ public partial class ChatQW : LLM
     {
         var selected = new List<SendData>();
         string reviewSchema = WorkNextIntentProtocol.ExtendReviewSchema(k_WorkReviewSchema);
+        var deliveryPacket = ReadReplyFactBlocks(CommittedSpatialReplyProtocol.ProducerContextMarker + "\n" + prompt, true)
+            .FirstOrDefault(b => b.marker == "[Task progress runtime]")?.value?["delivery"] as JObject;
+        if (deliveryPacket?["results"] is JArray deliveryResults)
+        {
+            var boundSchema = JObject.Parse(reviewSchema);
+            var ids = deliveryResults.OfType<JObject>().Select(r => (string)r["id"]).Where(id => !string.IsNullOrEmpty(id)).Distinct().ToArray();
+            if (ids.Length > 0) boundSchema["properties"]["delivery_reports"]["items"]["properties"]["id"]["enum"] = new JArray(ids);
+            else boundSchema["properties"]["delivery_reports"]["maxItems"] = 0;
+            reviewSchema = boundSchema.ToString(Formatting.None);
+        }
         bool taskPacket = (prompt ?? "").StartsWith("[内部事项进度判定；不生成角色台词，不调用工具]\n", StringComparison.Ordinal);
         bool generalWork = (prompt ?? "").StartsWith("[内部事项进度判定；不生成角色台词，不调用工具]\n[Runtime work review domain: general]\n", StringComparison.Ordinal);
         // The production packet already owns the task, request/corrections, actual
@@ -2110,7 +2122,7 @@ public partial class ChatQW : LLM
         if (!WorkNextIntentProtocol.ValidExtension(value)) return false;
         value = (Newtonsoft.Json.Linq.JObject)value.DeepClone();
         // Legacy providers remain readable; missing source never grants a new autonomous handoff.
-        foreach (string name in new[] { "next_intent_source", "next_step_id", "planning_focus" }) value.Remove(name);
+        foreach (string name in new[] { "next_intent_source", "next_step_id", "planning_focus", "delivery_reports", "remaining_request_quote" }) value.Remove(name);
         var schema = Newtonsoft.Json.Linq.JObject.Parse(k_WorkReviewSchema);
         var properties = (Newtonsoft.Json.Linq.JObject)schema["properties"];
         if (value.Count != properties.Count) return false;

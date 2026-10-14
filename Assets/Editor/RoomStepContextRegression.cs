@@ -27,6 +27,7 @@ public static partial class RoomStepContextRegression
                 assets.Add(new TextAsset(File.ReadAllText("Assets/AIChatTookit/Prompts/" + name + ".txt")) { name = name });
             typeof(LLM).GetField("m_PromptFiles", Flags).SetValue(model, assets.ToArray());
             var fixtures = JArray.Parse(File.ReadAllText("Assets/Editor/Fixtures/RoomStepContext.latest-20261012.json"));
+            foreach (var latest in JArray.Parse(File.ReadAllText("Assets/Editor/Fixtures/RoomStepContext.latest-1238-20261014.json"))) fixtures.Add(latest);
             foreach (JObject fixture in fixtures)
             {
                 string name = (string)fixture["name"];
@@ -74,9 +75,24 @@ public static partial class RoomStepContextRegression
                 object[] find = { bounded, null, null };
                 Require((bool)Call(null, "TryFindRoomTaskInput", find), "Actual wire contains the complete fact packet.");
                 var sentInput = (JObject)find[2];
+                Call(null, "RestoreRoomDecisionSharedEvidence", sentInput);
                 Require((string)sentInput["currentUserText"] == utterance && (string)sentInput.SelectToken("taskSequence.steps[0].status") == "completed" &&
                     (string)sentInput.SelectToken("taskSequence.steps[1].status") == "pending" && sentInput["stepAttention"] is JObject,
                     "Return packet retains whole request, actual completion and pending dependency.");
+                Require((string)sentInput.SelectToken("planningEvidenceScope.phase") == "approved-continuation" &&
+                    (int?)((JObject)Call(null,"BuildRoomTaskRequestDiagnostic",(string)budgetArgs[2]))["imageCount"] == 0,
+                    "Approved return uses its compact continuation contract and no irrelevant current/history image.");
+                File.WriteAllText(Path.Combine(directory, name + "-protected-fields.json"), new JObject {
+                    ["expectedSequence"] = sequence.DeepClone(), ["sentSequence"] = sentInput["taskSequence"]?.DeepClone(),
+                    ["expectedDialogue"] = input["recentDialogue"]?.DeepClone(), ["sentDialogue"] = sentInput["recentDialogue"]?.DeepClone(),
+                    ["expectedContinuation"] = input["workContinuation"]?.DeepClone(), ["sentContinuation"] = sentInput["workContinuation"]?.DeepClone()
+                }.ToString(Formatting.Indented));
+                // Production parses timestamps literally; the fixture loader may
+                // parse them as Date tokens. Compare the actual JSON representation.
+                bool SameWire(JToken a, JToken b) => JToken.DeepEquals(JToken.Parse(a.ToString(Formatting.None)), JToken.Parse(b.ToString(Formatting.None)));
+                Require(SameWire(sentInput["taskSequence"], sequence) && SameWire(sentInput["recentDialogue"], input["recentDialogue"]) &&
+                    SameWire(sentInput["workContinuation"], input["workContinuation"]),
+                    "Whole sequence, actual history and independent obligations survive final serialization.");
                 Require(bounded["response_format"]["schema"].ToString().Contains("approach") && !bounded["response_format"]["schema"].ToString().Contains("set-object-state"), "Native grammar cannot select another object operation during this user return.");
                 Require((int?)budget.SelectToken("final.textUnitBudget") == 49152 && (int?)budget.SelectToken("final.totalUnitBudget") == 61440, "Admission ceilings are unchanged.");
                 File.WriteAllText(Path.Combine(directory, name + "-request.json"), bounded.ToString(Formatting.Indented));
@@ -107,6 +123,7 @@ public static partial class RoomStepContextRegression
             File.WriteAllText(Path.Combine(directory, "continuation-model-cases.json"), modelCases.ToString(Formatting.Indented));
             checks += CheckInitialTaskAndTerminalRepair(model, directory);
             checks += CheckAutonomousAttention(model, directory);
+            checks += CheckGenericContinuationFocus(model, directory);
         }
         finally { UnityEngine.Object.DestroyImmediate(host); foreach (var asset in assets) UnityEngine.Object.DestroyImmediate(asset); }
         return checks;

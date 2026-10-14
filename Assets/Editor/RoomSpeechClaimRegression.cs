@@ -227,6 +227,7 @@ public static partial class RoomSpeechClaimRegression
             yield return Until(() => done, "invalid conversation state rejected");
             Check(!ok && server.Count == 10, "Repeated invalid conversation output exhausts exactly one extraction repair, without factual follow-up.");
             yield return RecoveryAndReuseChecks(model, server, directory);
+            yield return PlaybackExtractionChecks(model, server, directory);
             yield return CheckEarlyConnectionRecovery(model);
             ExportModelCases(model, directory);
             LastReport = new JObject { ["passed"] = true, ["checks"] = checks, ["httpRequests"] = server.Count,

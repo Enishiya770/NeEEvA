@@ -189,6 +189,7 @@ public static partial class RoomSpeechFactScopeRegression
             ["scope"] = "Production planner callback to writer facts, speech review and localized fallback with controlled provider failures. No HTTP retry, model semantic-quality or audible TTS claim." };
         try
         {
+            CheckOngoingSpeechDependencies(chat, bridge);
             foreach (string status in new[] {
                 "room-task-http-invalid-request;attempts=1;recovery=not-eligible",
                 "room-task-http-context-limit;attempts=2;recovery=exhausted" })

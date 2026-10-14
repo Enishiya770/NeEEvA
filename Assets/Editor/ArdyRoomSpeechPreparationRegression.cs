@@ -38,6 +38,7 @@ public static class ArdyRoomSpeechPreparationRegression
                 Check(f.Model.Decisions == decisions && f.Model.SpeechRequests == 1 && f.Bridge.ActionId == stopped &&
                     f.CancelRevision == operation + 1 && (string)Get(chat, "m_RoomTaskActionId") == stopped,
                     "Accepted ASR user-turn handoff reuses prepared result in formal response without a second stop.");
+                Check(Get(chat, "m_RoomSpeechPreparation") == null, "Committed stop receipt is consumed without retaining a control-slot reservation.");
 
                 p = f.Begin("停一下。"); operation = f.CancelRevision;
                 f.Final("closed-stream-recovery", "停一下。", "停一下。");
@@ -111,6 +112,10 @@ public static class ArdyRoomSpeechPreparationRegression
                 p.Deliver("stop-moving"); Call(chat, "CheckRoomPreparationWait", waiting, (float)Get(waiting, "deadline") + 1f);
                 Check(f.Model.Decisions == decisions + 1 && f.CancelRevision == operation && f.Bridge.ReservesBody,
                     "Timed-out preparation never stops late or starts a second fallback.");
+                int deadlinePreparations = f.Model.Preparations.Count, deadlineCancellations = f.Model.Cancellations;
+                chat.AcceptClosedSpeechEvidence(f.LastEvidence);
+                Check(f.Model.Preparations.Count == deadlinePreparations && f.Model.Cancellations == deadlineCancellations,
+                    "A duplicate closed transcript cannot reacquire the slot after deadline fallback took ownership.");
 
                 p = f.Begin("停一下。"); operation = f.CancelRevision;
                 f.Final("full-preview", "停一下。", "停一下。"); f.Formal("停一下。");
@@ -167,6 +172,32 @@ public static class ArdyRoomSpeechPreparationRegression
                 Check(Get(chat, "m_RoomSpeechPreparation") == null && !(bool)Get(chat, "m_FormalResponseInFlight") &&
                     bridge.ActionId == disabledTask && f.Model.Decisions == decisions,
                     "Disable clears the pending formal wait; re-enable cannot execute late preparation.");
+
+                foreach (string request in new[] { "去把你刚才关掉的那盏灯重新打开，然后回到我身边。", "检查输入设备，然后跟着我走。", "整理文件后告诉我保存位置。" })
+                foreach (bool transportFailure in new[] { true, false })
+                foreach (bool eyesOpen in new[] { true, false })
+                {
+                    // The early body-only review cannot consume other formal tasks.
+                    Set(chat, "m_AgentRunning", true); Set(chat, "m_EnableScreenVision", true); Set(chat, "m_AgentEyesOpen", eyesOpen);
+                    p = f.Begin(request); operation = f.CancelRevision;
+                    f.Final("full-preview", request, request);
+                    if (transportFailure) p.Callback(false, "", "preparation-http-failure"); else p.Deliver("none");
+                    decisions = f.Model.Decisions; int cancellations = f.Model.Cancellations;
+                    f.Formal(request);
+                    Check(Get(chat, "m_RoomSpeechPreparation") == null && f.Model.Decisions == decisions + 1 &&
+                        f.Model.Cancellations == cancellations && (bool)Get(chat, "m_FormalResponseInFlight"),
+                        "Failed or non-stop preparation releases control before the real current task, without cancelling its new request: " + request);
+                    p.Deliver("stop-moving");
+                    Call(chat, "CancelClosedRoomPreparation", "later-lifecycle-check");
+                    int preparations = f.Model.Preparations.Count;
+                    chat.AcceptClosedSpeechEvidence(f.LastEvidence);
+                    Check(f.CancelRevision == operation && f.Bridge.ReservesBody && f.Model.Decisions == decisions + 1 &&
+                        f.Model.Cancellations == cancellations && f.Model.Preparations.Count == preparations,
+                        "Consumed transcript tombstone suppresses duplicates; late callback cannot stop or cancel the successor.");
+                    chat.NotifyUserStartedSpeaking(); chat.AcceptClosedSpeechEvidence(f.LastEvidence);
+                    Check(f.Model.Preparations.Count == preparations && f.CancelRevision == operation,
+                        "A newer input revision cannot revive the same already-consumed recording.");
+                }
             }
         }
         catch (Exception error) { failure = error.ToString(); throw; }
@@ -179,11 +210,12 @@ public static class ArdyRoomSpeechPreparationRegression
                 scope = "Connected room and actual ChatSample closed-evidence, final confirmation, formal reuse and controller cancellation; controlled LLM callbacks and staged in-memory task ownership. No microphone, Qwen semantics, ARDY motion generation or audible latency claim."
             }, Formatting.Indented) + "\n");
         }
-        return checks;
+        return checks + WorkResultDeliveryRegression.RunChecks(chat, bridge);
     }
 
     private sealed class Fixture : IDisposable
     {
+        public ClosedSpeechEvidence LastEvidence;
         public readonly ChatSample Chat;
         public readonly ArdyRoomDialogueBridge Bridge;
         public readonly ArdyRoomSpeechPreparationFakeLLM Model;
@@ -201,7 +233,8 @@ public static class ArdyRoomSpeechPreparationRegression
             tts = chat.gameObject.AddComponent<TTS>();
             foreach (string field in new[] { "m_ChatSettings", "m_ChatHistory", "m_UseStreaming", "m_IsVoiceMode", "m_AutoSend",
                 "m_AgentRunning", "m_AgentCurrentRoundIsTick", "m_LogStreamTimings", "m_LogAgentLoop", "m_LogRawLLMOutput",
-                "m_EnableSubtitleTranslation", "m_SystemNoticeMode", "m_LastUserTurnTime", "m_UserSpeechActiveForAutonomy" })
+                "m_EnableSubtitleTranslation", "m_SystemNoticeMode", "m_LastUserTurnTime", "m_UserSpeechActiveForAutonomy",
+                "m_EnableScreenVision", "m_AgentEyesOpen" })
                 chatSaved[field] = Get(Chat, field);
             foreach (string field in new[] { "activeAction", "actionId", "phase", "reason", "lastAttemptActionId", "lastAttemptPhase",
                 "lastAttemptReason", "lastAttemptTime", "followActive", "followNeedsNewTarget", "followUser", "hasControllerOperation", "operationRevision" })
@@ -226,11 +259,15 @@ public static class ArdyRoomSpeechPreparationRegression
             Set(Bridge, "activeAction", true); Set(Bridge, "actionId", "prepared-fixture:" + (++task));
             Set(Bridge, "phase", "moving"); Set(Bridge, "followActive", false);
             Set(Bridge.Controller, "<IsBusy>k__BackingField", true);
+            // This synthetic task must stage the controller state too; otherwise
+            // the previous case's Cancelled receipt correctly suppresses a second cancel.
+            Set(Bridge.Controller, "<ExecutionState>k__BackingField", NeEEvA.Motion.ArdyRoomExecutionState.Preparing);
             float now = Time.realtimeSinceStartup;
             var evidence = new ClosedSpeechEvidence { CaptureSessionSerial = Sense.InputCaptureSessionSerial, Revision = 1,
                 AudioMs = 1450, SubmittedAudioMs = 1800, CapturedAt = now - 1.8f, ObservedAt = now - .15f,
                 ClosedAt = now, StableForSeconds = .8f, Text = text, NormalizedText = ClosedSpeechEvidence.Normalize(text), CloseReason = "llm-take_turn" };
             Sense.RetainClosedSpeechEvidence(evidence);
+            LastEvidence = evidence;
             int before = Model.Preparations.Count; Chat.AcceptClosedSpeechEvidence(evidence);
             Check(Model.Preparations.Count == before + 1, "Actual closed-evidence entry submits one semantic preparation.");
             Chat.AcceptClosedSpeechEvidence(evidence);
@@ -304,7 +341,11 @@ public sealed class ArdyRoomSpeechPreparationFakeLLM : LLM
         public void Deliver(string intent)
         {
             string text = (string)Newtonsoft.Json.Linq.JObject.Parse(Input)["currentUserText"];
-            Callback(true, JsonConvert.SerializeObject(new { intent, origin = intent == "none" ? "none" : "user", evidence = intent == "none" ? "" : text }), "controlled-preparation");
+            if (RoomControlReviewProtocol.Kind(Input) == RoomControlReviewProtocol.BodyStop)
+                Callback(true, JsonConvert.SerializeObject(new { explicitStopNow = intent == "stop-moving",
+                    bodyDirective = intent == "stop-moving" ? "stop-current" : intent == "none" ? "continue-current" : "other-task",
+                    force = "command-now", reason = "Controlled complete-utterance classification" }), "controlled-preparation");
+            else Callback(true, JsonConvert.SerializeObject(new { intent, origin = intent == "none" ? "none" : "user", evidence = intent == "none" ? "" : text }), "controlled-preparation");
         }
     }
     public readonly List<Pending> Preparations = new List<Pending>();

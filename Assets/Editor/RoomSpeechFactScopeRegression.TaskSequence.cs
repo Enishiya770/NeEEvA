@@ -64,6 +64,9 @@ public static partial class RoomSpeechFactScopeRegression
         finally { serializer.m_DataList = history; serializer.TrailingContext = trailing; }
         model.TaskSequencesEnabled = true;
         try {
+            yield return CheckBoundedRejectedProposal(chat, bridge, model);
+            yield return CheckReconciledBodyHandoff(chat, bridge, model);
+            yield return CheckStableArrivalRefresh(chat, bridge, model);
             yield return CheckStopHandoffAfterRejectedProposal(chat, bridge, model);
             yield return CheckRepeatedStopDispatch(chat, bridge, model);
             yield return CheckConcurrentBodyFailure(chat, bridge, model);
@@ -274,7 +277,7 @@ public static partial class RoomSpeechFactScopeRegression
             "Incomplete request coverage is rejected before goal registration or physical takeover.");
         var cancel = new JObject { ["intent"] = "none", ["origin"] = "user", ["evidence"] = "停止跟随",
             ["deviceGoal"] = new JObject { ["operation"] = "cancel", ["requestQuote"] = "停止跟随" } };
-        for (int attempt = 0; attempt < 2; attempt++)
+        for (int attempt = 0; attempt < 1; attempt++)
         {
             int reviews = model.DeviceGoalReviews.Count, decisions = model.Decisions.Count;
             model.Decisions.Last().Complete(true, cancel.ToString(Formatting.None), "controlled-wrong-cancel-proposal");

@@ -131,6 +131,8 @@ public static partial class SpatialGoalRunnerRegression
         yield return Wait(() => chat.IsVoiceOutputPlaying, 3, "real playback gate held");
         Set(chat, "<IsAISpeaking>k__BackingField", true);
         yield return Drive(chat, bridge, model, lamp, run);
+        Require((bool?)LastReport["targetIdentityReuse"]?["passed"] == true,
+            "Actual current target identity reuse and its owner/geometry invalidations must be exercised.");
         Require(chat.IsAISpeaking && chat.IsVoiceOutputPlaying && model.Probes.Count == run.probes,
             "Unified task progresses while speech/round gates are occupied, without intermediate work review.");
         Require(model.SceneSearchRequests.Count > run.searches && run.matchEvidence.Count >= 2,
@@ -365,6 +367,7 @@ public static partial class SpatialGoalRunnerRegression
         while (model.Speech.Count == run.speech)
         {
             Observe(chat, run);
+            if (LastReport["targetIdentityReuse"] == null) CheckTargetIdentityReuse(chat);
             Require(RoomPlans(model) == run.rooms + 1, "Approved task has no quiet RoomTask continuation or repair planner.");
             if (Time.realtimeSinceStartup > until) throw new TimeoutException("Unified task did not terminate: " + Runner(chat, run));
             if (model.SceneSearchRequests.Count > searches)
@@ -525,12 +528,13 @@ public static partial class SpatialGoalRunnerRegression
         heldPlayback?.Dispose(); heldPlayback = null; Set(chat, "<IsAISpeaking>k__BackingField", false);
         var reviewer = model.Decisions.Last(request => request.Kind == "room-review");
         var reviewInput = JObject.Parse(reviewer.Input);
+        Export(run.name + "-terminal-review", reviewer);
         Require((string)reviewInput["reviewAttention"] == "owned-device-result-and-current-request" &&
-            reviewInput["spatialReplyFacts"].Type == JTokenType.Null && reviewInput["historicalDeviceEvents"].Type == JTokenType.Null &&
+            reviewInput["spatialReplyFacts"].Type == JTokenType.Null &&
+            JToken.DeepEquals(reviewInput["historicalDeviceEvents"], JToken.Parse(((JArray)Call(chat,"ReadHistoricalDeviceEvents")).ToString(Formatting.None))) &&
             (bool?)reviewInput.SelectToken("sceneActionFacts.goal.completionEvidenceValid") == true &&
             (string)reviewInput["requestedUserText"] == run.text && reviewInput["taskSequence"] != null,
-            "Real terminal reviewer receives current proof and intact request/sequence, without repeated global spatial/history records.");
-        Export(run.name + "-terminal-review", reviewer);
+            "Real terminal reviewer receives current proof, intact request/sequence and historical event receipts for attribution, without a repeated global spatial packet.");
         if (testRepair)
         {
             string proofBefore = Goal(chat)["completionEvidence"].ToString(); int writers = model.Speech.Count;
@@ -939,12 +943,17 @@ public static partial class SpatialGoalRunnerRegression
                 const string filler = "嗯，让我确认一下。";
                 Set(chat, "m_LatencyFillerPlayed", true); Set(chat, "m_LatencyFillerText", filler);
                 Set(chat, "m_LatencyFillerStartedAt", Time.realtimeSinceStartup - .2f); Set(chat, "m_LatencyFillerDuration", .1f);
-                Call(chat, "CommitPlayedLatencyFiller");
+                var fillerClip=AudioClip.Create("Controlled completed opener",4800,1,48000,false);
+                try {
+                    Set(chat,"m_LatencyFillerClip",fillerClip);Set(chat,"m_LatencyProgressClip",fillerClip);
+                    Set(chat,"m_LatencyProgressSamples",fillerClip.samples);Set(chat,"m_LatencyProgressComplete",true);
+                    Call(chat, "CommitPlayedLatencyFiller");
+                } finally { UnityEngine.Object.DestroyImmediate(fillerClip); }
                 Require(Get(chat, "m_AssistantHeardText").ToString().EndsWith(filler, StringComparison.Ordinal) &&
                     !(bool)Get(Get(chat, "m_ReviewedGoalAnswerObligation"), "delivered") &&
                     !(bool)Call(chat, "TryResumeSpatialGoalAfterDialogue"),
                     "The real filler accounting path records a heard opener without satisfying the still-undelivered answer.");
-                LastReport["answerFillerScope"] = "Controlled completed-filler timing invokes production CommitPlayedLatencyFiller; this is a filler-accounting boundary test, not real filler playback. The subsequent complete answer uses actual muted PCM playback and must resume despite that heard prefix.";
+                LastReport["answerFillerScope"] = "Controlled completed-filler sample receipt invokes production CommitPlayedLatencyFiller; this is a filler-accounting boundary test, not real filler playback. The subsequent complete answer uses actual muted PCM playback and must resume despite that heard prefix.";
                 Save();
             }
             string text = "当前还没确认目标，任务尚未完成。";

@@ -128,6 +128,7 @@ class RoomStreamService:
         job = StreamJob(request, fingerprint, asyncio.get_running_loop().create_future(), now,
                         now+request.timeoutMs/1000, context, feature)
         job.stage_started = now
+        job.future.add_done_callback(lambda future: self._terminal_trace(job, future))
         state.head = job
         self.queue.append(job)
         self.wake.set()
@@ -135,6 +136,12 @@ class RoomStreamService:
 
     def cancel(self, request):
         state = self.states.get(request.characterId)
+        logging.getLogger("uvicorn.error.ardy.stream").info("[ARDY stream cancel] %s", json.dumps(dict(
+            characterId=request.characterId, sessionId=request.sessionId, revision=request.revision,
+            currentSessionId=state.session_id if state is not None else None,
+            currentRevision=state.revision if state is not None else None,
+            requestId=state.head.request.requestId if state is not None and state.head is not None else None,
+            alreadyCompleted=state.head.future.done() if state is not None and state.head is not None else None), separators=(",", ":")))
         if state is not None:
             if request.revision < state.revision:
                 return {"cancelled": False, "revision": state.revision, "sessionId": state.session_id}
@@ -166,6 +173,23 @@ class RoomStreamService:
             if error.status >= 500:
                 logging.getLogger(__name__).warning("[ARDY stream failure] %s", json.dumps(
                     dict(diagnostic, status=error.status, code=error.code), separators=(",", ":")))
+
+    def _terminal_trace(self, job, future):
+        diagnostic = self._diagnostic(job)
+        if future.cancelled():
+            diagnostic.update(outcome="future-cancelled")
+        else:
+            error = future.exception()
+            if error is not None:
+                diagnostic.update(outcome="failed-or-cancelled", code=getattr(error, "code", type(error).__name__),
+                                  status=getattr(error, "status", None))
+            else:
+                diagnostic.update(outcome="completed", timings=future.result().get("timings"))
+        # All endings, including 409 cancellation, retain the same request/session identity.
+        # Client disconnect/cancel does not imply the GPU computation never completed.
+        # Uvicorn configures this hierarchy at INFO; the default root logger is
+        # WARNING and would otherwise silently discard successful/cancel traces.
+        logging.getLogger("uvicorn.error.ardy.stream").info("[ARDY stream terminal] %s", json.dumps(diagnostic, separators=(",", ":")))
 
     @staticmethod
     def _stage(job, stage):

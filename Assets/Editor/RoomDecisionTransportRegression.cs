@@ -39,7 +39,7 @@ public static class RoomDecisionTransportRegression
                 ["visualObservation"] = new JObject { ["captureId"] = "current-fixture-capture" }
             };
             string source = input.ToString(Newtonsoft.Json.Formatting.None);
-            string emptyGoalSchema = RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(Array.Empty<string>());
+            string emptyGoalSchema = RoomTaskContextPolicy.AnchorNewProposalSchema(RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(Array.Empty<string>()), input);
             foreach (ChatQW.BackendType backend in new[] { ChatQW.BackendType.Local, ChatQW.BackendType.Cloud })
             {
                 model.m_Backend = backend;
@@ -93,7 +93,7 @@ public static class RoomDecisionTransportRegression
                     (backend==ChatQW.BackendType.Local?JToken.DeepEquals(terminalReview["response_format"]["schema"],terminalSchema):terminalReview["response_format"]["schema"]==null),
                     "Local constrained grammar and cloud system contract use the actual terminal four-field review schema.");
                 var allowedWire = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", allowed.ToString(), Image, false));
-                string allowedSchema = RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(new[] { "goal-current-a", "goal-current-b" });
+                string allowedSchema = RoomTaskContextPolicy.AnchorNewProposalSchema(RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(new[] { "goal-current-a", "goal-current-b" }), allowed);
                 CheckDecisionSchemaText(allowedWire, backend, allowedSchema);
                 JObject actualSchema = backend == ChatQW.BackendType.Local ? SceneObjectProtocolRegression.ExpandNativeSchema(allowedWire["response_format"]["schema"]) :
                     JObject.Parse(((string)allowedWire["messages"][0]["content"]).Substring(RoomTaskProtocol.DecisionContract.Length + 1));
@@ -225,7 +225,7 @@ public static class RoomDecisionTransportRegression
         const string header = "\n[Native decision field guide]\n";
         string prefix = RoomTaskProtocol.DecisionContract + header;
         Require(actual.StartsWith(prefix, StringComparison.Ordinal), "Local guide retains the complete decision contract before field definitions.");
-        var guide = SceneObjectProtocolRegression.ExpandNativeSchema(JObject.Parse(actual.Substring(prefix.Length)));
+        var guide = SceneObjectProtocolRegression.ExpandNativeSchema(JObject.Parse(actual.Substring(prefix.Length)), true);
         var expected = (JObject)schema.DeepClone(); expected.Remove("oneOf");
         var definitions = (JObject)guide.DeepClone(); definitions.Remove("intentConstraints"); definitions.Remove("directionConvention"); definitions.Remove("noActionReply");
         definitions.Remove("intentConstraintEncoding");
@@ -400,7 +400,7 @@ public static class RoomDecisionTransportRegression
             var wire = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", input.ToString(), Image, false));
             string system = (string)wire["messages"][0]["content"];
             string latest = (string)wire["messages"][2]["content"];
-            Require(system.Contains("批准后由程序统一执行寻找") && system.Contains("首步不会直接执行") &&
+            Require(system.Contains("审核批准后统一执行器负责找目标") && system.Contains("首步不直接执行") &&
                 latest.Contains("程序统一执行寻找") && latest.Contains("提案所附像素/检查/开关/搜索首步不会直接执行") &&
                 latest.Contains("设备提案不要求像素定位") && !latest.Contains("当前恢复约束"),
                 "System and final current-turn instructions agree on reviewed device handoff, without a competing pixel-recovery loop: " + backend);
@@ -409,7 +409,7 @@ public static class RoomDecisionTransportRegression
                 wire.SelectTokens("$..image_url.url").Select(x => (string)x).SequenceEqual(new[] { Image }),
                 "Unified device instructions preserve standalone search, the actual accepted request and current image ownership: " + backend);
             Require((bool?)CurrentData(latest)["userObservationBeforeDeviceTask"] == false &&
-                system.Contains("首次原话若明确要求先转头或转身") && latest.Contains("首次原话若明确要求先转头或转身") &&
+                system.Contains("原话明确先转头/转身再操作") && latest.Contains("首次原话若明确要求先转头或转身") &&
                 latest.Contains("设备提案批准后统一执行器才执行这个前置观察") && latest.Contains("不为找设备猜转向角度"),
                 "Initial proposal transport distinguishes an explicit once-only preface from an existing-goal update and requires independent approval before execution: " + backend);
         }

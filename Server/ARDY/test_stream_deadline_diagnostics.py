@@ -99,6 +99,36 @@ class StreamDeadlineDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(details, {"timings": {"qualityAttempts": 3}})
         self.assertNotIn("PRIVATE_DESCRIPTION", json.dumps(details))
 
+    async def test_cancelled_pending_request_has_one_terminal_identity_record(self):
+        async def blocked(*args):
+            await asyncio.Event().wait()
+        self.shared.provider.fetch = blocked
+        value = payload()
+        value["timeoutMs"] = 2000
+        with self.assertLogs("uvicorn.error.ardy.stream", level="INFO") as logs:
+            request = asyncio.create_task(self.client.post("/v1/locomotion/stream/step", json=value))
+            while "stream" not in self.stream.states:
+                await asyncio.sleep(.001)
+            job = self.stream.states["stream"].head
+            cancellation = await self.client.post("/v1/locomotion/stream/cancel", json={
+                key: value[key] for key in ("characterId", "sessionId", "revision")})
+            self.assertEqual(cancellation.status_code, 200)
+            self.assertTrue(cancellation.json()["cancelled"])
+            response = await request
+            await asyncio.sleep(0)
+            self.stream.abort(job, ServiceError(499, "client_disconnected", "Later disconnect"))
+        rows = [line.split("[ARDY stream terminal] ", 1)[1] for line in logs.output if "[ARDY stream terminal] " in line]
+        self.assertEqual(len(rows), 1)
+        recorded = json.loads(rows[0])
+        self.assertEqual(recorded["requestId"], value["requestId"])
+        self.assertEqual(recorded["sessionId"], value["sessionId"])
+        self.assertEqual(recorded["status"], 409)
+        self.assertEqual(response.status_code, 409)
+        cancel_rows = [json.loads(line.split("[ARDY stream cancel] ", 1)[1]) for line in logs.output if "[ARDY stream cancel] " in line]
+        self.assertEqual(len(cancel_rows), 1)
+        self.assertEqual(cancel_rows[0]["currentSessionId"], value["sessionId"])
+        self.assertEqual(cancel_rows[0]["requestId"], value["requestId"])
+
 
 if __name__ == "__main__":
     unittest.main()

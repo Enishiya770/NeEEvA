@@ -279,7 +279,7 @@ public static class SpatialGoalResultContextPolicy
     {
         bool ja = NormalizeReportLanguage(language) == "ja", en = NormalizeReportLanguage(language) == "en";
         if ((string)facts?["goal"]?["status"] == "rejected")
-            return ja ? "この操作の提案は承認されず、実行していないわ。" : en ? "This proposed operation was not approved and was not executed." : "这项操作提案未获批准，没有执行。";
+            return ja ? "この操作の提案は承認されず、実行していないわ。" : en ? "This proposed operation did not complete and was not executed." : "这项操作提案未获批准，没有执行。";
         bool known = (bool?)facts?["goal"]?["targetKnowledge"]?["identityKnown"] == true;
         bool notAttempted = (bool?)facts?["goal"]?["operationSummary"]?["operationAttempted"] == false;
         switch (RequiredReport(facts))
@@ -305,6 +305,10 @@ public static class SpatialGoalResultContextPolicy
                     return ja ? "まだ対象を探し始めていないわ。依頼で未確認の点をもう少し教えてくれる？" : en ? "I haven't started looking for the target. Could you clarify the unresolved part of the request?" : "我还没有开始寻找目标，可以澄清这次请求中未确定的部分吗？";
                 return ja ? "この依頼はまだ解決していないわ。未確認の点をもう少し教えてくれる？" : en ? "This request is still unresolved. Could you clarify the unresolved part?" : "这次请求还未解决，可以澄清其中未确定的部分吗？";
             default:
+                if (FailureReason(facts) == "device-task-body-owned-by-follow" || FailureReason(facts) == "device-task-body-owned-by-movement")
+                    return ja ? "現在の身体動作から新しい依頼への引き継ぎが成立せず、今回の操作はまだ始めていないわ。" :
+                        en ? "The handoff from the current body task to this request did not complete, so this operation has not started." :
+                        "当前身体任务还没有完成向新请求的交接，因此这次操作尚未开始。";
                 if (notAttempted) return ja ? "依頼はまだ完了しておらず、今回の操作は実行していないわ。" : en ? "The task is unfinished, and I haven't performed this operation." : "这次请求尚未完成，也没有执行操作。";
                 if ((bool?)facts?["goal"]?["searchSummary"]?["searchAttempted"] == true)
                     return ja ? "探してみたけれど、対象の確認と依頼の完了には至っていないわ。" : en ? "I've tried searching, but haven't confirmed the target or completed the task." : "已经尝试寻找，但还没确认目标并完成任务。";

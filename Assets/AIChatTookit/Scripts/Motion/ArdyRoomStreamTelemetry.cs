@@ -16,13 +16,25 @@ namespace NeEEvA.Motion
         public int controlRecoveryCount, controlRecoveryLimit;
         public string controlFailureEvidencePath, controlPlanningMode, warmContinuationReason;
         public float controlHardInitialSpeed, controlNominalInitialSpeed, controlTrackingError, controlRemainingDistance;
-        public string failureRequestId, failureSessionId, failureObservedUtc;
+        public string failureRequestId, failureSessionId, failureObservedUtc, failureStage;
+        public ArdyRoomStreamHandoff lastHandoff;
         public int failureOperationRevision;
         public bool failureAppliesToCurrentOperation;
         public float bufferSeconds, readyTargetSeconds, requestElapsedSeconds, roundTripSeconds, backendSeconds,
             backendQueueSeconds, featureSeconds, planningSeconds, parseSeconds, auditSeconds, frameSeconds, largestRecentFrameSeconds,
             controlLatencySeconds;
         public bool pending, prebuffering, recovering;
+    }
+
+    [Serializable]
+    public sealed class ArdyRoomStreamHandoff
+    {
+        public string reason, sessionId, requestId, stage, observedUtc;
+        public int operationRevision, wireRevision, controlRevision;
+        public long playerRevision;
+        public float bufferSeconds;
+        public bool pending;
+        internal ArdyRoomStreamHandoff Copy() => (ArdyRoomStreamHandoff)MemberwiseClone();
     }
 
     public sealed partial class ArdyRoomLocomotionController
@@ -79,7 +91,24 @@ namespace NeEEvA.Motion
             public int qualityAttempts;
         }
         private string streamEventName, streamLastFailureCategory, streamLastFailureReason;
-        private string streamFailureRequestId, streamFailureSessionId, streamFailureObservedUtc;
+        private string streamFailureRequestId, streamFailureSessionId, streamFailureObservedUtc, streamFailureStage;
+        private ArdyRoomStreamHandoff streamLastHandoff;
+        private sealed class StreamLifecycleException : InvalidOperationException
+        {
+            public readonly ArdyRoomStreamHandoff Evidence;
+            public StreamLifecycleException(string message, ArdyRoomStreamHandoff evidence) : base(message) { Evidence = evidence; }
+        }
+        private ArdyRoomStreamHandoff CaptureStreamHandoff(string reason) => new ArdyRoomStreamHandoff {
+            reason = reason, sessionId = streamSessionId, requestId = requestId, stage = Stage,
+            observedUtc = DateTime.UtcNow.ToString("o"), operationRevision = OperationRevision,
+            wireRevision = streamWireRevision, controlRevision = StreamControlRevision,
+            playerRevision = ownedPlayerRevision, bufferSeconds = StreamBufferSeconds, pending = streamRequestPending
+        };
+        private void RecordStreamHandoff(string reason)
+        {
+            streamLastHandoff = CaptureStreamHandoff(reason);
+            Debug.Log("[ARDY room/handoff] " + JsonUtility.ToJson(streamLastHandoff), this);
+        }
         private int streamFailureOperationRevision = -1;
         private float streamRoundTrip, streamBackend, streamBackendQueue, streamFeature, streamPlanning, streamParse, streamAudit;
         private float streamRecentFramePeak, streamRecentStepCost;
@@ -90,6 +119,7 @@ namespace NeEEvA.Motion
             lastFailureCategory = streamLastFailureCategory, lastFailureReason = streamLastFailureReason,
             failureRequestId = streamFailureRequestId, failureSessionId = streamFailureSessionId,
             failureObservedUtc = streamFailureObservedUtc, failureOperationRevision = streamFailureOperationRevision,
+            failureStage = streamFailureStage, lastHandoff = streamLastHandoff?.Copy(),
             failureAppliesToCurrentOperation = streamFailureOperationRevision == OperationRevision &&
                 !string.IsNullOrEmpty(streamLastFailureCategory),
             historyCode = warmHistoryObservation?.code, historyReason = warmHistoryObservation?.reason,
@@ -121,12 +151,18 @@ namespace NeEEvA.Motion
         private float StreamReadyTargetSeconds => Mathf.Clamp(Mathf.Ceil((StreamLeadSeconds + .1f) / .4f) * .4f, .8f, 1.2f);
 
         private void RecordStreamEvent(string name, string reason = null, string category = null)
+            => RecordStreamEventWithEvidence(name, reason, category, null);
+
+        private void RecordStreamEventWithEvidence(string name, string reason, string category, ArdyRoomStreamHandoff evidence)
         {
             streamEventName = name;
             if (reason != null) {
                 streamLastFailureReason = reason; streamLastFailureCategory = category;
-                streamFailureRequestId = requestId; streamFailureSessionId = streamSessionId;
-                streamFailureOperationRevision = OperationRevision; streamFailureObservedUtc = DateTime.UtcNow.ToString("o");
+                streamFailureRequestId = evidence != null ? evidence.requestId : requestId;
+                streamFailureSessionId = evidence != null ? evidence.sessionId : streamSessionId;
+                streamFailureStage = evidence != null ? evidence.stage : Stage;
+                streamFailureOperationRevision = evidence != null ? evidence.operationRevision : OperationRevision;
+                streamFailureObservedUtc = DateTime.UtcNow.ToString("o");
             }
             Debug.Log("[ARDY room/stream] " + JsonUtility.ToJson(StreamTelemetry), this);
         }
@@ -142,7 +178,9 @@ namespace NeEEvA.Motion
             if (error.Message.Contains("步态") || error.Message.Contains("关节") || error.Message.Contains("stream_quality_rejected")) return "motion-quality";
             if (execution?.Reason == ArdyRoomExecutionReason.NavigationRejected || execution?.Reason == ArdyRoomExecutionReason.GeneratedPathRejected)
                 return "navigation";
-            return "service-request";
+            if (error is ServiceRequestException) return "service-request";
+            if (error is StreamLifecycleException) return "stream-lifecycle";
+            return "client-state";
         }
 
         private IEnumerator GuardedStreamRun(IEnumerator routine, int token)
@@ -166,7 +204,7 @@ namespace NeEEvA.Motion
                             yield return null;
                             continue;
                         }
-                        RecordStreamEvent("failed", failure.Message, StreamFailureCategory(failure));
+                        RecordStreamEventWithEvidence("failed", failure.Message, StreamFailureCategory(failure), (failure as StreamLifecycleException)?.Evidence);
                         Fail(failure.Message, (failure as ExecutionException)?.Reason ?? ArdyRoomExecutionReason.GenerationFailed);
                         yield break;
                     }

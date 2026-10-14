@@ -269,7 +269,9 @@ public partial class ChatQW
 
     private static readonly HashSet<string> RoomTaskInternedFields = new HashSet<string>(StringComparer.Ordinal) {
         "selfPose", "authoredHint", "geometryNeighbor", "scope", "relativeToCurrentView", "relativeToCurrentBody", "returnDirection",
-        "targetReview", "sceneSearch", "lastAction", "confirmedTarget", "completionEvidence", "boundEntityMemory", "currentBearing" };
+        "targetReview", "sceneSearch", "lastAction", "confirmedTarget", "completionEvidence", "boundEntityMemory", "currentBearing",
+        "objectContext", "visualObservation", "currentFacts", "execution", "lastActionResults", "lastSceneTargetResult",
+        "resultReportRequirement", "movementReportRequirement" };
 
     private static readonly HashSet<string> RoomWorkingMemoryInternedIds = new HashSet<string>(StringComparer.Ordinal) {
         "captureId", "sourceCaptureId", "viewCaptureId", "referenceId", "selectionId", "targetMatchCaptureId", "descriptionCaptureId" };

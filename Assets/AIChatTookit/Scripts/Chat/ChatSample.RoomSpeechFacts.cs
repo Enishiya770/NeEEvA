@@ -1,16 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using NeEEvA.Perception;
 using UnityEngine;
 
 public partial class ChatSample
 {
-    [Flags] private enum RoomSpeechDependencies { None = 0, UserTarget = 1, SceneAction = 2, VisualObservation = 4 }
+    [Flags] private enum RoomSpeechDependencies { None = 0, UserTarget = 1, SceneAction = 2, VisualObservation = 4, UserActivity = 8 }
 
     private sealed class RoomSpeechSnapshot
     {
         public ArdyRoomDialogueBridge bridge;
+        public UnityEngine.Object controller, avatar;
+        public Transform userHead;
+        public bool targetTrackingValid;
         public int controllerOperation, targetRevision, sceneEpoch, visionEpoch;
         public string actionId, phase;
         public JObject sceneAction;
@@ -71,7 +75,8 @@ public partial class ChatSample
             required |= RoomSpeechDependencies.SceneAction;
         // A no-action spatial answer and a whole-search result cannot be downgraded
         // to generic chatter by a reviewer choosing factScope=none.
-        bool evidenceOnly = ReadRoomEvidenceReplyFacts(m_FormalResponseGeneration) != null || UseFocusedReplyPacket(m_FormalResponseGeneration);
+        bool evidenceOnly = ReadRoomEvidenceReplyFacts(m_FormalResponseGeneration) != null || UseFocusedReplyPacket(m_FormalResponseGeneration) ||
+            UseWorkResultReplyPacket(m_FormalResponseGeneration);
         if ((string)ReadAutonomousReplyPurpose(m_FormalResponseGeneration)?["evidenceFocus"] == "current-user-body")
             required |= RoomSpeechDependencies.UserTarget;
         if ((m_RoomTaskSpatialAnswer && !evidenceOnly) || intent == "search-scene") required |= RoomSpeechDependencies.SceneAction;
@@ -112,6 +117,20 @@ public partial class ChatSample
         return result;
     }
 
+    private RoomSpeechDependencies ResolveReviewedRoomSpeechDependencies(string intent, string reviewedScope, JObject verdict)
+    {
+        var dependencies = ResolveRoomSpeechDependencies(intent, reviewedScope);
+        var words = verdict?["movementDependencies"] as JObject;
+        if ((dependencies & RoomSpeechDependencies.UserTarget) != 0 &&
+            (string)verdict?["verdict"] == "consistent" &&
+            (string)words?["source"] == "independent-public-words" &&
+            (bool?)words["currentGeometryRequired"] == false &&
+            (string)words["currentGeometryQuote"] == "" && !string.IsNullOrWhiteSpace((string)words["ongoingActivityQuote"]) &&
+            new[] { "preparing", "moving", "recovering", "replanning", "returning" }.Contains((string)verdict["resultReport"]))
+            dependencies = (dependencies & ~RoomSpeechDependencies.UserTarget) | RoomSpeechDependencies.UserActivity;
+        return dependencies;
+    }
+
     private JObject SpatialGoalCompletionSpeechStamp()
     {
         var stamp=PickRoomFields(BuildSpatialGoalContext(), "goalId", "status", "ownerCurrent", "reason",
@@ -130,6 +149,9 @@ public partial class ChatSample
             bridge = bridge, controllerOperation = bridge?.Controller != null ? bridge.Controller.OperationRevision : -1,
             targetRevision = bridge != null ? bridge.ReadCurrentTargetEvidence().currentTargetRevision : -1,
             actionId = bridge != null ? bridge.ActionId : "", phase = bridge != null ? bridge.Phase : "disconnected",
+            controller = bridge != null ? bridge.Controller : null, avatar = bridge != null ? bridge.avatar : null,
+            userHead = bridge != null ? bridge.userHead : null,
+            targetTrackingValid = bridge != null && bridge.ReadCurrentTargetEvidence().userAnchorValid && bridge.ReadCurrentTargetEvidence().userTrackingValid,
             sceneEpoch = m_SceneActionEpoch, visionEpoch = m_SceneVisionEpoch,
             sceneAction = RoomSpeechSceneStamp(), observation = observation
         };
@@ -139,9 +161,14 @@ public partial class ChatSample
         var changes = new List<string>();
         var bridge = GetComponent<ArdyRoomDialogueBridge>();
         if (before.bridge == null || bridge != before.bridge || !bridge.IsConnected) { changes.Add("roomBinding"); return changes; }
-        if ((scope & RoomSpeechDependencies.UserTarget) != 0)
+        if ((scope & (RoomSpeechDependencies.UserTarget | RoomSpeechDependencies.UserActivity)) != 0)
         {
-            if (bridge.ReadCurrentTargetEvidence().currentTargetRevision != before.targetRevision) changes.Add("userTargetRevision");
+            if (bridge.userHead != before.userHead || bridge.avatar != before.avatar || bridge.Controller != before.controller)
+                changes.Add("userTaskBinding");
+            var target = bridge.ReadCurrentTargetEvidence();
+            if ((target.userAnchorValid && target.userTrackingValid) != before.targetTrackingValid) changes.Add("userTrackingValidity");
+            if ((scope & RoomSpeechDependencies.UserTarget) != 0 &&
+                bridge.ReadCurrentTargetEvidence().currentTargetRevision != before.targetRevision) changes.Add("userTargetRevision");
             if (bridge.ActionId != before.actionId) changes.Add("userTaskActionId");
             if (bridge.Phase != before.phase) changes.Add("userTaskPhase");
             if (bridge.Controller == null || bridge.Controller.OperationRevision != before.controllerOperation) changes.Add("userTaskOperation");
@@ -203,6 +230,7 @@ public partial class ChatSample
             case "我已经停止移动了，但后续没有得到可执行的动作计划，还没有开始执行。": return ja ? "移動は止めたわ。ただ、続きの動作には実行できる計画が得られず、まだ始められていないの。" : "I stopped moving, but no executable plan was obtained for the remaining actions, so they have not started.";
             case "这次规划要处理的信息太多，没能生成动作计划，还没有开始新的动作。": return ja ? "動作を考えるための情報が多すぎて計画を作れなかったので、まだ新しい動作は始めていないわ。" : "There was too much information to process for this action plan, so I haven't started a new action.";
             case "这次没有得到可执行的动作计划，没有启动新的动作。": return ja ? "今回は実行できる動作計画が得られなかったので、新しい動作は始めていないわ。" : "I didn't obtain an executable action plan, so I haven't started a new action.";
+            case "这次对新操作要求的核验没有通过，因此没有开始新操作。": return ja ? "今回の新しい操作の解釈を確認できなかったので、新しい操作は始めていないわ。" : "I couldn't validate my interpretation of the new operation request, so I haven't started a new operation.";
             case "我已经看向那里确认了一下。": return ja ? "そちらを向いて、見直したわ。" : "I've looked that way and checked the view.";
             case "我已经停止移动了。": return ja ? "移動を止めたわ。" : "I've stopped moving.";
             case "我已经走到你身边了。": return ja ? "あなたのそばまで来たわ。" : "I've reached your side.";

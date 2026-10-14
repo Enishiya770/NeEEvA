@@ -27,6 +27,9 @@ public partial class ChatQW
 
     private string BuildSceneSearchRequestJson(string input, string imageDataUrl)
     {
+        input = SceneSearchContextPolicy.Project(Newtonsoft.Json.Linq.JObject.Parse(input), out var attention)
+            .ToString(Newtonsoft.Json.Formatting.None);
+        Debug.Log("[SceneSearch/Attention] " + attention.ToString(Newtonsoft.Json.Formatting.None));
         string schema = SceneSearchProtocol.SchemaForInput(input);
         input = SceneFactContextCompactor.CompactJson(input, out var sharing);
         Debug.Log("[SceneSearch/Facts] " + Newtonsoft.Json.JsonConvert.SerializeObject(sharing));

@@ -21,7 +21,26 @@ public static partial class SpatialGoalRunnerRegression
         successor.Remove("actionId"); successor.Remove("receipt"); successor.Remove("generation"); successor.Remove("intent");
         int generation = (int)Get(chat, "m_FormalResponseGeneration");
         string reportAction = (string)Get(chat, "m_RoomTaskActionId");
+        object savedPreparation = Get(chat, "m_RoomSpeechPreparation");
         try {
+            foreach (string reservation in new[] { "pending", "completed-unconsumed", "consumed-transport-owned" }) {
+                var prepared = Activator.CreateInstance(typeof(ChatSample).GetNestedType("RoomSpeechPreparation", Flags), true);
+                Set(prepared, "completed", reservation != "pending");
+                Set(prepared, "consumed", reservation == "consumed-transport-owned");
+                Set(prepared, "ownsTransport", reservation != "completed-unconsumed");
+                Set(chat, "m_RoomSpeechPreparation", prepared);
+                Set(chat, "m_RoomTaskSequence", source.DeepClone());
+                int reviews = model.ControlReviews.Count;
+                Require(!(bool)Call(chat, "TryStartRoomSequenceContinuation", generation, new Action(() => { })) && model.ControlReviews.Count == reviews,
+                    "An unconsumed preparation or active transport still reserves the slot: " + reservation);
+                cases.Add(new JObject { ["id"] = reservation, ["passed"] = true });
+            }
+            // Simulate a historical consumed record independently of the normal
+            // detach path: its existence alone must no longer reserve execution.
+            var consumedPreparation = Activator.CreateInstance(typeof(ChatSample).GetNestedType("RoomSpeechPreparation", Flags), true);
+            Set(consumedPreparation, "completed", true); Set(consumedPreparation, "consumed", true);
+            Set(consumedPreparation, "ownsTransport", false);
+            Set(chat, "m_RoomSpeechPreparation", consumedPreparation);
             foreach (string boundary in new[] { "denied", "timeout", "generation", "pause", "vision", "input", "body-owner", "failed-predecessor", "duplicate" }) {
                 Call(chat, "CancelSequenceContinuation", "fixture-next");
                 Set(chat, "m_RoomTaskSequence", source.DeepClone());
@@ -72,7 +91,7 @@ public static partial class SpatialGoalRunnerRegression
                 model.ControlReviews.Count == failedReviews, "Failed predecessor is rejected by the engine before any model request, regardless of model opinion.");
             cases.Add(new JObject { ["id"] = "failed-predecessor-before-request", ["passed"] = true });
         }
-        finally { model.ControlReviewsEnabled = previous; Call(chat, "CancelSequenceContinuation", "fixture-complete"); }
+        finally { Set(chat, "m_RoomSpeechPreparation", savedPreparation); model.ControlReviewsEnabled = previous; Call(chat, "CancelSequenceContinuation", "fixture-complete"); }
         LastReport["sequenceContinuation"] = new JObject { ["cases"] = cases,
             ["scope"] = "Real device readback and production bounded continuation, controlled semantic judgments and boundaries; actual bridge submission. No live-model or played-speech timing claim." };
     }
@@ -117,9 +136,14 @@ public static partial class SpatialGoalRunnerRegression
             Call(chat, "FlushCompleteSentences", true);
             var queue = Get(chat, "m_PendingChunks");
             var queued = ((System.Collections.IEnumerable)queue).Cast<object>().ToArray();
-            Require(queued.Length == 2 && (bool)Get(queued[0], "RoomPrefixOnly") &&
-                (string)Get(queued[0], "Text") == prefix && !(bool)Get(queued[1], "RoomPrefixOnly"),
-                "Actual queue separates the entire audited independent answer from the dynamic progress sentence.");
+            LastReport["continuationQueueDiagnostic"] = new JArray(queued.Select(c=>new JObject {
+                ["text"]=(string)Get(c,"Text"), ["prefixOnly"]=(bool)Get(c,"RoomPrefixOnly"),
+                ["round"]=(int)Get(c,"RoundId"), ["hasLease"]=Get(c,"RoomState")!=null }));
+            string WithoutSpacing(string value) => new string(value.Where(c=>!char.IsWhiteSpace(c)).ToArray());
+            Require(queued.Length >= 2 && (bool)Get(queued[0], "RoomPrefixOnly") &&
+                (string)Get(queued[0], "Text") == prefix && queued.Skip(1).All(c=>!(bool)Get(c,"RoomPrefixOnly")) &&
+                WithoutSpacing(string.Concat(queued.Select(c=>(string)Get(c,"Text")))) == WithoutSpacing(combined),
+                "Actual queue separates the entire audited independent answer from every dynamic progress sentence without losing text.");
             Call(bridge, "SetFact", "arrived", "Controlled arrival while the independent answer plays");
             Require(Call(chat, "RefreshRoomSpeechForPlayback", queued[0], generation).ToString() == "Current",
                 "Arrival does not replace or resynthesize the stable result segment.");

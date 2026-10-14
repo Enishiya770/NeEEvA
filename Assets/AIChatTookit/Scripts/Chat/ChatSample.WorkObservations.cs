@@ -45,18 +45,17 @@ public partial class ChatSample
         ObserveString(receipt, nameof(m_PracticeSemanticResolutionNote), m_PracticeSemanticResolutionNote, () => m_PracticeSemanticResolutionNote, () => m_PracticeSemanticResolutionNote = "");
         ObserveString(receipt, nameof(m_SelfRepeatNote), m_SelfRepeatNote, () => m_SelfRepeatNote, () => m_SelfRepeatNote = "");
         ObserveString(receipt, nameof(m_PracticeSessionCarryNote), m_PracticeSessionCarryNote, () => m_PracticeSessionCarryNote, () => m_PracticeSessionCarryNote = "");
-        ObserveString(receipt, nameof(m_PendingSelfInspection), m_PendingSelfInspection, () => m_PendingSelfInspection, () => {
-            m_PendingSelfInspection = "";
-            m_SelfInspectionDeliveryAttempts = 0;
-            m_WorkStatus = "inspection-result-delivered";
-        });
-        if (m_SongSearchResultPending) ObserveString(receipt, nameof(m_LastSongSearchResult), m_LastSongSearchResult, () => m_LastSongSearchResult, () => m_SongSearchResultPending = false);
-        if (m_SongCatalogResultPending) ObserveString(receipt, nameof(m_LastSongCatalogResult), m_LastSongCatalogResult, () => m_LastSongCatalogResult, () => m_SongCatalogResultPending = false);
-        if (m_SongMemoryResultPending) ObserveString(receipt, nameof(m_LastSongMemoryResult), m_LastSongMemoryResult, () => m_LastSongMemoryResult, () => m_SongMemoryResultPending = false);
-        if (m_SpeakerManageResultPending) ObserveString(receipt, nameof(m_LastSpeakerManageResult), m_LastSpeakerManageResult, () => m_LastSpeakerManageResult, () => m_SpeakerManageResultPending = false);
-        if (m_PracticeDropResultPending) ObserveString(receipt, nameof(m_LastPracticeDropResult), m_LastPracticeDropResult, () => m_LastPracticeDropResult, () => m_PracticeDropResultPending = false);
-        if (m_PracticeEditResultPending) ObserveString(receipt, nameof(m_LastPracticeEditResult), m_LastPracticeEditResult, () => m_LastPracticeEditResult, () => m_PracticeEditResultPending = false);
-        if (m_HumBackResultPending) ObserveString(receipt, nameof(m_LastHumBackResult), m_LastHumBackResult, () => m_LastHumBackResult, () => m_HumBackResultPending = false);
+        // Receiving a complete text response is not delivery. These actual tool
+        // results are cleared only by versioned semantic coverage of played audio.
+        void Result(string kind, string value) { if (!string.IsNullOrEmpty(value)) receipt.Facts.Add(new JObject { ["kind"] = kind, ["result"] = value }); }
+        Result(nameof(m_PendingSelfInspection), m_PendingSelfInspection);
+        if (m_SongSearchResultPending) Result(nameof(m_LastSongSearchResult), m_LastSongSearchResult);
+        if (m_SongCatalogResultPending) Result(nameof(m_LastSongCatalogResult), m_LastSongCatalogResult);
+        if (m_SongMemoryResultPending) Result(nameof(m_LastSongMemoryResult), m_LastSongMemoryResult);
+        if (m_SpeakerManageResultPending) Result(nameof(m_LastSpeakerManageResult), m_LastSpeakerManageResult);
+        if (m_PracticeDropResultPending) Result(nameof(m_LastPracticeDropResult), m_LastPracticeDropResult);
+        if (m_PracticeEditResultPending) Result(nameof(m_LastPracticeEditResult), m_LastPracticeEditResult);
+        if (m_HumBackResultPending) Result(nameof(m_LastHumBackResult), m_LastHumBackResult);
         ObserveString(receipt, nameof(m_StickyToolFailure), m_StickyToolFailure, () => m_StickyToolFailure, () => ++m_StickyToolFailureShown);
         return receipt;
     }

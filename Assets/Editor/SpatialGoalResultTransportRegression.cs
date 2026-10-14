@@ -235,7 +235,14 @@ public static class SpatialGoalResultTransportRegression
                     Require(status == expectedStatus,
                         "Typed transport exposes whether format or request-listed source validation rejected the response: "+shape, ref checks);
                     var wire = JObject.Parse(exchange.Finished.Result);
-                    Require((string)wire["messages"]?[1]?["content"] == actualInput && ((JArray)wire["messages"]).Count == 2 && !wire.ToString().Contains("CANARY"), "Goal review reads the complete request/proposal and listed sources only, with no image/history/role tool context.", ref checks);
+                    var deliveredInput=JObject.Parse((string)wire["messages"][1]["content"]);
+                    if(!pending) foreach(JObject source in deliveredInput["referentSources"])
+                    {
+                        Require((bool?)source["historicalOnly"]==true && !string.IsNullOrEmpty((string)source["historicalReferenceScope"]),
+                            "New-operation review explicitly scopes each old identity source as historical, never new authorization.",ref checks);
+                        source.Remove("historicalOnly");source.Remove("historicalReferenceScope");
+                    }
+                    Require(JToken.DeepEquals(deliveredInput,requestInput) && ((JArray)wire["messages"]).Count == 2 && !wire.ToString().Contains("CANARY"), "Goal review retains the complete current request/proposal and exact listed identity sources with only historical scoping added; no image/history/role tool context.", ref checks);
                     Require((int?)wire["id_slot"] == 1 && (bool?)wire["stream"] == false && (bool?)wire["enable_thinking"] == false &&
                         JToken.DeepEquals(wire["response_format"]?["schema"],JObject.Parse(RoomTaskProtocol.BuildTypedDeviceGoalReviewSchema(pending,listedSources))) &&
                         wire["response_format"]?["schema"]?["properties"]?["referentEntityId"]==null,

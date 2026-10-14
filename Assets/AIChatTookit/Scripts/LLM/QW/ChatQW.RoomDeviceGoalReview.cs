@@ -44,6 +44,13 @@ public partial class ChatQW
 
     private string BuildRoomDeviceGoalReviewRequestJson(string input)
     {
+        try
+        {
+            var source = JObject.Parse(input, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+            if ((string)source["mode"] == "new-proposal")
+                input = RoomTaskContextPolicy.DeviceProposalReview(source).ToString(Newtonsoft.Json.Formatting.None);
+        }
+        catch (Newtonsoft.Json.JsonException) { /* Preserve malformed evidence; never project a silently overwritten key. */ }
         string mode = RoomDeviceGoalReviewMode(input);
         bool pending = mode == "pending-proposal-update";
         bool typed = mode != "goal-user-update";

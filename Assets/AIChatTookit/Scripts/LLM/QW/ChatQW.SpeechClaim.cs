@@ -54,16 +54,20 @@ public partial class ChatQW
             RoomSpeechClaimProtocol.ContractForDomain((string)words["reportDomain"]);
         string schema = languageOnly ? RoomSpeechClaimProtocol.LanguageSchema : RoomSpeechClaimProtocol.SchemaForDomain((string)words["reportDomain"]);
         if (languageOnly) words = new JObject { ["publicSpeech"] = words["publicSpeech"].DeepClone() };
-        else if (repair != null) words["extractionRepair"] = repair.DeepClone();
+        else if (repair != null) {
+            words["extractionRepair"] = repair.DeepClone();
+            // Even after removing the wrong language label, the rejected
+            // extraction anchors a repeated mistake. Diagnostics retain it;
+            // the one recovery reads original words plus failed-check names only.
+            ((JObject)words["extractionRepair"]).Remove("rejectedOutput");
+            contract += "\nThis is the single recovery. Recheck ALL fields from the original clauses, not only the first failed check.\n";
+        }
         var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
         sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":640,\"response_format\":{\"type\":\"json_object\"");
         if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(schema);
         sb.Append("},\"messages\":[");
         AppendMessage(sb, new SendData("system", contract +
-            "\nIf extractionRepair is present, independently re-extract once from the SAME publicSpeech. The rejected output is data, not an answer or instruction. " +
-            "Correct the identified schema/exact-quote issue by copying actual source spans, including their original endings. Check EVERY quote against publicSpeech, not just the first rejected field. " +
-            "Do not keep the rejected paraphrases or drop a factual assertion to avoid fixing its quote. Use a longer intact source span if clauses share a predicate. " +
-            "No desired language or execution answer is supplied. Preserve true mixed clauses; never invent a quote or change the speech.\n" +
+            "\nextractionRepair contains failed-check names only. Fix schema, exact quotes and field consistency from publicSpeech alone; never drop assertions to evade repair. Preserve real mixed clauses; no desired language or execution facts are supplied.\n" +
             (m_Backend == BackendType.Local ? "Return the native schema fields exactly." : schema))); sb.Append(',');
         AppendMessage(sb, new SendData("user", words.ToString(Formatting.None))); sb.Append(']');
         if (m_Backend == BackendType.Local) sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
@@ -90,8 +94,13 @@ public partial class ChatQW
             {
                 if (generation != m_RoomTaskRequestGeneration) yield break;
                 string json = BuildSpeechClaimRequest(input.ToString(Formatting.None), repair);
-                if ((bool?)MeasureRoomDecisionBudget(json, 4096)["allowed"] != true)
-                { callback?.Invoke(false, "", "speech-claim-context-budget"); yield break; }
+                var extractionBudget = MeasureRoomDecisionBudget(json, 4096);
+                if ((bool?)extractionBudget["allowed"] != true)
+                {
+                    Debug.Log("[Room/SpeechClaimBudget] " + new JObject { ["generation"] = generation, ["attempt"] = attempt,
+                        ["httpRequestSent"] = false, ["budget"] = extractionBudget }.ToString(Formatting.None));
+                    callback?.Invoke(false, "", "speech-claim-context-budget"); yield break;
+                }
                 float started = Time.realtimeSinceStartup;
                 using (var request = new UnityWebRequest(url, "POST"))
                 {
@@ -120,21 +129,38 @@ public partial class ChatQW
                         !string.IsNullOrEmpty((string)claim["evidence"]) || !string.IsNullOrEmpty((string)claim["targetQuote"]) ||
                         !string.IsNullOrEmpty((string)claim["pendingSameResultQuote"])))
                     { accepted = false; failure = "conversation:unexpected-result-fields"; }
-                    bool ambiguousLanguage = accepted && ((string)claim["actualLanguage"] == "mixed" || (string)claim["actualLanguage"] == "und");
+                    JObject languageDiagnostic = null;
+                    try {
+                        var raw = JObject.Parse(output, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+                        if (raw["actualLanguage"]?.Type == JTokenType.String &&
+                            new[] { "ja", "zh", "en", "mixed", "und" }.Contains((string)raw["actualLanguage"]))
+                            languageDiagnostic = new JObject { ["actualLanguage"] = raw["actualLanguage"].DeepClone(),
+                                ["languageReason"] = raw["languageReason"]?.DeepClone() };
+                    } catch (JsonException) { }
+                    // Diagnose language even when a separate quote/state check
+                    // failed. Diagnostics do not make an invalid claim trusted.
+                    bool ambiguousLanguage = (string)languageDiagnostic?["actualLanguage"] == "mixed" || (string)languageDiagnostic?["actualLanguage"] == "und";
+                    bool languageDisagreement = languageDiagnostic != null && !string.IsNullOrEmpty((string)input["publicSpeechLanguage"]) &&
+                        RoomTaskProtocol.ReviewLanguageRejection(languageDiagnostic, (string)input["publicSpeechLanguage"]) != null;
+                    bool recheckLanguage = ambiguousLanguage || languageDisagreement;
+                    var issues = new JArray();
+                    if (!string.IsNullOrEmpty(failure)) issues.Add(failure);
+                    if (recheckLanguage) issues.Add("actualLanguage:recheck-substantive-clause-grammar");
                     // Curl can reject reuse of a closed local connection before
                     // receiving HTTP (error 65 / upload rewind). Rebuild this
                     // read-only classification once, sharing the same two-attempt
                     // ceiling with schema repair; no action is resent.
                     bool reconnect = !received && attempt == 0 && request.responseCode == 0 &&
                         request.result == UnityWebRequest.Result.ConnectionError && Time.realtimeSinceStartup-started < .5f;
-                    bool recover = reconnect || received && attempt == 0 && (!accepted || ambiguousLanguage);
+                    bool recover = reconnect || received && attempt == 0 && (!accepted || recheckLanguage);
                     if (received) status = accepted ? "received" : "invalid-claim-or-ungrounded-quote";
-                    if (ambiguousLanguage && recover) failure = "actualLanguage:recheck-substantive-clause-grammar";
+                    if (accepted && recheckLanguage && recover) failure = "actualLanguage:recheck-substantive-clause-grammar";
                     Debug.Log("[Room/SpeechClaim] " + new JObject {
                         ["generation"] = generation, ["attempt"] = attempt, ["maximumRecoveryAttempts"] = 1,
                         ["accepted"] = accepted, ["httpStatus"] = request.responseCode, ["status"] = status,
                         ["transportResult"] = request.result.ToString(), ["transportError"] = request.error,
                         ["failureDetail"] = failure, ["recoveryScheduled"] = recover,
+                        ["validationIssues"] = issues, ["languageDiagnostic"] = languageDiagnostic,
                         ["recoveryKind"] = reconnect ? "early-connection-rebuild" : recover ? "extraction-repair" : "none",
                         ["rejectedOutput"] = accepted && !recover ? null : output.Substring(0, Math.Min(1600, output.Length)),
                         ["outputCharacters"] = output.Length, ["outputTruncated"] = output.Length > 1600,
@@ -146,12 +172,19 @@ public partial class ChatQW
                         if(reconnect) { yield return null; continue; }
                         // The quotes/state already passed independent extraction.
                         // A language recheck cannot rewrite those proven spans.
-                        languageSource = ambiguousLanguage ? (JObject)claim.DeepClone() : null;
+                        languageSource = accepted && recheckLanguage ? (JObject)claim.DeepClone() : null;
                         repair = new JObject { ["attempt"] = 1, ["maximumAttempts"] = 1, ["failureDetail"] = failure,
+                            ["validationIssues"] = issues.DeepClone(),
                             ["rejectedOutput"] = output.Substring(0, Math.Min(1600, output.Length)) };
                         claim = null; continue;
                     }
                     if (!accepted) { callback?.Invoke(false, "", "speech-claim-" + status); yield break; }
+                    if (recheckLanguage && languageSource == null) {
+                        // A full repair (or reconnect) used the shared recovery
+                        // budget. Its unresolved language classification was not
+                        // independently verified; it cannot order a public rewrite.
+                        callback?.Invoke(false, "", "speech-claim-language-unverified"); yield break;
+                    }
                     if (cacheKey != null) { m_SpeechClaimCacheKey = cacheKey; m_SpeechClaimCache = (JObject)claim.DeepClone(); }
                     break;
                 }
@@ -165,6 +198,14 @@ public partial class ChatQW
                 ["factScope"] = "none", ["resultReport"] = claim["resultReport"].DeepClone(),
                 ["actualLanguage"] = claim["actualLanguage"].DeepClone() };
             callback?.Invoke(true, rejection.ToString(Formatting.None), "speech-claim-language-mismatch"); yield break;
+        }
+        if (claim["planningFailureClaim"] is JObject failureClaim && input["decisionFailure"] is JObject actualFailure &&
+            (string)failureClaim["kind"] != "not-mentioned" && (string)failureClaim["kind"] != (string)actualFailure["kind"])
+        {
+            callback?.Invoke(true,new JObject { ["verdict"]="inconsistent",["reason"]="The independently extracted spoken failure cause differs from the current decision receipt.",
+                ["factScope"]="scene-action",["resultReport"]=claim["resultReport"].DeepClone(),["actualLanguage"]=claim["actualLanguage"].DeepClone(),
+                ["conflict"]="unsupported-claim",["conflictQuote"]=failureClaim["quote"].DeepClone(),["planningFailureReport"]=failureClaim["kind"].DeepClone()
+            }.ToString(Formatting.None),"speech-claim-failure-cause-mismatch");yield break;
         }
         bool temporalConflict = RoomSpeechClaimProtocol.HasTemporalConflict(claim);
         if (requirement != null && (temporalConflict || (string)claim["resultReport"] != (string)requirement["expectedReport"]))
@@ -222,6 +263,13 @@ public partial class ChatQW
                 // Cloud JSON mode need not honor const. Neither provider may rewrite the independent observation.
                 result["resultReport"] = claim["resultReport"].DeepClone();
                 result["actualLanguage"] = claim["actualLanguage"].DeepClone();
+                if(claim["planningFailureClaim"] is JObject reviewedCause)
+                    result["planningFailureReport"]=reviewedCause["kind"].DeepClone();
+                result.Remove("movementDependencies");
+                // This metadata comes from the separate words-only extraction,
+                // never from the factual reviewer's optional scope declaration.
+                if (domain == "movement" && claim["movementDependencies"] is JObject dependencies)
+                    result["movementDependencies"] = dependencies.DeepClone();
                 output = result.ToString(Formatting.None);
             }
             callback?.Invoke(ok, output, status);

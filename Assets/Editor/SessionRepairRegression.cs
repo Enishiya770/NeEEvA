@@ -82,10 +82,33 @@ public static class SessionRepairRegression
         Check(projection.SelectToken("visibleObjectCatalog.current.candidates[0].customSafetyRule.noCrossing")?.Value<bool>()==true&&
             (string)projection.SelectToken("sceneActionPrerequisites.customConstraint")=="keep clear","unknown constraints survive attention projection");
         Check(body.ToString()==original&&JToken.DeepEquals(body["currentFacts"],projection["currentFacts"]),"resident memory and actual body facts unchanged");
+        body["sceneActionPrerequisites"]["knownObjects"] = new JArray(new JObject {
+            ["entityId"]="known-device",["captureId"]="fresh-1",["currentVisibility"]="confirmed-in-current-capture",
+            ["registeredPowerCapability"]=true,["requiresFreshSemanticMatch"]=true,["actionAuthorization"]=false,
+            ["measuredDistanceMeters"]=3.0,["deviceDistanceLimitMeters"]=2.5,["withinOperationDistance"]=false
+        });
+        Check(Focus(body,out projection) && projection.SelectToken("sceneActionPrerequisites.knownObjects") == null &&
+            (string)projection.SelectToken("sceneActionPrerequisites.customConstraint")=="keep clear",
+            "body planner omits device-only distance/capability rows without dropping unknown constraints");
+        body["sceneActionPrerequisites"]["knownObjects"][0]["customSafetyRule"] = "do not enter this area";
+        Check(Focus(body,out projection) && (string)projection.SelectToken("sceneActionPrerequisites.knownObjects[0].customSafetyRule")=="do not enter this area",
+            "future/custom per-object restrictions survive projection");
         body["currentUserText"]="Follow me and describe that screen.";
         Check(!Focus(body,out _),"old attention cannot scope a changed complete request");
         body["currentUserText"]="Follow me.";body["taskSequence"]=new JObject();
         Check(!Focus(body,out _),"compound approved work retains predecessor receipts");
+        var progressClaim=JObject.Parse(@"{'ongoingActivityQuote':'I am still recovering','attemptResult':'incomplete','attemptResultQuote':'not finished yet','actualLanguage':'en','pendingSameResultQuote':'','resultReport':'recovering','evidence':'I am still recovering','targetQuote':'','otherClaims':[],'eventClaims':[]}");
+        string progressSpeech="I am still recovering, not finished yet.";
+        Check(RoomSpeechClaimProtocol.TryRead(progressClaim.ToString(),progressSpeech,out var progressRead) &&
+            (string)progressRead["resultReport"]=="recovering" && progressRead["otherClaims"].Values<string>().Contains("not finished yet"),
+            "ongoing recovery and unfinished status coexist without a terminal failure");
+        progressClaim["resultReport"]="incomplete";
+        Check(!RoomSpeechClaimProtocol.TryRead(progressClaim.ToString(),progressSpeech,out _),"ongoing quote cannot silently become a terminal result");
+        progressClaim["resultReport"]="recovering";progressClaim["ongoingActivityQuote"]="not finished yet";
+        Check(!RoomSpeechClaimProtocol.TryRead(progressClaim.ToString(),progressSpeech,out _),"same negative quote cannot prove an affirmative activity");
+        progressClaim["ongoingActivityQuote"]="";progressClaim["resultReport"]="paused";progressClaim["evidence"]="I stopped";
+        Check(RoomSpeechClaimProtocol.TryRead(progressClaim.ToString(),"I stopped, not finished yet.",out progressRead) &&
+            (string)progressRead["resultReport"]=="incomplete","stopping does not hide the explicit unfinished result");
         return count;
     }
 }

@@ -10,7 +10,7 @@ using NeEEvA.Perception;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
-public static class SceneReviewQueueRegression
+public static partial class SceneReviewQueueRegression
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     public static JObject LastReport { get; private set; }
@@ -253,6 +253,7 @@ public static class SceneReviewQueueRegression
 
         yield return CompletedGoalChecks(c);
         yield return DirectPlaybackChecks(c);
+        yield return SpeechHandoffChecks(c);
     }
 
     private static IEnumerator CompletedGoalChecks(Context c)

@@ -21,11 +21,11 @@ public static class WorkNextIntentProtocol
         "没有依据时可自由选择不依赖该前提的新话题或保持观察，不得把猜测写成既成事实。" +
         "没有值得推进的下一意图时source=none、proceed=false。planning_focus只表示下一意图需要的信息：" +
         "current-user-body=仅处理角色与当前用户的身体位置/跟随/停止，scene=物件或空间观察，other=回答或其他任务，unknown=不确定。" +
-        "这三个字段只说明来源和注意范围，不授权工具，不把已有到达事实改成当前仍在身边，也不把一次性靠近变成持续跟随。";
+        "这三个字段只说明来源和注意范围，不授权工具，不把已有到达事实改成当前仍在身边，也不把一次性靠近变成持续跟随。" + WorkResultDeliveryProtocol.Contract;
 
     public static bool ValidExtension(JObject value)
     {
-        return OptionalEnum(value, "next_intent_source", "none", "current-work", "autonomous") &&
+        return WorkResultDeliveryProtocol.ValidExtension(value) && OptionalEnum(value, "next_intent_source", "none", "current-work", "autonomous") &&
             OptionalEnum(value, "planning_focus", "current-user-body", "scene", "other", "unknown") &&
             (value["next_step_id"] == null || value["next_step_id"].Type == JTokenType.String && ((string)value["next_step_id"]).Length <= 64);
     }
@@ -38,6 +38,7 @@ public static class WorkNextIntentProtocol
         fields["next_step_id"] = new JObject { ["type"] = "string", ["maxLength"] = 64 };
         fields["planning_focus"] = new JObject { ["type"] = "string", ["enum"] = new JArray("current-user-body", "scene", "other", "unknown") };
         foreach (string name in new[] { "next_intent_source", "next_step_id", "planning_focus" }) ((JArray)result["required"]).Add(name);
+        WorkResultDeliveryProtocol.ExtendSchema(result);
         return result.ToString(Newtonsoft.Json.Formatting.None);
     }
 

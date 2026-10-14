@@ -218,6 +218,12 @@ public static class ArdyRoomDialogueIntegrationRegression
     private static IEnumerator Scenario()
     {
         yield return Delay(.4f);
+        if (Environment.GetCommandLineArgs().Contains("-ardyPreparationOnly"))
+        {
+            report.roomSpeechPreparationChecks = ArdyRoomSpeechPreparationRegression.RunChecks(chat, bridge);
+            report.scope = "Connected room preparation ownership and finite recovery with controlled callbacks; no motion-generation or audible-latency claim.";
+            yield break;
+        }
         bool retargetOnly = Environment.GetCommandLineArgs().Contains("-ardyApproachRetargetOnly");
         if (!retargetOnly) report.roomTaskClosureChecks = ArdyRoomTaskClosureRegression.RunChecks(chat, bridge);
         report.roomFollowChecks = ArdyRoomFollowRegression.RunChecks(chat, bridge);
@@ -382,12 +388,32 @@ public static class ArdyRoomDialogueIntegrationRegression
             !(bool)self["currentlyNearAndFacingUser"], "Avatar's own head was accepted as the user anchor.");
         CheckHeldRoot(); EndCase(); bridge.userHead = user;
 
+        BeginCase("continuous-target-updates-coalesce-before-first-playback");
+        user.position = FindUser(false, true); RoleCommand("approach");
+        string preparingAction = bridge.ActionId;
+        Vector3 lateral = Vector3.Cross(Vector3.up, Horizontal(user.position - avatar.transform.position).normalized);
+        for (int update = 0; update < 8; update++)
+        {
+            user.position += lateral * .20f;
+            yield return Delay(.045f);
+            if (!bridge.Controller.Player.IsPlaying && bridge.Controller.CommittedTargetRevision == 0)
+                Check(bridge.ReadCurrentTargetEvidence().approachRetargetCount == 0,
+                    "Queued preparation samples consumed actual route-attempt budget before any movement.");
+            Check(bridge.Phase != "blocked" && bridge.Phase != "cancelled", "Preparation updates prematurely exhausted an approach.");
+        }
+        Check(bridge.ReadCurrentTargetEvidence().approachRetargetUpdates >= 3,
+            "The fixture must cover multiple material target updates, not only one coalesced sample.");
+        yield return WaitFor(() => bridge.Phase == "arrived" && !bridge.ReservesBody, 50, "coalesced preparation arrival");
+        Check(bridge.ActionId == preparingAction && !bridge.IsFollowing && bridge.ReadCurrentTargetEvidence().currentlyNearAndFacingUser,
+            "Coalesced preparation must arrive at the latest target under the same bounded action.");
+        EndCase();
+
         BeginCase("moving-user-retargets-pending-operation");
         user.position = FindUser(false, true); RoleCommand("approach");
         yield return WaitFor(() => bridge.Controller.ExecutionState == ArdyRoomExecutionState.Generating, 30, "moving-user fixture generation");
         SaveWire(); string retargetAction = bridge.ActionId;
         user.position += Vector3.Cross(Vector3.up, Horizontal(user.position - avatar.transform.position).normalized) * .5f;
-        yield return WaitFor(() => bridge.ReadCurrentTargetEvidence().approachRetargetCount > 0, 2, "bounded target refresh");
+        yield return WaitFor(() => bridge.ReadCurrentTargetEvidence().approachRetargetUpdates > 0, 2, "bounded target refresh");
         Check(bridge.ActionId == retargetAction && !bridge.IsFollowing && bridge.Phase != "cancelled", "Small target drift cancelled the parent or enabled continuous following.");
         yield return WaitFor(() => bridge.Phase == "arrived" && !bridge.ReservesBody, 50, "retarget arrival");
         Check(bridge.ActionId == retargetAction && bridge.ReadCurrentTargetEvidence().approachRetargetCount <= 3, "Recovery created a new logical task or exceeded its count budget.");
@@ -448,7 +474,7 @@ public static class ArdyRoomDialogueIntegrationRegression
         Check(bridge.Controller.Player.PlaybackRevision >= playerRevision && !bridge.Controller.Player.HasPoseOwnership,
             "A stale generation reclaimed ownership after explicit stop.");
         report.playingStopPreservedRoot = true; EndCase();
-        Check(report.cases.Count == 14 && report.cases.All(value => value.completed), "Expected all fourteen bounded integration cases to complete.");
+        Check(report.cases.Count == 15 && report.cases.All(value => value.completed), "Expected all fifteen bounded integration cases to complete.");
     }
 
     private static DialogueMotionIntent RoleCommand(string name)

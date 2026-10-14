@@ -167,8 +167,8 @@ public static partial class RoomSpeechFactScopeRegression
                 Require(model.m_DataList.Count == history, "Cancelled language rewrite cannot publish through late callbacks.");
             else if (mode == "still-wrong")
                 Require(model.Decisions.Last() == first && model.m_DataList.Count == history + 1 &&
-                    model.m_DataList.Last().content != bad,
-                    "An identical rejected rewrite immediately uses the existing fallback without another factual-review request.");
+                    model.m_DataList.Last().content != bad && model.EngineFallbacks.Count > 0,
+                    "An identical rejected rewrite uses one separately recorded fallback review without another rewrite.");
             else
             {
                 yield return Wait(() => model.Decisions.Last() != first, "Rewritten language and facts reviewed again");

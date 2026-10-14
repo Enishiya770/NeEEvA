@@ -182,6 +182,9 @@ public partial class ChatSample
     {
         var model = m_ChatSettings.m_ChatModel;
         int owner = ++m_SceneObjectMatchOwner;
+        if (current() && TryReuseSceneTargetIdentity(decision, observation, initial, fact))
+        { completed(initial, null); yield break; }
+        m_SceneTargetIdentity = null;
         var ownerBridge = GetComponent<ArdyRoomDialogueBridge>();
         if (ownerBridge == null || ownerBridge.environmentRoot != m_SceneMatchEnvironment || ownerBridge.avatar != m_SceneMatchAvatar)
         { m_SceneObservationGoal = null; m_SceneObjectMatchReceipt = null; }
@@ -304,7 +307,10 @@ public partial class ChatSample
             fact.intentFocusWorldPoint = selected.WorldPoint; fact.hasIntentFocus = true;
             fact.targetResolutionSource = initial?.EntityId == selected.EntityId ? "candidate-confirmed" : "candidate-reselected";
             if (!decision.IsObservationApproach)
+            {
                 RememberSceneVisibleSemanticMatch(selected, fact.targetDescription, fact.matchCaptureId);
+                RememberSceneTargetIdentity(selected, mainGoal);
+            }
             completed(selected, null);
         }
         finally { if (owner == m_SceneObjectMatchOwner) model.CancelSceneObjectMatchMessage(); }

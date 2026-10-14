@@ -88,7 +88,7 @@ public partial class ChatSample
             !string.IsNullOrEmpty((string)recovery["lastFailureCategory"]))
             execution["boundedRecovery"] = PickRoomFields(recovery, "eventName", "lastFailureCategory", "lastFailureReason",
                 "recoveryCount", "qualityRecoveryCount", "qualityRecoveryLimit", "controlRecoveryCount", "controlRecoveryLimit", "recovering",
-                "failureOperationRevision", "failureRequestId", "failureSessionId", "failureObservedUtc");
+                "failureOperationRevision", "failureRequestId", "failureSessionId", "failureObservedUtc", "failureStage", "lastHandoff");
         return new JObject {
             ["controlEntryPoints"] = new JObject {
                 ["spokenTaskPlannerAvailable"] = HasRoomTaskPlanner,
@@ -304,14 +304,26 @@ public partial class ChatSample
         }
         string input = AddWorkRoomStepDecisionContext(
             BuildRoomDecisionInputWithObservation(userText, autonomous, prompt, bridge, observation), workStep);
-        void ReviewControl(string controlInput, Action<bool, string, string> callback)
+        void ReviewControl(string controlInput, Action<bool, string, string> callback, JObject replacement = null)
         {
             if (TryReusePreparedBodyReview(preparedBodyReview, controlInput, out string cachedReview))
             {
                 preparedBodyReview = null; // This transaction can consume the judgment once.
-                Debug.Log($"[Room/ControlReviewReuse] generation={generation} sameInput=true permissionRevalidated=true noHttp=true", this);
-                callback(true, cachedReview, "same-turn-prepared-body-review");
-                return;
+                if (replacement == null || RoomControlReviewProtocol.TryBodyDecision(cachedReview,
+                    m_ActionConstraints.CurrentUserText, true, out var cachedDecision, out _) && cachedDecision.intent == "stop-moving")
+                {
+                    Debug.Log($"[Room/ControlReviewReuse] generation={generation} sameInput=true permissionRevalidated=true noHttp=true", this);
+                    callback(true, cachedReview, "same-turn-prepared-body-review");
+                    return;
+                }
+                replacement["conflict"] = "Earlier body classification and approved current task disagree. Re-read the complete human request independently.";
+                Debug.Log("[Room/ControlReconciliation] " + new JObject { ["generation"]=generation,
+                    ["reason"]="approved-new-task-conflicts-with-prepared-continuation",["maximumReviews"]=1,
+                    ["previousBodyJudgment"]=cachedReview }.ToString(Formatting.None), this);
+            }
+            if (replacement != null) {
+                var request = JObject.Parse(controlInput); request["replacementTransaction"] = replacement.DeepClone();
+                controlInput = request.ToString(Formatting.None);
             }
             consumed = true;
             int revision = ++decisionRevision;
@@ -357,6 +369,11 @@ public partial class ChatSample
                     // The retry is bounded and still checks current body ownership.
                     // A denial/timeout never grants a stop or a device write.
                     HandoffDeviceGoal(latestDecision);
+                }, new JObject {
+                    ["source"] = "independently-approved-current-task", ["currentUserText"] = m_ActionConstraints.CurrentUserText,
+                    ["goalId"] = goalId, ["taskSequence"] = ReadRoomTaskSequence(),
+                    ["currentRequestSemantics"] = ReadCompactCurrentRequestSemantics(generation),
+                    ["scope"] = "Current approved objective only; independently reconcile implicit body replacement with the COMPLETE human request. A prior question-only classification may have missed a later imperative. Do not invent explicit stop, override keep-following/negation/conditions, or execute the new objective here."
                 });
                 return true;
             }
@@ -481,7 +498,7 @@ public partial class ChatSample
                     int reviewRevision = ++decisionRevision;
                     var proposalReferentSources = BuildSpatialGoalReferentSources();
                     var proposalDialogue = JArray.Parse(RecentRoomDialogue());
-                    string reviewInput = new JObject {
+                    string reviewInput = RoomTaskContextPolicy.DeviceProposalReview(new JObject {
                         ["currentUserText"] = sourceText,
                         ["mode"] = "new-proposal",
                         ["proposal"] = JObject.FromObject(decision.deviceGoal),
@@ -492,7 +509,15 @@ public partial class ChatSample
                         ["verifiedObservedDeviceHistory"] = BuildVerifiedObservedDeviceReferentHistory(),
                         ["referentSources"] = proposalReferentSources.DeepClone(),
                         ["scope"] = "Independently compare this complete actual user request with the proposed device task. No scene action or device write has been authorized by this proposal."
-                    }.ToString(Formatting.None);
+                    }).ToString(Formatting.None);
+                    Debug.Log("[Room/DeviceGoalProposal] " + new JObject {
+                        ["generation"] = generation, ["workEpoch"] = workEpoch, ["userTurn"] = userTurn,
+                        ["attempt"] = proposalReinterpretations, ["currentUserText"] = sourceText,
+                        ["proposal"] = JObject.FromObject(decision.deviceGoal),
+                        ["taskStep"] = m_RoomTaskSequenceSelection,
+                        ["taskSequence"] = ReadRoomTaskSequence(), ["referentSources"] = proposalReferentSources.DeepClone(),
+                        ["scope"] = "Exact proposed operation and current human request before independent review. Historical sources establish only identity; no action is authorized here."
+                    }.ToString(Formatting.None), this);
                     Action<bool, string, string> OnDeviceGoalReview = (reviewOk, reviewJson, reviewStatus) => {
                         if (deviceGoalReviewComplete || reviewRevision != decisionRevision || !CurrentRequest()) return;
                         pendingDeviceGoalReview = null;
@@ -547,10 +572,21 @@ public partial class ChatSample
                                 proposalInterpretationCorrection=new JObject {
                                     ["rejectedProposal"]=JObject.FromObject(decision.deviceGoal),["reviewReason"]=review.reason,
                                     ["attempt"]=proposalReinterpretations,["maximumAttempts"]=1,
-                                    ["scope"]="The actual user requested a device operation, but this interpretation was rejected. Reinterpret the complete current utterance once; preserve all target/state/negative constraints. A corrected proposal must receive its own independent authorization review. No old proposal or goal supplies new authority. If unresolved, return none and explain the uncertainty." };
+                                    ["currentTargetAnchor"] = m_ActionConstraints.CurrentUserText,
+                                    ["scope"]="The actual user requested an operation, but this interpretation was rejected. Reinterpret once. targetDescription anchors the COMPLETE CURRENT request, never an old imperative copied from historicalTargetConstraint. Identity comes separately from reviewed historical sources; current desiredState comes only from current words. Preserve negative/conditional/object constraints and all steps. The correction still needs independent authorization review. If unresolved return none; do not repeat the rejected field unchanged." };
                                 deviceGoalReviewComplete=false; currentRequestOnly=false; standingGoalStep=false; planLatestGoalUpdate=false;
                                 autonomous=false; userText=m_ActionConstraints.CurrentUserText;
                                 consumed=false; RequestFresh(); return;
+                            }
+                            if (review?.requestAssessment == "requested" && review.verdict == "rejected")
+                            {
+                                // One reinterpretation has been spent. Preserve the
+                                // real rejection; do not manufacture a none/s1 plan
+                                // and then report its schema failure as the cause.
+                                deviceGoalReviewRejected = true;
+                                consumed = false;
+                                OnDecision(ok, json, status, sourceText, prepared);
+                                return;
                             }
                             currentRequestOnly=true; standingGoalStep=false; planLatestGoalUpdate=false;
                             autonomous=false; userText=m_ActionConstraints.CurrentUserText;
@@ -1165,6 +1201,14 @@ public partial class ChatSample
         };
         if (!wireAccepted && classifiedTransportFailure)
             m_RoomTaskDecisionFailure["providerDiagnostic"] = providerFailure;
+        if ((int?)m_SpatialGoalLatestReview?["generation"] == generation &&
+            (int?)m_SpatialGoalLatestReview?["userTurn"] == userTurn &&
+            (bool?)m_SpatialGoalLatestReview?["registered"] == false)
+        {
+            m_RoomTaskDecisionFailure["proposalReview"] = PickRoomFields(m_SpatialGoalLatestReview,
+                "verdict", "modelReason", "validationFailure", "requestAssessment", "proposal", "referentKind", "referentSourceId");
+            m_RoomTaskDecisionFailure["scope"] = (string)m_RoomTaskDecisionFailure["scope"] + " proposalReview is the current proposal's rejected interpretation, not a denial by the human or proof of a device/navigation failure. Explain that interpretation could not be validated; do not present the reviewer's asserted cause as an observed world fact.";
+        }
         if (preflightBudgetFailure)
             m_RoomTaskDecisionFailure["scope"] = "This decision was stopped locally because the essential input still exceeded its budget after projection. No HTTP request was sent, no provider rejected it, and no new action was dispatched. Do not blame user clarity, claim a network outage, or promise an unsubmitted retry. Previous executed actions remain separate facts.";
         if (!string.IsNullOrEmpty(completedStopActionId)) {
@@ -1387,6 +1431,8 @@ public partial class ChatSample
         int repairAttempts = 0;
         string repairLanguage = null;
         bool repairPending = false;
+        bool fallbackReviewAttempted = false, reviewDeadlineReached = false, completedMovementRefreshUsed = false;
+        JObject fallbackConcurrentFailure = null;
         string reviewedFactScope = "legacy";
         string reviewedRequestDisposition = "uncertain";
         string reviewedPlanningFailureReport = "uncertain";
@@ -1430,7 +1476,8 @@ public partial class ChatSample
             bool diagnosedPlanningFailure = !reviewedAnswerOnly &&
                 (string.IsNullOrEmpty(m_RoomTaskActionId) || (bool?)ReadRoomTaskDecisionFailure()?["remainingAfterCommittedStop"] == true) &&
                 (bool?)ReadRoomTaskDecisionFailure()?["newActionSubmittedByThisDecision"] == false;
-            if (diagnosedPlanningFailure && (!coherent || ReadConcurrentBodyFailure(generation) != null ||
+            if (diagnosedPlanningFailure && (!coherent || ReadConcurrentBodyFailure(generation) != null &&
+                (!fallbackReviewAttempted || !JToken.DeepEquals(fallbackConcurrentFailure, ReadConcurrentBodyFailure(generation))) ||
                 reviewedPlanningFailureReport != (string)ReadRoomTaskDecisionFailure()?["kind"]))
             {
                 coherent = false;
@@ -1443,8 +1490,6 @@ public partial class ChatSample
                 // must not revive a candidate based on an invalidated completion.
                 coherent = false; reviewStatus = "device-goal-proof-changed-before-release";
             }
-            consumed = true;
-            ReleaseOwner();
             bool terminalResult = !diagnosedPlanningFailure && generation == m_SpatialGoalTerminalReplyGeneration;
             string language = repairLanguage ?? (terminalResult ? SpatialGoalReportLanguage(buffer.LanguageCode) :
                 coherent ? buffer.LanguageCode : SpatialGoalReportLanguage(buffer.LanguageCode));
@@ -1472,7 +1517,37 @@ public partial class ChatSample
                 text += ConcurrentBodyFailureNotice(ReadConcurrentBodyFailure(generation), language);
             if (!coherent && !quietFallback && CurrentFormalGenerationFailed(generation))
                 text += (language == "en" ? " " : "") + FormalGenerationFailureNotice(language);
-            if (!quietFallback) text = AppendRoomRequestProgress(text, language, generation);
+            if (!quietFallback && !fallbackReviewAttempted) text = AppendRoomRequestProgress(text, language, generation);
+            // Generated repairs and engine wording share the same words-only
+            // extraction and current-fact review. One fallback, no repair loop.
+            if (!coherent && fallbackReviewAttempted && !completedMovementRefreshUsed && !reviewDeadlineReached &&
+                reviewStatus == "movement-state-refreshed-from-current-receipt" && UseMovementReplyPacket(generation) &&
+                bridge.ActionId == m_RoomTaskActionId && bridge.Phase == "arrived" && text != candidate)
+            {
+                // One stable completion may supersede an in-flight transitional
+                // fallback. Never restart an action or relax its factual review.
+                completedMovementRefreshUsed = true; fallbackReviewAttempted = false;
+                Debug.Log($"[Room/SpeechCompletionRefresh] generation={generation} action={m_RoomTaskActionId} reason=owned-arrival-superseded-transitional-reply maximumRefreshes=1", this);
+            }
+            if (!coherent && !quietFallback && !fallbackReviewAttempted && !reviewDeadlineReached)
+            {
+                fallbackReviewAttempted = true;
+                fallbackConcurrentFailure = ReadConcurrentBodyFailure(generation)?.DeepClone() as JObject;
+                buffer = new SpeechTextBuffer();
+                buffer.Append(new SpeechText(text, language, "room-task-fallback", SpeechActionDependency.Independent));
+                candidate = text; candidateExecutable = text;
+                reviewedIndependentSpeech = null;
+                Debug.Log($"[Room/SpeechFallback] generation={generation} state=awaiting-semantic-review cause={reviewStatus}", this);
+                PrepareReview(0);
+                return;
+            }
+            if (!coherent && (fallbackReviewAttempted || reviewDeadlineReached))
+            {
+                quietFallback = true; text = "<silent/>";
+                Debug.LogWarning($"[Room/SpeechFallback] generation={generation} state=withheld-unverified cause={reviewStatus}", this);
+            }
+            consumed = true;
+            ReleaseOwner();
             RecordFinalRoomReply(generation, text, reviewStatus, bridge);
             // Only the audited public reply enters history and the action parser.
             // Raw candidates remain diagnostics; no discarded promises become memory.
@@ -1486,7 +1561,7 @@ public partial class ChatSample
             else OnSpeechStreamDelta(new SpeechText(text, language, "room-task-fallback", SpeechActionDependency.Independent));
             // A diagnostic fallback may explain a failed body step without
             // delivering other pending tool answers. Keep those results unread.
-            if (coherent || !UseReceiptOnlySpeechReview(generation)) AcknowledgeObservations(observations, generation, text);
+            if (!fallbackReviewAttempted && (coherent || !UseReceiptOnlySpeechReview(generation))) AcknowledgeObservations(observations, generation, text);
             m_FormalResponseInFlight = false;
             Debug.Log($"[Room/SpeechReview] generation={generation} action={m_RoomTaskActionId} releasedCandidate={coherent} repairAttempts={repairAttempts} status={reviewStatus}", this);
             OnStreamComplete(text);
@@ -1505,6 +1580,7 @@ public partial class ChatSample
                 }
                 if (Time.realtimeSinceStartup >= deadline)
                 {
+                    reviewDeadlineReached = true;
                     // The owner is still Fresh here; never cancel a replacement
                     // turn. Stop an abandoned repair's HTTP stream as well as
                     // rejecting its late callbacks so it cannot occupy a slot.
@@ -1515,6 +1591,7 @@ public partial class ChatSample
                 yield return null;
             }
         }
+        if (Application.isPlaying) StartCoroutine(WatchReviewOwner());
         if (IsPlanningFailureOnlyReply(generation))
         { Finish(false, "local-planning-failure-receipt"); return; }
         if (generation != m_SpatialGoalTerminalReplyGeneration && !UseWorkResultReplyPacket(generation) && m_AgentCurrentRoundIsTick && IsSceneVisualIntent(m_RoomTaskIntent) &&
@@ -1532,6 +1609,7 @@ public partial class ChatSample
         { Finish(false, "missing-or-invalid-public-speech"); return; }
         bool TryRepairEvidenceReply(JObject verdict, string guardRejectedReason)
         {
+            if (fallbackReviewAttempted || reviewDeadlineReached) return false;
             // A validated semantic rejection can repair an answer, never a plan.
             // Consume the single allowance before capture/provider dispatch, so
             // duplicate reviewer callbacks cannot start another continuation.
@@ -1678,7 +1756,7 @@ public partial class ChatSample
                 turnSweep = movementPacket || terminalPacket || workResultPacket ? null : ReadRoomSweepReplyFacts(observation),
                 visualObservation = observation != null ? JObject.Parse(observation.MetadataJson) : null,
                 visualEvidence = workResultPacket || movementPacket ? null : terminalPacket ? BuildWorkReviewObservationContext(observation) : BuildSceneObservationContext(observation),
-                reviewAttempt = attempt, repairAttempts,
+                reviewAttempt = attempt, repairAttempts, engineFallbackReview = fallbackReviewAttempted,
                 reviewAttention = movementPacket ? "owned-body-receipt-and-reply-purpose" : terminalPacket ? "owned-device-result-and-current-request" : "full-required-evidence",
                 scope = "Classify dependencies of the actual public claim. A user route assessment is not a verdict on image contents or another scene target." +
                     (terminalPacket ? " publicSpeech is the device-result segment. The runtime appends other requested steps' current progress from owned execution receipts at release/playback. This segment's device success never establishes completion of the whole task. Independent questions still require their answers." : "")
@@ -1699,7 +1777,7 @@ public partial class ChatSample
                     Finish(false, "invalid-review-json"); return;
                 }
                 reviewedFactScope = factScope;
-                var dependencies = ResolveRoomSpeechDependencies(m_RoomTaskIntent, factScope);
+                var dependencies = ResolveReviewedRoomSpeechDependencies(m_RoomTaskIntent, factScope, JObject.Parse(output));
                 var changed = ChangedRoomSpeechFacts(snapshot, dependencies);
                 var verdict = JObject.Parse(output);
                 if (progressOwner != null && RoomTaskProtocol.ReviewAllows(output) && !RoomSpeechPartsProtocol.TryRead(verdict, candidate,
@@ -1815,7 +1893,6 @@ public partial class ChatSample
                 SubmitReview(attempt, refreshed, "captured-for-review");
             });
         }
-        if (Application.isPlaying) StartCoroutine(WatchReviewOwner());
         if (m_MovementReplyStateGeneration == generation && m_MovementReplyState != null &&
             !JToken.DeepEquals(m_MovementReplyState, MovementPlaybackStamp(ReadCompactRoomTaskFacts(bridge), m_RoomTaskIntent, m_RoomTaskActionId)))
         {
@@ -1849,6 +1926,7 @@ public partial class ChatSample
         {
             string kind = (string)planningFailure["kind"];
             if (kind == "input-budget-exceeded") return "这次规划要处理的信息太多，没能生成动作计划，还没有开始新的动作。";
+            if (planningFailure["proposalReview"] is JObject) return "这次对新操作要求的核验没有通过，因此没有开始新操作。";
             return kind == "service-request-failed"
                 ? "这次生成动作计划的服务请求失败了，没有启动新的动作。"
                 : "这次没有得到可执行的动作计划，没有启动新的动作。";

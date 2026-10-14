@@ -47,7 +47,15 @@ public static class ArdyRoomStreamDiagnosticsRegression
         if (!Newtonsoft.Json.Linq.JToken.DeepEquals(quality,ArdyStreamQualityFailure.Read(wrapped)) ||
             ArdyStreamQualityFailure.Read("<html>proxy failure</html>")!=null)
             throw new InvalidOperationException("Quality candidate evidence lost or malformed response accepted.");
-        return 19;
+        var category = typeof(ArdyRoomLocomotionController).GetMethod("StreamFailureCategory", BindingFlags.Static | BindingFlags.NonPublic);
+        string Category(Exception error) => (string)category.Invoke(null, new object[]{error});
+        var localType = typeof(ArdyRoomLocomotionController).GetNestedType("StreamLifecycleException", BindingFlags.NonPublic);
+        var serviceType = typeof(ArdyRoomLocomotionController).GetNestedType("ServiceRequestException", BindingFlags.NonPublic);
+        var local = (Exception)Activator.CreateInstance(localType, new object[]{"closed prefix", new ArdyRoomStreamHandoff{sessionId="closed-session",stage="stream-arriving"}});
+        var remote = (Exception)Activator.CreateInstance(serviceType, new object[]{"HTTP failure", "{}", (long)503});
+        if(Category(local)!="stream-lifecycle" || Category(remote)!="service-request" || Category(new InvalidOperationException("local state"))!="client-state")
+            throw new InvalidOperationException("Local lifecycle/state failures were attributed to the remote service.");
+        return 22;
     }
     [Serializable] private sealed class Wire
     {
@@ -209,6 +217,8 @@ public static class ArdyRoomStreamDiagnosticsRegression
             Check(controller.ExecutionState == ArdyRoomExecutionState.Failed && controller.ExecutionReason == ArdyRoomExecutionReason.OwnershipLost &&
                 !controller.IsContinuousFollowActive && !player.HasPoseOwnership && string.IsNullOrEmpty(controller.StreamSessionId) &&
                 controller.StreamTelemetry.lastFailureCategory == "ownership" && controller.Status.Contains("root motion") &&
+                controller.StreamTelemetry.failureSessionId == "arrival-owner-change-fixture" &&
+                controller.StreamTelemetry.failureStage == "stream-arriving" &&
                 controller.Avatar.transform.position == ownerFailureRoot,
                 "Arrival handoff lost the actual Animator root-motion failure reason or retained follow/body authority after ownership loss.");
 
@@ -225,6 +235,7 @@ public static class ArdyRoomStreamDiagnosticsRegression
                 controller.ExecutionReason == ArdyRoomExecutionReason.GenerationFailed &&
                 controller.StreamTelemetry.lastFailureCategory == "motion-supply" && !controller.IsContinuousFollowActive,
                 "Exhausted supply for a changed/far goal was silently recast as arrival. This is an injected budget/state check, not a service outage test.");
+            SuspendedArrivalChecks(controller, realClip);
             return checks;
         }
         finally
@@ -241,6 +252,54 @@ public static class ArdyRoomStreamDiagnosticsRegression
     private static Dictionary<FieldInfo, object> MutableFields(object target) => target.GetType()
         .GetFields(Private | BindingFlags.Public).Where(field => !field.IsInitOnly).ToDictionary(field => field, field => field.GetValue(target));
     private static void Property(object target, string name, object value) => target.GetType().GetProperty(name).SetValue(target, value);
+    private static void SuspendedArrivalChecks(ArdyRoomLocomotionController controller, ArdyLocomotionClip realClip)
+    {
+        var player = controller.Player;
+        foreach (string mode in new[] { "no-pending", "pending", "new-target", "replacement", "foreign-owner" })
+        {
+            player.RestorePreview(); player.Play(realClip, null, 23); player.SampleAt(.0f);
+            Set(controller,"ownedClip",realClip);Set(controller,"ownedPlayerRevision",player.PlaybackRevision);
+            Set(controller,"streamSessionId","suspended-"+mode);Set(controller,"streamNextFrame",24);Set(controller,"streamBaseFrame",0);
+            Set(controller,"streamPreparedClip",null);Set(controller,"streamRecovering",false);Set(controller,"streamRequestPending",false);
+            Set(controller,"streamRecentStepCost",.20f);Set(controller,"streamRecentFramePeak",.02f);
+            Set(controller,"streamUserMoving",false);Property(controller,"StreamDesiredSpeed",.5f);
+            Property(controller,"IsContinuousFollowActive",true);Property(controller,"IsBusy",true);Property(controller,"Stage","stream-moving");
+            int token=(int)Get(controller,"revision");Property(controller,"OperationRevision",token);
+            Property(controller,"TargetGround",(Vector3)Call(controller,"AvatarGround")+Vector3.forward*3);
+            var suspended=(IEnumerator)Call(controller,"RunContinuousStream",token);
+            try {
+                Check(suspended.MoveNext() && controller.StreamBufferSeconds>.65f,"Production coroutine did not suspend above its dispatch threshold.");
+                Property(controller,"TargetGround",Call(controller,"AvatarGround"));
+                if(mode=="pending")Set(controller,"streamRequestPending",true);
+                Call(controller,"TickContinuousStream");
+                Check(controller.Stage=="stream-waiting" && controller.IsContinuousFollowActive && player.IsReturningToAnimation,
+                    "Rendered arrival did not retain the follow task while releasing its wire.");
+                var handoff=controller.StreamTelemetry.lastHandoff;
+                Check(handoff!=null && handoff.sessionId=="suspended-"+mode && handoff.stage=="stream-moving" &&
+                    handoff.pending==(mode=="pending") && handoff.bufferSeconds>.65f,"Pre-close identity/buffer/pending evidence was lost.");
+                // The pending branch creates a fresh production waiter. Stop only
+                // that fixture coroutine before manually advancing the old one.
+                if(Get(controller,"work") is Coroutine worker) {controller.StopCoroutine(worker);Set(controller,"work",null);}
+                if(mode=="replacement") {
+                    Set(controller,"revision",token+1);Property(controller,"OperationRevision",token+1);
+                    Check(!suspended.MoveNext(),"Replaced operation resumed its old worker.");
+                } else if(mode=="foreign-owner") {
+                    player.RestorePreview();player.Play(realClip,null,23);
+                    Exception failure=null;try{suspended.MoveNext();}catch(Exception error){failure=error;}
+                    Check(failure!=null && failure.Message.Contains("接管"),"A foreign player owner was silently treated as normal arrival.");
+                } else {
+                    if(mode=="new-target") {Set(controller,"streamUserMoving",true);Property(controller,"TargetGround",(Vector3)Call(controller,"AvatarGround")+Vector3.right*2);}
+                    for(int i=0;i<8;i++)Check(suspended.MoveNext() && controller.IsContinuousFollowActive &&
+                        Get(controller,"pending")==null && controller.StreamSessionId==null,
+                        "Closed wire generated another prefix instead of waiting for smooth handoff.");
+                }
+            } finally {
+                (suspended as IDisposable)?.Dispose();Set(controller,"streamRequestPending",false);Set(controller,"streamSessionId",null);
+                if(Get(controller,"work") is Coroutine worker){controller.StopCoroutine(worker);Set(controller,"work",null);}
+            }
+        }
+        Set(controller,"streamUserMoving",false);
+    }
     private static void StorageChecks(ArdyRoomLocomotionController controller)
     {
         var request = new Wire(); string raw = JsonUtility.ToJson(request);

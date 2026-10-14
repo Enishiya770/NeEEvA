@@ -35,6 +35,13 @@ public static partial class RoomDecisionBudgetRegression
             Require(sharedTable == null || !sharedTable.Descendants().OfType<JProperty>().Any(property => property.Name == "requestEvidenceRef"),
                 "Cross-branch shared scope/pose/bearing values never create nested request evidence references.");
             Require((bool)Call(null, "RestoreRoomDecisionSharedEvidence", projected), "Admitted shared evidence is valid and expandable.");
+            // Resolve exact shared pose fields for source-value comparisons;
+            // final admission above already exercised optional-row projection.
+            foreach(var reference in projected.Descendants().OfType<JProperty>().Where(p=>p.Name=="currentPoseRef" && (string)p.Value=="planningCatalogPose").ToArray()) {
+                var pose=(JObject)reference.Parent;var sharedPose=(JObject)projected["planningCatalogPose"];
+                foreach(var field in sharedPose.Properties())pose[field.Name]=field.Value.DeepClone();
+                reference.Remove();
+            }
             foreach (string field in new[] { "currentUserText", "latestUserText", "autonomous", "currentFacts", "currentSupport", "visualObservation",
                 "decisionContractFacts", "pendingObservationGoal", "objectTargetReview", "referentSources", "unknownSafetyConstraint" })
                 Require(JToken.DeepEquals(source[field], projected[field]), "Protected current evidence / authority remains exact: " + field);
@@ -50,8 +57,8 @@ public static partial class RoomDecisionBudgetRegression
                 (int)projected["visibleObjectCatalog"]["current"]["pageIndex"] == 2,
                 "Every current candidate and its page/catalog namespace survives even when optional history is bounded.");
             for (int index = 0; index < candidates.Count; ++index)
-                foreach (string key in new[] { "entityId", "referenceId", "sourceCaptureId", "imagePoint", "pointAtCapture", "directionFromCurrentPose", "modelDescription" })
-                    Require(JToken.DeepEquals(source["visibleObjectCatalog"]["current"]["candidates"][index][key], candidates[index][key]),
+                foreach (string key in new[] { "entityId", "referenceId", "sourceCaptureId", "imagePoint", "pointAtCapture", "modelDescription", "directionFromCurrentPose.relativeToCurrentView", "directionFromCurrentPose.relativeToCurrentBody", "directionFromCurrentPose.selfPose.captureId", "directionFromCurrentPose.selfPose.capturedAtUtc", "directionFromCurrentPose.selfPose.cameraYawRelativeToBodyDegrees", "directionFromCurrentPose.selfPose.sinceHistoricalCapture" })
+                    Require(JToken.DeepEquals(source["visibleObjectCatalog"]["current"]["candidates"][index].SelectToken(key), candidates[index].SelectToken(key)),
                         "Current identity/source/pixel/world-point/body-camera direction remains exact: " + key);
             var memory = (JArray)projected["visibleObjectCatalog"]["memory"];
             Require(memory.OfType<JObject>().Any(row => (string)row["entityId"] == "remembered-59") &&
@@ -350,7 +357,7 @@ public static partial class RoomDecisionBudgetRegression
     {
         var pose = new JObject { ["captureId"] = "capture-current", ["capturedAtUtc"] = "2026-10-09T10:35:40.0000000Z",
             ["cameraPosition"] = Vector(1, 2, 3), ["bodyPosition"] = Vector(1, 0, 3), ["cameraRotation"] = new JObject { ["x"] = 0, ["y"] = .2, ["z"] = 0, ["w"] = .98 },
-            ["bodyForward"] = Vector(0, 0, 1), ["cameraYawRelativeToBodyDegrees"] = 23,
+            ["bodyForward"] = Vector(0, 0, 1), ["hasBodyPose"] = true, ["cameraPitchRelativeToBodyDegreesUp"] = 0, ["cameraYawRelativeToBodyDegrees"] = 23,
             ["sinceHistoricalCapture"] = new JObject { ["captureId"] = "capture-history", ["bodyYawChangeDegreesRight"] = -123.4, ["bodyTranslationMeters"] = 2.1 },
             ["scope"] = "Measured pose; positive yaw right, historical coordinates are frozen and not navigation permission. " + new string('p', 500) };
         var memory = new JArray();

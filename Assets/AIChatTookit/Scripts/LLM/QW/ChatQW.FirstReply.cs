@@ -393,7 +393,7 @@ public partial class ChatQW
                 yield return RequestFirstReplyReview(FirstReplyProtocol.BuildGroundingRepairWire(wire, output), generation, callback, 1);
                 yield break;
             }
-            callback?.Invoke(route, questionUnderstanding, requestKind, candidateSufficient, responseDemand, status, proof, route == null ? null : (string)JObject.Parse(output)["planningFocus"]);
+            callback?.Invoke(route, questionUnderstanding, requestKind, candidateSufficient, responseDemand, status, proof, route == null ? null : FirstReplyProtocol.ReviewedPlanningFocus(output));
         }
     }
 

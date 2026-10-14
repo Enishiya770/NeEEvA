@@ -1,395 +1,218 @@
 # NeEEvA
 
-基于 Unity 的 AI 虚拟角色语音伴侣。VRM 虚拟形象「アントネーワ（安托涅瓦，出自《永远的7日之都》）」在 3D 房间场景中与用户进行实时日语语音对话，支持流式回复、语音打断、歌唱与哼唱感知、实时屏幕视觉、口型同步、图谱式长期记忆与 Agent Loop 自主行为调度。
+NeEEvA 是一个基于 Unity 的具身 AI 角色项目：角色在 3D 房间里听用户说话、观察环境、进行语音对话，并尝试完成靠近、跟随、寻找物件和操作场景设备等任务。项目也保留了长期记忆、录音片段回唱、VRM 表情与 PC VR 接入。
 
-## 主要特性
+**当前说明对应 `codex/project-checkpoint-20261011` 分支，更新于 2026-10-14。** 本仓库是持续开发中的源码工程，不是包含全部模型、音色和房间资源的安装包。
 
-- **VRM 1.0 虚拟形象**：基于 UniVRM 0.129.1，实时口型同步（OVRLipSync）、自动眨眼、姿态动画切换
-- **实时语音对话链路**：麦克风 VAD 检测 → WebSocket 增量转写与可撤销的临时理解 / 心里话 / 候选回答 → EOU 完整 SenseVoice 校正（附带情绪 / 音频事件标签）→ LLM 流式生成 → 按句切分排队 TTS → 边合成边播放边显示
-- **低延迟交互**：支持对话打断（barge-in，约 0.3s 响应）、试探性断句（tentative EOU，0.6s 静默即预判句尾）以减少等待；`<continue/>` 无缝续写、`<silent/>` 内心独白（只记录不朗读）
-- **歌唱、哼唱感知与角色演唱**：声学分析与临时语义判断共同区分普通说话、歌唱和“唱到一半改说话”；角色可查歌、把命名或未命名片段存入本地曲库、按顺序练唱、用自己的音色回唱，也可从已学曲库演唱或接唱可靠的后续片段
-- **实时屏幕视觉**：主推的 qwen3.6 多模态模型可以"看"用户的电脑屏幕——角色自主输出 `<look/>` 睁眼后，每一帧感知都附最新桌面截图，能实时感知画面变化，`<unlook/>` 闭眼（详见下文「启用 Qwen3.6 与实时视觉」）
-- **Agent Loop 自主行为**：角色不是被动应答机——她通过 `<next/>` 标签自主排定下一次"思考"时刻，可以主动搭话、安静等待，或被环境声响拉回注意力（详见「Agent Loop」一节）
-- **图谱式长期记忆（可读写）**：带权重的记忆节点 + 语义边构成知识网络（`seed_memory.json` 含 21 个种子节点），运行时持久化到 `Application.persistentDataPath/memory.json`，每帧按"权重 × 新近度"把 Top-30（可调）节点注入感知帧；角色可通过 `<memory_add/>` / `<memory_update/>` 标签自主写入新记忆，权重随时间半衰期衰减（默认 180 天减半，有下限保护）；Editor 菜单 `NeEEvA > Memory Graph` 提供记忆网络的力导向图查看与编辑（Play 模式可直连运行实例实时观察写入）
-- **情境记忆召回（"既视感"）**：当前对话与某段旧记忆语义相似时，即使它排不进核心 Top-30，也会作为「此刻被唤起的记忆」浮进感知帧——由语义嵌入检索 + 沿记忆网络边的扩散激活双机制驱动（详见「情境记忆召回」一节）
-- **多 LLM 后端可插拔**：DeepSeek、通义千问（DashScope 云端 / llama-server、Ollama 本地双后端）、OpenAI、智谱 ChatGLM、讯飞星火、RWKV
-- **多语音服务可选**：本地 SenseVoice ASR、GPT-SoVITS 声音克隆 TTS，以及 OpenAI / Azure / 讯飞 云端 TTS & STT
-- **Qwen-Omni 多模态**：文本 + 语音 + 摄像头 / 截图输入，流式文本与音频输出（`qwen-omni-turbo`）
-- **语音唤醒（WOV）**：通过语音触发激活对话
+## 当前能力
 
-## 系统架构
+| 模块 | 当前实现与边界 |
+| --- | --- |
+| 实时对话 | 麦克风检测、SenseVoice 增量转写与完整语音校正、流式文本、GPT-SoVITS 流式语音及用户打断。临时理解、内部审核与公开台词分开处理。 |
+| 角色视觉与注意力 | 从角色视角采集房间画面，结合可见物件、空间记忆与当前任务进行观察、搜索、转向及观察位置调整；桌面画面可显示在房间电视上。历史观察不等于当前可见事实。 |
+| 房间行动 | ARDY 对话动作与连续移动、靠近用户或物件、跟随、停止及任务交接；包含路径检查、流式动作延迟处理和恢复逻辑。动态动作质量仍需场景实测。 |
+| 多步骤任务 | 解析完整请求中的动作、条件、撤回与顺序；维护步骤依赖，在实际完成后续接。设备任务覆盖寻找、靠近、操作及状态核验，只作用于已接入的场景对象。 |
+| 行为与说话核对 | 公开表达与目标身份、实际执行状态和播放回执关联。生成了文字、动作已提交、动作已完成、用户已听到结果分别记录；失败结果也可以完成告知，不会因此被改记为成功。 |
+| 自主行为与记忆 | 根据当前事项、观察、用户约束及工具结果安排后续检查、回应或等待；提供记忆图谱与可选的语义召回。自主续接有预算和失效检查。 |
+| 歌唱 | 管理真实录音片段与本地曲库，按具体素材、范围和顺序回唱；可接入歌声合成与音色转换。不能仅凭歌名生成从未获取的完整原曲，当前也不是严格同步合唱。 |
+| 形象与交互 | VRM 角色、口型、眨眼、Artifairy 形态键同步和弹簧骨骼；桌面自由视角及 OpenXR/PICO 相关接入。完整 Android 体验需要另外部署和验证。 |
+
+这些是当前代码提供的能力与约束，不代表所有模型、房间、设备和自然语言组合都已通过验收。当前开发主线使用 `ChatQW`；其他 LLM 接入和 Qwen-Omni 示例仍在仓库中，但不保证具有同等的视觉、任务和动作能力。
+
+## 系统如何连接
 
 ```mermaid
 flowchart LR
-    MIC["🎤 麦克风"] --> VAD["VAD 检测<br/>RTSpeechHandler"]
-    VAD -->|PCM 100ms 帧| PASR["SenseVoice partial WS :9881<br/>可回滚实时转写"]
-    PASR --> DRAFT["临时理解 / 心里话 / 候选回答<br/>模态判断；不发声、不入历史"]
-    VAD -->|EOU 完整 WAV| ASR["SenseVoice final :9881<br/>文本 + 情绪 + 音频事件"]
-    VAD -->|稳定有调人声| SING["歌唱感知<br/>音高 / 音域 / 旋律轮廓"]
-    DRAFT --> GATE["认知与声学门控<br/>最终 ASR 优先；普通说话可否决回放"]
-    ASR --> GATE
-    SING --> GATE
-    GATE --> LOOP["ChatSample Agent Loop<br/>感知帧汇总"]
-    MEM["记忆网络 MemoryHub<br/>Top-30 节点"] --> LOOP
-    CAP["DesktopCapture 屏幕截图<br/>look 睁眼时"] --> LOOP
-    LOOP --> LLM["ChatQW qwen3.6<br/>DashScope 云端 / 本地 :8080"]
-    LLM -->|song_search 按需调用| SONG["歌曲检索<br/>本地旋律库 / MusicBrainz"]
-    SONG --> LOOP
-    LLM -->|song_remember / rename / forget| SONGMEM["本地歌曲记忆<br/>未命名 WAV / 多参考片段"]
-    SONGMEM --> LOOP
-    LLM -->|hum_back / song_sing| SVS["独立歌声合成 :9883<br/>SingingScore → 语种路由"]
-    SVS -->|未安装 / 语种不支持 / 失败时明确降级| HUM["角色歌声转换 :9882<br/>RVC 专属模型优先 / Seed-VC 回退"]
-    SVS --> AUDIO
-    HUM --> AUDIO["声音仲裁<br/>语音与歌声单路播放"]
-    LLM -->|流式 token| SPLIT["按句切分排队"]
-    SPLIT --> TTS["GPT-SoVITS TTS :9880<br/>Antoneva 音色"]
-    TTS --> AUDIO
-    AUDIO --> SPK["🔊 AudioSource 播放"]
-    SPK --> LIP["OVRLipSync 口型同步"]
+    User[用户语音或文字] --> Input[语音检测与转写]
+    Input --> Agent[ChatSample 对话与任务编排]
+    Vision[角色相机与场景事实] --> Agent
+    Memory[记忆与当前事项] --> Agent
+    Agent <--> Qwen[ChatQW / Qwen]
+    Qwen --> Review[结构化决定与语义核对]
+    Review --> Action[房间行动与设备控制]
+    Action <--> Motion[ARDY 动作服务]
+    Action --> Facts[执行结果与状态回读]
+    Facts --> Agent
+    Review --> Speech[公开台词与事实核对]
+    Speech --> TTS[GPT-SoVITS / AudioSource]
+    TTS --> Receipt[实际播放回执]
+    Receipt --> Agent
 ```
 
-默认端口一览（均可在对应组件 / 启动脚本中修改）：
+Qwen 负责理解、选择和表达，Unity 持有场景对象、任务状态、可执行接口与播放状态。决定通过检查后才提交执行；旧用户轮次、旧目标或已取消任务的异步回调不能直接继续操作。
 
-| 服务 | 默认地址 | 用途 |
-|---|---|---|
-| SenseVoice ASR / 歌唱感知 | `127.0.0.1:9881` | 本地语音识别、音高/旋律分析与歌曲检索编排 |
-| GPT-SoVITS TTS | `127.0.0.1:9880` | 本地声音克隆语音合成 |
-| 独立歌声合成 SVS | `127.0.0.1:9883` | 读取歌词、音符、F0 与力度，重新生成角色歌声；不是音频变声 |
-| 角色歌声转换（RVC 优先） | `127.0.0.1:9882` | 用专属角色模型转换用户演唱；Seed-VC 作为无专属模型时的回退 |
-| 本地 LLM（llama-server / Ollama） | `127.0.0.1:8080` | qwen3.6 本地推理（含视觉） |
-| 本地嵌入服务（可选） | `127.0.0.1:8090` | 为情境记忆提供语义向量；不启动时自动退回名字提及与扩散激活 |
-| DashScope（可选云端） | `dashscope.aliyuncs.com` | 千问云端推理 / Qwen-Omni |
+完整动作链路还使用共享 Qwen 服务的专用动作特征接口，再由适配器连接 ARDY。普通聊天 API 可用，并不意味着动作特征接口也已部署。
 
-## 环境要求
+## 运行准备
 
-- Unity **2022.3.22f1**
-- 可选的本地服务（按需启用）：
-  - **本地语音识别 SenseVoice**：✅ 服务端已包含在仓库中（`Server/SenseVoice`），Python 3.10+，`pip install` 后开箱即用，模型权重首次启动自动下载
-  - **本地声音克隆 TTS GPT-SoVITS**：⚠️ git 仓库只包含 Unity 调用端与启动脚本；完整服务端（含便携 runtime 与 Antoneva 音色）约定放在项目根目录 `GPT-SoVITS/`，双击 `start_tts_server.bat` 启动（默认 `127.0.0.1:9880`），克隆用户需自行部署（见下文「部署 GPT-SoVITS」）
-  - **独立歌声合成 SoulX-Singer（可选）**：桥接位于 `Server/SVS`，SenseVoice 会先生成 renderer-neutral 的 `SingingScore`，SoulX 再从歌词/音符/F0 重新合成歌声。模型与预处理权重体积较大，需手工运行 `install_soulx.cmd`；安装器会准备 Python 3.10，并在 Git 克隆被重置时改走官方 ZIP。官方前端支持普通话、英语和粤语；项目另带明确标为实验性的日语假名音素适配
-  - **本地歌声转换 RVC / Seed-VC**：✅ 桥接服务位于 `Server/SeedVC`，有 `Server/RVC/models/neeeva_character.pth` 时优先使用角色专属 RVC v2 模型，否则回退到 Seed-VC；首次使用 Seed-VC 可能下载约 2.4 GB 权重
-  - **本地 LLM qwen3.6-35b-a3b**：llama.cpp llama-server（默认 `127.0.0.1:8080`），模型与视觉投影 GGUF 需自行下载（见「本地部署 qwen3.6-35b-a3b」小节）
+### 环境与仓库范围
 
-## 快速开始
+- **Unity 2022.3.22f1**，版本以 [ProjectVersion.txt](ProjectSettings/ProjectVersion.txt) 为准。
+- 现有服务管理脚本主要面向 **Windows + PowerShell**。本地 GPU 服务需要与各自推理环境匹配的 CUDA/PyTorch；当前开发部署把 Qwen/嵌入服务与 Unity/语音/ARDY 分在两台机器上运行。
+- SenseVoice 使用 Python 环境；ARDY 安装流程要求 Python 3.11+、可用的 CUDA PyTorch 和对应资源。不同服务的依赖应按各自说明安装。
+- Unity 包版本由 [Packages/manifest.json](Packages/manifest.json) 管理；UniVRM/UniGLTF 源码位于 `Assets/`。首次打开需等待依赖安装及资源导入。
 
-1. 用 Unity Hub 打开本项目（首次导入会重新生成 `Library/`，耗时较长）。
-2. 打开主对话场景 `Assets/AIChatTookit/Scene/chatSample.unity`（包含 NeEEvA 形象与完整对话栈；`Assets/Scenes/NeEEvARoom.unity` 是由编辑器菜单 `NeEEvA > Build Room (White-box)` 生成的白盒房间场景）。
-3. 在场景内对应组件的 Inspector 中填入自己的 API Key（**仓库不包含任何密钥**；LLM 走本地 llama-server / Ollama 后端时无需密钥，可跳过）：
-   - LLM：`ChatQW`（主推，见下节）/ `ChatDeepSeek` 等组件的 `api_key`
-   - Qwen-Omni：`QwenOmni` 组件的 `api_key`（阿里云百炼 DashScope）
-4. （可选）启动本地语音识别服务（服务端代码已在仓库中，SenseVoiceSmall 模型权重首次启动时会自动从 ModelScope 下载）：
+仓库包含 Unity 代码、已跟踪的场景和角色资源、服务桥接代码、启动脚本及回归用例。以下内容需要另行准备：
 
-   ```bash
-   cd Server/SenseVoice
-   pip install -r requirements.txt
-   python sensevoice_server.py              # 默认 cuda:0，监听 127.0.0.1:9881
-   python sensevoice_server.py --device cpu # CPU 模式
-   ```
+| 资源 | 位置或说明 |
+| --- | --- |
+| Qwen、视觉投影与嵌入模型 | 本地 llama.cpp 目录或远端推理机；不随此仓库提供。 |
+| GPT-SoVITS 服务、权重与音色配置 | 项目根目录 `GPT-SoVITS/`；仓库仅保留其中的启动脚本。参考音频路径须与自己的部署一致。 |
+| ARDY 上游代码、环境、模型、适配器与运行证据 | `Server/ARDY/` 和 `Tools/MotionAdapter/` 下的忽略目录，以及本机模型缓存。 |
+| 歌声合成、转换模型与用户曲库 | 各 `Server/` 子目录中的模型、运行环境和录音数据；按需部署。 |
+| 私有房间与衍生场景依赖 | `Assets/Private/`、`LocalPrivate/` 中的本机资源。即使仓库保留了某个场景文件，也不代表其引用的素材齐全。 |
 
-   服务同时提供 `ws://127.0.0.1:9881/stream/asr`。实时对话开启后，Unity 会发送
-   16kHz mono PCM16 小帧并接收可回滚的 `partial`；用户说完后仍调用 `/asr` 做最终校正。
-   `partial` 形成的理解、内心反应、模态判断与候选回答只存在于本轮内存中，不会写入聊天历史或长期记忆。
-   `requirements.txt` 同时安装 torchcrepe；未安装或运行失败时会自动回落到内置 FFT 音高跟踪器，普通 ASR 不受影响。
+完整排除规则见 [.gitignore](.gitignore)。克隆仓库不能还原开发机上的全部私有场景、语音模型和运行数据。
 
-5. （可选）启动 GPT-SoVITS 声音克隆 TTS：双击 `GPT-SoVITS\start_tts_server.bat`（该文件夹在本机开发环境中已内置完整服务端与 Antoneva 音色；克隆用户需先按下文「部署 GPT-SoVITS」自行部署）。
-6. （可选，真正的歌声生成）运行 `Server\SVS\install_soulx.cmd` 安装官方 SoulX-Singer 代码、环境与权重，再运行 `Server\SVS\start_svs_server.cmd`。`.cmd` 只为本次子进程绕过 PowerShell 脚本限制，不会永久修改系统执行策略。Unity 会优先检查 `9883`：普通话/英语/粤语由 SoulX 官方前端处理，日语由内置的实验性假名音素适配处理；只有返回完整可播放 WAV 才记为 SVS 成功。未安装模型或推理失败会在日志中明确标为降级，不会把 `9882` 变声冒充成歌声生成。详细说明见 [`Server/SVS/README.md`](Server/SVS/README.md)。
-7. （可选，角色真人感歌声转换回退）首次运行 `Server\SeedVC\install_seedvc.ps1`。之后 Unity 会在场景启动及每次演唱前检查 `9882`，服务未运行时自动静默启动 `Server\SeedVC\start_seedvc_server.ps1`；也可手工运行该脚本。自动启动日志位于 `Server\SeedVC\runtime\seedvc_server.log`。
-   脚本会依次寻找 `NEEEVA_PYTHON_EXE`、`NEEEVA_GPT_SOVITS_ROOT\runtime\python.exe`、项目内 `GPT-SoVITS\runtime\python.exe` 和系统 `py -3.10`，无需修改源码。
-   ⚠️ **要用角色专属 RVC 音色（而不是 Seed-VC 通用回退），必须先执行 `Server\RVC\install_rvc.ps1`**——它安装的 `Server/RVC/vendor/rvc` 是**推理**运行时，不只是训练才需要。该目录与 `models/` 都被 gitignore，换机器时只带回 `.pth`/`.index` 会导致转换在运行时崩溃（症状：`/health` 显示 `rvc-character-v2` 正常，但一转换就返回 500 且报 `vendor\rvc` 找不到；歌声因此退化成没有角色音色的原始 SVS 输出）。
-8. 运行场景，开始对话。
-
-推荐按 `9881`（ASR）→ `9880`（TTS）→ `8080` 或云端 LLM 的顺序准备基础服务。`9883` 只在需要独立歌声生成时使用，`9882` 是语种不支持或 SVS 不可用时的兼容回退。可分别访问 `/health` 检查 `9881`、`9882`、`9883` 和本地 LLM 是否已经就绪。
-
-## 启用 Qwen3.6 与实时视觉（屏幕感知）
-
-项目主推的 LLM 是 **qwen3.6-35b-a3b**（多模态，支持视觉输入）。视觉附图只在 `ChatQW` 后端实现（`ChatQW.PostMsgStream` 的 `imageDataUrl` 重载），其他 LLM 后端不支持——想用实时视觉就必须把对话模型切到 Qwen。
-
-### 1. 选择 Qwen 作为对话模型
-
-在 `chatSample.unity` 中选中挂有 `ChatSample` 的对象，在 Inspector 的 `Chat Settings` 里把 `m_ChatModel` 指向场景中的 `ChatQW` 组件。
-
-### 2. 配置 ChatQW 后端（二选一）
-
-`ChatQW` 组件的 `m_Backend` 支持两种后端：
-
-| 字段 | 云端（Cloud，阿里云百炼） | 本地（Local，llama-server / Ollama） |
-|---|---|---|
-| `m_Backend` | `Cloud` | `Local` |
-| 模型名 | `m_ChatModelName`，如 `qwen3.6-35b-a3b`（需选支持视觉的版本，以百炼接口文档为准） | `m_LocalModelName`：llama-server 为单模型服务、会忽略请求里的模型名，随意填即可（场景当前填 `antoneva`）；Ollama 则需与已加载模型名一致 |
-| `api_key` | 必填（百炼平台申请） | 留空即可（本地服务不校验） |
-| 地址 | 自动使用 DashScope 兼容模式接口 | `m_LocalUrl`，默认 `http://127.0.0.1:8080/v1/chat/completions` |
-
-#### 本地部署 qwen3.6-35b-a3b（llama.cpp，含视觉）
-
-qwen3.6-35b-a3b 是 MoE 模型（总参 35B / 每次前向仅激活 3.6B），量化后可在消费级显卡上流畅运行，且原生支持视觉输入。
-
-**① 下载 llama.cpp**：从 [llama.cpp Releases](https://github.com/ggml-org/llama.cpp/releases) 下载 Windows 预编译包（NVIDIA 显卡选 `cuda` 版并连同 `cudart` 运行库包一起解压；无 N 卡可用 Vulkan / CPU 版），解压到任意目录（如 `E:\llamacpp`）。
-
-**② 下载模型 + 视觉投影**：从 Hugging Face 任选一个 GGUF 仓库——[unsloth/Qwen3.6-35B-A3B-MTP-GGUF](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-MTP-GGUF)、[bartowski/Qwen_Qwen3.6-35B-A3B-GGUF](https://huggingface.co/bartowski/Qwen_Qwen3.6-35B-A3B-GGUF) 或 [lmstudio-community/Qwen3.6-35B-A3B-GGUF](https://huggingface.co/lmstudio-community/Qwen3.6-35B-A3B-GGUF)（国内可走 hf-mirror.com 镜像或 ModelScope）。需要两个文件：
-
-- 模型本体：选一个量化档，`Q4_K_M` 约 18GB 起步，显存充裕可选更高精度
-- **视觉投影 `mmproj-*.gguf`**（同仓库内）：**必须下载**，没有它模型就"看不见"，带图请求会被拒绝
-
-```bash
-huggingface-cli download unsloth/Qwen3.6-35B-A3B-MTP-GGUF --include "*Q4_K_M*,mmproj*" --local-dir E:\llamacpp
-```
-
-文件名可自行改短（本项目环境命名为 `qwen36.gguf` / `mmproj-Q8_0.gguf`）。
-
-**③ 启动 llama-server**（本项目实际使用的参数）：
-
-```bash
-llama-server.exe -m qwen36.gguf --mmproj mmproj-Q8_0.gguf --host 127.0.0.1 --port 8080 -c 16384 --parallel 1 -ngl 99 --jinja --flash-attn on
-```
-
-- `-ngl 99`：全部层载入 GPU；显存不足时可调小，或加 `--n-cpu-moe N` 把部分 MoE 专家层放内存，用速度换显存
-- `-c 16384`：上下文长度。视觉 token 消耗大，建议不低于 16K
-- `--jinja`：使用模型内置对话模板；`--flash-attn on`：开启 FlashAttention
-- 模型加载约 30–60 秒；浏览器访问 `http://127.0.0.1:8080/health` 返回 ok 即就绪，之后 Unity 侧无需任何额外配置即可对话
-
-其他相关字段：
-
-- `m_EnableThinking`：Qwen3 / 3.6 思考模式开关，默认关闭（可大幅缩短首 token 延迟），云端/本地均生效
-- `m_KeepRecentImages`：多模态历史滑窗，默认 `2`——只保留最近 N 条带图消息的图片，更早的自动剥图只留文字，防止视觉 token 撑爆上下文
-
-### 3. 配置 ChatSample 的视觉参数
-
-`ChatSample` 组件 Inspector 的「视觉(屏幕感知)」区：
-
-- `m_EnableScreenVision`：视觉总开关（默认开）。关闭后角色永远闭眼，`<look/>` 也不生效
-- `m_CaptureMode`：截屏范围——`ActiveWindow` 跟随当前前台窗口所在显示器（推荐，自动跟随你的注意力）/ `Primary` 主屏 / `Specific` 按 `m_MonitorIndex` 指定显示器
-- `m_CaptureMaxDimension`：截图最长边像素，默认 `1280`（等比缩放，平衡画质与 token）
-- `m_CaptureJpegQuality`：JPEG 质量，默认 `80`
-
-### 4. 运行时如何"看见"
-
-视觉由角色在 Agent Loop 中**自主控制**，不需要手动按键：
-
-1. 启动会话后角色默认闭眼，感知帧会提示她「闭眼(用 `<look/>` 可以睁眼)」
-2. 当你提到屏幕内容（比如"看看这段代码""这个网页怎么样"），她会在回复末尾输出 `<look/>` 睁眼
-3. 睁眼状态是**持久的**：之后每一帧感知都会自动附上最新的桌面截图（约 50–150ms 一次 GDI 截屏 → JPEG → base64，随对话节奏发送），所以她能实时感知画面变化——切换窗口、滚动页面、播放视频
-4. 她认为不需要再看时会输出 `<unlook/>` 闭眼，停止图像输入以节省视觉 token
-
-限制：仅支持 Windows 平台（GDI P/Invoke 截屏）；只能看到屏幕，没有摄像头通道（单次的摄像头/截图问答请用 `QwenOmni` 模块）。
-
-## Agent Loop：角色的自主行为
-
-角色不是"一问一答"的被动应答机。`ChatSample` 以**感知帧**驱动 Agent Loop：每一帧把「用户最新发言、她自己最近说过什么、环境声响、会话阶段、视觉状态、记忆库 Top-N 节点」汇总给 LLM，由角色自己决定说话还是沉默、下次何时"想起来"。她通过在回复**末尾**输出标签控制自己的行为：
-
-| 标签 | 作用 |
-|---|---|
-| `<next in="10s" focus="…"/>` | 排定下一次自主思考的时刻，`focus` 是写给自己的注意力备忘 |
-| `<continue/>` | 立刻接着说下一帧（讲故事、长解释时的链式续写） |
-| `<silent/>` | 本轮只在心里想：文字进入记录但不朗读、不显示 |
-| `<look/>` / `<unlook/>` | 睁眼 / 闭眼，开关屏幕视觉（见上节） |
-| `<memory_add name="…" desc="…" weight="0.7"/>` | 把值得长期记住的事写进记忆网络（跨会话持久化） |
-| `<memory_update name="…" desc="…" weight="…"/>` | 修正/强化已有记忆，并刷新其激活时间 |
-| `<song_search query="…" mode="auto"/>` | 按需查询本地旋律库与公开文字元数据 |
-| `<song_remember/>` / `<song_rename/>` / `<song_forget/>` | 管理本地歌曲音频记忆 |
-| `<song_sing mode="memory\|continue"/>` / `<hum_back mode="echo\|practice"/>` | 从长期曲库演唱、可靠接唱，或回唱当前练习片段 |
-
-配套机制：连续多轮无用户回应会强制等待用户开口（`m_MaxConsecutiveAITurns`，默认 8，防独白循环）；环境突发声响可把下一次思考拉前（`m_BringForwardOnSpike`），模拟"被动静拽回注意力"；感知帧还会回显她最近几条发言，提醒她避免重复车轱辘话。相关提示词约定见 `Assets/AIChatTookit/Prompts/behavior.txt`。
-
-提示词支持按需技能：`Prompts/Skills/` 下的文本不会进入常驻 system prompt；本轮检测到对应意图时，LLM 层才把技能作为临时 system context 插在最后一条用户消息之前，且不写入聊天历史。当前 `singing.txt` 覆盖歌唱感知、查歌、曲库演唱、回唱/练唱和本地歌曲记忆；普通聊天会卸载它，以减少固定 token 和长提示导致的输出收敛。基础 `behavior.txt` 中的 `SKILL-BEGIN/END` 块只保留迁移对照，运行时会被剥离。
-
-Skill 的路由规则集中在 `ChatSample.s_SkillRouteDefinitions`；每个 Skill 需声明激活、追问、显式停用及双重否定覆盖信号。显式停用优先于同句内的激活关键词，会立即清空追问窗口，并阻止迟到的工具回调自动重启；只有用户后续新的明确激活指令才会解除。同一轮可激活多个 Skill，路由器会聚合后一次性交给 LLM，不会相互覆盖。
-
-## 流式倾听、临时理解与心里话
-
-用户尚未说完时，WebSocket partial 会持续触发一条**可撤销的认知支路**。它与最终回答使用不同的短提示，不朗读、不中断用户，也不直接写入聊天历史或长期记忆。每次更新包含：
-
-| 字段 | 含义 | 是否持久化 |
-|---|---|---|
-| 普通说话文字 | SenseVoice 在 EOU 后给出的最终转写，是这一轮最权威的语义输入 | 进入当前对话 |
-| 临时理解 | 根据尚未稳定的 partial 推测“用户现在可能想表达什么” | 否 |
-| `inner_reaction` | 角色面对当前推测时的主观心里反应，可帮助提前准备语气和方向，但不能当作事实 | 否 |
-| 候选回答 | 若用户此刻结束，角色可能说出口的草稿 | 否 |
-| `observed_mode` / `mode_confidence` | 独立判断当前更像 `speech`、`singing` 还是 `uncertain`，供歌唱门控参考 | 否 |
-
-最终 `/asr` 返回后，系统会重新比对临时理解与最终文字：足够一致时只把它作为**本轮一次性提示**交给正式 LLM，以缩短组织回答的时间；冲突时整份草稿作废。高置信度 `speech`（默认阈值 `0.82`）还会否决自动回唱，避免“角色答应下一轮跟唱，但用户其实在说话”时把普通语音复读出来；`singing` 判断只能支持最终声学结果，不能单独授权播放。
-
-这里的 `inner_reaction` 不等于 Agent Loop 的 `<silent/>`：前者是倾听期间短暂、可撤销的内部状态，后者是角色在一次正式自主回合中选择“不说出口”的完整想法。当前实现已经允许**倾听分析与回答准备并行**；但对话 TTS、角色歌声仍经过同一声音仲裁器串行播放，因此还不是可以边聊天边同时合唱的完全独立音乐智能体。
-
-## 情境记忆召回（"既视感"）
-
-核心记忆 Top-30 之外的旧记忆平时是"休眠"的——感知帧的排序公式（权重 × 新近度）里没有任何一项和"当前在聊什么"有关，节点一多，久远的事就永远进不了她的视野。情境召回补上了这条"内容寻址"通路：当下的对话与某段旧记忆相似时，它会作为**「此刻被唤起的记忆」**（独立于核心列表的第二通道，默认最多 6 条）浮进感知帧，她会像人突然想起往事一样自然地接住它。
-
-三个召回信号源，按可用性分层：
-
-| 信号源 | 机制 | 时效 |
-|---|---|---|
-| 语义嵌入检索 | 用户发言 → 向量 → 对全库余弦相似度 Top-K（`EmbeddingClient`，需嵌入服务） | 异步，作用于紧随的续写/tick 帧（"说着说着想起来"） |
-| 名字提及扫描 | 任一方发言中出现节点名 → 立即激活并刷新记忆时间 | 同步，当帧生效 |
-| 扩散激活 | 被唤起/提及/写入的节点沿**有向边**把能量传给邻居（顺边全额、逆边打折、两跳衰减），激活值按半衰期（默认 3 分钟）自然消退 | 同步，"相关但不相似"的记忆也能被带热 |
-
-### 启用语义嵌入（可选但推荐）
-
-1. 部署一个 OpenAI 兼容的嵌入服务，二选一：
-   - **本地**：再开一个 llama-server 实例加载嵌入模型（如 [bge-m3 GGUF](https://huggingface.co/gpustack/bge-m3-GGUF)，仅几百 MB）：
-     ```bash
-     llama-server -m bge-m3-Q8_0.gguf --embeddings --port 8090
-     ```
-   - **云端**：阿里云百炼 `https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings`（模型如 `text-embedding-v4`，需 api_key）
-2. 在场景中 `MemoryHub` 所在的 GameObject 上 **Add Component → EmbeddingClient**，按需改地址/模型名（默认指向 `127.0.0.1:8090`）。
-
-不配嵌入服务也能用：语义检索自动停用，提及扫描和扩散激活照常工作。节点向量带磁盘缓存（`memory_embeddings.json`，与 memory.json 同目录），只有新增/被改写的节点会重新嵌入；换嵌入模型或服务地址时缓存整体自动失效重建。
-
-## 歌唱感知、歌曲记忆与角色演唱
-
-歌唱模式默认开启，无需在 Unity 中手工切换。短探测或 WebSocket partial 发现稳定有调人声后，`RTSpeechHandler` 会撤销普通语音的 tentative EOU，改用约 1.8 秒的停唱静默；与此同时，流式认知支路继续分析可能的歌词、意图与说话/歌唱模态。最终 `/asr` 返回歌词推测、歌唱概率、音域、旋律音符序列和音高稳定度，纯哼唱没有歌词也能成为有效片段。
-
-播放前采用“最终 ASR + 声学结果 + 临时心里话”的联合门控：
-
-- 最终文字明确是普通交流，或高置信度临时判断为 `speech` 时，不回放、不写入练唱序列，并尽量回滚这一轮误缓存的普通语音。
-- 用户唱到一半改说“不会唱了”“忘词了”“先停一下”等，整轮标为混合输入，末尾口语优先交给 LLM 正常回应。
-- “上一轮约好跟唱”只是预期，不是证据；可以在后台提前准备转换，但必须等最终门控通过才能真正播放。
-- 临时 `singing` 判断只能为声学结果提供旁证，不能单独确认用户正在唱歌。
-
-### 查歌与本地曲库
-
-角色只有在确实想确认歌曲时才会输出 `<song_search query="..." mode="auto" reason="..."/>`。查询异步执行，结果在下一帧回到角色感知中；返回前模型被要求不得编造歌名。默认提供方：
-
-- **本地哼唱曲库**：原始录音不离开本机，按移调不敏感的旋律 DTW 与歌词/标题线索匹配。元数据存放在 `Server/SenseVoice/song_catalog.json`，受管 WAV 存放在 `Server/SenseVoice/song_library/`；`GET /songs/catalog` 可查看记录摘要。
-- **MusicBrainz**：有文字线索时查询公开歌曲元数据，只发送查询文字，不上传麦克风音频。它不提供歌词或旋律识别，因此结果永远只作为待核实候选，不能单独确认歌名。
-
-`mode="auto"` 会按可用性组合上述提供方；`hum`、`catalog` 可限制检索类型。工具内置 12 秒冷却，候选低于可靠阈值时会明确告诉角色“不能确认”。项目没有接入 ACRCloud 等付费音频指纹服务。
-
-角色可自主调用 `<song_remember/>` 保存最近一次**最终确认的演唱**。`title` 允许为空：系统会生成稳定歌曲 ID，并以 `unknown` 安全临时名保存 WAV；之后可用 `<song_rename/>` 同时更新元数据和实际文件名。相同歌词和旋律的重复录音会保存为同一段的不同演唱版本，不会被误当成歌曲的前后顺序；真正不同的片段才按练习顺序加入。`<song_forget/>` 会删除记录及其受管 WAV，因此仅在用户明确要求或刚刚明显误存时使用。
-
-调用 `<song_remember/>` 只代表发起请求。只有 `9881` 返回落盘成功、歌曲 ID 和文件结果后，工具才把“已在本机记住”交还给角色；角色不得在提交请求的同一轮提前说“已经记住”。没有记忆标签的短哼声、单音和环境噪声不会落盘。
-
-### 回唱、连续练唱与曲库演唱
-
-| 动作 | 音频来源 | 行为 |
-|---|---|---|
-| `<hum_back mode="echo"/>` | 最近一次最终确认的演唱 | 回唱最近一句 |
-| `<hum_back mode="practice"/>` | 本轮练唱会话中按顺序确认的不同片段 | 合成为一次连续演唱，重复段作为版本而非后续 |
-| `<song_sing mode="memory"/>` | 本地长期曲库 | 演唱这首歌已经学会的独立片段 |
-| `<song_sing mode="continue"/>` | 当前歌词/旋律位置 + 本地曲库 | 只接唱曲库中顺序明确、可靠匹配的后续已学片段 |
-
-`continue` 不会凭空生成角色从未听过的旋律；所谓“完整演唱”目前是把已经学到且顺序明确的片段连续组织起来。每次演唱会使用不同的推理种子和受控的细微音高、力度等变化，所以同一首不会只是逐字节重放，但也不会为了制造差异而破坏原旋律。
-
-最终歌唱识别现在会生成 `SingingScore v1`：全局歌词、带休止的音符与时值、10ms 级连续 F0、力度包络、换气位置和颤音提示。日语继续由 SenseVoice 识别，不运行第二套歌词 ASR；乐谱保留原始 `lyrics` 供对话理解，同时生成纯假名 `lyrics_reading` 与按音拍拆分的 `lyrics_mora` 供日语歌声渲染。该结构随最终 ASR 返回，并在新保存的本地曲库片段中一起落盘；快速 partial 不生成大体积乐谱，因此不会拖慢流式倾听。也可调用 `POST /singing/score` 单独提取。Unity 对最近有效歌声保留一份与裁剪后音频对齐的乐谱快照。
-
-当 `9883` 的 SoulX-Singer 后端已安装且语种为普通话、英语或粤语时，Unity 优先提交 SingingScore、目标歌唱片段和角色音色提示。默认角色提示为 `Server/SVS/prompts/41041_svs_zh_short.wav`：它是约 3 秒、带准确普通话音素元数据的专用角色声线样本，不再把旧日语台词误按英语解析。若最终 ASR 已提供歌词，服务会把歌词、音符与连续 F0 直接转换为 SoulX 元数据，不再重复识别用户音频；缺少可用歌词时才回退到官方对齐预处理。真正的 renderer 只读取元数据重新生成波形，因而不是把用户歌声直接换音色。只有响应包含 `X-SVS-Complete: 1`、WAV 可解码并实际播放完成，工具才报告“歌声生成成功”。
-
-SoulX-Singer 官方前端不支持日语；项目内置的 `soulx-ja-phone-adapter-experimental` 会将 SenseVoice 给出的纯假名音拍直接映射到 SoulX 已有音素，处理促音、拨音、长音、拗音及常见外来音。它只使用假名、音拍、音符和 F0 乐谱生成新波形，不靠用户源音频承载音色；遇到无法安全映射的音拍会明确失败。若以后配置完整的 `NEEEVA_JA_SVS_RUNNER`、`NEEEVA_JA_SVS_MODEL` 与可选 Python，外部原生日语乐谱后端会优先。SoulX 约 2.62 GB 的模型在 6 GB 显卡上可能无法与对话 TTS 常驻共存，所以 `9883` 只把 FP16 权重常驻在系统内存，推理时临时搬到 CUDA，结束后立即退回 CPU 并释放显存。普通话/粤语另有一个常驻 CPU 歌唱 ASR：先按真实人声间隙分段，再提取逐字时间戳，避免把歌词按平均发声时长硬摊到音符上；同一字的拖腔最多扩展一个续音，不会把颤音误当作反复咬字。若用户明确纠正歌词，`<hum_back lyrics="正确歌词" .../>` 会替换错字但保留声学时间戳。生成前还会修正孤立八度/谐波尖峰、合并不足 80ms 的碎音；合成保持用户原调，不再按提示声线自动整体移调。角色提示和歌词时间戳均按内容缓存，默认使用 12 步低延迟推理；可通过 `NEEEVA_SVS_INFERENCE_STEPS=4..32` 调整速度/质量。持久化 worker 异常退出时会自动更换并重试一次。后端未安装、语种不支持或推理失败时，若 `Allow SVC Fallback From SVS` 开启，Unity 会**明确记录降级**后把真实原始演唱 WAV 交给 `9882`；后者仍是 RVC / Seed-VC 音频转换，不会被记作独立生成。失败时默认不退回机械 TD-PSOLA，角色也不得用普通 TTS 念歌词来假装唱过。
-
-每次成功 SVS 都会自动在 `Server/SVS/runtime/captures/` 留下最近 20 份诊断包，包含原始片段、SingingScore、角色提示/目标元数据、生成 WAV 和耗时结果；可用 `NEEEVA_SVS_SAVE_CAPTURES=0` 关闭。Unity 日志会记录响应的 `X-SVS-Capture` 编号，便于直接定位“这一次究竟唱了什么”。
-
-转换等待和播放都可被 barge-in 打断，角色自己的歌声也不会被重新识别成用户输入。当前不支持严格同步的双人合唱：倾听和认知准备可以并行，真正可听见的说话与歌唱仍由同一声音仲裁器单路播放。
-
-`ChatSample > 角色旋律回哼` 默认 `Enable Singing Voice Synthesis=false`（SVC 音色转换为默认后端，SVS 独立歌声合成退为可选）、`Enable SVSRVC Post Polish=false`、`Allow SVC Fallback From SVS=true`、`Enable Neural Hum SVC=true`、`Allow Legacy Hum Fallback=false`。`independent SVS complete` 表示独立重新合成；可选的 `svc-post-polish` 表示先独立生成、再用角色 RVC 润色，属于音色转换后处理；`明确降级：改用 9882 SVC` 则表示直接转换原始演唱。`backend=rvc-character-v2` 表示角色专属转换模型，`backend=seed-vc` 表示零样本转换回退。SVS 说明见 [`Server/SVS/README.md`](Server/SVS/README.md)；专属转换模型训练见 [`Server/RVC/README.md`](Server/RVC/README.md)；转换桥见 [`Server/SeedVC/README.md`](Server/SeedVC/README.md)。
-
-**改动歌唱边界、模态判定或语音延迟相关的东西之前，请先读 [`docs/singing-boundary-status.md`](docs/singing-boundary-status.md)**：那里记着每个阈值是怎么量出来的、哪些数是小样本拟合的、哪些判据和延迟假设已经试过并被证伪、以及哪些代码路径还没被真正触发过。这块反复出现"看似合理的改动上线后要撤回"，原因基本都是没有先看已有的反例。
-
-手工添加仍可使用兼容接口，歌名同样可省略：
+### 先打开 Unity 工程
 
 ```powershell
-curl.exe -X POST "http://127.0.0.1:9881/songs/catalog/remember" `
-  -F "audio_file=@E:\Music\my_hum.wav;type=audio/wav" `
-  -F "title=" `
-  -F "reason=想保留的即兴旋律"
+git clone --branch codex/project-checkpoint-20261011 https://github.com/Enishiya770/NeEEvA.git
+cd NeEEvA
 ```
 
-## 部署 GPT-SoVITS 声音克隆 TTS（可选）
+已有工程直接使用自己的工作目录，无需重新克隆。
 
-项目约定 GPT-SoVITS 服务端放在**项目根目录的 `GPT-SoVITS/` 文件夹**，一键启动：
+1. 用 Unity Hub 按上述版本打开工程。
+2. 从 `Assets/AIChatTookit/Scene/chatSample.unity` 开始检查基础对话；白盒房间位于 `Assets/Scenes/NeEEvARoom.unity`。私有房间及 Artifairy 衍生聊天场景需额外资源。
+3. 在 `ChatSample` 的 Chat Settings 中检查模型、语音组件及对象引用；涉及房间行为时，同时检查 `ArdyRoomDialogueBridge` 的角色、环境和用户位置绑定。
+4. 配置下面的模型与语音服务后再进入 Play Mode。当前 Build Settings 的场景列表为空；制作构建时需手动加入目标场景。
 
-```
-双击 GPT-SoVITS\start_tts_server.bat    # 监听 127.0.0.1:9880，加载 Antoneva 音色
-```
+### 配置模型与语音
 
-该文件夹包含便携 Python runtime、v2Pro 底模、Antoneva 音色权重（`GPT_weights_v2Pro/Antoneva-e15.ckpt` + `SoVITS_weights_v2Pro/Antoneva_e8_s96.pth`，已在 `GPT_SoVITS/configs/tts_infer.yaml` 的 `custom` 段配好）和参考音频 `sourceVoice/antoneva.wav`——Unity 场景中 `GPTSoVITSFASTAPI` 组件的参考音频路径、参考文本与语言均已按此预配置，启动服务即可直接对话。
+`ChatQW` 提供两种后端。仓库中的 `chatSample.unity` 当前配置为 Local，地址为 `http://127.0.0.1:8080/v1/chat/completions`。
 
-⚠️ 由于体积约 12GB，`GPT-SoVITS/` 未纳入 git 仓库（仅启动脚本入库）。克隆本仓库的用户需按下述步骤自行部署到同名文件夹：
+| 配置 | Local | Cloud |
+| --- | --- | --- |
+| `m_Backend` | `Local` | `Cloud` |
+| 服务地址 | `m_LocalUrl` | 代码使用 DashScope 兼容接口 |
+| 模型名称 | `m_LocalModelName`，与自己的服务配置匹配 | `m_ChatModelName`，使用账号实际可用的模型 |
+| 密钥 | 根据所部署服务的认证要求配置 | 在 `api_key` 中填写自己的密钥 |
+| 角色视觉 | 需要支持图片输入的模型及视觉投影 | 需要所选模型支持图片输入 |
 
-1. 下载并安装 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)（源码或官方整合包均可），准备好自己训练/下载的 GPT 与 SoVITS 音色权重。
-2. 以 **api_v2** 模式启动推理服务（Unity 端对接的是 `/tts` 接口）：
+完整房间行为不能只靠替换模型名称获得。当前本地链路使用 llama.cpp 相关扩展；替换成其他兼容服务时，需分别验证结构化输出、视觉、并发和动作特征协议。
 
-   ```bash
-   python api_v2.py -a 127.0.0.1 -p 9880 -c GPT_SoVITS/configs/tts_infer.yaml
-   ```
+**SenseVoice：** 在已准备并激活的 Python 环境中，从项目根目录执行：
 
-   在 `tts_infer.yaml`（或启动后通过 `/set_gpt_weights`、`/set_sovits_weights` 接口）指定要加载的音色权重。
-3. 准备一段 3–10 秒的参考音频，放在 **GPT-SoVITS 项目目录**下（`ref_audio_path` 按服务端工作目录的相对路径解析）。场景当前预配置的路径是 `sourceVoice/antoneva.wav`，按此放置可免改 Unity 侧配置。
-4. 如需换音色/参考音频，在 Unity 场景中选中挂有 `GPTSoVITSFASTAPI` 的对象，在 Inspector 中调整（场景已按 Antoneva 预填好）：
-   - `m_ReferWavPath`：参考音频相对 GPT-SoVITS 项目目录的路径（当前为 `sourceVoice\antoneva.wav`）
-   - `m_ReferenceText`：参考音频的文字内容（须与音频实际语音一致）
-   - `m_ReferenceTextLan`：参考音频语言（当前为日文）
-   - `m_TargetLanguageMode`：默认“自动识别”，AI 改用中文、日文或英语时，每个 TTS 文本段会自动把 `text_lang` 切换为 `zh` / `ja` / `en`
-   - `m_TargetTextLan`：固定模式下的目标语言，也是自动识别失败时的回退语言（当前为日文）
-   - `m_WarmUpAllTargetLanguages`：启动时依次预热中/日/英三种语言，并缓存三条角色短回应，避免首次切换语言额外等待约 4–5 秒
-   - `m_PostURL`：默认 `http://127.0.0.1:9880/tts`，服务端不在本机时改成对应地址
-   - 运行时也可由受控 Agent 工具或 UI 调用 `TrySetTargetLanguage("auto" | "zh" | "ja" | "en")`；不在白名单内的值会被拒绝
-   - `ChatSample` 的 `m_EnableLatencyFiller` 默认开启：根据历史首音延迟做移动平均预测，预计超过 `1.5s` 时约在 `0.65s` 播放预缓存短回应；正式首音到达后自然切入回答，不增加新的 SoVITS 请求
-5. 在 `ChatSample` 组件 Inspector 的 `Chat Settings` 里把 `m_TextToSpeech` 指向该 `GPTSoVITSFASTAPI` 组件即可。组件带 `WarmUp()` 预热：启动会话时自动发一条极短合成请求，把模型加载进显存，消除首次合成 2–4 秒的冷启动延迟。
-
-## 常见问题
-
-- **有回复文字、非流式预热有声音，但实时对话完全静音**（日志里成片的 `[TTS流式] 失败(code=422) ... unsupported WAV: riff=False`）：GPT-SoVITS 的 `api_v2.py` 需要打适配补丁——Unity 端把 `streaming_mode` 当整数模式（2/3）发送，上游把它声明为 bool，pydantic v2 会拒绝。`GPT-SoVITS/` 不在 git 仓库内，**换机器或重装后必须重新打补丁**，见 [`Server/GPT-SoVITS-patch/README.md`](Server/GPT-SoVITS-patch/README.md)。
-- **GPT-SoVITS 启动后 `tts_infer.yaml` 被改动了**：api_v2 加载权重时会自动规范化该文件（归一 `version` 字段、补全各版本默认段），属正常行为，音色配置不受影响，无需改回。
-- **没有 NVIDIA 显卡 / CUDA 报错**：SenseVoice 改用 `python sensevoice_server.py --device cpu`；GPT-SoVITS 把 `GPT-SoVITS/GPT_SoVITS/configs/tts_infer.yaml` 中 `custom` 段的 `device` 改为 `cpu`、`is_half` 改为 `false`（CPU 模式合成速度明显变慢）。
-- **她听不到我说话**：确认 SenseVoice 服务窗口在监听 `9881`；检查 Windows 设置 → 隐私 → 麦克风已允许桌面应用访问；再看 Unity Console 是否有 ASR 请求报错。
-- **启动 SenseVoice 报 `[WinError 10048]`**：`9881` 已经被另一个进程占用，最常见原因是 SenseVoice 已经在运行。先访问 `http://127.0.0.1:9881/health`；能正常返回就直接复用，不要再启动第二份。只有健康检查失败时才查找并结束旧进程，或把服务端口和 Unity URL 一起改掉。
-- **看不到流式 partial**：重启 SenseVoice 服务并访问 `http://127.0.0.1:9881/health`，确认返回 `streaming_preview: true`；Unity 的 `SenseVoiceSpeechToText > Enable Streaming Preview` 与 `RTSpeechHandler > Enable Streaming Recognition` 也应开启。
-- **唱歌仍被当成普通说话**：确认 `/health` 返回 `singing_analysis: true`；在 Unity 的 `RTSpeechHandler` 中保持 `Enable Singing Mode` 开启。远距离、严重混响或伴奏远强于人声时建议先清唱测试。
-- **答应跟唱后，我改成说话却被原样复读**：应先看到最终普通 ASR 或日志中的临时 `mode=speech`，随后歌唱动作被 `speechVeto=True` 否决，且最终感知帧不再含 `[演唱片段]`。若仍复读，先确认 Unity 已重新编译最新脚本并重启 Play Mode；旧场景进程不会热切换已经运行中的门控状态。
-- **她查不到歌名**：空的本地曲库只能使用文字目录候选；哼唱匹配需先向本地曲库加入参考歌曲。旋律片段太短、跑调较大或背景伴奏过强时只能返回低置信候选。
-- **她说已经唱了，但没有声音 / 只是念歌词**：文字承诺不算演唱成功。检查 Unity Console 的 `[HumBack]` / `[SongSing]` 结果以及 `http://127.0.0.1:9882/health`；只有 `9882` 返回可解码 WAV 并实际播放完成，工具才会向角色报告成功。普通 GPT-SoVITS TTS 只能说话，不能代替有音调的演唱。
-- **`9883` 显示 `backend_available: false`**：轻量桥已经启动，但 SoulX 仓库、SVS 模型或预处理模型未装齐。运行 `Server\SVS\install_soulx.cmd`，再查看 `Server\SVS\runtime\svs_server.log`。`missing` 数组会指出缺少项。
-- **中文/英语能生成，日语仍走 `9882`**：重启 `9883` 后检查 `/health` 的 `backends.ja`，正常应显示 `soulx-ja-phone-adapter-experimental` 且 `backend_available=true`。若仍显示旧的 `diffsinger-ja` 缺少 runner/model，说明正在运行的是更新前进程。假名读音不完整或包含未支持字符时也会明确拒绝，不会复读源音频。
-- **`9882` 没有自动启动**：查看 `Server/SeedVC/runtime/seedvc_server.log`；如 Python 未被自动找到，可设置 `NEEEVA_PYTHON_EXE` 为解释器完整路径，或设置 `NEEEVA_GPT_SOVITS_ROOT` 为 GPT-SoVITS 根目录。Unity 默认在场景启动和每次演唱前探测并按需启动；也可手工运行脚本后再访问 `/health`。
-- **只唱到后半段，或连续两段间隔很久**：曲库会把相同歌词/旋律的多次录音当作同一段的不同版本，它们不能构成前后顺序。请按顺序教角色真正不同的片段并保存到同一歌曲 ID；`practice` 会尽量一次合成连续片段，`continue` 只接唱顺序明确的已学后续。
-- **有回复文字但没有声音**：确认 GPT-SoVITS 服务窗口在监听 `9880`；注意 `m_ReferWavPath` 按**服务端工作目录**的相对路径解析，移动过参考音频需两侧同步改。
-- **其他端口被占用**：`9880`、`9881`、`9882`、`9883`、`8080`（以及可选 `8090`）都可在启动参数 / 脚本和 Unity 组件 URL 中修改，改完必须保持服务端与调用端一致。
-- **首次对话前几秒没反应**：模型冷启动所致。GPT-SoVITS 已内置 WarmUp 预热，SenseVoice 启动时也会自动预热，一般只影响服务刚启动后的第一句。
-
-## 项目结构
-
-```
-Assets/
-  AIChatTookit/       对话框架
-    Scripts/LLM/        各 LLM 接入（DeepSeek / QW / chatGPT / chatGLM / SparkAI / RWKV / Ollama）
-    Scripts/TTS&&STT/   语音合成与识别（SenseVoice / GPT-SoVITS / OpenAI / Azure / Xunfei / Whisper）
-    Scripts/Chat/       对话编排（流式管线、实时语音、打断处理、DesktopCapture 桌面截屏视觉）
-    Scripts/Memory/     图谱式长期记忆（MemoryHub / MemoryStore / MemoryRecall）
-    Scripts/Expression/ 口型同步、眨眼等表情控制
-    Scripts/WOV/        语音唤醒
-    QwenOmni/           通义千问 Omni 多模态接入
-    Scene/              chatSample 主对话场景（NeEEvA 形象 + 完整对话栈）
-    Prompts/            角色人设 / 行为 / 语言提示词
-      Skills/           按当前轮次动态装载的领域提示词（当前为 singing）
-    MemoryData/         种子记忆 seed_memory.json
-  Editor/             编辑器工具（NeEEvARoomBuilder 白盒房间生成、MemoryGraphWindow 记忆网络可视化编辑）
-  Model/              NeEEvA.vrm 虚拟形象及贴图
-  Scenes/             NeEEvARoom 白盒房间场景（由 NeEEvA > Build Room 编辑器菜单生成）
-  VRM10/ UniGLTF/     UniVRM 0.129.1（VRM 1.0 运行时，内嵌源码）
-Server/
-  SenseVoice/         本地语音识别服务（FastAPI + FunASR）
-  SVS/                独立歌声合成桥（SingingScore + SoulX-Singer）
-  SeedVC/             角色歌声转换桥（FastAPI；RVC 优先 / Seed-VC 回退）
-  RVC/                角色专属 RVC v2 训练、导出与原曲翻唱工具
-GPT-SoVITS/           本地声音克隆 TTS 服务端（约 12GB，未入库，仅 start_tts_server.bat 在仓库中）
+```powershell
+python -m pip install -r Server/SenseVoice/requirements.txt
+Push-Location Server/SenseVoice
+python sensevoice_server.py
+# 无 CUDA 时，可改用：python sensevoice_server.py --device cpu
+Pop-Location
 ```
 
-## 致谢 / 第三方
+首次运行需要下载模型。服务提供最终 `/asr` 与增量 `/stream/asr`，默认监听 `127.0.0.1:9881`。上述命令在前台运行，退出服务后才返回目录。
 
-- [AIChatToolkit](https://github.com/zhangliwei7758/unity-AI-Chat-Toolkit)（MIT，作者 zhangliwei7758）— Unity AI 对话框架，本项目在其基础上做了大量扩展（Agent Loop、屏幕视觉、记忆网络、SenseVoice/GPT-SoVITS 接入等）
-- [UniVRM / UniGLTF](https://github.com/vrm-c/UniVRM) v0.129.1（MIT）— VRM Consortium，VRM 1.0 运行时
-- Oculus OVRLipSync — 口型同步（Oculus SDK 许可）
-- [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) / [FunASR](https://github.com/modelscope/FunASR) — 阿里通义实验室语音识别模型与推理框架
-- [torchcrepe](https://github.com/maxrmorrison/torchcrepe)（MIT）— 歌唱音高与周期性提取
-- [MusicBrainz](https://musicbrainz.org/doc/MusicBrainz_API) — 公开歌曲元数据检索
-- [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)（MIT）— 少样本声音克隆 TTS
-- [SoulX-Singer](https://github.com/Soul-AILab/SoulX-Singer)（Apache-2.0）— 零样本、歌词/旋律/乐谱条件歌声合成
-- [Seed-VC](https://github.com/Plachtaa/seed-vc)（GPL-3.0）— 零样本语音/歌声转换
-- [Retrieval-based Voice Conversion WebUI](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI)（MIT）— 角色专属 RVC v2 歌声音色模型训练与推理
+**GPT-SoVITS：** 先部署完整运行目录、音色权重及 `GPT_SoVITS/configs/tts_infer.yaml`，再检查 Unity `GPTSoVITSFASTAPI` 的参考音频、参考文本和语言配置。启动入口是 `GPT-SoVITS/start_tts_server.bat`。当前流式模式需要项目适配，详见 [GPT-SoVITS 补丁说明](Server/GPT-SoVITS-patch/README.md)；只复制启动脚本无法获得语音服务。
 
-## 注意事项
+**ARDY：** 房间动态动作需要 Qwen 动作特征接口、匹配的适配器及 ARDY 环境。部署入口见 [MotionAdapter](Tools/MotionAdapter/README.md)、[共享 Qwen 特征接口](Tools/MotionAdapter/native/README.md) 和 [ARDY 服务说明](Server/ARDY/motion_service/README.md)。环境就绪后，可从项目根目录运行：
 
-- 所有 API 密钥均不包含在仓库中，需自行申请并在 Inspector 中填写。
-- `Library/`、`Logs/`、`UserSettings/` 等 Unity 生成目录已被 `.gitignore` 排除，克隆后首次打开 Unity 会自动重新生成；`GPT-SoVITS/`（约 12GB）、歌曲录音、转换缓存与本机训练的 RVC/Seed-VC 权重同样未入库。
-- 当前的“接唱”只使用曲库中已经学过且顺序可靠的片段，不会推理出角色从未听过的原曲后续；当前声音输出也是单路仲裁，不是严格同步的实时合唱。
-- 本仓库未附带整体开源许可证；所引用的第三方组件遵循各自的原始许可证。
-- 角色与相关设定仅用于学习交流。
+```powershell
+.\Server\ARDY\start_motion_service.ps1
+```
+
+## 启动入口与服务地址
+
+### 已配置好的开发环境
+
+当前 `start_all.cmd` 的实际顺序是：**远端共享 Qwen 动作特征模式与嵌入服务 → 本地 ARDY → 本地语音与歌唱服务**。它使用 SSH 别名 `neeeva-5090` 及远端已有控制脚本；不是适用于任意新机器的一键安装器。
+
+| 入口 | 实际用途 |
+| --- | --- |
+| `start_all.cmd` | 启动完整开发服务栈，包含动作特征与 ARDY。 |
+| `start_chat.cmd` | 远端 LLM/嵌入 + 本地 TTS/ASR；不启动 ARDY 或歌唱服务。 |
+| `start_llm.cmd` / `start_remote_llm.cmd` | 远端 LLM/嵌入及 SSH 转发，使用默认聊天模式。 |
+| `start_cloud.cmd` | 为 Cloud 后端启动本地嵌入、TTS、ASR、VC、SVS；不启动 ARDY。 |
+| `start_local_llm.cmd` | 停止远端服务栈后启动本地 LLM。 |
+| `start_local_all.cmd` | 停止远端服务栈后启动本地六项服务；不等同于含 ARDY 的完整动作栈。 |
+| `status.cmd` | 检查 ARDY、本地语音、远端服务及隧道状态。 |
+| `stop_all.cmd` | 依次停止受管理的 ARDY、本地语音、远端隧道和模型服务。 |
+
+远端配置背景见 [远端 LLM 部署记录](docs/remote-llm-5090.md)。该文包含历史部署信息，启动行为以根目录脚本为准。已有聊天模式 Qwen 时，完整动作启动不会悄悄替换它；应在会话结束后停止相关服务，再选择完整入口。
+
+### 在自己的机器上按需启动
+
+先准备各服务环境和模型，再使用对应服务脚本。只需要已部署好的 TTS/ASR 时，可在项目根目录执行：
+
+```powershell
+.\Tools\neeeva_services.ps1 start -Only tts,asr
+.\Tools\neeeva_services.ps1 status -Only tts,asr
+```
+
+本地服务控制器可用 `NEEEVA_LLAMACPP_ROOT` 指定 llama.cpp 目录，默认路径为开发机的 `E:\llamacpp`；脚本中的模型文件名也需与实际资源匹配。单机运行的状态和停止操作使用该控制器对应的 `status` / `stop`，不要把依赖远端 SSH 的根目录入口当成通用管理器。
+
+| 服务 | 默认本地端口 | 用途 |
+| --- | --- | --- |
+| Qwen | `8080` | 聊天、视觉；完整模式额外提供动作特征。远端部署通过 SSH 映射到本地。 |
+| 嵌入服务 | `8090` | 可选的记忆语义召回。 |
+| ARDY | `8093` | 对话动作与房间移动。 |
+| GPT-SoVITS | `9880` | 对话语音合成。 |
+| SenseVoice | `9881` | 语音识别与录音分析。 |
+| Seed-VC / RVC | `9882` | 歌声音色转换。 |
+| SVS | `9883` | 独立歌声合成及后端路由。 |
+
+端口可在组件或启动配置中调整。跨机器使用时，`127.0.0.1` 永远指向当前运行客户端的机器；头显独立运行时也一样。
+
+## 使用与扩展
+
+- **先验证对话，再启用房间动作。** 检查文本返回、实际出声和麦克风输入，再验证角色看到的画面、对象绑定及行动结果。屏幕上出现台词不等于音频已播放完毕。
+- **检查角色视野。** 运行中的 `Tools → NeEEvA → Character Scene Vision` 可查看采集图像和观察身份；角色视角、玩家相机和桌面截屏是不同来源。详见 [角色场景视觉](docs/scene-vision-20260913.md)。
+- **场景设备需要接入。** “打开电视”等请求针对已接入的 Unity 设备及其可用控制，不提供对任意现实设备的通用控制。设备状态要由实际执行和回读确认。
+- **切换角色。** `Assets/Model/` 包含已有角色资源及 Artifairy 变体；需重新核对 VRM、口型、表情、动作参考姿态和场景绑定，拖入模型不等于完整聊天场景配置完成。
+- **桌面与 VR。** 桌面自由视角使用右键配合 WASD、Q/E；具体相机和 OpenXR 配置见 [玩家相机与 PICO VR](docs/player-camera-vr.md)。该文的历史测试记录不能代替当前设备的构建和实机验证。
+- **歌唱按需部署。** 当前素材协议以真实 `clip` / `song` 引用为基础，见 [歌唱素材协议](docs/singing-material-protocol.md) 与 [运行提示词](Assets/AIChatTookit/Prompts/Skills/singing.txt)。后端安装分别见 [SVS](Server/SVS/README.md)、[DiffSinger](Server/DiffSinger/README.md)、[Seed-VC](Server/SeedVC/README.md)、[RVC](Server/RVC/README.md)。合成与音色转换是不同环节，模型缺失、语种和音质限制需分别检查。
+
+## 开发与验证
+
+### 代码导航
+
+| 路径 | 内容 |
+| --- | --- |
+| `Assets/AIChatTookit/Scripts/Chat/` | `ChatSample` 对话编排、任务续接、观察与播放回执；`ArdyRoomDialogueBridge` 连接房间执行；各类协议检查。 |
+| `Assets/AIChatTookit/Scripts/LLM/QW/` | Qwen 请求、首句、房间决定、上下文、事实与语义审核、流式恢复。 |
+| `Assets/AIChatTookit/Scripts/Perception/` | 角色视觉、观察对象、候选与可见目录。 |
+| `Assets/AIChatTookit/Scripts/Motion/` | ARDY 播放、导航、连续移动、交接与恢复。 |
+| `Assets/AIChatTookit/Scripts/TTS&&STT/` | 语音识别与合成接入。 |
+| `Assets/AIChatTookit/Scripts/Memory/` | 记忆图谱、持久化与召回。 |
+| `Assets/AIChatTookit/Scripts/Expression/` | 口型、眨眼与形态键同步。 |
+| `Assets/AIChatTookit/Scripts/Presentation/` | 界面、玩家相机与 XR 交互。 |
+| `Assets/AIChatTookit/Prompts/` | 角色与行为提示词、按领域加载的提示规则。 |
+| `Assets/Editor/`、`Assets/Editor/Fixtures/` | Unity 回归入口、编辑器工具与重放样本。 |
+| `Server/` | ASR、TTS 补丁、歌唱桥接及 ARDY 服务。 |
+| `Tools/MotionAdapter/` | 动作特征、适配器、验证脚本和历史报告。 |
+| `docs/` | 专题说明与带日期的设计、实验和交付记录。 |
+
+当前任务编排可从 [RoomTaskSequenceProtocol](Assets/AIChatTookit/Scripts/Chat/RoomTaskSequenceProtocol.cs)、[RoomTaskContextPolicy](Assets/AIChatTookit/Scripts/Chat/RoomTaskContextPolicy.cs) 阅读；表达与执行事实关联见 [RoomSpeechClaimProtocol](Assets/AIChatTookit/Scripts/Chat/RoomSpeechClaimProtocol.cs)，结果告知结算见 [WorkResultDeliveryProtocol](Assets/AIChatTookit/Scripts/Chat/WorkResultDeliveryProtocol.cs)。
+
+### 验证入口与证据范围
+
+- Unity 用例位于 `Assets/Editor/*Regression*.cs`。不同用例有纯协议、模拟传输、真实模型请求和 Play Mode 检查，依赖与运行方式并不相同。
+- [传输与房间回归脚本](Tools/MotionAdapter/run_transport_recovery_regressions.ps1) 使用已有的 `Server/ARDY/runtime/unity-naturalness-validation` 隔离工程，并要求新的输出目录；部分模式还需要图形、服务或指定输入。它会复制当前源码及 fixtures 到隔离工程，Unity 可执行文件路径也仍按开发机设置。换机器需先适配环境，不能在刚克隆的仓库直接当作通用测试命令运行。
+- ARDY 服务测试入口见 [服务 README](Server/ARDY/motion_service/README.md)。例如，在依赖就绪的 ARDY 环境中可运行不调用真实模型的截止时间回归：
+
+  ```powershell
+  .\Server\ARDY\.venv\Scripts\python.exe -m unittest Server.ARDY.test_stream_deadline_diagnostics -v
+  ```
+
+- 带日期的 JSON fixture、历史报告和通过数量仅说明当时的输入与环境；不能据此断言当前提交全部通过。自然动作、语音音质、长对话和实体 VR 仍需实际体验验证。
+
+### 常见问题
+
+| 现象 | 优先检查 |
+| --- | --- |
+| `start_all.cmd` 无法连接远端 | 是否配置 SSH 别名、远端控制脚本与模型；新机器应先按需部署服务。 |
+| 文字正常但不出声 | TTS 端口、参考音频路径、语言设置、实际播放状态，以及 GPT-SoVITS 补丁；HTTP 422 不代表 WAV 本身损坏。 |
+| 能聊天却不能移动 | ARDY `8093`、Qwen 动作特征模式、适配器资源，以及角色/环境/用户位置绑定。 |
+| 角色描述的画面不对 | 角色视觉预览、采集时刻、眼位、朝向、遮挡；旧物件记忆不能代替新观察。 |
+| 克隆后房间或模型引用缺失 | 场景引用是否指向私有资源或未下载的模型，避免把开发机本地文件视为仓库内容。 |
+
+服务管理日志位于 `Server/RuntimeLogs/`；Unity 运行错误先查看 Console 和 Editor 日志。语义审核也由模型执行，结构检查和状态回执可以约束执行，但不能消除全部自然语言理解错误。
+
+## 第三方与资源许可
+
+项目基于 AIChatToolkit 扩展，使用 UniVRM/UniGLTF、OVRLipSync、SenseVoice/FunASR、GPT-SoVITS，以及 Qwen、ARDY 等模型与运行组件；可选歌唱链路使用 SoulX-Singer、DiffSinger、Seed-VC、RVC、torchcrepe 和 MusicBrainz 等项目或服务。
+
+本仓库未附带覆盖整个项目的统一开源许可证。第三方源码、模型、音色、角色和场景素材分别受原作者许可约束；仓库中存在文件不等于授予其再分发或商用权。私有 SailingMoon 房间素材保持本地使用，具体排除范围见 `.gitignore`。
+
+API 密钥、用户录音、个人曲库及运行数据应保留在本地配置或约定的忽略目录中。保存、提交场景和配置前，应检查是否包含个人凭据或不应上传的资源。

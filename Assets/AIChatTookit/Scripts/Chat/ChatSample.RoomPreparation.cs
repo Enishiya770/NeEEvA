@@ -12,7 +12,7 @@ public partial class ChatSample
         public bool userTurnClaimed, acceptedWorkEpoch, followingTask;
         public string text, normalized, taskId, json, status, stopActionId, stopDispatch;
         public float closedAt, deadline;
-        public bool completed, accepted, finalConfirmed, consumed;
+        public bool completed, accepted, finalConfirmed, consumed, ownsTransport;
         public ArdyRoomDialogueBridge bridge;
         public LLM provider;
         public SenseVoiceSpeechToText speechProvider;
@@ -22,6 +22,8 @@ public partial class ChatSample
         public int waitingFormalGeneration = -1;
     }
     private RoomSpeechPreparation m_RoomSpeechPreparation;
+    private int m_ConsumedRoomCapture = -1;
+    private SenseVoiceSpeechToText m_ConsumedRoomSpeechProvider;
     private int m_RoomPreparationSequence;
 
     public void AcceptClosedSpeechEvidence(ClosedSpeechEvidence evidence)
@@ -34,6 +36,8 @@ public partial class ChatSample
         var speechProvider = m_ChatSettings.m_SpeechToText as SenseVoiceSpeechToText;
         if (speechProvider == null || speechProvider.InputCaptureSessionSerial != evidence.CaptureSessionSerial ||
             !m_ChatSettings.m_ChatModel.isActiveAndEnabled) return;
+        if (m_ConsumedRoomCapture == evidence.CaptureSessionSerial &&
+            m_ConsumedRoomSpeechProvider == speechProvider) return;
         var bridge = GetComponent<ArdyRoomDialogueBridge>();
         if (!bridge.ReservesBody && !bridge.IsFollowing) return;
         if (m_RoomSpeechPreparation != null && m_RoomSpeechPreparation.capture == evidence.CaptureSessionSerial &&
@@ -49,17 +53,21 @@ public partial class ChatSample
             expectedUserTurn = m_ActionConstraints.CurrentUserTurn,
             normalized = evidence.NormalizedText, closedAt = evidence.ClosedAt, status = "pending",
             deadline = Time.realtimeSinceStartup + 2.75f, provider = m_ChatSettings.m_ChatModel,
-            speechProvider = speechProvider
+            speechProvider = speechProvider, ownsTransport = true
         };
         m_RoomSpeechPreparation = prepared;
         Debug.Log($"[Room/Preparation] capture={prepared.capture} input={prepared.inputRevision} task={prepared.taskId} operation={prepared.operationRevision} state=submitted", this);
-        m_ChatSettings.m_ChatModel.PostRoomPreparationMessage(BuildRoomDecisionInput(prepared.text, false, "", bridge), (ok, json, status) => {
+        string preparationInput = RoomControlReviewProtocol.BodyInput(prepared.text, prepared.taskId,
+            prepared.operationRevision, bridge.Phase, prepared.followingTask, false).ToString(Newtonsoft.Json.Formatting.None);
+        m_ChatSettings.m_ChatModel.PostRoomPreparationMessage(preparationInput, (ok, json, status) => {
+            prepared.ownsTransport = false;
             CheckRoomPreparationWait(prepared, Time.realtimeSinceStartup);
             if (!IsFreshRoomPreparation(prepared) || prepared.completed) return;
             prepared.completed = true;
-            prepared.json = json;
             prepared.status = status;
-            prepared.accepted = ok && RoomTaskProtocol.TryDecision(json, prepared.text, false, out prepared.decision);
+            prepared.accepted = ok && RoomControlReviewProtocol.TryBodyDecision(json, prepared.text, false, out prepared.decision, out _);
+            prepared.json = prepared.accepted ? Newtonsoft.Json.JsonConvert.SerializeObject(new {
+                intent = prepared.decision.intent, origin = prepared.decision.origin, evidence = prepared.decision.evidence }) : json;
             CommitPreparedRoomStop(prepared);
             var continuation = prepared.continuation; prepared.continuation = null; continuation?.Invoke();
         });
@@ -129,6 +137,7 @@ public partial class ChatSample
         if (now < prepared.deadline) return;
         var fallback = prepared.waitingFormalGeneration == m_FormalResponseGeneration ? prepared.fallback : null;
         bool priorRoundInFlight = m_AgentRoundInFlight, priorStreamComplete = m_StreamComplete;
+        if (fallback != null) RememberConsumedRoomPreparation(prepared);
         // Detach before starting a fresh request. A cancelled provider is allowed
         // never to invoke its callback; a late success must not acquire authority.
         CancelClosedRoomPreparation("preparation-deadline");
@@ -189,8 +198,15 @@ public partial class ChatSample
         }
         prepared.continuation = null;
         prepared.fallback = null;
-        prepared.provider?.CancelRoomPreparationMessage();
+        if (prepared.ownsTransport) prepared.provider?.CancelRoomPreparationMessage();
+        prepared.ownsTransport = false;
         Debug.Log($"[Room/Preparation] capture={prepared.capture} state=discarded reason={reason}", this);
+    }
+
+    private void RememberConsumedRoomPreparation(RoomSpeechPreparation prepared)
+    {
+        m_ConsumedRoomCapture = prepared.capture;
+        m_ConsumedRoomSpeechProvider = prepared.speechProvider;
     }
 
     private bool TryConsumeRoomPreparation(int generation, ArdyRoomDialogueBridge bridge,
@@ -204,10 +220,19 @@ public partial class ChatSample
         {
             if (!IsFreshRoomPreparation(prepared) || generation != m_FormalResponseGeneration || prepared.consumed) return;
             prepared.consumed = true;
+            RememberConsumedRoomPreparation(prepared);
+            // Detach the completed transaction BEFORE its continuation can take
+            // the provider slot. Retain the local receipt for a committed stop;
+            // releasing it must neither cancel a new request nor clear reply flags.
+            m_RoomSpeechPreparation = null;
+            prepared.continuation = null;
+            prepared.fallback = null;
+            prepared.ownsTransport = false;
+            Debug.Log($"[Room/Preparation] capture={prepared.capture} state=consumed status={prepared.status} transportOwned=False; released before continuation", this);
             // An early closed-transcript decision has no scene observation.
             // Preserve the fast confirmed stop, but do not let that preparation
-            // replace the visual planner for other intents in an open-eye round.
-            if (SceneEyesOpen && prepared.decision?.intent != "stop-moving")
+            // replace the complete formal planner for any other intent, eyes open or closed.
+            if (prepared.decision?.intent != "stop-moving")
             { requestFresh(); return; }
             if (!prepared.accepted || (prepared.decision.intent != "stop-moving" &&
                 bridge.ReadCurrentTargetEvidence().currentTargetRevision != prepared.targetRevision))

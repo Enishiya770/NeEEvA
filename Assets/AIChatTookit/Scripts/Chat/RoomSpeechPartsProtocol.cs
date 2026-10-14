@@ -16,6 +16,7 @@ public static class RoomSpeechPartsProtocol
         "Protected result fragments are excluded from selectable IDs. After the otherClaimsComparison, select IDs only for fragments that comparison identifies as the CHARACTER's owned movement. " +
         "If comparison identifies only courtesy/questions and no movement, bodyProgressParts must be []. Unselected fragments remain unchanged. " +
         "bodyProgressParts只列出台词中角色自身当前移动的分句编号；otherClaimsSupport=none时必须为空数组[]，感谢、道歉、邀请聊天不能被当前移动替换。" +
+        "失败结果、当前停止/等待、未来行动承诺是不同命题。‘先停下/暂时等待/いったん止まる/stop for now’本身不承诺恢复或重试；没有明确将来行动句时，不能仅凭‘暂时’判未来承诺冲突。一次尝试未完成同时当前停下是相容的。" +
         "回答独立问题的算术、逻辑与一般知识按其自身依据核对，不能因没有场景或设备回执就判unsupported；可直接验算的算术在otherClaimsComparison写明验算依据。现场物件、位置、动作与设备状态仍须对应现场证据，不能借一般知识虚构。";
 
     public static bool Required(JObject input) => input?["speechProgressOwner"] is JObject owner &&

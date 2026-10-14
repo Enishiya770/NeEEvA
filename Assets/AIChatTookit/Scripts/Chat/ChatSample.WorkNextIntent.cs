@@ -16,7 +16,9 @@ public partial class ChatSample
             !string.IsNullOrEmpty(m_PendingSelfInspection) || HasWorkToolInFlight() ||
             SpatialGoalPreventsWorkClosure() || IsSingingGoalAwaitingConfirmation() ||
             IsSingingGoalAwaitingExecution() && !HasAutonomousSingingGoal() ||
-            sequence?["steps"] is JArray steps && steps.Count > 0 && !WorkNextIntentProtocol.AllStepsCompleted(sequence)) return false;
+            !string.IsNullOrEmpty(decision.remaining_request_quote) ||
+            sequence?["steps"] is JArray steps && steps.Count > 0 && !steps.OfType<JObject>().All(s =>
+                (string)s["status"] == "completed" || FailedStepReportDelivered(s))) return false;
         m_WorkStatus = "closed"; m_WorkReviewOpen = false; m_WorkAutonomousHandoff = true;
         LogWorkNextIntent(decision, "new-autonomous-intention", sequence);
         return true;
@@ -29,6 +31,10 @@ public partial class ChatSample
         // must not reopen the full action planner or replay a completed tool.
         m_WorkReplyOnly = sequence != null && (!WorkNextIntentProtocol.HasReadyStep(sequence, m_WorkNextStepId) ||
             decision.next_intent_source == "current-work" && string.IsNullOrEmpty(m_WorkNextStepId));
+        // Legacy/single-step tasks can have an owned terminal receipt without a
+        // step table. A model's mislabeled delivery intention is not permission
+        // to resubmit that ended action through the full planner.
+        if (sequence == null && CurrentWorkActionNeedsFailureDelivery()) m_WorkReplyOnly = true;
         if (decision.next_intent_source == "autonomous" || decision.next_intent_source == "none")
             m_WorkReplyOnly = true; // Inconsistent source/status cannot acquire old-task action authority.
         if (m_WorkReplyOnly)
@@ -52,6 +58,20 @@ public partial class ChatSample
                 "只有执行器实际处于恢复中才描述恢复；历史成功不重做，待交付的独立工具结果不能遗漏。";
         }
         LogWorkNextIntent(decision, m_WorkReplyOnly ? "remaining-answer-or-diagnosis" : "current-work", sequence);
+    }
+
+    private bool CurrentWorkActionNeedsFailureDelivery()
+    {
+        if (m_WorkRoomRequestText != m_ActionConstraints.CurrentUserText) return false;
+        var owned = BuildWorkRoomCompletionObservation(); // Checks work epoch and user turn.
+        if (owned == null) return false;
+        string action = (string)owned["actionId"];
+        var execution = owned.SelectToken("currentRoomFacts.execution") as JObject;
+        if ((bool?)execution?.SelectToken("boundedRecovery.recovering") == true ||
+            (bool?)owned.SelectToken("currentRoomFacts.currentFacts.navigationRecoveryActive") == true) return false;
+        bool Failed(JObject fact) => !string.IsNullOrEmpty(action) && (string)fact?["actionId"] == action &&
+            new[] { "failed", "blocked", "rejected", "cancelled", "state-applied-unconfirmed" }.Contains((string)fact["phase"]);
+        return Failed(execution) || Failed(ReadRoomSceneActionFacts()["lastAction"] as JObject);
     }
 
     private void LogWorkNextIntent(AutonomyIntentDecision decision, string disposition, JObject sequence)

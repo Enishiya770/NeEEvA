@@ -64,7 +64,7 @@ public static class ConversationRepairRegression
             typeof(ChatSample).GetMethod("FinishRoomSpeechPlaybackHistory",Flags).Invoke(chat,new object[]{"第一句。"});
             Check(history.content=="第一句。", "read-only reply history contains only completed sentence after TTS failure");
         } finally { UnityEngine.Object.DestroyImmediate(host); }
-        return checks + SessionRepairRegression.RunChecks() + ContinuityPolicyRegression.RunChecks();
+        return checks + SessionRepairRegression.RunChecks() + ContinuityPolicyRegression.RunChecks() + IdentityAttentionRegression.RunChecks() + TaskSemanticsRegression.RunChecks();
     }
 
     public static IEnumerator RunNative(string fixturePath, string output)
@@ -76,6 +76,8 @@ public static class ConversationRepairRegression
         var fixture=JObject.Parse(File.ReadAllText(fixturePath)); var rows=new JArray();
         LastReport=new JObject { ["passed"]=false,["pureChecks"]=RunChecks(),["cases"]=rows,
             ["fixtureSource"]=fixture["source"], ["scope"]="Production request builders and actual local model. Recorded dialogue retained. Runtime fact packets reconstructed from recorded receipts; original HTTP bodies were not recorded. No actions executed." };
+        LastReport["identityAttention"] = IdentityAttentionRegression.LastReport.DeepClone();
+        LastReport["taskSemantics"] = TaskSemanticsRegression.LastReport.DeepClone();
         var host=new GameObject("Conversation repair live");host.SetActive(false);var model=host.AddComponent<ChatQW>();model.enabled=false;
         foreach(var item in ((JObject)fixture["roleConfiguration"]).Properties()) {
             var field=typeof(ChatQW).GetField(item.Name,Flags);
@@ -88,7 +90,62 @@ public static class ConversationRepairRegression
         var systemHistory=model.m_DataList.Where(m=>m.role=="system").ToList();
         for(Type type=typeof(ChatQW);type!=null;type=type.BaseType) {var f=type.GetField("url",Flags);if(f!=null){f.SetValue(model,model.m_LocalUrl);break;}}
         try {
+            if (fixture["taskSemantics"] is JObject semantics)
+                yield return TaskSemanticsRegression.RunNative(model, semantics, output);
+            if (fixture["identityAttention"] is JObject identity)
+                yield return IdentityAttentionRegression.RunNative(model, identity, output);
             yield return TranscriptComparisonTransportRegression.Run(model,output);
+            foreach(JObject item in fixture["workReviews"] as JArray ?? new JArray()) {
+                model.m_DataList.Clear();model.m_DataList.AddRange(systemHistory);
+                foreach(JObject message in item["history"]??fixture["history"])
+                    model.m_DataList.Add(new LLM.SendData((string)message["role"],(string)message["content"]));
+                string prompt=(string)item["prompt"];
+                if ((bool?)item["productionPrompt"] != true) prompt+=WorkNextIntentProtocol.Contract+
+                    (string)typeof(ChatSample).GetField("ScenePlaybackHandoffContract",Flags).GetValue(null);
+                string wire=(string)typeof(ChatQW).GetMethod("BuildWorkReviewRequestJson",Flags).Invoke(model,new object[]{prompt});
+                File.WriteAllText(Path.Combine(output,(string)item["name"]+"-request.json"),wire);
+                PrivateDecisionResult response=null;float began=Time.realtimeSinceStartup;
+                model.PostWorkReviewResult(prompt,null,value=>response=value);
+                while(response==null&&Time.realtimeSinceStartup-began<30)yield return null;
+                JObject decision=null;try{decision=JObject.Parse(response?.Output??"");}catch{}
+                var rawDecision = decision?.DeepClone();
+                if (decision != null && item["delivery"] is JObject delivery && delivery["results"] is JArray recordedResults)
+                {
+                    var results = (JArray)recordedResults.DeepClone();
+                    foreach (var report in (decision["delivery_reports"] as JArray ?? new JArray()).OfType<JObject>())
+                    {
+                        var result = results.OfType<JObject>().FirstOrDefault(r => (string)r["id"] == (string)report["id"]);
+                        if (WorkResultDeliveryProtocol.Covers(result, new WorkResultDeliveryProtocol.Report {
+                            id = (string)report["id"], quote = (string)report["quote"] }, (string)delivery["completedPlaybackText"])) result["delivered"] = true;
+                    }
+                    if (WorkResultDeliveryProtocol.IsSettledActionQuote((string)decision["remaining_request_quote"], item["sequence"] as JObject,
+                        results.OfType<JObject>().Where(r => (bool?)r["delivered"] == true).Select(r => (string)r["source"]))) decision["remaining_request_quote"] = "";
+                    if ((string)decision["next_intent_source"] != "autonomous" &&
+                        WorkResultDeliveryProtocol.CanClose(results, item["sequence"] as JObject, (string)decision["remaining_request_quote"])) decision["work_status"] = "closed";
+                    else if (WorkResultDeliveryProtocol.MustContinue((string)decision["work_status"], results,
+                        (string)decision["remaining_request_quote"], (string)(item["history"] as JArray)?.OfType<JObject>().LastOrDefault(m => (string)m["role"] == "user")?["content"]))
+                    {
+                        // Same production refusal of premature closure: version
+                        // validity is not delegated to the language model.
+                        decision["work_status"] = "continue"; decision["proceed"] = true;
+                        decision["next_intent_source"] = "current-work";
+                        decision["next_step_id"] = ""; decision["planning_focus"] = "other";
+                    }
+                }
+                bool passed=response?.Succeeded==true&&(string)decision?["work_status"]==(string)item["expectedStatus"];
+                if((string)item["expectedStatus"]=="continue") passed &= (string)decision?["next_intent_source"]=="current-work";
+                if(item["expectedPlanningFocus"]!=null) passed &= (string)decision?["planning_focus"]==(string)item["expectedPlanningFocus"];
+                if((bool?)item["expectedNoActionStep"]==true) passed &= string.IsNullOrEmpty((string)decision?["next_step_id"]);
+                if (item["expectedDeliveredIds"] is JArray expectedIds)
+                    passed &= expectedIds.Values<string>().All(id => (decision?["delivery_reports"] as JArray)?.OfType<JObject>().Any(r =>
+                        (string)r["id"] == id && !string.IsNullOrWhiteSpace((string)r["quote"]) &&
+                        ((string)item["completedPlaybackText"] ?? "").Contains((string)r["quote"])) == true);
+                if ((bool?)item["expectedRemainingQuestion"] == true)
+                    passed &= !string.IsNullOrWhiteSpace((string)decision?["remaining_request_quote"]);
+                rows.Add(new JObject{["name"]=item["name"],["passed"]=passed,["rawDecision"]=rawDecision,["response"]=decision,["status"]=response?.Status,
+                    ["seconds"]=Time.realtimeSinceStartup-began,["actionsExecuted"]=false});
+                File.WriteAllText(Path.Combine(output,"conversation-repair.json"),LastReport.ToString());
+            }
             foreach(JObject item in fixture["comparisons"]) {
                 var packet=new JObject { ["capture"]=4,["stream"]=new JObject{["text"]=item["stream"]},["full"]=new JObject{["text"]=item["full"]} };
                 bool equivalent=false;float began=Time.realtimeSinceStartup;
@@ -97,15 +154,16 @@ public static class ConversationRepairRegression
             }
             foreach(JObject item in fixture["eventReviews"] as JArray ?? new JArray()) {
                 model.m_DataList.Clear();model.m_DataList.AddRange(systemHistory);
-                foreach(JObject message in fixture["history"])model.m_DataList.Add(new LLM.SendData((string)message["role"],(string)message["content"]));
+                foreach(JObject message in item["history"]??fixture["history"])model.m_DataList.Add(new LLM.SendData((string)message["role"],(string)message["content"]));
                 var input=(JObject)item["input"].DeepClone();
                 bool done=false,ok=false;string response=null,status=null;float began=Time.realtimeSinceStartup;
                 model.PostRoomTaskMessage(input.ToString(),true,(success,value,detail)=>{ok=success;response=value;status=detail;done=true;});
                 while(!done&&Time.realtimeSinceStartup-began<30)yield return null;
                 if(!done)model.CancelRoomTaskPlanningMessage();
                 bool allowed=ok&&RoomTaskProtocol.ReviewAllows(response);
+                bool expectedState=item["expectedState"]==null || ok&&(string)JObject.Parse(response)["resultReport"]==(string)item["expectedState"];
                 rows.Add(new JObject{["name"]=item["name"],["allowed"]=allowed,["review"]=response,["status"]=status,
-                    ["passed"]=done&&ok&&allowed==(bool)item["allowed"],["seconds"]=Time.realtimeSinceStartup-began});
+                    ["passed"]=done&&ok&&expectedState&&allowed==(bool)item["allowed"],["seconds"]=Time.realtimeSinceStartup-began});
                 File.WriteAllText(Path.Combine(output,"conversation-repair.json"),LastReport.ToString());
             }
             foreach(JObject item in fixture["repairs"]) {

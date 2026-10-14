@@ -195,7 +195,7 @@ public partial class ChatSample
     }
 
     private JArray BuildVerifiedObservedDeviceReferentHistory() => new JArray(m_VerifiedObservedDeviceHistory
-        .Where(VerifiedSpatialReferentCurrent).Select(item => item.receipt.DeepClone()));
+        .Where(VerifiedSpatialReferentCurrent).Select(item => RoomTaskContextPolicy.HistoricalReferent(item.receipt)));
 
     private bool VerifiedSpatialReferentCurrent(VerifiedSpatialDeviceReferent item)
     {
@@ -230,7 +230,7 @@ public partial class ChatSample
     }
 
     private JArray BuildVerifiedDeviceReferentHistory() => new JArray(m_VerifiedSpatialDeviceHistory
-        .Where(VerifiedSpatialReferentCurrent).Select(item=>item.receipt.DeepClone()));
+        .Where(VerifiedSpatialReferentCurrent).Select(item=>RoomTaskContextPolicy.HistoricalReferent(item.receipt)));
 
     // Source IDs name authoritative receipts, never a model-supplied entity pair.
     // Keep both kinds even for one entity: seeing it and operating it establish
@@ -262,7 +262,7 @@ public partial class ChatSample
                 ["actionPhase"] = item.receipt["actionPhase"]?.DeepClone()
             });
         }
-        return result;
+        return new JArray(result.OfType<JObject>().Select(RoomTaskContextPolicy.HistoricalReferent));
     }
 
     private bool TryResolveReviewedSpatialReferent(RoomTaskProtocol.DeviceGoalReview review,

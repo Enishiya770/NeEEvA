@@ -929,6 +929,7 @@ namespace NeEEvA.Motion
 
         private string ReadAndDisposeResponse()
         {
+            EndStreamWireReceipt("response-consumed");
             var request = pending; pending = null;
             try
             {

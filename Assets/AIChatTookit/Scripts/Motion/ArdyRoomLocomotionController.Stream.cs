@@ -107,6 +107,7 @@ namespace NeEEvA.Motion
             streamEventName = "begin"; streamLastFailureReason = streamLastFailureCategory = null;
             streamFailureOperationRevision = -1;
             streamFailureRequestId = streamFailureSessionId = streamFailureObservedUtc = null;
+            streamLastHandoff = null; streamFailureStage = null;
             segmentPlan = null; ownedClip = null; nextSeamFrame = -1; timelineFinal = false;
             segmentEvidence.Clear(); DiscardedSegmentEvidenceCount = 0;
             LastErrorResponseJson = LastRequestJson = LastResponseJson = null;
@@ -163,6 +164,7 @@ namespace NeEEvA.Motion
             sourceRootHeight = streamCapabilities.sourceRootHeight;
             while (Current(token) && IsContinuousFollowActive)
             {
+                CheckContinuousStreamPlayerOwnership();
                 if (ownedClip != null && player.IsReturningToAnimation) { yield return null; continue; }
                 if (ownedClip != null && player.ReturnedToAnimation && !player.HasPoseOwnership) ownedClip = null;
                 if (ownedClip == null) CheckContinuousStreamPlayerOwnership();
@@ -184,7 +186,9 @@ namespace NeEEvA.Motion
                     {
                         if (Time.realtimeSinceStartup > historyDeadline)
                             throw CreatePoseHistoryException();
-                        yield return null; PrepareAnchor();
+                        yield return null;
+                        if (!Current(token) || !IsContinuousFollowActive) yield break;
+                        CheckContinuousStreamPlayerOwnership(); PrepareAnchor();
                     }
                     if (!Current(token)) yield break;
                     streamSessionId = Guid.NewGuid().ToString("N"); streamWireRevision = ++wireRevision;
@@ -208,8 +212,16 @@ namespace NeEEvA.Motion
                 }
                 // Only the accepted short prefix is committed. Dispatch just before that
                 // prefix runs out; the remaining prediction has not been acknowledged.
-                while (Current(token) && StreamBufferSeconds > StreamLeadSeconds) yield return null;
-                if (!Current(token)) yield break;
+                string waitingSession = streamSessionId;
+                int waitingWire = streamWireRevision;
+                while (Current(token) && IsContinuousFollowActive && streamSessionId == waitingSession &&
+                    streamWireRevision == waitingWire && StreamBufferSeconds > StreamLeadSeconds) yield return null;
+                if (!Current(token) || !IsContinuousFollowActive) yield break;
+                // LateUpdate may have completed arrival while this coroutine was
+                // suspended. Re-enter the waiting/resume lifecycle, never append
+                // to its deliberately closed timeline. Foreign owners still fail.
+                CheckContinuousStreamPlayerOwnership();
+                if (streamSessionId == null || streamSessionId != waitingSession || streamWireRevision != waitingWire) continue;
                 if (StreamRenderedArrival()) { FinishStreamArrival(); continue; }
                 if (StreamPrefixReachesGoal())
                 {
@@ -219,9 +231,12 @@ namespace NeEEvA.Motion
                     Stage = "stream-arriving";
                     int waitingControl = StreamControlRevision;
                     RecordStreamArrivalBoundary("wait-enter", waitingControl);
-                    while (Current(token) && streamSessionId != null && StreamPrefixReachesGoal() && !StreamRenderedArrival())
+                    while (Current(token) && IsContinuousFollowActive && streamSessionId == waitingSession &&
+                        streamWireRevision == waitingWire && StreamPrefixReachesGoal() && !StreamRenderedArrival())
                         yield return null;
-                    if (!Current(token)) yield break;
+                    if (!Current(token) || !IsContinuousFollowActive) yield break;
+                    CheckContinuousStreamPlayerOwnership();
+                    if (streamSessionId == null || streamSessionId != waitingSession || streamWireRevision != waitingWire) continue;
                     RecordStreamArrivalBoundary(StreamRenderedArrival() ? "rendered-arrival" : "target-changed", waitingControl);
                     if (streamSessionId != null && StreamRenderedArrival()) FinishStreamArrival();
                     else if (streamSessionId != null && ArrivalRetargetBudgetInsufficient(StreamBufferSeconds, streamRecentStepCost, streamRecentFramePeak))
@@ -234,6 +249,7 @@ namespace NeEEvA.Motion
                 }
                 if (!streamUserMoving && StreamDesiredSpeed < .04f && StreamMeasuredSpeed < .10f)
                 {
+                    RecordStreamHandoff("stationary-wait");
                     CloseStreamWire();
                     if (ownedClip != null && player.RequestSmoothStop(ReturnToIdleSeconds)) ownedPlayerRevision = player.PlaybackRevision;
                     Stage = "stream-waiting"; IsBusy = false;
@@ -259,9 +275,11 @@ namespace NeEEvA.Motion
         private void FinishStreamArrival()
         {
             if (!StreamRenderedArrival()) return;
+            RecordStreamHandoff("rendered-arrival");
             bool restartWait = streamRequestPending;
             if (restartWait)
             {
+                EndStreamWireReceipt("rendered-arrival", true);
                 if (work != null) { StopCoroutine(work); work = null; }
                 if (pending != null) { pending.Abort(); pending.Dispose(); pending = null; }
                 streamRequestPending = false;
@@ -281,7 +299,9 @@ namespace NeEEvA.Motion
             catch (Exception error)
             {
                 // This method also runs from LateUpdate, outside the coroutine fence.
-                Fail("抵达时身体交接失败 · " + error.Message, ArdyRoomExecutionReason.OwnershipLost);
+                string reason = "抵达时身体交接失败 · " + error.Message;
+                RecordStreamEventWithEvidence("failed", reason, "ownership", streamLastHandoff);
+                Fail(reason, ArdyRoomExecutionReason.OwnershipLost);
                 return;
             }
             Stage = "stream-waiting"; IsBusy = false;
@@ -323,6 +343,10 @@ namespace NeEEvA.Motion
         // IEnumerator handed to Unity would bypass that cancellation/error fence.
         private IEnumerable<object> GenerateStreamStep(int token, ArdyRoomHistoryFrame[] initialHistory)
         {
+            if (!Current(token) || !IsContinuousFollowActive || streamSessionId == null) yield break;
+            string generationSession = streamSessionId;
+            int generationWire = streamWireRevision;
+            CheckContinuousStreamPlayerOwnership();
             float planningStarted = Time.realtimeSinceStartup;
             int start = streamNextFrame, localStart = start - streamBaseFrame;
             var timeline = streamPreparedClip ?? ownedClip;
@@ -339,7 +363,7 @@ namespace NeEEvA.Motion
             else
             {
                 if ((streamPreparedClip == null && !OwnsPlayingTimeline()) || timeline == null || localStart < 4 || localStart > timeline.frames.Length)
-                    throw new InvalidOperationException("持续跟随丢失已采用的姿态前缀。");
+                    throw new StreamLifecycleException("持续跟随丢失已采用的姿态前缀。", CaptureStreamHandoff("invalid-adopted-prefix"));
                 sourcePosition = timeline.frames[localStart - 1].rootPosition;
                 var forward = timeline.rotationClip.SampleDelta(0, (localStart - 1) / 20f) * Vector3.forward;
                 heading = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
@@ -443,8 +467,12 @@ namespace NeEEvA.Motion
             streamRoundTrip = streamBackend = streamBackendQueue = streamFeature = streamParse = streamAudit = 0;
             Stage = ownedClip == null ? (streamRecovering ? "stream-recovering" : "stream-prebuffering") : "stream-moving";
             RecordStreamEvent("request");
+            BeginStreamWireReceipt();
             yield return pending.SendWebRequest();
-            if (!Current(token)) yield break;
+            EndStreamWireReceipt("response-observed", false, request.requestId);
+            if (!Current(token) || !IsContinuousFollowActive || streamSessionId != generationSession ||
+                streamWireRevision != generationWire) yield break;
+            CheckContinuousStreamPlayerOwnership();
             streamRoundTrip = Time.realtimeSinceStartup - streamDispatchTime; streamRequestPending = false;
             float parsingStarted = Time.realtimeSinceStartup;
             string json = ReadAndDisposeResponse(); LastResponseJson = json;
@@ -640,6 +668,7 @@ namespace NeEEvA.Motion
             streamConsecutiveRecoveries++; StreamRecoveryCount++;
             // Capture the pending request and buffer state BEFORE clearing that generation.
             RecordStreamEvent(trigger, reason, category);
+            EndStreamWireReceipt("recovery:" + category, true);
             if (stopRunningCoroutine && work != null) { StopCoroutine(work); work = null; }
             if (pending != null) { pending.Abort(); pending.Dispose(); pending = null; }
             streamRequestPending = false;
@@ -754,6 +783,7 @@ namespace NeEEvA.Motion
 
         private void CloseStreamWire()
         {
+            EndStreamWireReceipt("session-closed", true);
             if (streamSessionId != null && characterId != null)
             {
                 UnityWebRequest cancel = null;
@@ -761,7 +791,17 @@ namespace NeEEvA.Motion
                 {
                     cancel = JsonRequest("/v1/locomotion/stream/cancel", JsonUtility.ToJson(new StreamCancellation {
                         characterId = characterId, sessionId = streamSessionId, revision = streamWireRevision }), 5);
-                    var owned = cancel; cancel.SendWebRequest().completed += _ => owned.Dispose();
+                    var owned = cancel;
+                    string closedSession = streamSessionId; int closedWire = streamWireRevision;
+                    cancel.SendWebRequest().completed += _ => {
+                        Debug.Log("[ARDY room/wire-cancel] " + Newtonsoft.Json.JsonConvert.SerializeObject(new {
+                            sessionId = closedSession, revision = closedWire, observedUtc = DateTime.UtcNow.ToString("o"),
+                            httpStatus = owned.responseCode, transportResult = owned.result.ToString(), error = owned.error,
+                            response = owned.downloadHandler?.text,
+                            scope = "Cancellation acknowledgement only; does not prove whether generation completed before cancellation."
+                        }), this);
+                        owned.Dispose();
+                    };
                 }
                 catch { cancel?.Dispose(); }
             }

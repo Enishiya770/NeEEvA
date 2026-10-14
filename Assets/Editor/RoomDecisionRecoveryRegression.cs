@@ -45,8 +45,10 @@ public static partial class RoomDecisionRecoveryRegression
             Require(table != null && table.Count > 0, "Compacted input explicitly carries its complete evidence dictionary.");
             Expand(recovered, table);
             recovered.Remove("requestEvidenceTable"); recovered.Remove("requestEvidenceEncoding");
-            Require(JToken.DeepEquals(source, recovered),
-                "Expanding references reconstructs every original field, frozen coordinate, frame, authority, history entry and Unicode user word exactly. " + FirstDifference(source, recovered, "$"));
+            var sentSource = MainInput(before);
+            Require(source.ToString(Formatting.None) == input, "Purpose-scoped serialization does not mutate stored source evidence.");
+            Require(JToken.DeepEquals(sentSource, recovered),
+                "Expanding recovery references reconstructs every field of the original purpose-scoped HTTP packet exactly. " + FirstDifference(sentSource, recovered, "$"));
             Require((bool?)recovered["visibleObjectCatalog"]["memory"][0]["actionAuthorization"] == false &&
                 (bool?)recovered["visibleObjectCatalog"]["memory"][0]["historical"] == true,
                 "Lossless context retry never upgrades remembered coordinates into current visibility or permission.");

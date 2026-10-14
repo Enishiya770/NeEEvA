@@ -20,15 +20,18 @@ public partial class ChatSample
     private string BuildWorkReviewFrame(string reason)
     {
         var capture = m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText;
+        var roomOutcome = BuildWorkRoomCompletionObservation();
+        var priorResults = BuildMovementPriorResults();
         var frame = new JObject {
             ["version"] = "task-progress-runtime-v1",
             ["workEpoch"] = m_WorkEpoch,
             ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
             ["trigger"] = reason,
-            ["room"] = BuildWorkRoomCompletionObservation() == null
+            ["room"] = roomOutcome == null
                 ? ReadCompactRoomTaskFacts(GetComponent<ArdyRoomDialogueBridge>()) : null,
-            ["sceneAction"] = BuildMovementPriorResults() == null ? ReadRoomSceneActionFacts()["lastAction"]?.DeepClone() : null,
+            ["sceneAction"] = priorResults == null ? ReadRoomSceneActionFacts()["lastAction"]?.DeepClone() : null,
             ["speech"] = BuildPrivateSpeechProgress(),
+            ["delivery"] = ReadWorkDelivery(),
             ["pendingDiagnostics"] = new JObject {
                 ["toolCorrection"] = m_PendingToolCorrectionFrame,
                 ["skillStatus"] = m_PendingSkillStatusFrame,

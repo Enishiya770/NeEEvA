@@ -12,6 +12,16 @@ namespace NeEEvA.Motion
         public int CommittedTargetRevision { get; private set; }
         public string RetargetStatus { get; private set; } = "none";
         public bool RetargetNeedsRestart { get; private set; }
+        public int MovingTargetAttempts { get; private set; }
+        public bool MovingTargetBudgetExhausted { get; private set; }
+        private int movingTargetAttemptLimit = int.MaxValue;
+
+        public void SetMovingTargetAttemptBudget(int operation, int remaining)
+        {
+            if (operation != OperationRevision || remaining < 0)
+                throw new ArgumentException("Moving-target budget must belong to the current operation.");
+            movingTargetAttemptLimit = remaining;
+        }
         private Vector3? requestedFacePoint;
         private bool movingTargetQueued, retargetWorkActive, retargetSettling;
         private float targetUpdatedRealtime;
@@ -20,6 +30,8 @@ namespace NeEEvA.Motion
         {
             RequestedTargetGround = ground; requestedFacePoint = face;
             MovingTargetRevision = CommittedTargetRevision = 0;
+            MovingTargetAttempts = 0; movingTargetAttemptLimit = int.MaxValue;
+            MovingTargetBudgetExhausted = false;
             movingTargetQueued = retargetWorkActive = retargetSettling = RetargetNeedsRestart = false;
             RetargetStatus = "none";
         }
@@ -182,6 +194,17 @@ namespace NeEEvA.Motion
                     { SettleForMovingTarget("未能在未来接缝前准备好新轨迹"); yield break; }
                     var history = ArdyRoomSegmentPlan.GeneratedHistory(ownedClip, segment.StartFrame);
                     var targets = ArdyRoomSegmentPlan.ContinueHeading(segment.Targets, history[15]);
+                    // A sampled/coalesced goal is not an attempted route. Charge once
+                    // per replacement timeline at its first actual generation dispatch.
+                    if (index == 0)
+                    {
+                        if (MovingTargetAttempts >= movingTargetAttemptLimit)
+                        {
+                            MovingTargetBudgetExhausted = true;
+                            SettleForMovingTarget("本次实际路线调整预算已用完"); yield break;
+                        }
+                        MovingTargetAttempts++;
+                    }
                     requestId = Guid.NewGuid().ToString("N");
                     int requestRevision = ++wireRevision;
                     var request = new Request { characterId = characterId, requestId = requestId, revision = requestRevision,

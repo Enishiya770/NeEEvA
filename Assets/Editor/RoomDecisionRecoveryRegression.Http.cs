@@ -142,8 +142,8 @@ public static partial class RoomDecisionRecoveryRegression
                             var actual = JObject.Parse(requests[1]);
                             Require(actual.SelectTokens("$..image_url.url").Count() == 2 &&
                                 actual["messages"][1].ToString(Formatting.None).Contains("history-capture") &&
-                                JToken.DeepEquals(MainInput(actual), BuildSource()),
-                                "A real recovered two-image request preserves full original authority, historical labels, current/historical pixels and native schema byte for byte.");
+                                JToken.DeepEquals(MainInput(actual), RoomTaskContextPolicy.PlanningObservationView(BuildSource())),
+                                "A real recovered two-image request preserves the original purpose-scoped authority, historical labels, current/historical pixels and native schema byte for byte.");
                         }
                         else
                         {
@@ -174,7 +174,7 @@ public static partial class RoomDecisionRecoveryRegression
                             Require(status.EndsWith("recovery=context-not-reducible", StringComparison.Ordinal) &&
                                 actual.SelectTokens("$..image_url.url").Count() == 2 &&
                                 actual["messages"][1].ToString(Formatting.None).Contains("history-capture") &&
-                                JToken.DeepEquals(MainInput(actual), expectedSource),
+                                JToken.DeepEquals(MainInput(actual), RoomTaskContextPolicy.PlanningObservationView(expectedSource)),
                                 "When protected two-image/schema/authority content cannot meet the tighter budget, stop after the failed first HTTP without stripping history or replaying an over-budget request.");
                         }
                     }

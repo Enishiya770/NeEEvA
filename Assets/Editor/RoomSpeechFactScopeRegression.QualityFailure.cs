@@ -67,6 +67,25 @@ public static partial class RoomSpeechFactScopeRegression
             Set(chat, "m_RoomTaskSequenceAvatar", bridge.avatar); Set(chat, "m_RoomTaskSequenceEnvironment", bridge.environmentRoot);
             Call(chat, "ReadRoomTaskSequence"); // Let the production ledger consume the actual recorded terminal receipt.
             Require((string)sequence["steps"][0]["status"] == "failed", "Recorded terminal execution closes the attempted step as failed.");
+            Set(chat,"m_RoomTaskSequence",null);
+            object SingleProposal() => JsonUtility.FromJson("{\"intent\":\"向用户解释失败，并尝试重新跟随\",\"next_step_id\":\"\",\"next_intent_source\":\"current-work\",\"planning_focus\":\"current-user-body\"}",
+                typeof(ChatSample).GetNestedType("AutonomyIntentDecision",Flags));
+            var single=SingleProposal();
+            Call(chat,"SelectWorkContinuationScope",single,null);
+            Require((bool)Get(chat,"m_WorkReplyOnly") && (string)Get(single,"planning_focus")=="other" &&
+                Call(chat,"CreateWorkRoomStepRequest")==null && !((string)Get(single,"intent")).Contains("尝试重新跟随"),
+                "A terminal single action without a step table must deliver its failure rather than reopen movement.");
+            int ownerTurn=(int)Get(chat,"m_WorkRoomTaskUserTurn");string ownerAction=(string)Get(chat,"m_WorkRoomTaskActionId");
+            try {
+                Set(chat,"m_WorkRoomTaskUserTurn",ownerTurn-1);
+                Call(chat,"SelectWorkContinuationScope",SingleProposal(),null);
+                Require(!(bool)Get(chat,"m_WorkReplyOnly"),"An older user turn's failure cannot veto a new current task.");
+                Set(chat,"m_WorkRoomTaskUserTurn",ownerTurn);Set(chat,"m_WorkRoomTaskActionId","different-current-action");
+                Call(chat,"SelectWorkContinuationScope",SingleProposal(),null);
+                Require(!(bool)Get(chat,"m_WorkReplyOnly"),"Another action's old failure cannot supply the current outcome.");
+            } finally {Set(chat,"m_WorkRoomTaskUserTurn",ownerTurn);Set(chat,"m_WorkRoomTaskActionId",ownerAction);}
+            LastDecisionFailureReport["singleActionFailureDelivery"]=new JObject{["passed"]=true,["noLedger"]=true,["newTurnProtected"]=true,["differentActionProtected"]=true};
+            Set(chat,"m_RoomTaskSequence",sequence);
             var proposal = JsonUtility.FromJson(new JObject { ["intent"] = row["proposedDecision"]["intent"],
                 ["next_step_id"] = "s1", ["next_intent_source"] = "current-work", ["planning_focus"] = "current-user-body" }.ToString(),
                 typeof(ChatSample).GetNestedType("AutonomyIntentDecision", Flags));

@@ -41,6 +41,8 @@ public static partial class RoomSpeechFactScopeRegression
     {
         var fixture = JObject.Parse(File.ReadAllText("Assets/Editor/Fixtures/WorkResult.latest-20261013.json"));
         string original = fixture.ToString(), request = (string)fixture["originalRequest"];
+        bool oldFallback = model.CompleteControlledEngineFallback;
+        model.CompleteControlledEngineFallback = false;
         string[] names = { "m_SceneActionFact", "m_SpatialDeviceGoal", "m_RoomTaskSequence", "m_RoomTaskSequenceModel",
             "m_RoomTaskSequenceBridge", "m_RoomTaskSequenceAvatar", "m_RoomTaskSequenceEnvironment", "m_WorkReplyOnly",
             "m_PendingSelfInspection", "m_SongCatalogResultPending", "m_LastSongCatalogResult", "m_StickyToolFailure", "m_AgentRunning" };
@@ -76,6 +78,13 @@ public static partial class RoomSpeechFactScopeRegression
             foreach (JObject message in fixture["history"]) serializer.m_DataList.Add(new LLM.SendData((string)message["role"], (string)message["content"]));
             CheckIndependentResultDependencies(chat, bridge);
             Require((bool)Call(chat, "UseWorkResultReplyPacket", generation), "Typed pending diagnosis selects the work-result producer.");
+            var resultSnapshot = Call(chat, "CaptureRoomSpeechSnapshot", bridge, null);
+            Require(!((List<string>)Call(chat, "ChangedRoomSpeechFacts", resultSnapshot,
+                    Call(chat, "ResolveRoomSpeechDependencies", "set-object-state", "user-target"))).Contains("noVisualEvidence"),
+                "A completed predecessor does not force image capture for a receipt-only body result.");
+            Require(((List<string>)Call(chat, "ChangedRoomSpeechFacts", resultSnapshot,
+                    Call(chat, "ResolveRoomSpeechDependencies", "set-object-state", "visual-observation"))).Contains("noVisualEvidence"),
+                "An actual visual claim still requires current pixels even in a result-delivery round.");
             var requirement = (JObject)Call(chat, "CurrentSpeechMovementRequirement", generation);
             Require((string)requirement["expectedReport"] == "incomplete" && requirement.ToString().Contains(action),
                 "A prior device primary cannot hide the current failed body step from speech review.");
@@ -112,13 +121,17 @@ public static partial class RoomSpeechFactScopeRegression
                 "Actual diagnostic review uses current failed-step evidence without waiting for a new camera frame.");
             File.WriteAllText(Path.Combine(directory, "review-input.json"), review.Input);
             review.Complete(false, "", "controlled-review-service-failure");
+            var fallbackReview = model.EngineFallbacks.Last();
+            Require(fallbackReview != review && ((string)JObject.Parse(fallbackReview.Input)["publicSpeech"]).Contains("今回の移動は未完了"),
+                "Engine fallback must undergo the same semantic review before release.");
+            fallbackReview.Complete(true, "{\"verdict\":\"consistent\",\"reason\":\"Owned failed attempt, no retry promised.\",\"factScope\":\"user-target\",\"actualLanguage\":\"ja\",\"resultReport\":\"incomplete\"}", "controlled-fallback-reviewed");
             Require(model.m_DataList.Last().content.Contains("今回の移動は未完了") &&
                 (string)Get(chat, "m_PendingSelfInspection") != "" && (bool)Get(chat, "m_SongCatalogResultPending"),
                 "Failed review reports the owned return failure while preserving undelivered cross-domain results.");
             Set(chat, "m_LastSongCatalogResult", "Newer catalog result, not included in the old packet.");
             Call(chat, "AcknowledgeObservations", receipt, generation, "Delivered original result packet.");
-            Require((bool)Get(chat, "m_SongCatalogResultPending") && (string)Get(chat, "m_PendingSelfInspection") == "",
-                "Acknowledgement clears only included unchanged results; a newer cross-domain result survives.");
+            Require((bool)Get(chat, "m_SongCatalogResultPending") && (string)Get(chat, "m_PendingSelfInspection") != "",
+                "Text acknowledgement cannot clear an unplayed tool answer or a newer cross-domain result.");
             // A separate user question still uses the full answer/evidence path.
             Set(chat, "m_WorkStatus", "continue");
             Call(chat, "RememberFirstReplyRequestSemantics", new FirstReplyCompletion { Disposition = FirstReplyDisposition.Tools, RequestKind = "mixed" }, generation, model);
@@ -126,6 +139,6 @@ public static partial class RoomSpeechFactScopeRegression
             Require(fixture.ToString() == original, "Projection never mutates recorded observations or memory.");
             Call(chat, "CancelRoomSpeechReview", "recorded-work-result-fixture-finished");
         }
-        finally { foreach (var item in saved) Set(chat, item.Key, item.Value); foreach (var item in oldBody) Set(bridge, item.Key, item.Value); serializer.m_DataList = oldHistory; }
+        finally { model.CompleteControlledEngineFallback = oldFallback; foreach (var item in saved) Set(chat, item.Key, item.Value); foreach (var item in oldBody) Set(bridge, item.Key, item.Value); serializer.m_DataList = oldHistory; }
     }
 }

@@ -405,6 +405,8 @@ public partial class ChatQW
         "referenceId", "sourceKind", "sourceCaptureId", "entityId", "capturedAtUtc", "captureId", "observedUtc", "capturedAtRealtime",
         "authoredHint", "observedRendererBoundsCenter", "observedRendererBoundsSize", "geometryNeighbor", "pointAtCapture",
         "imagePointAtCapture", "imagePoint", "pixelBounds", "markerPixelBounds", "markerAnchorPixel", "markerPlacement", "visiblePixelCount",
+        "pageIndex", "imageRegion", "opaquePixelsConfirmed",
+        "reviewed", "independentlyReviewedAtThisView", "selectionAllowed", "selectionConstraint", "revisitedByTask",
         "modelDescription", "descriptionCaptureId", "semanticStatus", "matchedOriginalTarget", "targetMatchCaptureId", "positionMemoryValid",
         "relativeToCurrentView", "relativeToCurrentBody", "ageSeconds", "historical", "currentVisibility", "actionAuthorization", "scope",
         "sceneLabel", "identitySource", "requiresReobservation", "semanticIdentityConfirmed", "candidateId", "marker", "selectionId",
@@ -423,6 +425,7 @@ public partial class ChatQW
         "cameraPosition", "cameraRotation", "cameraForward", "hasBodyPose", "bodyPosition", "bodyRotation", "bodyForward",
         "cameraYawRelativeToBodyDegrees", "cameraPitchRelativeToBodyDegreesUp", "sinceHistoricalCapture", "cameraDisplacementWorld",
         "cameraTranslationMeters", "cameraRotationDegrees", "bodyDisplacementWorld", "bodyTranslationMeters", "bodyYawChangeDegreesRight",
+        "currentPoseRef",
         "viewCaptureId", "yawDegreesRight", "elevationDegreesUp", "distanceMeters", "yawDegrees", "horizontalDistanceMeters" };
 
     private static bool RoomDecisionUnknownObservationFields(JObject row) => row.Properties()

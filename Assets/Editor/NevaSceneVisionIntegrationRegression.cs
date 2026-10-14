@@ -1104,10 +1104,33 @@ public sealed class NevaSceneVisionIntegrationModel : LLM
         Probes.Add(request); Save(request);
     }
     public override void PostRoomTaskMessage(string input, bool review, Action<bool, string, string> callback) => PostRoomTaskMessage(input, null, review, callback);
+    public bool CompleteControlledEngineFallback = true;
+    public readonly List<Request> EngineFallbacks = new List<Request>();
     public override void PostRoomTaskMessage(string input, string imageDataUrl, bool review, Action<bool, string, string> callback)
     {
         var request = new Request { Kind = review ? "room-review" : "room", Input = input, Image = imageDataUrl, RoomCallback = callback };
         request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildRoomTaskRequestJsonWithImage", input, imageDataUrl, review);
+        var packet = JObject.Parse(input);
+        if (review && (bool?)packet["engineFallbackReview"] == true)
+        {
+            // Separate, recorded provider callback for lifecycle regressions.
+            // This is controlled approval, never a claim of semantic validation;
+            // actual model checks use ConversationRepairRegression instead.
+            EngineFallbacks.Add(request); Save(request);
+            if (CompleteControlledEngineFallback) request.Complete(true, new JObject {
+                ["verdict"]="consistent",["reason"]="Controlled fallback lifecycle approval",
+                ["factScope"]=(bool?)packet.SelectToken("movementReportRequirement.required") == true ? "user-target" :
+                    (bool?)packet.SelectToken("sceneActionFacts.resultReportRequirement.required") == true ||
+                    (bool?)packet.SelectToken("sceneSearchReportRequirement.required") == true ? "scene-action" : "none",
+                ["actualLanguage"]=packet["publicSpeechLanguage"],
+                ["resultReport"]=(string)packet.SelectToken("movementReportRequirement.expectedReport") ??
+                    (string)packet.SelectToken("sceneActionFacts.resultReportRequirement.expectedReport") ??
+                    (string)packet.SelectToken("sceneSearchReportRequirement.expectedReport") ?? "omitted",
+                ["planningFailureReport"]=(string)packet.SelectToken("decisionFailure.kind") ?? "not-mentioned",
+                ["requestDisposition"]=(string)packet.SelectToken("currentRequestSemantics.requestKind") == "answer-only" ? "answer-only" : "action-request"
+            }.ToString(), "controlled-engine-fallback");
+            return;
+        }
         Decisions.Add(request); Save(request);
     }
     public override void PostRoomTaskMessageWithObservationHistory(string input, string imageDataUrl,

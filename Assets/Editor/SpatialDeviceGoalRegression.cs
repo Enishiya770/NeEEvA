@@ -378,17 +378,22 @@ public static class SpatialDeviceGoalRegression
     private static void AnswerPlaybackReceiptChecks(ChatSample chat)
     {
         string[] fields={"m_LatencyFillerPlayed","m_LatencyFillerText","m_LatencyFillerStartedAt","m_LatencyFillerDuration",
-            "m_LatencyFillerFromEou","m_LatencyFillerClip"};
+            "m_LatencyFillerFromEou","m_LatencyFillerClip","m_LatencyProgressClip","m_LatencyProgressSamples","m_LatencyProgressComplete"};
         var saved=fields.Select(name=>Get(chat,name)).ToArray();
         var heard=(System.Text.StringBuilder)Get(chat,"m_AssistantHeardText");string savedHeard=heard.ToString();
         int generation=(int)Get(chat,"m_FormalResponseGeneration");
         var receipt=Get(chat,"m_ReviewedGoalAnswerObligation");
         const string answer="The target is not confirmed yet.";
+        var fillerClip=AudioClip.Create("Controlled completed filler receipt",48000,1,48000,false);
         try
         {
             heard.Clear();Call(chat,"BindReviewedGoalAnswerSpeech",generation,answer);
             Set(chat,"m_LatencyFillerPlayed",true);Set(chat,"m_LatencyFillerText",answer);
             Set(chat,"m_LatencyFillerStartedAt",Time.realtimeSinceStartup-2f);Set(chat,"m_LatencyFillerDuration",1f);
+            // Model the completed filler sample receipt explicitly. Wall-clock
+            // elapsed time alone no longer counts as played audio in production.
+            Set(chat,"m_LatencyFillerClip",fillerClip);Set(chat,"m_LatencyProgressClip",fillerClip);
+            Set(chat,"m_LatencyProgressSamples",fillerClip.samples);Set(chat,"m_LatencyProgressComplete",true);
             Call(chat,"CommitPlayedLatencyFiller");Call(chat,"CompleteReviewedGoalAnswerPlayback",generation);
             Check(heard.ToString()==answer&&!(bool)Get(receipt,"delivered")&&string.IsNullOrEmpty((string)Get(receipt,"playedText")),
                 "Even identical filler text committed by the production heard-text path cannot satisfy an unplayed formal answer.");
@@ -408,6 +413,7 @@ public static class SpatialDeviceGoalRegression
         finally
         {
             for(int i=0;i<fields.Length;i++)Set(chat,fields[i],saved[i]);heard.Clear();heard.Append(savedHeard);
+            UnityEngine.Object.DestroyImmediate(fillerClip);
         }
     }
 

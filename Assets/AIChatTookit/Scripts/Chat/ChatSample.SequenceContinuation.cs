@@ -48,19 +48,32 @@ public partial class ChatSample
         var state = ReadRoomTaskSequence();
         var bridge = GetComponent<ArdyRoomDialogueBridge>();
         var model = m_ChatSettings?.m_ChatModel;
-        if (generation != m_FormalResponseGeneration || m_SequenceBodyContinuation != null ||
-            state?["steps"] is not JArray steps || bridge?.Controller == null ||
-            model?.SupportsRoomPreparationMessages != true || m_RoomSpeechPreparation != null ||
-            m_SceneVisionStopPreparation?.ownsTransport == true || !m_WorkReviewOpen || m_WorkNoProgress ||
-            steps.OfType<JObject>().Any(s => (string)s["status"] == "running" || (string)s["status"] == "failed")) return false;
+        var steps = state?["steps"] as JArray;
+        var preparation = m_RoomSpeechPreparation;
+        string blocked = generation != m_FormalResponseGeneration ? "generation-changed" :
+            m_SequenceBodyContinuation != null ? "continuation-already-pending" : steps == null ? "no-current-sequence" :
+            bridge?.Controller == null ? "no-body-controller" : model?.SupportsRoomPreparationMessages != true ? "review-unavailable" :
+            preparation != null && (!preparation.consumed || preparation.ownsTransport) ? "speech-preparation-pending" :
+            m_SceneVisionStopPreparation?.ownsTransport == true ? "stop-review-pending" :
+            !m_WorkReviewOpen || m_WorkNoProgress ? "work-not-continuable" :
+            steps.OfType<JObject>().Any(s => (string)s["status"] == "running" || (string)s["status"] == "failed") ? "unsettled-or-failed-step" : null;
+        bool Deferred(string reason) {
+            Debug.Log("[Work/SequenceContinuationDeferred] " + new JObject { ["generation"] = generation,
+                ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn, ["reason"] = reason,
+                ["preparationPresent"] = preparation != null, ["preparationConsumed"] = preparation?.consumed,
+                ["preparationCompleted"] = preparation?.completed, ["preparationOwnsTransport"] = preparation?.ownsTransport,
+                ["bodyReserved"] = bridge != null && bridge.ReservesBody, ["scope"] = "No successor submitted; existing reporting and bounded work review remain available." }.ToString(Formatting.None), this);
+            return false;
+        }
+        if (blocked != null) return Deferred(blocked);
         var ready = RoomTaskSequenceProtocol.Ready(steps).Values<string>().ToArray();
         var selected = steps.OfType<JObject>().FirstOrDefault(s => ready.Contains((string)s["id"]));
         // These kinds already denote the tracked user. Object/visual/device
         // steps retain their full semantic binding and current-view pipeline.
         if (selected == null || !new[] { "approach", "follow" }.Contains((string)selected["kind"]) ||
-            !(selected["after"] is JArray predecessors) || predecessors.Count == 0) return false;
+            !(selected["after"] is JArray predecessors) || predecessors.Count == 0) return Deferred("no-ready-dependent-user-body-step");
         string key = m_WorkEpoch + ":" + m_ActionConstraints.CurrentUserTurn + ":" + (string)selected["id"];
-        if (m_SequenceBodyAttempts.Contains(key)) return false;
+        if (m_SequenceBodyAttempts.Contains(key)) return Deferred("attempt-already-used");
         var lease = new SequenceBodyContinuation {
             generation = generation, epoch = m_WorkEpoch, turn = m_ActionConstraints.CurrentUserTurn,
             vision = m_SceneVisionEpoch, input = m_InputAudioRevision, operation = bridge.Controller.OperationRevision,
@@ -69,7 +82,7 @@ public partial class ChatSample
             sequence = state, candidate = (JObject)selected.DeepClone(), report = report, started = Time.realtimeSinceStartup
         };
         m_SequenceBodyContinuation = lease;
-        if (!SequenceContinuationBodyAvailable(lease)) { m_SequenceBodyContinuation = null; return false; }
+        if (!SequenceContinuationBodyAvailable(lease)) { m_SequenceBodyContinuation = null; return Deferred("body-or-owner-unavailable"); }
         var summaries = new JArray(steps.OfType<JObject>().Select(s => {
             var summary = PickRoomFields(s, "id", "quote", "kind", "desiredState", "after", "status");
             var receipt = s["receipt"] as JObject;
@@ -83,7 +96,7 @@ public partial class ChatSample
             ["steps"] = summaries, ["priorResultSpeechCompleted"] = false,
             ["scope"] = "Statuses are engine-recorded completion receipts. Body is available now. This executor can only track the current user; independently determine the requested target from the complete utterance. No new visual/object decision or user confirmation was performed." };
         string wireInput = input.ToString(Formatting.None);
-        if (wireInput.Length > 8000) { m_SequenceBodyContinuation = null; return false; }
+        if (wireInput.Length > 8000) { m_SequenceBodyContinuation = null; return Deferred("continuation-input-budget"); }
         m_SequenceBodyAttempts.Add(key);
         lease.transport = true;
         StartCoroutine(WatchSequenceContinuation(lease));

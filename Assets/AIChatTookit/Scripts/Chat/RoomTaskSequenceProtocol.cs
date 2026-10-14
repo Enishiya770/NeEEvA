@@ -28,7 +28,7 @@ public static class RoomTaskSequenceProtocol
         "ORDERING: Before writing taskCoverage, resolve the FINAL valid actions and their execution order. Assign s1, s2, ... in that order, not the order of an abandoned mention. taskPlan must list prerequisites BEFORE their dependents; every after ID must already appear earlier in taskPlan. Only taskCoverage follows the original text order, including withdrawn clauses as context. Use those planned IDs in coverage. Never concatenate nonadjacent source spans into a quote." +
         "已有taskSequence时沿用其步骤，不输出新taskPlan；其中状态和回执由引擎提供，不能自行宣称完成或删除未完成项。" +
         "taskStep选择readyStepIds中的一个；执行必须符合该步骤kind与目标，device-state首次须附deviceGoal，其requestQuote须对应所选步骤的quote，不能选同类型的后续物件，不得用approach代替。" +
-        "新taskPlan中无前置步骤的未完成项就是就绪步骤；有就绪步骤就必须选择它的id。即使intent=none且附deviceGoal来启动统一设备任务，taskStep仍必须指向本次device-state，不能是null。" +
+        "新taskPlan中无前置步骤的未完成项就是就绪步骤；决定执行时必须选择它的id。即使intent=none且附deviceGoal来启动统一设备任务，taskStep仍必须指向本次device-state，不能是null。纯粹说明无法形成可靠执行方案时，intent=none且无deviceGoal，taskStep=null；保留全部待办及前置，不把说明当成动作或完成。" +
         "完整原话、条件和对象仍约束本次决定，taskStep本身不授权动作。没有可执行步骤时taskStep=null、intent=none；" +
         "other只可交给正常工具通道，不能通过房间移动冒充完成。用户新取消/限制优先于旧任务。";
 
@@ -237,7 +237,7 @@ public static class RoomTaskSequenceProtocol
                 if (plan[i] is JObject row && row["id"]?.Type == JTokenType.String && !mapped.Contains((string)row["id"]))
                     Add("taskPlan[" + i + "]", "planned-step-needs-action-coverage");
             string selected = input["taskStep"]?.Type == JTokenType.String ? (string)input["taskStep"] : null;
-            if (selected == null && ((string)input["intent"] != "none" || plan.Count > 0)) Add("taskStep", "select-a-ready-compatible-planned-step");
+            if (selected == null && ((string)input["intent"] != "none" || input["deviceGoal"] is JObject)) Add("taskStep", "select-a-ready-compatible-planned-step");
             else if (selected != null && !seen.Contains(selected)) Add("taskStep", "selection-references-missing-planned-step");
         }
         catch (Exception) { Add("$", "invalid-plan-structure"); }
@@ -256,7 +256,8 @@ public static class RoomTaskSequenceProtocol
             var value = Parse(json); var token = value["taskStep"];
             if (token == null || token.Type != JTokenType.String && token.Type != JTokenType.Null) return false;
             id = (string)token;
-            if (id == null) return decision.intent == "none" && decision.deviceGoal == null && Ready(steps).Count == 0;
+            if (id == null) { bool noAction = decision.intent == "none" && decision.deviceGoal == null;
+                if (noAction) reason = null; return noAction; }
             string selected = id;
             var step = steps.OfType<JObject>().FirstOrDefault(s => (string)s["id"] == selected);
             if (step == null || !Ready(steps).Values<string>().Contains(id)) { reason = "invalid-task-sequence-prerequisite"; return false; }

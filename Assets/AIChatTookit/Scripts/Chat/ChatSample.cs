@@ -7037,6 +7037,8 @@ public partial class ChatSample : MonoBehaviour
         public string work_evidence;
         public string work_status;
         public string next_intent_source, next_step_id, planning_focus;
+        public WorkResultDeliveryProtocol.Report[] delivery_reports;
+        public string remaining_request_quote;
         public string singing_goal_status;
         public string singing_goal_evidence;
         [NonSerialized] public Newtonsoft.Json.Linq.JObject singing_goal_expected;
@@ -9283,13 +9285,38 @@ public partial class ChatSample : MonoBehaviour
                     : $"[Agent/自主意图] 本次选择安静观察或休息；{wait:F0}s 后再考虑");
             ScheduleNextTick(wait, "autonomy-no-new-intent");
         };
+        if (playbackReview != null && reviewingWork)
+            playbackReview.refreshSpeech = fresh => {
+                // The old decision is untrusted once its delivery premise has
+                // changed. Reuse only current task receipts and completed words,
+                // never turn the old candidate into a public continuation first.
+                string prompt = BuildPlaybackHandoffWorkReviewPrompt(fresh, out bool needsImage);
+                Debug.Log("[Agent/PlaybackHandoffScope] " + new Newtonsoft.Json.Linq.JObject { ["generation"] = playbackReview.formalGeneration,
+                    ["purpose"] = needsImage ? "full-goal-review" : "delivery-progress", ["characters"] = prompt.Length,
+                    ["imageAttached"] = needsImage, ["actualPlaybackRequired"] = true, ["engineMemoryMutated"] = false }.ToString(Newtonsoft.Json.Formatting.None), this);
+                playbackReview.model.PostWorkReviewResult(prompt, needsImage ? fresh.ImageDataUrl : null, result => {
+                    if (!ScenePlaybackReviewCurrent(playbackReview)) {
+                        if (m_ScenePlaybackReview == playbackReview) ClearScenePlaybackReview("speech-recheck-owner-changed");
+                        if (generation == m_AutonomyProbeGeneration) m_AutonomyProbeInFlight = false;
+                        return;
+                    }
+                    playbackReview.resuming = false;
+                    if (result.Succeeded) { onDecision(result.Output); return; }
+                    m_AutonomyProbeInFlight = false;
+                    ClearScenePlaybackReview("speech-progress-recheck-failed");
+                    HandlePrivateDecisionFailure(result);
+                });
+            };
         RequestSceneObservation("autonomy", observed => {
             if (generation != m_AutonomyProbeGeneration || workEpoch != m_WorkEpoch || !isActiveAndEnabled) return;
             if (playbackReadOnly && (!ScenePlaybackReviewCurrent(playbackReview) || observed?.HasImage != true))
             { m_AutonomyProbeInFlight = false; if (m_ScenePlaybackReview == playbackReview) ClearScenePlaybackReview("private-capture-unavailable-or-superseded"); return; }
             sceneObservation = observed;
             frame = reviewingWork ? BuildWorkReviewFrame(triggerReason) : BuildAutonomyIntentFrame(triggerReason);
-            if (playbackReadOnly) playbackReview.factStamp = CaptureScenePlaybackFactStamp();
+            if (playbackReadOnly) {
+                playbackReview.factStamp = CaptureScenePlaybackFactStamp();
+                playbackReview.speechStamp = CaptureScenePlaybackSpeechStamp();
+            }
             string prompt = BuildAutonomyIntentProbePrompt(triggerReason, frame) +
                 BuildWorkReviewObservationContext(observed);
             if (playbackReadOnly) prompt += "\n[本次是最后一段已生成语音播放期间的只读私人复查。公开回复已经生成，音频尚未全部播放；不可把未播部分说成已被用户听到。本次只形成待选意图，不会发声、执行动作/工具、写记忆或提交事项状态。音频结束后仍需当前图和正常决策核验，新用户、新动作或事件会使本次候选失效。]";

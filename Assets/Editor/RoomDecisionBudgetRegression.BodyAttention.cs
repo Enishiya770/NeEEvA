@@ -7,10 +7,15 @@ public static partial class RoomDecisionBudgetRegression
 {
     private static void CheckInitialBodyAttention(ChatQW provider)
     {
+        CheckSharedCompletionPackets();
         var source = WorkingMemorySource();
         source["currentUserText"] = "跟着我走，保持两米距离。";
         source["latestUserText"] = source["currentUserText"].DeepClone();
         source["autonomous"] = false;
+        // Exercise the current visible-catalog producer, not an older hand-made schema.
+        foreach (var row in ((JArray)source.SelectToken("visibleObjectCatalog.current.candidates")).OfType<JObject>()) {
+            row["pageIndex"] = 0; row["imageRegion"] = 4; row["opaquePixelsConfirmed"] = true;
+        }
         source["currentRequestSemantics"] = new JObject {
             ["source"] = "independent-first-reply-current-request-review", ["requestKind"] = "action",
             ["actionAuthorization"] = false, ["planningFocus"] = new JObject {
@@ -56,9 +61,29 @@ public static partial class RoomDecisionBudgetRegression
             ["general"] = Call(null, "BuildRoomTaskRequestDiagnostic", generalWire) as JObject,
             ["focused"] = budget["diagnostic"], ["scope"] = "Real serializer; controlled semantic attention, unchanged menu and protected constraints." };
         CheckLatestAccumulatedAttention(provider, "TaskBudget.latest-2309-20261013.json", "latest2309Attention");
+        CheckLatestAccumulatedAttention(provider, "TaskBudget.latest-1135-20261014.json", "latest1135Attention");
+        CheckLatestAccumulatedAttention(provider, "TaskBudget.latest-1348-20261014.json", "latest1348Attention");
         CheckLatestAccumulatedAttention(provider);
         CheckLatestAccumulatedAttention(provider, "TaskBudget.latest-2123-20261012.json", "latest2123Attention");
         CheckLatestAccumulatedAttention(provider, "TaskBudget.latest-2252-20261012.json", "latest2252Attention");
+    }
+
+    private static void CheckSharedCompletionPackets()
+    {
+        var block=new JObject { ["actionId"]="same-owned-attempt",["entityId"]="same-entity",["phase"]="failed",
+            ["reason"]=new string('x',2048),["futureConstraint"]=new JObject{["allow"]=false,["requestedBy"]="USER"},
+            ["observedUtc"]="2026-10-14T02:38:46.1199Z",["position"]=new JObject{["x"]=1.25,["y"]=2.5,["z"]=-3.75} };
+        var input=new JObject { ["currentUserText"]="检查文件，再告诉我结果。",["autonomous"]=false,
+            ["currentFacts"]=block.DeepClone(),["sceneActionFacts"]=new JObject{["currentFacts"]=block.DeepClone()},
+            ["priorResults"]=new JArray(new JObject{["currentFacts"]=block.DeepClone()}) };
+        var wire=new JObject{["messages"]=new JArray(new JObject{["role"]="user",["content"]=input.ToString(Formatting.None)})};
+        object[] args={wire.ToString(Formatting.None),null};
+        Require((bool)Call(null,"TryCompactRoomTaskRequest",args),"Identical completed/failed fact packets share one request-local value.");
+        var compact=Input((string)args[1]);
+        Require(compact.SelectToken("currentFacts.requestEvidenceRef")!=null,"Expanded exact sharing covers fact packets, not just geometry fragments.");
+        Require((bool)Call(null,"RestoreRoomDecisionSharedEvidence",compact),"Newly shared packets have a valid exact expansion.");
+        Require(JToken.DeepEquals(compact,input),"Full expansion preserves failures, unknown constraints, coordinates, times and array cardinality without mutating memory.");
+        LastReport["completionPacketSharing"]=new JObject{["beforeCharacters"]=((string)args[0]).Length,["afterCharacters"]=((string)args[1]).Length,["roundTripVerified"]=true};
     }
 
     private static void CheckLatestAccumulatedAttention(ChatQW provider, string fixtureName = "TaskBudget.latest-1945-20261012.json", string reportName = "latestAccumulatedAttention")
@@ -71,10 +96,21 @@ public static partial class RoomDecisionBudgetRegression
             string original = input.ToString(Formatting.None);
             string raw = (string)Call(provider, "BuildRoomTaskRequestJsonWithImage", original, "data:image/png;base64,AA==", false);
             var budget = Budget(raw, false);
-            reports.Add(new JObject { ["name"] = row["name"], ["recordedOriginalBudget"] = row["recordedBudget"],
-                ["reconstructedBudget"] = budget["diagnostic"] });
+            var measured = new JObject { ["name"] = row["name"], ["recordedOriginalBudget"] = row["recordedBudget"],
+                ["reconstructedBudget"] = budget["diagnostic"] };
+            if (reportName == "latest1348Attention") {
+                var known = (System.Collections.Generic.HashSet<string>)typeof(ChatQW).GetField("RoomDecisionKnownObservationFields",Flags).GetValue(null);
+                string[] producerFields = {"pageIndex","imageRegion","opaquePixelsConfirmed","reviewed","independentlyReviewedAtThisView","selectionAllowed","selectionConstraint","revisitedByTask"};
+                try {
+                    foreach(string field in producerFields) known.Remove(field);
+                    string old = (string)Call(provider,"BuildRoomTaskRequestJsonWithImage",original,"data:image/png;base64,AA==",false);
+                    measured["beforeCatalogSchemaFix"] = Budget(old,false)["diagnostic"];
+                } finally { foreach(string field in producerFields) known.Add(field); }
+                measured["comparisonScope"]="Same reconstructed full input and serializer; only the current catalog/search producer field registrations are toggled. Not original Play token usage.";
+            }
+            reports.Add(measured);
             LastReport[reportName] = new JObject { ["scope"] = fixture["scope"], ["turns"] = reports };
-            Require((bool)budget["ok"], "Latest complete five-turn cross-task stress remains admitted: " + row["name"]);
+            Require((bool)budget["ok"], "Latest complete five-turn cross-task stress remains admitted: " + row["name"] + " " + budget["diagnostic"]);
             var sent = Input((string)budget["wire"]); Call(null, "RestoreRoomDecisionSharedEvidence", sent);
             Require((string)sent["currentUserText"] == (string)input["currentUserText"] && original == input.ToString(Formatting.None),
                 "Latest dialogue stays intact and attention never changes the retained source.");

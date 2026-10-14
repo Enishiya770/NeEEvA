@@ -137,6 +137,7 @@ public static class FormalStreamRecoveryRegression
             ["realModelRequests"] = 0, ["actionExecutorsCreated"] = 0 };
         PureChecks();
         checks += ConversationRepairRegression.RunChecks();
+        LastReport["identityAttention"] = IdentityAttentionRegression.LastReport.DeepClone();
         LastReport["taskSequenceChecks"] = RoomTaskSequenceRegression.RunChecks(Output);
         checks += CommittedSpatialReplyProtocolRegression.RunChecks(Output);
         LastReport["committedPublicProtocol"] = CommittedSpatialReplyProtocolRegression.LastReport.DeepClone();

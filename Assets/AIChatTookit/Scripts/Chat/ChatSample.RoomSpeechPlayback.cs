@@ -207,6 +207,7 @@ public partial class ChatSample
 
     private void RecordRoomSpeechPlayed(RoomSpeechPlaybackLease lease, string text)
     {
+        RecordWorkCompletedSpeech(text);
         if (lease == null && (int?)m_LastFormalReplyReceipt?["generation"] == m_FormalResponseGeneration)
             m_LastFormalReplyReceipt["completedPlaybackText"] = ((string)m_LastFormalReplyReceipt["completedPlaybackText"] ?? "") + text;
         if (lease == null) return;

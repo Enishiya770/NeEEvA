@@ -146,7 +146,8 @@ public static partial class ArdyRoomStreamDelayRegression
             report.scope="Real native ARDY motion and imported avatar. Controlled target becomes 2 cm beyond the committed future seam while prior control continuity is cleared. Production planner must reject braking, persist diagnostics and recover with fresh rendered history.";
             report.limits="Mechanism replay; original failed room trajectory was not retained. No native pose is synthesized by the harness and no kinematic or geometry threshold is relaxed.";
         }
-        routine = controlOnly ? ControlScenarios() : qualityOnly ? QualityScenarios() : Scenarios(); lastFrame = -1; observationError = null; InstallObserver(true);
+        routine = Environment.GetCommandLineArgs().Contains("-ardyFollowHandoffOnly") ? FollowHandoffScenarios() :
+            controlOnly ? ControlScenarios() : qualityOnly ? QualityScenarios() : Scenarios(); lastFrame = -1; observationError = null; InstallObserver(true);
     }
 
     private static IEnumerator QualityScenarios()

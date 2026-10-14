@@ -203,10 +203,12 @@ public partial class ChatSample
         m_WorkSubstepReviewPending = false;
         string status = (decision.work_status ?? "").Trim().ToLowerInvariant();
         var sequence = ReadRoomTaskSequence();
+        ApplyWorkDelivery(decision, sequence);
+        status = (decision.work_status ?? "").Trim().ToLowerInvariant();
         if (AcceptWorkAutonomousHandoff(decision, sequence)) return false;
         if ((status == "closed" || status == "none") && sequence?["steps"] is JArray steps &&
             System.Linq.Enumerable.Any(System.Linq.Enumerable.OfType<JObject>(steps), s =>
-                (string)s["kind"] != "other" && (string)s["status"] != "completed" &&
+                (string)s["kind"] != "other" && (string)s["status"] != "completed" && !FailedStepReportDelivered(s) &&
                 !((string)s["kind"] == "follow" && (string)s["status"] == "running" &&
                     !System.Linq.Enumerable.Any(System.Linq.Enumerable.OfType<JObject>(steps), later =>
                         System.Linq.Enumerable.Contains(((JArray)later["after"]).Values<string>(), (string)s["id"])))))

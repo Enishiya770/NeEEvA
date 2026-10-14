@@ -1,0 +1,223 @@
+{
+  "source": "Logs/unity-review-20261014-154814/Editor.snapshot.log",
+  "history": [
+    {
+      "role": "user",
+      "content": "现在能看到什么吗？"
+    },
+    {
+      "role": "assistant",
+      "content": "今、私の視界にはテレビとテレビ台がちゃんと映っていますよ。ユウ、大丈夫？ 視線がぼやけているのか、少し心配です。"
+    },
+    {
+      "role": "user",
+      "content": "没关系，先来我身边。"
+    },
+    {
+      "role": "assistant",
+      "content": "あなたのそばへ向かっているわ。"
+    },
+    {
+      "role": "user",
+      "content": "去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯，你去把它关掉，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":6.590000152587891,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯，你去把。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.0,\"end_seconds\":6.989999771118164}]}\n{\"id\":2,\"start_seconds\":6.590000152587891,\"end_seconds\":8.029999732971192,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"你去把它关掉。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"你去把它关掉，然后。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":6.190000057220459,\"end_seconds\":8.430000305175782}]}\n{\"id\":3,\"start_seconds\":8.029999732971192,\"end_seconds\":9.850000381469727,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯，你去把它关掉，然后回到我身边。\"}]"
+    },
+    {
+      "role": "assistant",
+      "content": "テレビ台のランプは、正常に消灯しました。あなたのそばに着いたわ。"
+    },
+    {
+      "role": "user",
+      "content": "跟着我走。"
+    },
+    {
+      "role": "assistant",
+      "content": "あなたについて移動しているわ。"
+    },
+    {
+      "role": "user",
+      "content": "去把你刚才呃关掉的那盏小灯重新打开，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":4.829999923706055,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"去把你刚才呃关掉的那盏小灯重新打开。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n{\"id\":2,\"start_seconds\":4.829999923706055,\"end_seconds\":6.869999885559082,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n{\"id\":3,\"start_seconds\":6.869999885559082,\"end_seconds\":7.349999904632568,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"Yeah.\",\"language\":\"en\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":6.46999979019165,\"end_seconds\":7.349999904632568}]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"去把你刚才呃关掉的那盏小灯重新打开，然后回到我身边。\"}]\n[同一录音的较早 ASR 观测：不是额外发言，也不表示最终结果必然更准确。可用于补漏和判断冲突，不要重复拼接；有歧义时可以询问。\n覆盖录音前 2.58s：去把你刚才。]"
+    },
+    {
+      "role": "assistant",
+      "content": "テレビ台のランプは正常に点灯しています。今回の経路調整は上限に達したけれど、必要な距離や向きにはまだ届いていないわ。いったん止まるね。今回の移動は未完了なの。"
+    },
+    {
+      "role": "assistant",
+      "content": "今回の経路調整は上限に達したけれど、必要な距離や向きにはまだ届いていないわ。いったん止まるね。今回の移動は未完了なの。"
+    }
+  ],
+  "turns": [
+    {
+      "request": "现在能看到什么吗？",
+      "inputEvidence": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.77] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.09; 语言:zh; 音域:G#2～A5; 音高稳定度:0.51; 旋律:G5-G#5-F#4-B2-G#2-E5-F3-G3-F#5-G#5-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 现在能看到什么吗？",
+      "public": [
+        {
+          "generation": 3,
+          "generated": "今、私の視界にはテレビとテレビ台がちゃんと映っていますよ。ユウ、大丈夫？ 視線がぼやけているのか、少し心配です。",
+          "played": "今、私の視界にはテレビとテレビ台がちゃんと映っていますよ。ユウ、大丈夫？ 視線がぼやけているのか、少し心配です。",
+          "sourceLine": 64489
+        }
+      ],
+      "sourceLine": 63896
+    },
+    {
+      "request": "没关系，先来我身边。",
+      "inputEvidence": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.77] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.18; 语言:zh; 音域:A2～A5; 音高稳定度:0.53; 旋律:A5-A2-C3-C#3-A5-G5-B2-G#2-A#2-C#4-G#5-A5; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 没关系，先来我身边。",
+      "public": [
+        {
+          "generation": 5,
+          "generated": "あなたのそばへ向かっているわ。",
+          "played": "あなたのそばへ向かっているわ。",
+          "sourceLine": 66282
+        }
+      ],
+      "sourceLine": 65382
+    },
+    {
+      "request": "去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯，你去把它关掉，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":6.590000152587891,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯，你去把。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.0,\"end_seconds\":6.989999771118164}]}\n{\"id\":2,\"start_seconds\":6.590000152587891,\"end_seconds\":8.029999732971192,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"你去把它关掉。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"你去把它关掉，然后。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":6.190000057220459,\"end_seconds\":8.430000305175782}]}\n{\"id\":3,\"start_seconds\":8.029999732971192,\"end_seconds\":9.850000381469727,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯，你去把它关掉，然后回到我身边。\"}]",
+      "inputEvidence": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.92] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.18; 语言:zh; 音域:G#2～A5; 音高稳定度:0.51; 旋律:G#5-E5-C#3-B2-A#2-A4-C#3-G5-F#5-E5-A#2-C3-D#3-C3-G#3-A#2-A2-G#2-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯，你去把它关掉，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":6.590000152587891,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯，你去把。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":0.0,\"end_seconds\":6.989999771118164}]}\n{\"id\":2,\"start_seconds\":6.590000152587891,\"end_seconds\":8.029999732971192,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"你去把它关掉。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"你去把它关掉，然后。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":6.190000057220459,\"end_seconds\":8.430000305175782}]}\n{\"id\":3,\"start_seconds\":8.029999732971192,\"end_seconds\":9.850000381469727,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"去把你刚才看到的那个电视柜上呃，就是电视柜上有一盏小灯，你去把它关掉，然后回到我身边。\"}]",
+      "public": [
+        {
+          "generation": 8,
+          "generated": "テレビ台のランプは、正常に消灯しました。この移動を終えて姿勢を戻しているところよ。これだけではタスク全体の完了は確認できないわ。",
+          "played": "テレビ台のランプは、正常に消灯しました。あなたのそばに着いたわ。",
+          "sourceLine": 70570
+        }
+      ],
+      "sourceLine": 67810
+    },
+    {
+      "request": "跟着我走。",
+      "inputEvidence": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.62] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.16; 语言:zh; 音域:G#2～C#3; 音高稳定度:0.55; 旋律:C3-A2-G#2; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 跟着我走。",
+      "public": [
+        {
+          "generation": 10,
+          "generated": "あなたについて移動しているわ。",
+          "played": "あなたについて移動しているわ。",
+          "sourceLine": 72772
+        }
+      ],
+      "sourceLine": 71612
+    },
+    {
+      "request": "去把你刚才呃关掉的那盏小灯重新打开，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":4.829999923706055,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"去把你刚才呃关掉的那盏小灯重新打开。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n{\"id\":2,\"start_seconds\":4.829999923706055,\"end_seconds\":6.869999885559082,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n{\"id\":3,\"start_seconds\":6.869999885559082,\"end_seconds\":7.349999904632568,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"Yeah.\",\"language\":\"en\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":6.46999979019165,\"end_seconds\":7.349999904632568}]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"去把你刚才呃关掉的那盏小灯重新打开，然后回到我身边。\"}]\n[同一录音的较早 ASR 观测：不是额外发言，也不表示最终结果必然更准确。可用于补漏和判断冲突，不要重复拼接；有歧义时可以询问。\n覆盖录音前 2.58s：去把你刚才。]",
+      "inputEvidence": "[说话人:ユウ; speaker_id:owner; 类型:owner; 可信度:0.89] [听觉测量（不是整轮模态或行动结论）; 歌唱概率:0.30; 语言:zh; 音域:G#2～A5; 音高稳定度:0.52; 旋律:F4-F5-F#5-D#5-A#2-G#3-C3-G5-A2-B2-A2-G#2-C#5-G5-A#2-C3-C#3-D3-…; 歌词是ASR推测，长音与一字多音处可能不准确; 曲库里没有旋律接近的段落] 去把你刚才呃关掉的那盏小灯重新打开，然后回到我身边。 [同轮分轨观测；以下为同一录音按时间独立ASR的主语义，时间基于去除首尾静音后的内容音频；这是已经录完的一轮，不是接下来才会发生的计划。请同时理解唱前约定、实际歌声和唱后请求；较早流式预判可能只听到开头，不能代替下面完整时序。是否回应、行动或询问仍由你判断。type仅是声学候选，uncertain不等于没有唱歌。尾段可能包含新的用户请求，请结合完整时序理解。alternatives为边界重叠窗口的备选，不是重复发言，不要直接拼接；空文本/failed表示未识别，不能推断没有声音。confidence_available=false表示ASR没有提供可校准置信度。存在歧义时可以先询问，也可以结合语境自行判断。\n{\"id\":1,\"start_seconds\":0.0,\"end_seconds\":4.829999923706055,\"region\":\"head\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"去把你刚才呃关掉的那盏小灯重新打开。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n{\"id\":2,\"start_seconds\":4.829999923706055,\"end_seconds\":6.869999885559082,\"region\":\"island\",\"type\":\"singing_candidate\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"然后回到我身边。\",\"language\":\"zh\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":false,\"alternatives\":[]}\n{\"id\":3,\"start_seconds\":6.869999885559082,\"end_seconds\":7.349999904632568,\"region\":\"tail\",\"type\":\"uncertain\",\"type_source\":\"acoustic_boundary_hypothesis\",\"text\":\"Yeah.\",\"language\":\"en\",\"status\":\"ok\",\"error\":\"\",\"confidence_available\":false,\"review_required\":true,\"alternatives\":[{\"source\":\"boundary_overlap\",\"text\":\"。\",\"language\":\"zh\",\"audio_event\":\"Speech\",\"error\":\"\",\"start_seconds\":6.46999979019165,\"end_seconds\":7.349999904632568}]}\n整轮ASR仅作补漏/冲突参考，不能覆盖分段内容：{\"text\":\"去把你刚才呃关掉的那盏小灯重新打开，然后回到我身边。\"}]\n[同一录音的较早 ASR 观测：不是额外发言，也不表示最终结果必然更准确。可用于补漏和判断冲突，不要重复拼接；有歧义时可以询问。\n覆盖录音前 2.58s：去把你刚才。]",
+      "public": [
+        {
+          "generation": 12,
+          "generated": "テレビ台のランプは正常に点灯しています。経路か空間の確認を通らず、今回の移動は完了していないわ。",
+          "played": "テレビ台のランプは正常に点灯しています。今回の経路調整は上限に達したけれど、必要な距離や向きにはまだ届いていないわ。いったん止まるね。今回の移動は未完了なの。",
+          "sourceLine": 78784
+        },
+        {
+          "generation": 13,
+          "generated": "今回の経路調整は上限に達したけれど、必要な距離や向きにはまだ届いていないわ。いったん止まるね。今回の移動は未完了なの。",
+          "played": "今回の経路調整は上限に達したけれど、必要な距離や向きにはまだ届いていないわ。いったん止まるね。今回の移動は未完了なの。",
+          "sourceLine": 80364
+        },
+        {
+          "generation": 14,
+          "generated": "今回の経路調整は上限に達したけれど、必要な距離や向きにはまだ届いていないわ。いったん止まるね。今回の移動は未完了なの。",
+          "played": "",
+          "sourceLine": 81900
+        }
+      ],
+      "sourceLine": 75815
+    }
+  ],
+  "sequence": {
+    "workEpoch": 6,
+    "userTurn": 6,
+    "request": "去把你刚才呃关掉的那盏小灯重新打开，然后回到我身边。",
+    "steps": [
+      {
+        "id": "s1",
+        "quote": "去把你刚才呃关掉的那盏小灯重新打开",
+        "kind": "device-state",
+        "desiredState": "on",
+        "after": [],
+        "status": "completed",
+        "actionId": "b8327b82a2bd4b2494f3eb18cf28d34c:12:14",
+        "goalId": "device-goal-67c70772fc81421fa76cf93e99f802df",
+        "receipt": {
+          "goal": {
+            "goalId": "device-goal-67c70772fc81421fa76cf93e99f802df",
+            "status": "satisfied",
+            "desiredState": "on",
+            "boundEntityId": "scene-object-614ac3c9ae1a46e2947427c9433f1a44",
+            "completionEvidenceValid": true,
+            "completionEvidence": {
+              "actionId": "b8327b82a2bd4b2494f3eb18cf28d34c:12:14",
+              "entityId": "scene-object-614ac3c9ae1a46e2947427c9433f1a44",
+              "desiredState": "on",
+              "resultCaptureId": "c14d57355e2c4035b720224c82249103-72e8933e3a3440499bc259e5f438585d-5174ba0217184883804bf6edf62cadcc",
+              "observedUtc": "2026-10-14T06:45:04.0883826Z",
+              "readAtUtc": "2026-10-14T06:45:04.1682546Z",
+              "actual": {
+                "entityId": "scene-object-614ac3c9ae1a46e2947427c9433f1a44",
+                "sceneLabel": "桌面装饰灯",
+                "registered": true,
+                "on": true,
+                "lightEnabled": true,
+                "emissionEnabled": true,
+                "lightState": "enabled",
+                "emissionState": "on",
+                "conflict": "",
+                "bakedLightingResidualUncontrolled": true
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "s2",
+        "quote": "然后回到我身边",
+        "kind": "approach",
+        "desiredState": null,
+        "after": [
+          "s1"
+        ],
+        "status": "failed",
+        "actionId": "b8327b82a2bd4b2494f3eb18cf28d34c:12:15",
+        "receipt": {
+          "actionId": "b8327b82a2bd4b2494f3eb18cf28d34c:12:15",
+          "intent": "approach",
+          "targetKind": "user",
+          "phase": "blocked",
+          "stage": "generation",
+          "reason": "本次走近的有限调整已用完，实际距离或朝向仍未满足，已停止。",
+          "operationRevision": 18,
+          "observedUtc": "2026-10-14T06:45:06.0951466Z"
+        }
+      }
+    ],
+    "coverage": [
+      {
+        "quote": "去把你刚才呃关掉的那盏小灯重新打开",
+        "kind": "action",
+        "stepIds": [
+          "s1"
+        ]
+      },
+      {
+        "quote": "然后回到我身边",
+        "kind": "action",
+        "stepIds": [
+          "s2"
+        ]
+      }
+    ],
+    "readyStepIds": []
+  },
+  "blocked": {
+    "actionId": "b8327b82a2bd4b2494f3eb18cf28d34c:12:15",
+    "phase": "blocked",
+    "reason": "本次走近的有限调整已用完，实际距离或朝向仍未满足，已停止。",
+    "operationRevision": 18,
+    "observedUtc": "2026-10-14T06:45:06.0951466Z",
+    "approachRetargetCount": 3,
+    "approachRetargetStatus": "exhausted"
+  },
+  "actualFirstResultSpeech": "テレビ台のランプは正常に点灯しています。今回の経路調整は上限に達したけれど、必要な距離や向きにはまだ届いていないわ。いったん止まるね。今回の移動は未完了なの。",
+  "scope": "Five complete recorded user turns plus actual duplicate and suppressed draft, immutable action outcomes. No original HTTP body replay claim."
+}

@@ -136,7 +136,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         public bool navigationRecoveryActive, navigationRecoveryAttempted;
         public string navigationRecoveryReason;
         public string approachRetargetStatus;
-        public int approachRetargetCount;
+        public int approachRetargetCount, approachRetargetUpdates, approachRetargetRestarts;
         public float approachRetargetTravel;
         public string scope = "Current engine observations for the explicit user's target revision. assessment describes user approach, not a scene-object destination. executionTargetKind identifies the running/last task. no-attempt means no user approach has been submitted for this target; assessment is not an action result.";
     }
@@ -189,7 +189,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         public bool navigationRecoveryActive, navigationRecoveryAttempted;
         public string navigationRecoveryReason;
         public string approachRetargetStatus;
-        public int approachRetargetCount;
+        public int approachRetargetCount, approachRetargetUpdates, approachRetargetRestarts;
         public float approachRetargetTravel;
     }
 
@@ -333,6 +333,11 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
             }
             else controller.MoveTo(plan.GroundTarget, plan.FacePoint);
             operationRevision = controller.OperationRevision;
+            if (!followActive)
+            {
+                approachRetargetOperationBase = approachRetargetCount;
+                controller.SetMovingTargetAttemptBudget(operationRevision, MaxApproachRetargets - approachRetargetCount);
+            }
             ObserveExecution();
         }
         catch (Exception error) { StopMovement("failed", error.Message); }
@@ -1053,7 +1058,8 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
             streamTelemetry = ReadStreamTelemetry(), lastObservedRejection = ReadRejectionEvidence(),
             navigationRecoveryActive = navigationRecoveryActive, navigationRecoveryAttempted = navigationRecoveryAttempted,
             navigationRecoveryReason = navigationRecoveryReason,
-            approachRetargetStatus = approachRetargetStatus, approachRetargetCount = approachRetargetCount, approachRetargetTravel = approachRetargetTravel
+            approachRetargetStatus = approachRetargetStatus, approachRetargetCount = approachRetargetCount, approachRetargetTravel = approachRetargetTravel,
+            approachRetargetUpdates = approachRetargetUpdates, approachRetargetRestarts = approachRetargetRestarts
         };
         var detached = JsonUtility.FromJson<CurrentTargetEvidence>(JsonUtility.ToJson(value));
         // Models need the bounded verdict and counts. Individual candidate colliders are retained
@@ -1150,7 +1156,8 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
             streamTelemetry = ReadStreamTelemetry(), lastObservedRejection = ReadRejectionEvidence(),
             navigationRecoveryActive = navigationRecoveryActive, navigationRecoveryAttempted = navigationRecoveryAttempted,
             navigationRecoveryReason = navigationRecoveryReason,
-            approachRetargetStatus = approachRetargetStatus, approachRetargetCount = approachRetargetCount, approachRetargetTravel = approachRetargetTravel
+            approachRetargetStatus = approachRetargetStatus, approachRetargetCount = approachRetargetCount, approachRetargetTravel = approachRetargetTravel,
+            approachRetargetUpdates = approachRetargetUpdates, approachRetargetRestarts = approachRetargetRestarts
         };
         value.approachObservation = attemptObservation;
         if (avatar != null && importedReference != null)

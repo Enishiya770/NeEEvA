@@ -247,7 +247,7 @@ public static class SceneObjectProtocolRegression
 
     // Independent structural evaluation of precisely the JSON Schema keywords used
     // by DecisionSchema. Unknown keywords fail the test instead of being ignored.
-    internal static JObject ExpandNativeSchema(JToken schema)
+    internal static JObject ExpandNativeSchema(JToken schema, bool textGuide = false)
     {
         if (!(schema is JObject root)) return null;
         JToken Expand(JToken value, int depth = 0)
@@ -262,7 +262,7 @@ public static class SceneObjectProtocolRegression
                     JToken resolved = root;
                     foreach (string part in reference.Substring(2).Split('/'))
                         resolved = resolved is JArray rows ? rows[int.Parse(part)] : resolved?[part.Replace("~1", "/").Replace("~0", "~")];
-                    Require(resolved is JObject, "Shared schema field resolves to a complete definition.");
+                    Require(resolved is JObject || textGuide && resolved is JArray, "Shared schema field resolves to a complete definition; text guides may also share field lists.");
                     return Expand(resolved, depth + 1);
                 }
                 var result = new JObject();

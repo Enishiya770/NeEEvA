@@ -10,7 +10,8 @@ public static partial class RoomStepContextRegression
     {
         if (token is JObject obj)
         {
-            if (obj["$ref"] != null) return ExpandNative(definitions[((string)obj["$ref"]).Substring("#/$defs/".Length)], definitions);
+            if (((string)obj["$ref"])?.StartsWith("#/$defs/", StringComparison.Ordinal) == true)
+                return ExpandNative(definitions[((string)obj["$ref"]).Substring("#/$defs/".Length)], definitions);
             return new JObject(obj.Properties().Where(p => p.Name != "$defs").Select(p => new JProperty(p.Name, ExpandNative(p.Value, definitions))));
         }
         if (token is JArray array) return new JArray(array.Select(v => ExpandNative(v, definitions)));
@@ -37,7 +38,8 @@ public static partial class RoomStepContextRegression
                 "Native sharing preserves every field, branch, limit and complete-coverage requirement.");
             Require(RoomTaskProtocol.CompactNativeDecisionSchema(schema.ToString(Formatting.None)) == schema.ToString(Formatting.None), "Compiled native schema is idempotent.");
             var expandedSchema = JObject.Parse(expanded);
-            var guide = JObject.Parse((string)Call(null, "BuildRoomDecisionFieldGuide", expanded));
+            var sharedGuide = JObject.Parse((string)Call(null, "BuildRoomDecisionFieldGuide", expanded));
+            var guide = (JObject)ExpandNative(sharedGuide, (JObject)sharedGuide["$defs"]);
             for (int branchIndex = 0; branchIndex < ((JArray)expandedSchema["oneOf"]).Count; ++branchIndex)
             {
                 var branch = (JObject)expandedSchema["oneOf"][branchIndex];

@@ -5,6 +5,16 @@ using UnityEngine;
 
 public partial class ChatQW
 {
+    private const string BodyContinuationPlanningContract =
+        "你是同一用户事项的当前身体步骤规划器，不发声、不直接执行，只输出给定schema JSON。" +
+        "完整currentUserText仍是唯一用户授权；workContinuation只是下一步提案，taskSequence是引擎记录的历史完成和当前待办。" +
+        "逐字核对完整原请求中的角色、目标、否定、条件、顺序、距离和未回答的问题。只选择依赖已完成的ready步骤，保留现有taskStep身份，不重建计划，不重做已完成的动作。" +
+        "approach是角色走到当前用户身边，follow是角色持续跟随当前用户，stop-moving是停止角色自身移动。" +
+        "若提案误解了原话、目标其实是物件/其他人、条件未满足或需要缺失的证据，返回none，不靠旧图、坐标或历史请求补造权限。" +
+        "intent=none时origin=none、evidence为空，空间事项replyScope=spatial；否则origin=user，evidence逐字引用原请求中该步骤的授权短语。" +
+        "历史事件只证明当时的结果，不证明当前世界未变。已完成前序保留行动者、对象、时间和结果；独立答案仍欠交付，不因身体步骤完成而消失。" +
+        "场景记忆保留在引擎；当前仅投影本步骤所需事实，未加载资料不代表不存在。保留未知限制及currentFacts/currentSupport/execution/decisionContractFacts的约束。" +
+        "每次提交仍需当前用户跟踪、路径、地面、姿态与身体归属验证；规划不证明动作已执行或完成。不要输出无关设备提案、像素或转向字段。";
     private const string BodyPlanningContract =
         "你是当前角色的空间意图规划步骤，不发声、不直接执行，只输出给定schema JSON。" +
         "本次只向你提供当前用户身体任务的注意力视图；场景记忆仍保留在引擎，但未加载的资料不能当作当前事实。" +
@@ -27,6 +37,8 @@ public partial class ChatQW
         "revisitedByTask", "reviewedByTask", "imageAttachedToCurrentLocalization", "truncated", "coverageComplete",
         "historicalOnly", "reviewed", "independentlyReviewedAtThisView", "viewportWidth", "viewportHeight",
         "pixelWidth", "pixelHeight", "fieldOfView", "orthographicSize", "nearClipPlane", "farClipPlane"
+        , "currentVisibility", "requiresFreshSemanticMatch", "registeredPowerCapability", "measuredDistanceMeters",
+        "deviceDistanceLimitMeters", "withinOperationDistance"
     };
 
     private static bool TryFocusCurrentUserBodyPlanning(string input, out string focused)
@@ -34,9 +46,10 @@ public partial class ChatQW
         focused=input;
         JObject value;
         try { value=JObject.Parse(input); } catch (JsonException) { return false; }
-        if(!RoomTaskContextPolicy.InitialUserBodyAttention(value) || (bool?)value["answerRequired"]==true ||
+        bool continuation = RoomTaskContextPolicy.ReadyUserIntents(value) != null;
+        if(!continuation && (!RoomTaskContextPolicy.InitialUserBodyAttention(value) || (bool?)value["answerRequired"]==true ||
             !string.IsNullOrWhiteSpace((string)value.SelectToken("currentRequestSemantics.currentTurnEvidence.answerQuote")) ||
-            value["workContinuation"] is JObject || value["taskSequence"] is JObject) return false;
+            value["workContinuation"] is JObject || value["taskSequence"] is JObject)) return false;
         // The independently read COMPLETE utterance has no scene referent or
         // separate question. Do not destroy memory; omit scene-only read models
         // from this one consumer. Keep all literal constraints and unknown fields.
@@ -48,9 +61,12 @@ public partial class ChatQW
         foreach(string field in new[]{"visualObservation","visualEvidence","visibleKnownObjects",
             "sceneSpatialMemory","visibleObjectCatalog","turnSweep",
             "sceneCognitionSummary","verifiedDeviceHistory","verifiedObservedDeviceHistory","referentSources",
-            "objectTargetReview","planningHistoryImageCaptureIds"})
+            "objectTargetReview","planningHistoryImageCaptureIds","sceneActionPrerequisites"})
         {
             if(value[field]==null)continue;
+            // Historical event/target facts may explain a compound prerequisite.
+            // They are distinct from optional observed-world/camera detail.
+            if(continuation && new[]{"verifiedDeviceHistory","verifiedObservedDeviceHistory","referentSources","objectTargetReview"}.Contains(field)) continue;
             var protectedView = BodyPlanningProtectedView(value[field]);
             omitted[field]=Sizes(value[field], protectedView);
             if (protectedView == null) value.Remove(field); else value[field] = protectedView;
@@ -70,10 +86,13 @@ public partial class ChatQW
             if(protectedView==null)scene.Remove("objectContext");else scene["objectContext"]=protectedView;
         }
         value["planningEvidenceScope"]=new JObject { ["purpose"]="current-user-body",["sceneDetailsOmitted"]=true,
+            ["phase"] = continuation ? "approved-continuation" : "initial-request",
             ["engineMemoryMutated"]=false,["actionAuthorization"]=false,
-            ["scope"]="The complete current utterance and current body/route/support/ownership are retained. This is an attention view, not permission. If the utterance actually needs a scene referent, independent answer, another task or missing evidence, do not infer it from omitted records; return intent=none. All action menu and execution checks remain unchanged." };
+            ["scope"]=continuation ? "Complete original request, owned sequence, predecessor events, pending answers and current body constraints are retained. Select only a ready current-user body step after independently checking its authorization. Missing necessary evidence means none; completion of this step cannot erase other obligations. No memory mutation or action permission." :
+                "The complete current utterance and current body/route/support/ownership are retained. This is an attention view, not permission. If the utterance actually needs a scene referent, independent answer, another task or missing evidence, do not infer it from omitted records; return intent=none. All action menu and execution checks remain unchanged." };
         focused=value.ToString(Formatting.None);
         Debug.Log("[Room/PlanningFactScope] "+new JObject { ["purpose"]="current-user-body",["sourceCharacters"]=input.Length,
+            ["phase"] = continuation ? "approved-continuation" : "initial-request",
             ["projectedCharacters"]=focused.Length,["fieldProjection"]=omitted,["imagesOmitted"]=true,["engineMemoryMutated"]=false }.ToString(Formatting.None));
         return true;
     }
@@ -86,7 +105,7 @@ public partial class ChatQW
         }
         if(!(token is JObject obj)) return token.Type==JTokenType.Null?null:token.DeepClone();
         var result=new JObject();
-        string[] containers={"current","memory","candidates","objects","currentObjects","historicalObjects","historicalViews",
+        string[] containers={"current","memory","candidates","objects","knownObjects","currentObjects","historicalObjects","historicalViews",
             "dialogueViews","recentObservations","knownObjectHistory","visualObservation","authoredNames","currentBearing",
             "relativeToCurrentView","relativeToCurrentBody","returnDirection","authoredHint","directionFromCurrentPose"};
         foreach(var p in obj.Properties()) {

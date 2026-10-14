@@ -93,6 +93,11 @@ public static partial class RoomSpeechClaimRegression
                     Check(schema.SelectToken("properties.eventClaims")!=null && ((JArray)schema["required"]).Values<string>().Contains("eventClaims"),"Current claim schema requires event tuples.");
                     ((JObject)schema["properties"]).Remove("eventClaims");
                     ((JArray)schema["required"]).First(v=>(string)v=="eventClaims").Remove();
+                    Check(schema.SelectToken("properties.languageReason.type")?.ToString()=="string" &&
+                        (string)((JArray)schema["required"])[0]=="languageReason",
+                        "Current extractor grounds language in grammar before classifying every domain.");
+                    ((JObject)schema["properties"]).Remove("languageReason");
+                    ((JArray)schema["required"]).First(v=>(string)v=="languageReason").Remove();
                 }
                 Check(JToken.DeepEquals(actual, expected), "Captured facts, schema and request controls remain unchanged (historical instructions retained): " + name + "/" + kind);
             }
