@@ -51,6 +51,10 @@ public static class WorkNextIntentProtocol
     public static bool HasReadyStep(JObject sequence, string selected = null) => sequence?["steps"] is JArray steps &&
         RoomTaskSequenceProtocol.Ready(steps).Values<string>().Any(id => string.IsNullOrEmpty(selected) || selected == id);
 
+    public static bool ReplyOnly(JObject sequence, string source, string stepId) =>
+        source == "autonomous" || source == "none" || sequence != null &&
+        (!HasReadyStep(sequence, stepId) || source == "current-work" && string.IsNullOrEmpty(stepId));
+
     public static JObject Progress(JObject sequence)
     {
         if (!(sequence?["steps"] is JArray steps)) return null;

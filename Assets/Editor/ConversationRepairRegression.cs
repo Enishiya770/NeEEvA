@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.IO;
 using System.Linq;
@@ -64,7 +64,7 @@ public static class ConversationRepairRegression
             typeof(ChatSample).GetMethod("FinishRoomSpeechPlaybackHistory",Flags).Invoke(chat,new object[]{"第一句。"});
             Check(history.content=="第一句。", "read-only reply history contains only completed sentence after TTS failure");
         } finally { UnityEngine.Object.DestroyImmediate(host); }
-        return checks + SessionRepairRegression.RunChecks() + ContinuityPolicyRegression.RunChecks() + IdentityAttentionRegression.RunChecks() + TaskSemanticsRegression.RunChecks();
+        return checks + DialogueSemanticsRegression.RunChecks() + SessionRepairRegression.RunChecks() + ContinuityPolicyRegression.RunChecks() + IdentityAttentionRegression.RunChecks() + TaskSemanticsRegression.RunChecks();
     }
 
     public static IEnumerator RunNative(string fixturePath, string output)
@@ -116,7 +116,7 @@ public static class ConversationRepairRegression
                     {
                         var result = results.OfType<JObject>().FirstOrDefault(r => (string)r["id"] == (string)report["id"]);
                         if (WorkResultDeliveryProtocol.Covers(result, new WorkResultDeliveryProtocol.Report {
-                            id = (string)report["id"], quote = (string)report["quote"] }, (string)delivery["completedPlaybackText"])) result["delivered"] = true;
+                            id = (string)report["id"], coverage = (string)report["coverage"], quote = (string)report["quote"] }, (string)delivery["completedPlaybackText"])) result["delivered"] = true;
                     }
                     if (WorkResultDeliveryProtocol.IsSettledActionQuote((string)decision["remaining_request_quote"], item["sequence"] as JObject,
                         results.OfType<JObject>().Where(r => (bool?)r["delivered"] == true).Select(r => (string)r["source"]))) decision["remaining_request_quote"] = "";
@@ -132,13 +132,21 @@ public static class ConversationRepairRegression
                         decision["next_step_id"] = ""; decision["planning_focus"] = "other";
                     }
                 }
+                // Apply the same continuation admission as the runtime after
+                // coverage. A proposal to repeat an ended step is reply-only.
+                if ((string)decision?["work_status"] == "continue" && WorkNextIntentProtocol.ReplyOnly(
+                    item["sequence"] as JObject, (string)decision["next_intent_source"], (string)decision["next_step_id"]))
+                {
+                    decision["next_step_id"] = ""; decision["next_intent_source"] = "current-work";
+                    decision["planning_focus"] = "other";
+                }
                 bool passed=response?.Succeeded==true&&(string)decision?["work_status"]==(string)item["expectedStatus"];
                 if((string)item["expectedStatus"]=="continue") passed &= (string)decision?["next_intent_source"]=="current-work";
                 if(item["expectedPlanningFocus"]!=null) passed &= (string)decision?["planning_focus"]==(string)item["expectedPlanningFocus"];
                 if((bool?)item["expectedNoActionStep"]==true) passed &= string.IsNullOrEmpty((string)decision?["next_step_id"]);
                 if (item["expectedDeliveredIds"] is JArray expectedIds)
                     passed &= expectedIds.Values<string>().All(id => (decision?["delivery_reports"] as JArray)?.OfType<JObject>().Any(r =>
-                        (string)r["id"] == id && !string.IsNullOrWhiteSpace((string)r["quote"]) &&
+                        (string)r["id"] == id && (string)r["coverage"] == "reported" && !string.IsNullOrWhiteSpace((string)r["quote"]) &&
                         ((string)item["completedPlaybackText"] ?? "").Contains((string)r["quote"])) == true);
                 if ((bool?)item["expectedRemainingQuestion"] == true)
                     passed &= !string.IsNullOrWhiteSpace((string)decision?["remaining_request_quote"]);

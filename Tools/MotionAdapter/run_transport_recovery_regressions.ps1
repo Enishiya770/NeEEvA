@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$Output,
-    [ValidateSet('transport','feedback','room','cognition','speech-view','xr-lifecycle','device-sequence','work-loop','approach','preparation','approach-plan','private-review','quality-recovery','quality-speech','conversation-repair','stream-delay','arrival','stream-pure','control-recovery','follow-handoff')][string]$Focus='transport',
+    [ValidateSet('transport','feedback','room','cognition','speech-view','xr-lifecycle','device-sequence','work-loop','approach','preparation','approach-plan','private-review','quality-recovery','quality-speech','conversation-repair','stream-delay','arrival','stream-pure','control-recovery','follow-handoff','activity-monitor','activity-runtime')][string]$Focus='transport',
     [string]$LifecycleInput='',
     [string]$QualitySpeechInput='',
     [string]$ConversationRepairInput='',
@@ -43,6 +43,10 @@ $taskManifest=@(foreach($taskCode in $taskCodePaths) {
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskOutput 'source-manifest.json') -Encoding utf8
 $taskMethod=if($Focus -eq 'transport'){'FormalStreamRecoveryRegression.RunBatch'}elseif($Focus -eq 'feedback'){'FeedbackStageHttpRegression.RunBatch'}elseif($Focus -eq 'xr-lifecycle'){'ReloadSafeTrackedDeviceGraphicRaycasterRegression.RunBatch'}elseif($Focus -eq 'work-loop'){'AgentWorkLoopRegression.RunBatch'}elseif($Focus -eq 'approach'){'ArdyRoomDialogueIntegrationRegression.RunBatch'}elseif($Focus -eq 'approach-plan'){'ArdyRoomApproachRegression.RunBatch'}elseif($Focus -eq 'quality-recovery'){'ArdyRoomStreamDelayRegression.RunBatch'}else{'NevaSceneVisionIntegrationRegression.RunBatch'}
 $taskArguments=@('-batchmode','-projectPath',$taskValidationRoot,'-executeMethod',$taskMethod,'-logFile',(Join-Path $taskOutput 'unity.log'))
+if($Focus -eq 'activity-monitor') {
+    $taskArguments=@('-batchmode','-nographics','-projectPath',$taskValidationRoot,'-executeMethod','ActivityMonitorRegression.RunBatch',
+        '-logFile',(Join-Path $taskOutput 'unity.log'),'-activityMonitorOutput',$taskOutput)
+}
 if($Focus -eq 'preparation') {
     $taskArguments=@('-batchmode','-projectPath',$taskValidationRoot,'-executeMethod','ArdyRoomDialogueIntegrationRegression.RunBatch','-logFile',(Join-Path $taskOutput 'unity.log'),'-ardyRoomDialogueOutput',$taskOutput,'-ardyPreparationOnly')
 }
@@ -78,7 +82,8 @@ elseif($Focus -eq 'quality-speech') {
     if (-not (Test-Path -LiteralPath (Join-Path $QualitySpeechInput 'latest-quality-follow-failure/review-input.json'))) { throw 'Explicit recorded speech input is required.' }
     $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-qualitySpeechInput',[IO.Path]::GetFullPath($QualitySpeechInput))
 }
-elseif($Focus -eq 'conversation-repair' -or $Focus -eq 'preparation') { }
+elseif($Focus -eq 'activity-runtime') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-activityMonitorRuntime','1') }
+elseif($Focus -eq 'conversation-repair' -or $Focus -eq 'preparation' -or $Focus -eq 'activity-monitor') { }
 elseif($Focus -eq 'stream-delay' -or $Focus -eq 'arrival' -or $Focus -eq 'follow-handoff' -or $Focus -eq 'control-recovery' -or $Focus -eq 'stream-pure') { }
 elseif($Focus -eq 'cognition') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-roomCognitionRegression','1') }
 elseif($Focus -eq 'speech-view') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-roomSpeechViewRegression','1') }

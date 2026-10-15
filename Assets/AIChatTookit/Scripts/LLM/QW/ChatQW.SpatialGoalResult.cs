@@ -58,6 +58,10 @@ public partial class ChatQW
             CommittedSpatialReplyProtocol.RepairWritingInstruction(feedback);
         if (!string.IsNullOrWhiteSpace((string)CommittedSpatialReplyProtocol.ReadRepairFeedback(feedback)?["factualBaseline"]))
             reportInstruction = CommittedSpatialReplyProtocol.RepairWritingInstruction(feedback);
+        if (ReplyAnswerObligationProtocol.Read(projected).Count > 0)
+            reportInstruction += "\n[Unanswered question in this same request]\n" +
+                ReplyAnswerObligationProtocol.Read(projected).ToString(Formatting.None) +
+                "\nBefore the action result, ANSWER this question at its own time. When pre-task evidence is unavailable, explicitly say you cannot confirm the earlier event. Do not replace that answer with the action's present success. Do not mention internal records/field names. Then report the verified action result. Keep both in the required spoken language.";
         int estimate = SpatialGoalResultContextPolicy.EstimateTextTokens(role.ToString()) +
             SpatialGoalResultContextPolicy.EstimateTextTokens(evidence) +
             SpatialGoalResultContextPolicy.EstimateTextTokens(reportInstruction) + 64;

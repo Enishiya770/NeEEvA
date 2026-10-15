@@ -74,6 +74,7 @@ public partial class ChatSample
         bool recordHistory, string transientContext)
     {
         var model = m_ChatSettings?.m_ChatModel;
+        if (model != null) model.OngoingSpeechMonitoring = ActivityMonitoringAvailable;
         if (!m_EnableFirstReplyRouting || model == null || !model.SupportsFirstReplyRouting ||
             m_FirstReplyAttemptGeneration == generation || m_AgentCurrentRoundIsTick ||
             m_HoldSpeechForSongMemoryResult || m_HoldSpeechForHumBackResult ||
@@ -115,6 +116,7 @@ public partial class ChatSample
                         channels.HasSpeech && !channels.HasInvalidSpeechPhase && !channels.HasInvalidLanguage &&
                         !channels.HasUndeclaredSpeech && channels.SpeechDependency == SpeechActionDependency.Independent)
                     {
+                        BindActivityOrdinaryHistory(generation, model);
                         m_FormalResponseInFlight = false;
                         // This narrow context did not consume the full observation
                         // tree. Pending tool facts stay pending for the normal path.

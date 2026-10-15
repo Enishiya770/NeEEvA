@@ -19,6 +19,20 @@ public sealed class ArdyDialogueMotionBridge : MonoBehaviour
     public Vrm10Instance Avatar => target;
     public string Status => controller != null ? controller.Status : "尚未连接对话与角色";
 
+    public Newtonsoft.Json.Linq.JObject ReadMonitoredActivity()
+    {
+        if(!IsBound || string.IsNullOrEmpty(controller.CurrentActionId))return null;
+        string active=controller.DescribeActiveMotion();
+        if(string.IsNullOrEmpty(active))return null;
+        return new Newtonsoft.Json.Linq.JObject{["id"]=controller.CurrentActionId,["version"]=controller.Revision.ToString(),
+            ["kind"]="body-motion",["cancellable"]=true,["state"]=Newtonsoft.Json.Linq.JObject.Parse(active)};
+    }
+    public bool StopMonitoredActivity(string version,string reason)
+    {
+        if(!IsBound || controller.Revision.ToString()!=version || string.IsNullOrEmpty(controller.DescribeActiveMotion()))return false;
+        controller.Cancel("process-monitor: "+reason);return true;
+    }
+
     private void Start()
     {
         if (chat != null && target != null && !IsBound)

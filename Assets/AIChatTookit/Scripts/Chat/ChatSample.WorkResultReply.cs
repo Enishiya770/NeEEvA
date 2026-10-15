@@ -23,6 +23,7 @@ public partial class ChatSample
         ["currentRequestSemantics"] = ReadMovementReplySemantics(generation),
         ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
         ["taskSequence"] = ReadRoomTaskSequence(),
+        ["delivery"] = ReadWorkDelivery(),
         ["currentExecution"] = BuildWorkResultExecution(),
         ["eventContext"] = BuildReplyEventContext(generation),
         ["priorTaskResults"] = BuildMovementPriorResults(),
@@ -34,6 +35,8 @@ public partial class ChatSample
         ["previousReplyFailureReceipt"] = ReadPreviousReplyFailureReceipt(),
         ["newActionSubmitted"] = false,
         ["scope"] = "Deliver the still-owed result or diagnosis for the complete original request. " +
+            "delivery identifies already heard versus still owed results. Do not repeat settled results or replay the earlier starting acknowledgement. " +
+            "Describe completed events at their recorded time; an old receipt is not a fresh inspection of the current world. " +
             "Use each step's own receipt, identity and event time. Completed results remain completed; " +
             "a failed step is not pending and this reply neither retries nor promises another attempt. " +
             "Report the concrete remaining failure and any bounded recovery already attempted. " +

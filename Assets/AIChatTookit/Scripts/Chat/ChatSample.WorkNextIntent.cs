@@ -29,14 +29,11 @@ public partial class ChatSample
         m_WorkNextStepId = decision.next_step_id;
         // A reply remains possible when the executor has no pending step. It
         // must not reopen the full action planner or replay a completed tool.
-        m_WorkReplyOnly = sequence != null && (!WorkNextIntentProtocol.HasReadyStep(sequence, m_WorkNextStepId) ||
-            decision.next_intent_source == "current-work" && string.IsNullOrEmpty(m_WorkNextStepId));
+        m_WorkReplyOnly = WorkNextIntentProtocol.ReplyOnly(sequence, decision.next_intent_source, m_WorkNextStepId);
         // Legacy/single-step tasks can have an owned terminal receipt without a
         // step table. A model's mislabeled delivery intention is not permission
         // to resubmit that ended action through the full planner.
         if (sequence == null && CurrentWorkActionNeedsFailureDelivery()) m_WorkReplyOnly = true;
-        if (decision.next_intent_source == "autonomous" || decision.next_intent_source == "none")
-            m_WorkReplyOnly = true; // Inconsistent source/status cannot acquire old-task action authority.
         if (m_WorkReplyOnly)
         {
             // The executor's admitted next step also owns the writer's purpose.

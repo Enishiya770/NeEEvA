@@ -162,6 +162,7 @@ public partial class ChatSample
         return JsonConvert.SerializeObject(new {
             planningContextVersion = "working-memory-v1",
             currentUserText = userText, autonomous,
+            ongoingActivityMonitoring = ActivityMonitoringAvailable,
             taskSequenceRequired = !autonomous && m_ChatSettings.m_ChatModel.SupportsRoomTaskSequences &&
                 !(SpatialGoalExecutionCurrent(m_SpatialDeviceGoal) && SpatialGoalUnfinished(m_SpatialDeviceGoal)),
             taskSequence = autonomous ? null : ReadRoomTaskSequence(),
@@ -1237,6 +1238,7 @@ public partial class ChatSample
                 intent = m_RoomTaskIntent, dispatch = m_RoomTaskDispatch, actionId = m_RoomTaskActionId,
                 targetRevision = m_RoomTaskTargetRevision,
                 taskSequence = ReadRoomTaskSequence(), recentPublicReplies = ReadRecentRoomReplies(),
+                answerObligations = ReadWorkAnswerObligations(true),
                 priorTaskResults = BuildMovementPriorResults(),
                 historicalDeviceEvents = ReadHistoricalDeviceEvents(),
                 decisionFailure = ReadRoomTaskDecisionFailure(),
@@ -1419,6 +1421,7 @@ public partial class ChatSample
         bool recordHistory, ObservationReceipt observations)
     {
         if (generation != m_FormalResponseGeneration || !isActiveAndEnabled || m_UserSpeechActiveForAutonomy || m_SceneTimePaused) return;
+        if (TryPublishProcessMonitoredSpeech(buffer, candidateExecutable, generation, recordHistory, observations)) return;
         var bridge = GetComponent<ArdyRoomDialogueBridge>();
         var model = m_ChatSettings.m_ChatModel;
         var avatar = bridge != null ? bridge.avatar : null;
@@ -1496,12 +1499,6 @@ public partial class ChatSample
             bool quietFallback = !diagnosedPlanningFailure && !terminalResult && !coherent && !UseMovementReplyPacket(generation) && m_AgentCurrentRoundIsTick && !IsWorkSceneFeedbackGuard(generation) &&
                 (bool?)BuildRoomSearchReportRequirement()["required"] != true;
             string fallback = RoomTaskFallback(bridge == GetComponent<ArdyRoomDialogueBridge>() ? bridge : null);
-            if (UseWorkResultReplyPacket(generation))
-            {
-                var outcome = BuildWorkRoomCompletionObservation();
-                fallback = RoomMovementResultPolicy.Fallback(outcome?["currentRoomFacts"] as JObject,
-                    (string)outcome?["intent"], (string)outcome?["actionId"]) ?? fallback;
-            }
             if (terminalResult)
                 fallback = BuildSpatialGoalReviewFallback(language);
             else if (!diagnosedPlanningFailure && (bool?)BuildRoomSearchReportRequirement()["required"] == true)
@@ -1510,6 +1507,8 @@ public partial class ChatSample
                 fallback = "我还没有确认当前画面中的情况。";
             string text = quietFallback ? "<silent/>" : coherent ? reviewedIndependentSpeech ?? candidate : terminalResult ? fallback :
                 !diagnosedPlanningFailure && CurrentGenerationRequiresReviewedGoalAnswer(generation) ? ReviewedGoalAnswerFallback(language) : LocalizeRoomFallback(fallback, language);
+            if (!coherent && !terminalResult && UseWorkResultReplyPacket(generation))
+                text = WorkResultMovementReport(BuildWorkRoomCompletionObservation(), language) ?? text;
             if (!coherent && !diagnosedPlanningFailure && !terminalResult && UseMovementReplyPacket(generation) &&
                 bridge.ActionId == m_RoomTaskActionId && bridge.Phase == "arrived")
                 text = MovementProgressText(ReadCompactRoomTaskFacts(bridge), m_RoomTaskIntent, m_RoomTaskActionId, language, false) ?? text;
@@ -1724,6 +1723,7 @@ public partial class ChatSample
                 intendedAction = m_RoomTaskIntent, dispatch = m_RoomTaskDispatch, actionId = m_RoomTaskActionId,
                 decisionFailure = ReadRoomTaskDecisionFailure(),
                 humanInput = BuildCommittedReplyHumanInput(generation),
+                answerObligations = ReadWorkAnswerObligations(true),
                 currentRequestSemantics = workResultPacket || movementPacket ? ReadMovementReplySemantics(generation) : ReadCompactCurrentRequestSemantics(generation),
                 replyPurpose = movementPacket ? ReadAutonomousReplyPurpose(generation) : null,
                 attentionState = ReadAttentionState("reviewer"),

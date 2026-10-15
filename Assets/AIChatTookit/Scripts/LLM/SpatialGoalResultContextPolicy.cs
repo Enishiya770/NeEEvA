@@ -52,7 +52,7 @@ public static class SpatialGoalResultContextPolicy
         "root ::= \"<lang code=\\\"\" (\"ja\" | \"zh\" | \"en\") \"\\\"/><speech mode=\\\"independent\\\"/><say>\" spoken \"</say>\"\n" +
         "spoken ::= [^<>\\r\\n\\x00]+\n";
     public const string OutputContract =
-        "[Authorized spatial goal result]\nReport the latest device outcome in one brief sentence (at most 180 characters). " +
+        "[Authorized spatial goal result]\nReport the latest device outcome briefly (at most 180 characters). Also answer any answerObligations using answerEvidence and its actual time; be explicit about unknowns. Actions do not erase questions. Multiple brief sentences are allowed. Express uncertainty naturally to the listener; never mention packet/field names such as answerEvidence or imply an inspection failed merely because its historical record is unavailable. " +
         "A requested or attempted action is not success. If blocked, failed, cancelled or unresolved, say that accurately. " +
         "latestFacts.resultReportRequirement is mandatory: explicitly report its actual on/off result or incomplete outcome and specific observed failure. A greeting, reassurance, finding the target, readiness or a future promise cannot replace that result. " +
         "If the required expectedReport is clarification, ask one concise, specific question about the review's actual uncertainty. Otherwise do not turn an execution failure or rejected proposal into a new clarification request. When targetKnowledge.identityKnown=true, the same object is known: failed reobservation is not forgotten identity or room. Never invent a wall switch, alternate control, power fault or a different target. registered=false alone does not mean the user withheld permission; pendingRetained and requestAssessment distinguish real uncertainty from a discarded proposal. Empty referent sources are missing identity evidence. Do not ask for internal IDs, invent appearance, or treat authored labels as visual recognition. " +
@@ -401,6 +401,8 @@ public static class SpatialGoalResultContextPolicy
         }
         var result = new JObject {
             ["goal"] = goal,
+            ["answerObligations"] = facts["answerObligations"]?.DeepClone(),
+            ["answerEvidence"] = facts["answerEvidence"]?.DeepClone(),
             ["taskSequence"] = RoomTaskContextPolicy.Sequence(facts["taskSequence"] as JObject),
             ["lastAction"] = facts["lastAction"] is JObject action ? Scalars(action,
                 "actionId", "intent", "entityId", "requestedEntityId", "requestedState", "phase", "reason",

@@ -45,7 +45,7 @@ public partial class ChatQW
     {
         focused=input;
         JObject value;
-        try { value=JObject.Parse(input); } catch (JsonException) { return false; }
+        try { value=ReadRoomTaskRecoveryJson(input); } catch (JsonException) { return false; }
         bool continuation = RoomTaskContextPolicy.ReadyUserIntents(value) != null;
         if(!continuation && (!RoomTaskContextPolicy.InitialUserBodyAttention(value) || (bool?)value["answerRequired"]==true ||
             !string.IsNullOrWhiteSpace((string)value.SelectToken("currentRequestSemantics.currentTurnEvidence.answerQuote")) ||
@@ -84,6 +84,12 @@ public partial class ChatQW
             var protectedView=BodyPlanningProtectedView(observed);
             omitted["sceneActionFacts.objectContext"]=Sizes(observed, protectedView);
             if(protectedView==null)scene.Remove("objectContext");else scene["objectContext"]=protectedView;
+        }
+        if (value["sceneActionFacts"] is JObject sceneFacts && sceneFacts["capability"]?.Type == JTokenType.String) {
+            // Static object-tool catalogue is not a constraint on this body step.
+            // Keep active owners, receipts and all unknown annotations intact.
+            omitted["sceneActionFacts.capability"] = Sizes(sceneFacts["capability"], null);
+            sceneFacts.Remove("capability");
         }
         value["planningEvidenceScope"]=new JObject { ["purpose"]="current-user-body",["sceneDetailsOmitted"]=true,
             ["phase"] = continuation ? "approved-continuation" : "initial-request",

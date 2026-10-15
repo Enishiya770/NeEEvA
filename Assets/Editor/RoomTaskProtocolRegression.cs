@@ -350,6 +350,8 @@ public static class RoomTaskProtocolRegression
                     RoomTaskProtocol.BuildDecisionSchemaForObservationGoals(new string[0]);
                 string contract = review ? RoomTaskProtocol.ReviewContract : RoomTaskProtocol.DecisionContract;
                 string system = contract + "\n" + schema;
+                if (review) system = contract + "\n" + (backend == ChatQW.BackendType.Local ?
+                    RoomTaskProtocol.CompactDecisionFieldGuide(JObject.Parse(schema)) : schema) + "\n" + SpeechActScopeProtocol.ReviewContract;
                 if (!review && backend == ChatQW.BackendType.Local)
                 {
                     string actualSystem = (string)messages[0]["content"];

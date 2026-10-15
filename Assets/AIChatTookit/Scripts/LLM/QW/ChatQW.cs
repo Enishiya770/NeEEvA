@@ -1668,6 +1668,7 @@ public partial class ChatQW : LLM
 
     public override void CancelActiveResponse()
     {
+        CancelActivityMonitor();
         CancelSceneSearchDecisionMessage();
         CancelRoomTaskMessage();
         CancelSceneObjectMatchMessage();
@@ -1971,6 +1972,14 @@ public partial class ChatQW : LLM
         }
         reviewBudget["generation"] = generation; reviewBudget["httpRequestSent"] = false;
         Debug.Log("[Agent/WorkReviewBudget] " + reviewBudget.ToString(Newtonsoft.Json.Formatting.None));
+        // Freeze coverage against this admitted request, not results that may
+        // appear while audio/execution advances. Runtime checks live versions.
+        var requestMessages = JObject.Parse(json)["messages"] as JArray;
+        var lastUser = requestMessages?.OfType<JObject>().LastOrDefault(m => (string)m["role"] == "user");
+        var content = lastUser?["content"];
+        string reviewPrompt = content?.Type == JTokenType.String ? (string)content :
+            string.Concat((content as JArray ?? new JArray()).OfType<JObject>().Where(p => (string)p["type"] == "text").Select(p => (string)p["text"]));
+        var expectedResults = ReadWorkReviewDelivery(reviewPrompt)?["results"] as JArray;
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
             m_EphemeralRequest = request;
@@ -1987,6 +1996,16 @@ public partial class ChatQW : LLM
             bool validJson = false, validSchema = false;
             bool accepted = request.responseCode == 200 && request.result == UnityWebRequest.Result.Success && TryReadWorkReviewResponse(
                 request.downloadHandler.text, out output, out finishReason, out validJson, out validSchema, out failure);
+            JObject parsed = null;
+            if (validJson) parsed = JObject.Parse(output);
+            if (accepted && !WorkResultDeliveryProtocol.ValidateCoverage(expectedResults, parsed, out var coverageFailure))
+            { accepted = false; validSchema = false; failure = coverageFailure; }
+            if (expectedResults != null)
+                Debug.Log("[Agent/WorkReviewDelivery] " + new JObject { ["generation"] = generation,
+                    ["expectedResultIds"] = new JArray(WorkResultDeliveryProtocol.ReviewIds(expectedResults)),
+                    ["rawReports"] = parsed?["delivery_reports"]?.DeepClone(), ["accepted"] = accepted,
+                    ["status"] = failure, ["workStatus"] = parsed?["work_status"]?.DeepClone(),
+                    ["scope"] = "Request-snapshot coverage only; runtime still checks each version and completed playback." }.ToString(Formatting.None));
             if (m_LogRequestStats)
             {
                 string finish = finishReason == "stop" || finishReason == "length" || finishReason == "content_filter"
@@ -2009,18 +2028,19 @@ public partial class ChatQW : LLM
     private string BuildWorkReviewRequestJson(string prompt)
         => BuildWorkReviewRequestJsonWithImage(prompt, null);
 
+    private static JObject ReadWorkReviewDelivery(string prompt) =>
+        ReadReplyFactBlocks(CommittedSpatialReplyProtocol.ProducerContextMarker + "\n" + prompt, true)
+            .FirstOrDefault(b => b.marker == "[Task progress runtime]")?.value?["delivery"] as JObject;
+
     private string BuildWorkReviewRequestJsonWithImage(string prompt, string imageDataUrl)
     {
         var selected = new List<SendData>();
         string reviewSchema = WorkNextIntentProtocol.ExtendReviewSchema(k_WorkReviewSchema);
-        var deliveryPacket = ReadReplyFactBlocks(CommittedSpatialReplyProtocol.ProducerContextMarker + "\n" + prompt, true)
-            .FirstOrDefault(b => b.marker == "[Task progress runtime]")?.value?["delivery"] as JObject;
+        var deliveryPacket = ReadWorkReviewDelivery(prompt);
         if (deliveryPacket?["results"] is JArray deliveryResults)
         {
             var boundSchema = JObject.Parse(reviewSchema);
-            var ids = deliveryResults.OfType<JObject>().Select(r => (string)r["id"]).Where(id => !string.IsNullOrEmpty(id)).Distinct().ToArray();
-            if (ids.Length > 0) boundSchema["properties"]["delivery_reports"]["items"]["properties"]["id"]["enum"] = new JArray(ids);
-            else boundSchema["properties"]["delivery_reports"]["maxItems"] = 0;
+            WorkResultDeliveryProtocol.BindCoverageSchema(boundSchema, deliveryResults);
             reviewSchema = boundSchema.ToString(Formatting.None);
         }
         bool taskPacket = (prompt ?? "").StartsWith("[内部事项进度判定；不生成角色台词，不调用工具]\n", StringComparison.Ordinal);
@@ -2061,7 +2081,8 @@ public partial class ChatQW : LLM
             // The dedicated producer already includes this complete contract.
             // Keep legacy callers self-contained without duplicating it in the
             // runtime packet or removing anything from quoted user evidence.
-            (taskPacket ? "" : WorkNextIntentProtocol.Contract) + reviewSchema));
+            (taskPacket ? "" : WorkNextIntentProtocol.Contract) + reviewSchema +
+            "\n最后核对交付证据：历史assistant消息、publicText和生成稿都不证明音频已播。quote只能引用该结果版本的completedPlaybackText；没有逐字引句就留空。先区分各项所问对象/动作/时间，别把一个动作结果填给另一项。comparison只写短对照。"));
         if (taskPacket)
         {
             prompt = ProjectWorkReviewAttention(prompt, out var projection);

@@ -2,7 +2,20 @@
 
 NeEEvA 是一个基于 Unity 的具身 AI 角色项目：角色在 3D 房间里听用户说话、观察环境、进行语音对话，并尝试完成靠近、跟随、寻找物件和操作场景设备等任务。项目也保留了长期记忆、录音片段回唱、VRM 表情与 PC VR 接入。
 
-**当前说明对应 `codex/project-checkpoint-20261011` 分支，更新于 2026-10-14。** 本仓库是持续开发中的源码工程，不是包含全部模型、音色和房间资源的安装包。
+**当前说明对应 `codex/project-checkpoint-20261015` 分支，更新于 2026-10-15。** 本仓库是持续开发中的源码工程，不是包含全部模型、音色和房间资源的安装包。
+
+## 与 project-checkpoint-20261011 的主要区别
+
+本分支相较于 `codex/project-checkpoint-20261011` 的主要区别是新增了 **“即时自我觉察功能”**（Activity Monitor）。角色在说话和行动进行时，并行观察自己正在说什么、做什么，以及事实是否发生变化，据此作局部纠正；正常流程无需等待这一监控请求完成。
+
+- **觉察说话与事实的关系：** 区分排队时、开始出声时和当前的执行事实，判断是原话有误、表达过于确定，还是说话后环境发生了变化；保留当时真实发生的过去事件。
+- **按播放进度纠正：** 尚未播出的事实子句可局部替换；已经出声的内容通过后续简短台词纠正。被打断的音频不被当作整句已经播完。
+- **觉察行动中的冲突：** 独立检查正在执行的行动。发现具体冲突时，只能停止已接入且版本仍匹配的可取消活动；后续意图交回正常规划，不直接执行新动作，也不撤销已完成的效果。
+- **保持正常表达与行动：** 愿望、感受、邀请、提问和明确表达不确定性的推测，不因缺少事实证明而被纠正；仅仅尚未完成，也不是停止正常行动的理由。
+
+代码默认开启 `ChatSample.m_EnableActivityMonitor`，当前由支持该接口的 `ChatQW` 提供模型判断。监控有请求频率、上下文、纠正次数和超时限制，并在应用结果前重新检查版本与事实；监控超时或失败时原流程继续运行。“即时”指过程中的反馈能力，不表示逐帧推理或零延迟。
+
+实现入口：[ChatSample.ActivityMonitor](Assets/AIChatTookit/Scripts/Chat/ChatSample.ActivityMonitor.cs)、[ActivityMonitorProtocol](Assets/AIChatTookit/Scripts/Chat/ActivityMonitorProtocol.cs)、[ChatQW.ActivityMonitor](Assets/AIChatTookit/Scripts/LLM/QW/ChatQW.ActivityMonitor.cs)。
 
 ## 当前能力
 
@@ -13,6 +26,7 @@ NeEEvA 是一个基于 Unity 的具身 AI 角色项目：角色在 3D 房间里�
 | 房间行动 | ARDY 对话动作与连续移动、靠近用户或物件、跟随、停止及任务交接；包含路径检查、流式动作延迟处理和恢复逻辑。动态动作质量仍需场景实测。 |
 | 多步骤任务 | 解析完整请求中的动作、条件、撤回与顺序；维护步骤依赖，在实际完成后续接。设备任务覆盖寻找、靠近、操作及状态核验，只作用于已接入的场景对象。 |
 | 行为与说话核对 | 公开表达与目标身份、实际执行状态和播放回执关联。生成了文字、动作已提交、动作已完成、用户已听到结果分别记录；失败结果也可以完成告知，不会因此被改记为成功。 |
+| 即时自我觉察（本分支新增） | 在说话与行动进行中并行监控事实变化，按播放进度局部纠正台词，并对具体行动冲突反馈停止或重新考虑。 |
 | 自主行为与记忆 | 根据当前事项、观察、用户约束及工具结果安排后续检查、回应或等待；提供记忆图谱与可选的语义召回。自主续接有预算和失效检查。 |
 | 歌唱 | 管理真实录音片段与本地曲库，按具体素材、范围和顺序回唱；可接入歌声合成与音色转换。不能仅凭歌名生成从未获取的完整原曲，当前也不是严格同步合唱。 |
 | 形象与交互 | VRM 角色、口型、眨眼、Artifairy 形态键同步和弹簧骨骼；桌面自由视角及 OpenXR/PICO 相关接入。完整 Android 体验需要另外部署和验证。 |
@@ -33,10 +47,15 @@ flowchart LR
     Action <--> Motion[ARDY 动作服务]
     Action --> Facts[执行结果与状态回读]
     Facts --> Agent
-    Review --> Speech[公开台词与事实核对]
+    Review --> Speech[公开台词]
     Speech --> TTS[GPT-SoVITS / AudioSource]
     TTS --> Receipt[实际播放回执]
     Receipt --> Agent
+    Facts --> Monitor[即时自我觉察]
+    Speech --> Monitor
+    Receipt --> Monitor
+    Monitor -->|局部纠正| Speech
+    Monitor -->|冲突反馈| Agent
 ```
 
 Qwen 负责理解、选择和表达，Unity 持有场景对象、任务状态、可执行接口与播放状态。决定通过检查后才提交执行；旧用户轮次、旧目标或已取消任务的异步回调不能直接继续操作。
@@ -67,7 +86,7 @@ Qwen 负责理解、选择和表达，Unity 持有场景对象、任务状态、
 ### 先打开 Unity 工程
 
 ```powershell
-git clone --branch codex/project-checkpoint-20261011 https://github.com/Enishiya770/NeEEvA.git
+git clone --branch codex/project-checkpoint-20261015 https://github.com/Enishiya770/NeEEvA.git
 cd NeEEvA
 ```
 

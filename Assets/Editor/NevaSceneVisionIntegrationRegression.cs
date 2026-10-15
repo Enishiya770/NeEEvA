@@ -283,6 +283,13 @@ public static class NevaSceneVisionIntegrationRegression
         int operation = bridge.Controller.OperationRevision;
         Vector3 root = avatar.transform.position;
 
+        if (Argument("-activityMonitorRuntime", "0") == "1")
+        {
+            yield return ActivityMonitorPlayRegression.Run(chat, bridge, Output);
+            report["activityMonitor"] = ActivityMonitorPlayRegression.LastReport;
+            Finish(null); yield break;
+        }
+
         if (!string.IsNullOrEmpty(Argument("-qualitySpeechInput", "")))
         {
             yield return QualitySpeechLiveRegression.Run(Argument("-qualitySpeechInput", ""), Output);

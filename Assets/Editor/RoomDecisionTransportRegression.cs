@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -73,7 +73,8 @@ public static class RoomDecisionTransportRegression
                 var review = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", source, Image, true));
                 Require((int?)review["max_tokens"] == 240 && ((JArray)review["messages"]).Count == 2 &&
                     !review.ToString().Contains("[本轮唯一行动来源]") && review.SelectTokens("$..image_url.url").Count() == 1 &&
-                    (string)review["messages"][0]["content"] == RoomTaskProtocol.ReviewContract + "\n" + RoomTaskProtocol.ReviewSchema &&
+                    (string)review["messages"][0]["content"] == RoomTaskProtocol.ReviewContract + "\n" +
+                        (backend == ChatQW.BackendType.Local ? RoomTaskProtocol.CompactDecisionFieldGuide(JObject.Parse(RoomTaskProtocol.ReviewSchema)) : RoomTaskProtocol.ReviewSchema) + "\n" + SpeechActScopeProtocol.ReviewContract &&
                     (backend == ChatQW.BackendType.Local ? JToken.DeepEquals(review["response_format"]["schema"], JObject.Parse(RoomTaskProtocol.ReviewSchema)) :
                         review["response_format"]["schema"] == null),
                     "Speech review retains its 240-token, two-message contract and single image.");
@@ -89,7 +90,8 @@ public static class RoomDecisionTransportRegression
                     ((JArray)terminalSchema["properties"]["factScope"]["enum"]).Values<string>().Contains("none")&&
                     ((JArray)terminalSchema["properties"]["verdict"]["enum"]).Values<string>().Contains("inconsistent"),
                     "Terminal review requires scope/result classification while retaining honest inconsistent/non-result verdicts.");
-                Require((string)terminalReview["messages"][0]["content"]==RoomTaskProtocol.ReviewContract+"\n"+terminalSchema.ToString(Newtonsoft.Json.Formatting.None)&&
+                Require((string)terminalReview["messages"][0]["content"]==RoomTaskProtocol.ReviewContract+"\n"+
+                    (backend==ChatQW.BackendType.Local?RoomTaskProtocol.CompactDecisionFieldGuide(terminalSchema):terminalSchema.ToString(Newtonsoft.Json.Formatting.None))+"\n"+SpeechActScopeProtocol.ReviewContract&&
                     (backend==ChatQW.BackendType.Local?JToken.DeepEquals(terminalReview["response_format"]["schema"],terminalSchema):terminalReview["response_format"]["schema"]==null),
                     "Local constrained grammar and cloud system contract use the actual terminal four-field review schema.");
                 var allowedWire = JObject.Parse((string)Call(model, "BuildRoomTaskRequestJsonWithImage", allowed.ToString(), Image, false));

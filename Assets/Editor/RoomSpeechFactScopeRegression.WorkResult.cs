@@ -120,6 +120,16 @@ public static partial class RoomSpeechFactScopeRegression
             Require(review.Image == null && (string)JObject.Parse(review.Input).SelectToken("movementReportRequirement.expectedReport") == "incomplete",
                 "Actual diagnostic review uses current failed-step evidence without waiting for a new camera frame.");
             File.WriteAllText(Path.Combine(directory, "review-input.json"), review.Input);
+            string reviewWire = (string)typeof(ChatQW).GetMethod("BuildRoomTaskRequestJson", Flags).Invoke(serializer,
+                new object[] { review.Input, true });
+            var wireMessages = (JArray)JObject.Parse(reviewWire)["messages"];
+            Require(wireMessages.ToString().Contains(SceneFactContextCompactor.JsonSharingContract) &&
+                wireMessages.ToString().Contains(SceneFactContextCompactor.ReferenceKey),
+                "Production work-result review shares exact repeated receipts instead of serializing them again.");
+            Require(reviewWire.Contains(request) && reviewWire.Contains(action) && reviewWire.Contains("goal-not-reached") &&
+                reviewWire.Contains("Inspection result:") && reviewWire.Contains("Catalog result:"),
+                "Sharing preserves the full request, current owner, actual failure and separate tool results.");
+            File.WriteAllText(Path.Combine(directory, "review-request.json"), reviewWire);
             review.Complete(false, "", "controlled-review-service-failure");
             var fallbackReview = model.EngineFallbacks.Last();
             Require(fallbackReview != review && ((string)JObject.Parse(fallbackReview.Input)["publicSpeech"]).Contains("今回の移動は未完了"),

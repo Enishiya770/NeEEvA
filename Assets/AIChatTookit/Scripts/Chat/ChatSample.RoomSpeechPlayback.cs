@@ -116,6 +116,8 @@ public partial class ChatSample
 
     private RoomPlaybackCheck RefreshRoomSpeechForPlayback(PendingSpeechChunk chunk, int generation)
     {
+        var process = RefreshActivitySpeech(chunk);
+        if (process != RoomPlaybackCheck.Current) return process;
         var lease = chunk.RoomState;
         if (lease == null) return RoomPlaybackCheck.Current;
         if (!RoomSpeechLeaseCurrent(lease, generation) || !chunk.RoomPrefixOnly && chunk.RoomStateVersion != lease.version)
@@ -172,6 +174,10 @@ public partial class ChatSample
         if (!string.IsNullOrEmpty(lease.failureNotice) && !lease.played.Contains(lease.failureNotice)) text += (lease.language == "en" ? " " : "") + lease.failureNotice;
         RemoveQueuedRoomSpeech(lease, true);
         chunk.Text = text; chunk.LanguageCode = lease.language; chunk.RoomStateVersion = lease.version;
+        if (chunk.ProcessUnit != null) {
+            chunk.ProcessUnit.Text = text; chunk.ProcessUnit.Version++;
+            chunk.ProcessVersion = chunk.ProcessUnit.Version;
+        }
         if (lease.history != null && lease.model != null && lease.model.m_DataList.Contains(lease.history))
             lease.history.content = lease.played + (lease.prefixQueued ? pendingPrefix : "") + text;
         var receipt = new JObject {
@@ -229,7 +235,7 @@ public partial class ChatSample
     private void QueueRoomSpeechTranslation(RoomSpeechPlaybackLease lease, int generation, string text)
     {
         // Only enqueue this changing state after its playback gate has passed.
-        if (lease != null && m_SubtitleOverlay != null)
+        if ((lease != null || ActivityMonitoringAvailable) && m_SubtitleOverlay != null)
             m_SubtitleOverlay.QueueTranslationChunk(generation, text, true);
     }
 
@@ -242,7 +248,7 @@ public partial class ChatSample
             if (string.IsNullOrWhiteSpace(completed)) m_DeliveryModel.m_DataList.Remove(m_DeliveryHistory);
             else m_DeliveryHistory.content = completed;
             if ((int?)m_LastFormalReplyReceipt?["generation"] == m_DeliveryGeneration) {
-                m_LastFormalReplyReceipt["completedPlaybackText"] = completed;
+                m_LastFormalReplyReceipt["completedPlaybackText"] = m_ActivityLatePlaybackPrefix + completed;
                 m_LastFormalReplyReceipt["playbackStatus"] = m_FailedDeliveryGeneration == m_DeliveryGeneration ? "partial-or-failed" : "drained";
             }
         }

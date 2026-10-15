@@ -28,6 +28,7 @@ public partial class ChatSample
             ConfigureMotionOutput(m_MotionOutputEnabled, m_GeneratedMotionEnabled);
         ClaimPreparedRoomUserTurn(text);
         m_ActionConstraints.RecordUserTurn(text);
+        RecordActivityDialogue("user",text,"accepted-user-turn");
     }
 
     private void BeginMotionPlanningResponse()

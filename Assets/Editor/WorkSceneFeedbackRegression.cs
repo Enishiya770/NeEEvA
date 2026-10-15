@@ -523,7 +523,9 @@ public static class WorkSceneFeedbackRegression
         string imageNote = (string)typeof(ChatQW).GetField("k_AttachedImageNote", Flags).GetRawConstantValue();
         Require(review.Kind == "room-review" && messages?.Count == 2 &&
             (string)messages[0]["role"] == "system" &&
-            (string)messages[0]["content"] == RoomTaskProtocol.ReviewContract + "\n" + RoomTaskProtocol.ReviewSchema &&
+            (string)messages[0]["content"] == RoomTaskProtocol.ReviewContract + "\n" +
+                (payload.SelectToken("response_format.schema") != null ? RoomTaskProtocol.CompactDecisionFieldGuide(JObject.Parse(RoomTaskProtocol.ReviewSchema)) : RoomTaskProtocol.ReviewSchema) +
+                "\n" + SpeechActScopeProtocol.ReviewContract &&
             (string)messages[1]["role"] == "user" && wireInput == imageNote + review.Input &&
             payload.SelectTokens("$..image_url.url").Select(token => (string)token).SequenceEqual(new[] { review.Image }),
             "The actual compiled provider wire pairs the current factual audit contract with its unchanged input and exact current RGB, without general persona or singing history.");

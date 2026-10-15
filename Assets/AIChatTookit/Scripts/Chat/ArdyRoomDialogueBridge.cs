@@ -442,6 +442,14 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         StopForTask(stopActionId); failure = null; return true;
     }
 
+    public bool StopMonitoredActivity(string expectedTaskId,string expectedVersion,string reason)
+    {
+        if(!IsConnected || string.IsNullOrEmpty(expectedTaskId) || ActiveTaskId!=expectedTaskId ||
+            controller.OperationRevision.ToString()!=expectedVersion || controller.OperationRevision!=operationRevision)return false;
+        StopMovement("cancelled","process-monitor: "+reason);
+        return true;
+    }
+
     public void StopMovement(string result = "stopped", string explanation = "已明确停止移动，保留当前位置。")
     {
         string stoppedOrientId = sceneOrientActive ? sceneOrientId : null;

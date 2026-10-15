@@ -85,7 +85,13 @@ public partial class ChatSample
             foreach (var step in plan.OfType<JObject>()) step["status"] = "pending";
             m_RoomTaskSequence = new JObject { ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
                 ["request"] = m_ActionConstraints.CurrentUserText, ["steps"] = plan,
-                ["coverage"] = JObject.Parse(json)["taskCoverage"]?.DeepClone() };
+                ["coverage"] = JObject.Parse(json)["taskCoverage"]?.DeepClone(),
+                ["answerObligations"] = ReplyAnswerObligationProtocol.FromSemantics(m_ActionConstraints.CurrentUserText, ReadCompactCurrentRequestSemantics(m_FormalResponseGeneration)) };
+            if (((JArray)m_RoomTaskSequence["answerObligations"]).Count > 0)
+                m_RoomTaskSequence["answerEvidence"] = new JObject {
+                    ["observedHistory"] = BuildVerifiedObservedDeviceReferentHistory(),
+                    ["eventHistory"] = ReadHistoricalDeviceEvents(),
+                    ["scope"] = "Frozen before dispatch of this task plan. Records retain their own entity/time. Missing records mean evidence unavailable, not proof an event never happened. This snapshot cannot establish current state." };
             m_RoomTaskSequenceReviewedSteps.Clear(); m_RoomTaskSequenceProgressCheckAt = 0;
             m_SequenceBodyAttempts.Clear(); m_SequenceBodySubmission = null;
             m_RoomTaskSequenceModel = m_ChatSettings.m_ChatModel;

@@ -27,6 +27,7 @@ public partial class ChatSample
             ["workEpoch"] = m_WorkEpoch,
             ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
             ["trigger"] = reason,
+            ["processFeedback"] = m_LastActivityFeedback?.DeepClone(),
             ["room"] = roomOutcome == null
                 ? ReadCompactRoomTaskFacts(GetComponent<ArdyRoomDialogueBridge>()) : null,
             ["sceneAction"] = priorResults == null ? ReadRoomSceneActionFacts()["lastAction"]?.DeepClone() : null,

@@ -563,6 +563,12 @@ public class LLM:MonoBehaviour
 
     /// <summary>Same-model, request-local spatial decision and speech consistency check. No history or side effects.</summary>
     public virtual bool SupportsRoomTaskMessages => false;
+    public virtual bool SupportsActivityMonitor => false;
+    [NonSerialized] public bool OngoingSpeechMonitoring;
+    /// <summary>Independent, bounded process feedback. Never writes public history or executes actions.</summary>
+    public virtual void PostActivityMonitor(string input, Action<bool, string, string> callback)
+        => callback?.Invoke(false, "", "activity-monitor-unsupported");
+    public virtual void CancelActivityMonitor() { }
     public virtual bool SupportsRoomTaskSequences => false;
     /// <summary>Cancel only the private room planner; keep a newly started public result stream intact.</summary>
     public virtual void CancelRoomTaskPlanningMessage() { }

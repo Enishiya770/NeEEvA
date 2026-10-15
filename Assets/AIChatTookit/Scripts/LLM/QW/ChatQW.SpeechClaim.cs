@@ -61,6 +61,10 @@ public partial class ChatQW
             // the one recovery reads original words plus failed-check names only.
             ((JObject)words["extractionRepair"]).Remove("rejectedOutput");
             contract += "\nThis is the single recovery. Recheck ALL fields from the original clauses, not only the first failed check.\n";
+            if (((string)repair["failureDetail"] ?? "").StartsWith("speechActs:", StringComparison.Ordinal))
+                contract += "A bare acknowledgement belongs ONLY in speechActs, never eventClaims or otherClaims. " +
+                    "If the clause actually asserts an inspection/action, use assertion and retain the fact. " +
+                    "Resolve this from the whole clause; retaining contradictory lists is not preserving a factual assertion.\n";
         }
         var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
         sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":640,\"response_format\":{\"type\":\"json_object\"");
@@ -135,7 +139,8 @@ public partial class ChatQW
                         if (raw["actualLanguage"]?.Type == JTokenType.String &&
                             new[] { "ja", "zh", "en", "mixed", "und" }.Contains((string)raw["actualLanguage"]))
                             languageDiagnostic = new JObject { ["actualLanguage"] = raw["actualLanguage"].DeepClone(),
-                                ["languageReason"] = raw["languageReason"]?.DeepClone() };
+                                ["languageReason"] = raw["languageReason"]?.DeepClone(),
+                                ["wholeUtteranceReading"] = (raw["movementReading"] ?? raw["speechReading"])?.DeepClone() };
                     } catch (JsonException) { }
                     // Diagnose language even when a separate quote/state check
                     // failed. Diagnostics do not make an invalid claim trusted.
@@ -143,18 +148,26 @@ public partial class ChatQW
                     bool languageDisagreement = languageDiagnostic != null && !string.IsNullOrEmpty((string)input["publicSpeechLanguage"]) &&
                         RoomTaskProtocol.ReviewLanguageRejection(languageDiagnostic, (string)input["publicSpeechLanguage"]) != null;
                     bool recheckLanguage = ambiguousLanguage || languageDisagreement;
+                    // Mixed epistemic and result clauses can mis-scope negation.
+                    // Only those get the existing shared words-only recovery;
+                    // ordinary stale progress still refreshes immediately.
+                    bool recheckMeaning = accepted && requirement != null &&
+                        (string)claim["resultReport"] != (string)requirement["expectedReport"] &&
+                        (claim["speechActs"] as JArray)?.OfType<JObject>().Any(a => (string)a["kind"]=="uncertainty") == true;
                     var issues = new JArray();
                     if (!string.IsNullOrEmpty(failure)) issues.Add(failure);
                     if (recheckLanguage) issues.Add("actualLanguage:recheck-substantive-clause-grammar");
+                    if (recheckMeaning) issues.Add("resultReport:recheck-affirmative-predicate-and-negation");
                     // Curl can reject reuse of a closed local connection before
                     // receiving HTTP (error 65 / upload rewind). Rebuild this
                     // read-only classification once, sharing the same two-attempt
                     // ceiling with schema repair; no action is resent.
                     bool reconnect = !received && attempt == 0 && request.responseCode == 0 &&
                         request.result == UnityWebRequest.Result.ConnectionError && Time.realtimeSinceStartup-started < .5f;
-                    bool recover = reconnect || received && attempt == 0 && (!accepted || recheckLanguage);
+                    bool recover = reconnect || received && attempt == 0 && (!accepted || recheckLanguage || recheckMeaning);
                     if (received) status = accepted ? "received" : "invalid-claim-or-ungrounded-quote";
                     if (accepted && recheckLanguage && recover) failure = "actualLanguage:recheck-substantive-clause-grammar";
+                    if (accepted && recheckMeaning && recover) failure = "resultReport:recheck-affirmative-predicate-and-negation";
                     Debug.Log("[Room/SpeechClaim] " + new JObject {
                         ["generation"] = generation, ["attempt"] = attempt, ["maximumRecoveryAttempts"] = 1,
                         ["accepted"] = accepted, ["httpStatus"] = request.responseCode, ["status"] = status,
@@ -172,7 +185,7 @@ public partial class ChatQW
                         if(reconnect) { yield return null; continue; }
                         // The quotes/state already passed independent extraction.
                         // A language recheck cannot rewrite those proven spans.
-                        languageSource = accepted && recheckLanguage ? (JObject)claim.DeepClone() : null;
+                        languageSource = accepted && recheckLanguage && !recheckMeaning ? (JObject)claim.DeepClone() : null;
                         repair = new JObject { ["attempt"] = 1, ["maximumAttempts"] = 1, ["failureDetail"] = failure,
                             ["validationIssues"] = issues.DeepClone(),
                             ["rejectedOutput"] = output.Substring(0, Math.Min(1600, output.Length)) };
@@ -229,6 +242,12 @@ public partial class ChatQW
             if (ok && RoomTaskProtocol.TryReviewScope(output, out _))
             {
                 var result = ReadRoomTaskRecoveryJson(output);
+                string answerFailure=ReplyAnswerObligationProtocol.Reject(input,result);
+                if(answerFailure!=null) {
+                    result["verdict"]="inconsistent";result["reason"]=answerFailure;result["conflict"]="unanswered-request";
+                    result["conflictQuote"]="";
+                    callback?.Invoke(true,result.ToString(Formatting.None),answerFailure);return;
+                }
                 string eventFailure = SpeechEventBindingProtocol.Reject(input, result, out string eventQuote);
                 if (eventFailure != null) {
                     result["verdict"]="inconsistent"; result["reason"]=eventFailure;

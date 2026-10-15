@@ -40,7 +40,7 @@ public static class WorkResultDeliveryRegression
             object Decision(string quote, string remaining = "") => JsonUtility.FromJson(new JObject {
                 ["work_status"] = "continue", ["proceed"] = true, ["next_intent_source"] = "current-work", ["next_step_id"] = "",
                 ["planning_focus"] = "other", ["intent"] = "Report result", ["remaining_request_quote"] = remaining,
-                ["delivery_reports"] = new JArray(new JObject { ["id"] = id, ["quote"] = quote })
+                ["delivery_reports"] = new JArray(new JObject { ["id"] = id, ["coverage"] = "reported", ["quote"] = quote })
             }.ToString(), typeof(ChatSample).GetNestedType("AutonomyIntentDecision", BindingFlags.NonPublic));
             bool Apply(object decision) => (bool)Call("ApplyWorkDelivery", decision, sequence);
             Check(!Apply(Decision(spoken)), "Generated text cannot be counted as completed audio.");
@@ -54,6 +54,13 @@ public static class WorkResultDeliveryRegression
             Check(!Apply(Decision(spoken, "告诉我采样率")), "A distinct unanswered question survives fully reported failure.");
             Check((bool)((JObject)Call("ReadWorkDelivery"))["results"][0]["delivered"], "Delivery is recorded independently of whole-work closure.");
             Check(Apply(Decision(spoken)), "Reported terminal result can settle without converting failure to success.");
+            var autonomous = Decision(spoken);
+            autonomous.GetType().GetField("work_status").SetValue(autonomous, "closed");
+            autonomous.GetType().GetField("next_intent_source").SetValue(autonomous, "autonomous");
+            autonomous.GetType().GetField("intent").SetValue(autonomous, "Suggest composing a song together.");
+            Check(Apply(autonomous) && (string)autonomous.GetType().GetField("next_intent_source").GetValue(autonomous) == "autonomous" &&
+                (bool)autonomous.GetType().GetField("proceed").GetValue(autonomous),
+                "Settling a result preserves an independently selected reasonable autonomous intention.");
             var invalid = Decision(spoken, "not a quote from this request");
             invalid.GetType().GetField("work_status").SetValue(invalid, "closed");
             Check(!Apply(invalid) && (string)invalid.GetType().GetField("work_status").GetValue(invalid) == "continue",
@@ -82,10 +89,22 @@ public static class WorkResultDeliveryRegression
             Check(!Apply(Decision(spoken)), "Even the new result id cannot borrow completed speech from before that version existed.");
             Call("RecordWorkCompletedSpeech", spoken);
             Check(Apply(Decision(spoken)), "The new version settles only after its own completed playback.");
+            Set("m_WorkRequestSemantics", new JObject { ["workEpoch"]=8001,["userTurn"]=ledger.CurrentUserTurn,
+                ["currentUserText"]=ledger.CurrentUserText,["requestKind"]="mixed",
+                ["currentTurnEvidence"]=new JObject { ["answerQuote"]="再告诉我采样率" } });
+            Set("m_WorkRequestSemanticsModel", ((ChatSetting)Get("m_ChatSettings")).m_ChatModel);
+            var question=((JArray)((JObject)Call("ReadWorkDelivery"))["results"]).OfType<JObject>().Single(r=>(string)r["source"]=="independent-answer");
+            Check(!Apply(Decision(spoken)), "An independently identified question survives an empty remaining_request_quote.");
+            id=(string)question["id"];
+            Check(!Apply(Decision("音频采样率是 48000 Hz。")), "An answer version cannot borrow audio played before it was identified.");
+            Call("RecordWorkCompletedSpeech", "音频采样率是 48000 Hz。");
+            Check(Apply(Decision("音频采样率是 48000 Hz。")) && ((JArray)Call("ReadWorkAnswerObligations",true)).Count==0,
+                "Actual delivered answer settles separately and disappears from subsequent writing obligations.");
             ledger.RecordUserTurn("再解释一下刚才保存为什么失败。");
             Call("EnsureWorkDeliveryOwner");
             Check(((Dictionary<string, string>)Get("m_WorkDeliveredResults")).Count == 0 && ((List<string>)Get("m_WorkCompletedSpeech")).Count == 0,
                 "An explicit new question/turn owns a new delivery obligation.");
+            Check(((JArray)Call("ReadWorkAnswerObligations",false)).Count==0,"Old question interpretation cannot cross a new user turn.");
             return checks;
         }
         finally

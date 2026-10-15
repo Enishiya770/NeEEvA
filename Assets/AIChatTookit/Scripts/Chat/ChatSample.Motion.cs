@@ -53,6 +53,7 @@ public partial class ChatSample
 
     private int BeginFormalResponseGeneration()
     {
+        CancelActivityMonitoring(true);
         CancelSceneSearchTask("formal-response-replaced");
         // Release the old device transaction before a replacement can occupy
         // the same model's auxiliary planner slot. Deferred runner cancellation
@@ -253,6 +254,7 @@ public partial class ChatSample
 
     private void OnDisable()
     {
+        CancelActivityMonitoring(true);
         ResetSingingPolicyReview("chat-disabled");
         ClearDeferredSingingRequest();
         SuspendSceneTime("chat-disabled");

@@ -26,7 +26,8 @@ public static class AutonomyPremiseProtocol
         "Return autonomyPremise alongside the normal decision fields; keep its reason concise.";
 
     public static bool Required(string input)
-    { try { return (bool?)JObject.Parse(input)["autonomous"] == true; } catch (Exception) { return false; } }
+    { try { var value=JObject.Parse(input); return (bool?)value["autonomous"] == true && (bool?)value["ongoingActivityMonitoring"] != true; }
+      catch (Exception) { return false; } }
 
     public static string ExtendSchema(string schema, string input)
     {

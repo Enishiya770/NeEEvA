@@ -118,6 +118,10 @@ public partial class ChatSample
             ["roomDecision"] = new JObject { ["intent"] = m_RoomTaskIntent, ["dispatch"] = m_RoomTaskDispatch },
             ["scope"] = "Execution readback and owner-bound goal evidence. Substep arrival or a spoken statement does not satisfy a device goal."
         };
+        result["answerObligations"] = ReadWorkAnswerObligations(true);
+        if (((JArray)result["answerObligations"]).Count>0) result["answerEvidence"] =
+            ReadRoomTaskSequence()?["answerEvidence"]?.DeepClone() ?? new JObject {
+                ["scope"] = "No pre-task evidence snapshot available. Current success cannot establish an earlier sighting or its cause. Answer historical questions with explicit uncertainty, not a claim that the event never happened." };
         result["resultReportRequirement"] = SpatialGoalResultContextPolicy.BuildReportRequirement(result);
         return result;
     }

@@ -13,6 +13,13 @@ public partial class ChatQW
     {
         bool Current() => generation == m_StreamRequestGeneration;
         if (!Current()) yield break;
+        if (OngoingSpeechMonitoring && SupportsActivityMonitor) {
+            // Routing and the public/action syntax boundary already ran. The
+            // character may revise ordinary speech during playback; do not add
+            // another full words-only approval wait or reject mixed language.
+            Debug.Log("[LLM/FirstReplyPublication] mode=ongoing-monitor actionAuthorized=False");
+            callback(true); yield break;
+        }
         string speech = string.Join("\n", candidate.Speech.Select(part => part.Text));
         string wire = FirstReplyPublicationProtocol.Request(CurrentModelName, speech, m_Backend == BackendType.Local).ToString(Formatting.None);
         var budget = MeasureRoomDecisionBudget(wire, 4096);

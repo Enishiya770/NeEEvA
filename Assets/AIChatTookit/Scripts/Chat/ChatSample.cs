@@ -216,6 +216,7 @@ public partial class ChatSample : MonoBehaviour
     {
         UpdateSceneTimePose();
         TickSceneAttention();
+        TickActivityMonitor();
         StepUrge();
 
         bool playing = IsVoiceOutputPlaying;
@@ -4267,6 +4268,8 @@ public partial class ChatSample : MonoBehaviour
         public RoomSpeechPlaybackLease RoomState;
         public int RoomStateVersion;
         public bool RoomPrefixOnly;
+        public ActivityMonitorProtocol.SpeechUnit ProcessUnit;
+        public int ProcessVersion;
     }
 
     private sealed class PendingSpeechClip
@@ -4278,12 +4281,15 @@ public partial class ChatSample : MonoBehaviour
         public RoomSpeechPlaybackLease RoomState;
         public int RoomStateVersion;
         public bool RoomPrefixOnly;
+        public ActivityMonitorProtocol.SpeechUnit ProcessUnit;
+        public int ProcessVersion;
     }
 
     private static bool MatchesPreparedSpeech(PendingSpeechClip clip, PendingSpeechChunk chunk, string text)
     {
         return clip.RoundId == chunk.RoundId && clip.Text == text && clip.LanguageCode == chunk.LanguageCode &&
-            clip.RoomState == chunk.RoomState && clip.RoomStateVersion == chunk.RoomStateVersion;
+            clip.RoomState == chunk.RoomState && clip.RoomStateVersion == chunk.RoomStateVersion &&
+            clip.ProcessUnit == chunk.ProcessUnit && clip.ProcessVersion == chunk.ProcessVersion;
     }
 
     //待合成文本队列（LLM切句后推入，TTSSender消费）
@@ -4711,6 +4717,9 @@ public partial class ChatSample : MonoBehaviour
 
     private void InvalidateFormalResponse(string reason)
     {
+        if (IsAISpeaking && m_ActivitySpeech.Exists(u => u.State == "playing" || u.State == "starting"))
+            RecordActivityInterruption(m_CurrentlyPlayingText, reason);
+        CancelActivityMonitoring();
         FinishRoomSpeechPlaybackHistory(m_AssistantHeardText.ToString());
         ClearStagedFormalObservation();
         CancelDialogueMotion(reason);
@@ -5041,14 +5050,8 @@ public partial class ChatSample : MonoBehaviour
         if (!m_LatencyFillerPlayed || string.IsNullOrEmpty(m_LatencyFillerText)) return;
 
         ObserveLatencyFillerProgress();
-        float fraction = m_LatencyProgressClip != m_LatencyFillerClip || m_LatencyFillerClip == null ? 0f :
-            m_LatencyProgressComplete ? 1f : Mathf.Clamp01((float)m_LatencyProgressSamples / Math.Max(1,m_LatencyFillerClip.samples));
-        int charsHeard = Mathf.Clamp(
-            Mathf.FloorToInt(m_LatencyFillerText.Length * fraction),
-            0,
-            m_LatencyFillerText.Length);
-        if (charsHeard > 0)
-            m_AssistantHeardText.Append(m_LatencyFillerText.Substring(0, charsHeard));
+        if (m_LatencyProgressComplete) m_AssistantHeardText.Append(m_LatencyFillerText);
+        else if (m_LatencyProgressSamples > 0) RecordActivityInterruption(m_LatencyFillerText, "opening-interrupted");
 
         m_LatencyFillerPlayed = false;
         m_LatencyFillerFromEou = false;
@@ -5963,9 +5966,10 @@ public partial class ChatSample : MonoBehaviour
                 RoomState = m_RoomSpeechPlayback?.roundId == m_CurrentSpeechRoundId ? m_RoomSpeechPlayback : null,
                 RoomStateVersion = m_RoomSpeechPlayback?.roundId == m_CurrentSpeechRoundId ? m_RoomSpeechPlayback.version : 0,
                 RoomPrefixOnly = resultBoundary >= 0 && boundary == resultBoundary
+                ,ProcessUnit = RegisterActivitySpeech(completed, language)
             });
             if (resultBoundary >= 0 && boundary == resultBoundary) m_RoomSpeechPlayback.prefixQueued = true;
-            if (m_SubtitleOverlay != null && m_RoomSpeechPlayback?.roundId != m_CurrentSpeechRoundId)
+            if (m_SubtitleOverlay != null && !ActivityMonitoringAvailable && m_RoomSpeechPlayback?.roundId != m_CurrentSpeechRoundId)
             {
                 string probe = completed.TrimEnd();
                 bool semanticBoundary = IsStrongBoundary(probe[probe.Length - 1]) ||
@@ -6082,11 +6086,12 @@ public partial class ChatSample : MonoBehaviour
                 if (m_LogStreamTimings) Debug.Log($"[Stream] T+{Elapsed():F2}s TTS返回(音频{pending.length:F2}s): \"{chunk}\"");
                 if (!m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId))
                 {
-                    m_PendingClips.Enqueue(new PendingSpeechClip
+                    EnqueueActivityPreparedClip(new PendingSpeechClip
                     {
                         RoundId = speechChunk.RoundId,
                         RoomState = speechChunk.RoomState,
                         RoomStateVersion = speechChunk.RoomStateVersion, RoomPrefixOnly = speechChunk.RoomPrefixOnly,
+                        ProcessUnit = speechChunk.ProcessUnit, ProcessVersion = speechChunk.ProcessVersion,
                         Text = chunk,
                         LanguageCode = speechChunk.LanguageCode,
                         Clip = pending
@@ -6096,6 +6101,7 @@ public partial class ChatSample : MonoBehaviour
             else
             {
                 if (m_LogStreamTimings) Debug.LogWarning($"[Stream] T+{Elapsed():F2}s TTS失败/跳过: \"{chunk}\"");
+                ObserveActivitySpeech(speechChunk.ProcessUnit, "not-played");
                 ReportTtsFailureOnce(
                     "tts_failed",
                     "部分语音未能播放。",
@@ -6144,7 +6150,8 @@ public partial class ChatSample : MonoBehaviour
             if (string.IsNullOrWhiteSpace(future) || !SpeechChunkPolicy.Bounded(future) || IsPurePunctuation(future)) return;
             SpeechText preparedSpeech = tts.ResolveSpeech(new SpeechText(future, queued.LanguageCode));
             var slot = new PendingSpeechClip { RoundId = queued.RoundId, Text = future, LanguageCode = preparedSpeech.LanguageCode,
-                RoomState = queued.RoomState, RoomStateVersion = queued.RoomStateVersion, RoomPrefixOnly = queued.RoomPrefixOnly };
+                RoomState = queued.RoomState, RoomStateVersion = queued.RoomStateVersion, RoomPrefixOnly = queued.RoomPrefixOnly,
+                ProcessUnit = queued.ProcessUnit, ProcessVersion = queued.ProcessVersion };
             next = slot; nextDone = false; nextRequestedAt = Time.realtimeSinceStartup;
             Debug.Log($"[TTS/Lookahead] 当前句合成已完成，播放期间预取下一句: \"{future}\"");
             tts.PrepareSpeech(preparedSpeech, (clip, ignored) =>
@@ -6254,6 +6261,7 @@ public partial class ChatSample : MonoBehaviour
                     m_FormalBufferedClip = ownedClip;
                     m_AudioSource.clip = ownedClip;
                     m_AudioSource.loop = false;
+                    ObserveActivitySpeech(speechChunk.ProcessUnit, "starting");
                     m_AudioSource.Play();
                     preparedPlayAt = Time.realtimeSinceStartup;
                     started = true;
@@ -6266,7 +6274,7 @@ public partial class ChatSample : MonoBehaviour
                     m_ChatSettings.m_TextToSpeech.SpeakStreamingWithPlaybackGate(
                         speechRequest,
                         m_AudioSource,
-                        _ => { started = true; directClip = m_AudioSource != null ? m_AudioSource.clip : null; },
+                        _ => { started = true; ObserveActivitySpeech(speechChunk.ProcessUnit, "starting"); directClip = m_AudioSource != null ? m_AudioSource.clip : null; },
                         (success, _, duration) =>
                         {
                             succeeded = success;
@@ -6337,6 +6345,7 @@ public partial class ChatSample : MonoBehaviour
                     ["scope"] = "Unity playback advancement; gaps exclude sentence-internal silence and are frame-granular."
                 }.ToString(Newtonsoft.Json.Formatting.None));
                 RegisterActuallySpokenRound(responseGeneration, speechChunk.RoundId);
+                ObserveActivitySpeech(speechChunk.ProcessUnit, "playing");
                 if (ownedClip != null) tts.ObservePreparedSpeech(ownedClip, "advanced", m_AudioSource.timeSamples);
                 QueueRoomSpeechTranslation(speechChunk.RoomState, responseGeneration, text);
                 if (firstChunk) MarkRealFirstAudioStarted();
@@ -6426,6 +6435,7 @@ public partial class ChatSample : MonoBehaviour
 
                 if (succeeded)
                 {
+                    ObserveActivitySpeech(speechChunk.ProcessUnit, "completed");
                     m_AssistantHeardText.Append(text);
                     RecordRoomSpeechPlayed(speechChunk.RoomState, text);
                     RecordReviewedGoalAnswerPlayedChunk(responseGeneration, text);
@@ -6436,6 +6446,7 @@ public partial class ChatSample : MonoBehaviour
                 }
                 else
                 {
+                    ObserveActivitySpeech(speechChunk.ProcessUnit, "interrupted");
                     RecordSpeechDeliveryFailure(responseGeneration, text);
                     if (m_LogStreamTimings) Debug.LogWarning($"[Stream] T+{Elapsed():F2}s TTS流中断/失败: \"{text}\"");
                 }
@@ -6525,7 +6536,8 @@ public partial class ChatSample : MonoBehaviour
                 if (responseGeneration != m_FormalResponseGeneration) yield break;
             }
             var guardedChunk = new PendingSpeechChunk { RoundId = pendingClip.RoundId, Text = pendingClip.Text,
-                LanguageCode = pendingClip.LanguageCode, RoomState = pendingClip.RoomState, RoomStateVersion = pendingClip.RoomStateVersion, RoomPrefixOnly = pendingClip.RoomPrefixOnly };
+                LanguageCode = pendingClip.LanguageCode, RoomState = pendingClip.RoomState, RoomStateVersion = pendingClip.RoomStateVersion, RoomPrefixOnly = pendingClip.RoomPrefixOnly,
+                ProcessUnit = pendingClip.ProcessUnit, ProcessVersion = pendingClip.ProcessVersion };
             var playbackCheck = RefreshRoomSpeechForPlayback(guardedChunk, responseGeneration);
             if (playbackCheck != RoomPlaybackCheck.Current)
             {
@@ -6539,6 +6551,7 @@ public partial class ChatSample : MonoBehaviour
                 continue;
             }
             m_AudioSource.clip = clip;
+            ObserveActivitySpeech(pendingClip.ProcessUnit, "starting");
             m_AudioSource.Play();
             bool advanced = false;
             yield return AwaitFormalAudioAdvancement(responseGeneration, pendingClip.RoundId,
@@ -6547,8 +6560,9 @@ public partial class ChatSample : MonoBehaviour
             if (!advanced) continue;
             if (firstChunk) MarkRealFirstAudioStarted();
             RegisterActuallySpokenRound(responseGeneration, pendingClip.RoundId);
+            ObserveActivitySpeech(pendingClip.ProcessUnit, "playing");
             QueueRoomSpeechTranslation(pendingClip.RoomState, responseGeneration, text);
-            m_CurrentlyPlayingText = text;  //Interrupt时按播放比例切这一段
+            m_CurrentlyPlayingText = text;  // 中断时保留候选与采样进度，不假定字词对齐。
             if (firstChunk)
             {
                 //首句出声时才清空"正在思考中..."
@@ -6581,6 +6595,7 @@ public partial class ChatSample : MonoBehaviour
             if (!IsAISpeaking || responseGeneration != m_FormalResponseGeneration ||
                 m_AudioSource == null || m_AudioSource.clip != clip) yield break;
             m_AssistantHeardText.Append(text);
+            ObserveActivitySpeech(pendingClip.ProcessUnit, "completed");
             RecordRoomSpeechPlayed(pendingClip.RoomState, text);
             RecordReviewedGoalAnswerPlayedChunk(responseGeneration, text);
             m_CurrentlyPlayingText = "";
@@ -6730,23 +6745,12 @@ public partial class ChatSample : MonoBehaviour
             || m_SentenceBuffer.Length > 0 || m_PendingChunks.Count > 0 || m_PendingClips.Count > 0;
         if (!hasResponseWork) return;
 
-        //当前正在播的那一chunk按音频时长比例算听到了多少字
+        // Sample progress has no word alignment. Preserve the interrupted
+        // candidate separately; never invent a completed textual prefix.
         if (m_AudioSource != null && m_AudioSource.clip != null && m_AudioSource.clip.length > 0f
             && !string.IsNullOrEmpty(m_CurrentlyPlayingText))
         {
-            float duration = m_LatencyFillerPlayed
-                ? Mathf.Max(0.1f, m_LatencyFillerDuration)
-                : m_FormalBufferedClip != null && m_AudioSource.clip == m_FormalBufferedClip
-                ? m_FormalBufferedClip.length
-                : m_ChatSettings.m_TextToSpeech.SupportsStreamingPlayback
-                ? Mathf.Max(0.5f, m_CurrentlyPlayingText.Length * Mathf.Max(0.08f, m_WordWaitTime))
-                : m_AudioSource.clip.length;
-            float fraction = Mathf.Clamp01(m_AudioSource.time / duration);
-            int charsHeard = Mathf.FloorToInt(m_CurrentlyPlayingText.Length * fraction);
-            if (charsHeard > 0)
-            {
-                m_AssistantHeardText.Append(m_CurrentlyPlayingText.Substring(0, charsHeard));
-            }
+            RecordActivityInterruption(m_CurrentlyPlayingText, "user-interrupted");
         }
 
         InvalidateFormalResponse("barge-in");
@@ -9364,7 +9368,7 @@ public partial class ChatSample : MonoBehaviour
             return;
         }
         //角色还在说话(<continue/>链上一帧还没收尾) → 让流水线走完再排
-        if (IsAISpeaking || m_AgentRoundInFlight || m_FormalResponseInFlight || IsVoiceOutputPlaying)
+        if (IsAISpeaking || m_AgentRoundInFlight || m_FormalResponseInFlight || IsVoiceOutputPlaying || m_ActivityRequestPending)
         {
             if (m_LogAgentLoop) Debug.Log($"[Agent] FireTick 排队等待(speaking={IsAISpeaking}, inflight={m_AgentRoundInFlight})");
             ScheduleNextTick(m_MinTickSec, triggerReason);
@@ -9601,6 +9605,7 @@ public partial class ChatSample : MonoBehaviour
             GetSkillRouteState("singing").ActiveThisRound || m_NoSingingWorkContinuations > 0)
             sb.Append(BuildSingingExecutionSnapshot());
         sb.Append(m_WorkProgressFact);
+        sb.Append(BuildActivityFeedbackContext());
         sb.Append("\n[视觉关注与行动事实] " + BuildSceneActionFacts().ToString(Newtonsoft.Json.Formatting.None));
         sb.Append("\n[时间与活动状态] " + SceneTimeContextJson);
         var pendingCaptureSense = m_ChatSettings?.m_SpeechToText as SenseVoiceSpeechToText;

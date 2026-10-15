@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -331,6 +331,9 @@ public partial class ChatQW
         string contract = review ? (eventReview ? SpeechEventBindingProtocol.ReviewContract + RoomSpeechEventEvidenceProtocol.ReviewContract : RoomTaskProtocol.ReviewContract) : (bodyFocused ? (bodyContinuation ? BodyContinuationPlanningContract : BodyPlanningContract) : RoomTaskProtocol.DecisionContract) +
             (schema.Contains("\"taskStep\"") ? RoomTaskSequenceProtocol.Contract : "");
         if (failureReview) contract = RoomTaskProtocol.PlanningFailureReviewContract;
+        if (review && schema.Contains("\"answerCoverage\"")) contract = ReplyAnswerObligationProtocol.ReviewContract +
+            ReplyAnswerObligationProtocol.Contract + (schema.Contains("\"eventBindings\"") ? SpeechEventBindingProtocol.ReviewContract : "") +
+            (failureReview ? RoomTaskProtocol.PlanningFailureReviewContract : "");
         if (review && !eventReview && schema.Contains("\"eventOrderConsistency\""))
             contract = RoomSpeechEventEvidenceProtocol.EventOrderContract + contract;
         if (!review && AutonomyPremiseProtocol.Required(input)) contract = AutonomyPremiseProtocol.Contract + "\n" + contract;
@@ -345,7 +348,7 @@ public partial class ChatQW
             contract = RoomSpeechPartsProtocol.Contract + "\n\n" + contract;
         var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
         sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":").Append(review ?
-            (schema.Contains("\"eventBindings\"") ? 640 : schema.Contains("\"targetConsistency\"") ? 480 : 240) : 640);
+            (schema.Contains("\"eventBindings\"") || schema.Contains("\"answerCoverage\"") ? 640 : schema.Contains("\"targetConsistency\"") ? 480 : 240) : 640);
         sb.Append(",\"response_format\":{\"type\":\"json_object\"");
         if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(review ? schema : RoomTaskProtocol.CompactNativeDecisionSchema(schema));
         sb.Append("},\"messages\":[");
@@ -355,11 +358,13 @@ public partial class ChatQW
         string schemaText = !review && m_Backend == BackendType.Local
             ? "[Native decision field guide]\n" + (bodyFocused ?
                 "intent: approach|follow|stop-moving|none; origin: user|none; evidence: exact current-utterance quote, at most 160 characters; replyScope: ordinary|spatial for none. Task sequence fields, when required by the schema, still follow the full task coverage contract. Omit unrelated execution fields." :
-                BuildRoomDecisionFieldGuide(schema)) : schema;
+                BuildRoomDecisionFieldGuide(schema)) : review && m_Backend == BackendType.Local ?
+                RoomTaskProtocol.CompactDecisionFieldGuide(JObject.Parse(schema)) : schema;
         if (bodyFocused && !bodyContinuation) contract += "\n最后核对：currentRequestSemantics只是前置分类，即使requestKind=action也可能判断错；执行授权必须来自当前完整原话的外层真实意图。" +
             "复述、转述、引用或询问过去指令，不是现在要求执行引号内/被转述的动作。此时taskPlan=[]，taskCoverage逐字覆盖原话为context/answer，taskStep=null，intent=none，origin=none，evidence为空。" +
             "若确有当前身体动作要求，则其步骤必须实际列在taskPlan中，taskStep引用已列步骤；不能输出空计划却引用s1。先判断外层意图，再按当前仍有效的请求拆步。";
-        AppendMessage(sb, new SendData("system", contract + "\n" + schemaText)); sb.Append(',');
+        AppendMessage(sb, new SendData("system", contract + "\n" + schemaText +
+            (review ? "\n" + SpeechActScopeProtocol.ReviewContract : ""))); sb.Append(',');
         if (review && !eventReview && !failureReview && schema.Contains("\"targetComparison\""))
         { AppendMessage(sb, new SendData("system", RoomTaskProtocol.SpeechTargetComparisonContract)); sb.Append(','); }
         if (review && !eventReview && ReadRoomTaskRecoveryJson(input)["replyPurpose"] is JObject)
@@ -413,7 +418,22 @@ public partial class ChatQW
                 count++;
             }
         }
-        AppendMessage(sb, new SendData("user", input ?? "") { imageDataUrl = imageDataUrl });
+        string wireInput = input;
+        if (bodyFocused || review && purposeInput?["workResultFacts"] is JObject)
+        {
+            // Share only exactly equal subtrees in these receipt/body consumers.
+            // Keep the original input for all local checks and final user intent.
+            wireInput = SceneFactContextCompactor.CompactJson(input, out var sharing);
+            if (sharing.applied)
+            {
+                AppendMessage(sb, new SendData("system", SceneFactContextCompactor.JsonSharingContract)); sb.Append(',');
+                Debug.Log("[Room/PurposeFactSharing] " + new JObject { ["purpose"] = bodyFocused ? "current-user-body" : "work-result-review",
+                    ["beforeCharacters"] = sharing.beforeCharacters, ["afterCharacters"] = sharing.afterCharacters,
+                    ["references"] = sharing.references, ["roundTripVerified"] = sharing.roundTripVerified,
+                    ["engineMemoryMutated"] = false }.ToString(Formatting.None));
+            }
+        }
+        AppendMessage(sb, new SendData("user", wireInput ?? "") { imageDataUrl = imageDataUrl });
         if (failureReview) {
             sb.Append(',');AppendMessage(sb,new SendData("system",
                 "Judge whether the SPOKEN CLAIMS match the RECEIPTS, not whether the requested task succeeded. " +

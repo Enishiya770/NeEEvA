@@ -53,6 +53,7 @@ public partial class ChatSample
             ["currentRoomTask"] = PrivateProgressResultFacts(BuildWorkRoomCompletionObservation()),
             ["priorTaskResults"] = PrivateProgressResultFacts(BuildMovementPriorResults()),
             ["lastPublicReply"] = BuildAttentionInteractionTime(),
+            ["processFeedback"] = m_LastActivityFeedback?.DeepClone(),
             ["interaction"] = new JObject {
                 ["userSpeaking"] = m_UserSpeechActiveForAutonomy, ["lastFocus"] = m_LastFocus,
                 ["secondsSinceUser"] = m_LastUserTurnTime > 0 ? (float?)(Time.realtimeSinceStartup - m_LastUserTurnTime) : null,

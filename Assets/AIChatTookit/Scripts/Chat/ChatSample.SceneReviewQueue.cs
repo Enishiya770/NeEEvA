@@ -12,6 +12,7 @@ public partial class ChatSample
         "先在 work_evidence 逐项对照完整原请求里的问题/结果说明与 completedPlaybackText 的逐字引句，再选择状态。" +
         "工具已返回信息不等于角色已将该信息告诉用户；不得把工具字段或生成稿倒填为已播台词。" +
         "currentOutputDrained/playbackStatus 只证明所列文字播完，不证明所有问题都回答了。找不到答案的已播引句时，该独立答案仍欠交付。" +
+        "若独立问题的所问事实没有可用证据，已明确告知‘无法确认是否发生’也是已交付答案；未知的世界状态不是未完成的回答，不得要求编造一个肯定/否定结果或反复说明同一未知。" +
         "已播出的答案无需补说；真实未完步骤和失败说明仍保留。本次只做私人进度判定，不执行或发声。]";
 
     private string BuildPlaybackHandoffWorkReviewPrompt(SceneVisionObservation observation, out bool needsImage)
@@ -319,6 +320,7 @@ public partial class ChatSample
 
     private bool CanBeginScenePlaybackReview(string reason)
     {
+        if (m_ActivityRequestPending) return false;
         var room = GetComponent<ArdyRoomDialogueBridge>();
         return m_EnableAutonomyIntentProbe && m_ScenePlaybackReview == null && !m_AutonomyProbeInFlight &&
             m_AgentRunning && !m_AgentGracefulShutdownPending && isActiveAndEnabled && !m_SceneTimePaused &&
@@ -445,7 +447,7 @@ public partial class ChatSample
     {
         var value = m_ScenePlaybackReview;
         if (value?.resume == null || value.resuming || !ScenePlaybackReviewCurrent(value)) return false;
-        if (m_AgentRoundInFlight || m_FormalResponseInFlight || m_AutonomyProbeInFlight || IsAISpeaking || IsVoiceOutputPlaying)
+        if (m_AgentRoundInFlight || m_FormalResponseInFlight || m_AutonomyProbeInFlight || IsAISpeaking || IsVoiceOutputPlaying || m_ActivityRequestPending)
             return false;
         if (m_TextOutputDrainedGeneration != value.formalGeneration) return false;
         if (DiscardChangedScenePlaybackFacts(value)) return true;

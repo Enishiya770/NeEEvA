@@ -13,6 +13,21 @@ public partial class ChatSample
     private readonly List<string> m_WorkCompletedSpeech = new List<string>();
     private readonly Dictionary<string, string> m_WorkResultPlaybackText = new Dictionary<string, string>();
 
+    // Work ownership outlives a single response generation. Questions are
+    // reporting obligations only and cannot authorize any action.
+    private JArray ReadWorkAnswerObligations(bool pendingOnly)
+    {
+        EnsureWorkDeliveryOwner();
+        var semantics = m_WorkRequestSemantics;
+        if (semantics == null || (int?)semantics["workEpoch"] != m_WorkEpoch ||
+            (int?)semantics["userTurn"] != m_ActionConstraints.CurrentUserTurn ||
+            (string)semantics["currentUserText"] != m_ActionConstraints.CurrentUserText ||
+            m_WorkRequestSemanticsModel != m_ChatSettings?.m_ChatModel) return new JArray();
+        var questions = ReplyAnswerObligationProtocol.FromSemantics(m_ActionConstraints.CurrentUserText, semantics);
+        return new JArray(questions.OfType<JObject>().Where(q => !pendingOnly ||
+            !m_WorkDeliveredResults.ContainsKey((string)ReplyAnswerObligationProtocol.DeliveryResult(q)["id"])));
+    }
+
     private void EnsureWorkDeliveryOwner()
     {
         if (m_WorkDeliveryEpoch == m_WorkEpoch && m_WorkDeliveryTurn == m_ActionConstraints.CurrentUserTurn &&
@@ -66,6 +81,8 @@ public partial class ChatSample
         Tool("practiceDrop", m_PracticeDropResultPending, m_LastPracticeDropResult);
         Tool("practiceEdit", m_PracticeEditResultPending, m_LastPracticeEditResult);
         Tool("humBack", m_HumBackResultPending, m_LastHumBackResult);
+        foreach (var question in ReadWorkAnswerObligations(false).OfType<JObject>())
+            results.Add(ReplyAnswerObligationProtocol.DeliveryResult(question));
         foreach (var result in results.OfType<JObject>())
         {
             // The canonical sequence already carries the full immutable receipt.
@@ -74,15 +91,13 @@ public partial class ChatSample
             if (((string)result["source"]).StartsWith("step:", StringComparison.Ordinal))
             {
                 var facts = (JObject)result["facts"];
-                var receiptFacts = facts["receipt"] as JObject;
-                result["facts"] = PickRoomFields(facts, "id", "kind", "actionId", "goalId", "desiredState");
-                result["facts"]["outcome"] = PickRoomFields(receiptFacts,
-                    "phase", "status", "reason", "observedUtc", "stateChanged", "entityId");
+                result["facts"] = WorkResultDeliveryProtocol.StepSummary(facts);
                 result["canonicalReceipt"] = "taskSequence.steps[" + (string)facts["id"] + "].receipt";
             }
             bool delivered = m_WorkDeliveredResults.TryGetValue((string)result["id"], out string quote);
             result["delivered"] = delivered; result["deliveredQuote"] = delivered ? quote : "";
             result["hasCompletedPlaybackAfterResult"] = m_WorkResultPlaybackText.ContainsKey((string)result["id"]);
+            result["completedPlaybackText"] = m_WorkResultPlaybackText.TryGetValue((string)result["id"], out var versionSpeech) ? versionSpeech : "";
         }
         string played = string.Concat(m_WorkCompletedSpeech);
         // Historical formal receipts remain in the work facts. Without a bound
@@ -95,15 +110,24 @@ public partial class ChatSample
     private bool ApplyWorkDelivery(AutonomyIntentDecision decision, JObject sequence)
     {
         var delivery = ReadWorkDelivery(); var results = (JArray)delivery["results"];
+        var checks = new JArray();
         foreach (var report in decision.delivery_reports ?? new WorkResultDeliveryProtocol.Report[0])
         {
+            if (report == null) { checks.Add(new JObject { ["rejection"] = "report-missing" }); continue; }
             var result = results.OfType<JObject>().FirstOrDefault(r => (string)r["id"] == report.id);
             m_WorkResultPlaybackText.TryGetValue(report.id ?? "", out string completedForVersion);
-            if (!WorkResultDeliveryProtocol.Covers(result, report, completedForVersion)) continue;
+            string rejection = WorkResultDeliveryProtocol.CoverageRejection(result, report, completedForVersion);
+            checks.Add(new JObject { ["id"] = report.id, ["quote"] = report.quote, ["comparison"] = report.comparison, ["coverage"] = report.coverage,
+                ["source"] = result?["source"]?.DeepClone(), ["accepted"] = rejection == null, ["rejection"] = rejection,
+                ["completedPlaybackForVersion"] = completedForVersion ?? "" });
+            if (rejection != null) continue;
             m_WorkDeliveredResults[report.id] = report.quote;
             result["delivered"] = true; result["deliveredQuote"] = report.quote;
             AcknowledgeDeliveredToolResult((string)result["source"]);
         }
+        foreach (var result in results.OfType<JObject>().Where(r => (bool?)r["delivered"] != true &&
+            !(decision.delivery_reports ?? new WorkResultDeliveryProtocol.Report[0]).Any(row => row?.id == (string)r["id"])))
+            checks.Add(new JObject { ["id"] = result["id"].DeepClone(), ["source"] = result["source"].DeepClone(), ["rejection"] = "report-missing" });
         if (WorkResultDeliveryProtocol.IsSettledActionQuote(decision.remaining_request_quote, sequence,
             results.OfType<JObject>().Where(r => (bool?)r["delivered"] == true).Select(r => (string)r["source"])))
             decision.remaining_request_quote = "";
@@ -127,6 +151,7 @@ public partial class ChatSample
         Debug.Log("[Work/ResultDelivery] " + new JObject { ["workEpoch"] = m_WorkEpoch,
             ["userTurn"] = m_ActionConstraints.CurrentUserTurn, ["settled"] = settled,
             ["remainingRequestQuote"] = decision.remaining_request_quote ?? "", ["results"] = results,
+            ["reports"] = JArray.FromObject(decision.delivery_reports ?? new WorkResultDeliveryProtocol.Report[0]), ["coverageChecks"] = checks,
             ["scope"] = "Execution outcomes unchanged; only completed spoken coverage is settled." }.ToString(Formatting.None), this);
         return settled;
     }
