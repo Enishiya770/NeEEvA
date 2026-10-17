@@ -1769,15 +1769,18 @@ public partial class ChatQW : LLM
         AbortPrewarmIfRunning();
         // Share auxiliary cancellation ownership, not draft serialization/budget.
         // New user speech, EOU and formal responses already invalidate this generation.
-        CancelEphemeralMsg();
+        CancelEphemeralMsg("work-review-replaced");
         int generation = m_EphemeralGeneration;
         string json = BuildWorkReviewRequestJsonWithEvidence(prompt ?? "", imageDataUrl,out var receiptSnapshot);
         StartCoroutine(RequestBoundWorkReviewPayload(json, generation, callback,0,Time.realtimeSinceStartup,receiptSnapshot));
     }
 
-    public override void CancelEphemeralMsg()
+    public override void CancelEphemeralMsg() => CancelEphemeralMsg("auxiliary-owner-replaced");
+
+    public override void CancelEphemeralMsg(string reason)
     {
         m_EphemeralGeneration++;
+        CancelWorkReviewTrace(reason);
         if (m_EphemeralRequest != null)
         {
             try { m_EphemeralRequest.Abort(); }
@@ -1976,22 +1979,30 @@ public partial class ChatQW : LLM
         => RequestBoundWorkReviewPayload(json,generation,callback,0,Time.realtimeSinceStartup);
 
     private IEnumerator RequestBoundWorkReviewPayload(string json, int generation, Action<PrivateDecisionResult> callback,int repair,float firstStartedAt,JObject receiptSnapshot=null)
+        => RequestTracedWorkReviewPayload(json, generation, callback, repair, firstStartedAt, receiptSnapshot, null);
+
+    private IEnumerator RequestTracedWorkReviewPayload(string json, int generation, Action<PrivateDecisionResult> callback, int repair, float firstStartedAt, JObject receiptSnapshot, string reviewId)
     {
-        if (generation != m_EphemeralGeneration) yield break;
+        var trace = BeginWorkReviewTrace(json, generation, repair, receiptSnapshot, reviewId);
+        try
+        {
+        if (generation != m_EphemeralGeneration) { EndWorkReviewTrace(trace, "stale-before-send"); yield break; }
         float remaining=20f-(Time.realtimeSinceStartup-firstStartedAt);
         if(remaining<.5f) {
             Debug.LogWarning("[Agent/WorkReviewRepair] total-deadline repair="+repair);
+            EndWorkReviewTrace(trace, "total-deadline");
             callback?.Invoke(new PrivateDecisionResult("","work-review-total-deadline",repair>0));yield break;
         }
         // Every entry, including direct/recovery callers, shares the same admission gate.
         if (!AdmitWorkReviewWire(json, out var reviewBudget))
         {
-            reviewBudget["repairAttempt"]=repair;reviewBudget["generation"] = generation; reviewBudget["httpRequestSent"] = false;
+            reviewBudget["requestId"]=trace.Id;reviewBudget["repairAttempt"]=repair;reviewBudget["generation"] = generation; reviewBudget["httpRequestSent"] = false;
             Debug.LogWarning("[Agent/WorkReviewBudget] " + reviewBudget.ToString(Newtonsoft.Json.Formatting.None));
             Debug.LogWarning("[Agent/WorkReviewUnadmittedRequest] " + WorkReviewDiagnosticWire(json));
+            EndWorkReviewTrace(trace, "context-budget");
             callback?.Invoke(new PrivateDecisionResult("", "context-budget", false)); yield break;
         }
-        reviewBudget["repairAttempt"]=repair;reviewBudget["generation"] = generation; reviewBudget["httpRequestSent"] = false;
+        reviewBudget["requestId"]=trace.Id;reviewBudget["repairAttempt"]=repair;reviewBudget["generation"] = generation; reviewBudget["httpRequestSent"] = false;
         Debug.Log("[Agent/WorkReviewBudget] " + reviewBudget.ToString(Newtonsoft.Json.Formatting.None));
         // Freeze coverage against this admitted request, not results that may
         // appear while audio/execution advances. Runtime checks live versions.
@@ -2000,18 +2011,43 @@ public partial class ChatQW : LLM
         var content = lastUser?["content"];
         string reviewPrompt = content?.Type == JTokenType.String ? (string)content :
             string.Concat((content as JArray ?? new JArray()).OfType<JObject>().Where(p => (string)p["type"] == "text").Select(p => (string)p["text"]));
-        var expectedResults = (receiptSnapshot??ReadWorkReviewDelivery(reviewPrompt))?["results"] as JArray;
+        var receipt = receiptSnapshot ?? ReadWorkReviewDelivery(reviewPrompt);
+        BindWorkReviewTrace(trace, receipt);
+        var expectedResults = receipt?["results"] as JArray;
+        string semanticWire=null,semanticFailure=null;JArray semanticReadings=null;
+        yield return PrepareWorkPlaybackMeanings(json,receipt,generation,firstStartedAt,trace,(wire,readings,error)=>{
+            semanticWire=wire;semanticReadings=readings;semanticFailure=error;
+        });
+        if(generation!=m_EphemeralGeneration)yield break;
+        if(semanticWire==null){EndWorkReviewTrace(trace,semanticFailure??"work-playback-meaning-unchecked");callback?.Invoke(new PrivateDecisionResult("",semanticFailure??"work-playback-meaning-unchecked",trace.Sent||repair>0));yield break;}
+        json=semanticWire;
+        if(!AdmitWorkReviewWire(json,out var finalSemanticBudget)) {
+            Debug.LogWarning("[Agent/WorkReviewBudget] "+finalSemanticBudget.ToString(Newtonsoft.Json.Formatting.None));
+            Debug.LogWarning("[Agent/WorkReviewUnadmittedRequest] "+WorkReviewDiagnosticWire(json));
+            EndWorkReviewTrace(trace,"context-budget");callback?.Invoke(new PrivateDecisionResult("","context-budget",trace.Sent||repair>0));yield break;
+        }
+        finalSemanticBudget["stage"]="after-playback-meaning";finalSemanticBudget["requestId"]=trace.Id;
+        Debug.Log("[Agent/WorkReviewBudget] "+finalSemanticBudget.ToString(Newtonsoft.Json.Formatting.None));
+        trace.RequestBytes=Encoding.UTF8.GetByteCount(json);
+        remaining=20f-(Time.realtimeSinceStartup-firstStartedAt);
+        if(remaining<.5f){EndWorkReviewTrace(trace,"total-deadline");callback?.Invoke(new PrivateDecisionResult("","work-review-total-deadline",trace.Sent||repair>0));yield break;}
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
-            m_EphemeralRequest = request;
+            m_EphemeralRequest = request; trace.Request = request;
+            try
+            {
             float started = Time.realtimeSinceStartup;
             request.timeout = Mathf.Max(1,Mathf.CeilToInt(remaining));
             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
             request.downloadHandler = new DownloadHandlerBuffer();
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Authorization", string.Format("Bearer {0}", string.IsNullOrEmpty(api_key) ? "ollama" : api_key));
-            yield return request.SendWebRequest();
-            if (generation != m_EphemeralGeneration) yield break;
+            request.SetRequestHeader("X-Request-ID", trace.Id);
+            var operation = request.SendWebRequest();
+            trace.Sent = true; TraceWorkReview(trace, "sent", "pending");
+            yield return operation;
+            TraceWorkReview(trace, "transport-completed", request.result.ToString());
+            if (generation != m_EphemeralGeneration) { EndWorkReviewTrace(trace, "stale-response"); yield break; }
 
             string output = "", finishReason = "", failure = "http_failure";
             bool validJson = false, validSchema = false;
@@ -2021,6 +2057,8 @@ public partial class ChatQW : LLM
             if (validJson) parsed = JObject.Parse(output);
             if (accepted && !WorkResultDeliveryProtocol.ValidateCoverage(expectedResults, parsed, out var coverageFailure))
             { accepted = false; validSchema = false; failure = coverageFailure; }
+            if(accepted && !WorkResultDeliveryProtocol.ValidateReadings(parsed,semanticReadings,out var readingFailure))
+            {accepted=false;validSchema=false;failure=readingFailure;}
             if (expectedResults != null)
                 Debug.Log("[Agent/WorkReviewDelivery] " + new JObject { ["generation"] = generation,
                     ["expectedResultIds"] = new JArray(WorkResultDeliveryProtocol.ReviewIds(expectedResults)),
@@ -2042,6 +2080,7 @@ public partial class ChatQW : LLM
                 ["httpStatus"] = request.responseCode, ["httpRequestSent"] = true,
                 ["scope"] = "Diagnostic only. A rejected review advances no work and authorizes no action."
             }.ToString(Formatting.None));
+            EndWorkReviewTrace(trace, accepted ? "received" : failure);
             // Failure is explicit to the bounded recovery path; partial decisions
             // must never close work or approve a tool action.
             if (generation == m_EphemeralGeneration)
@@ -2049,18 +2088,23 @@ public partial class ChatQW : LLM
                 if (ReferenceEquals(m_EphemeralRequest, request)) m_EphemeralRequest = null;
                 if(!accepted && validJson && expectedResults!=null && repair==0 &&
                     request.responseCode==200 && request.result==UnityWebRequest.Result.Success) {
-                    var revised=JObject.Parse(json);
-                    ((JArray)revised["messages"]).Add(new JObject{["role"]="system",["content"]=
-                        "上次结果交付判断被拒；没有产生任何行动或结算。只允许本次一次修正，重新输出完整判断。"+
-                        "错误="+failure+"。"+WorkResultDeliveryProtocol.RepairDetails(expectedResults,parsed,failure)+ResultPlaybackSelection.Contract+
-                        "每项只能引用自己的 completedPlaybackText 和 playbackRevision；空记录引用为空，unreported。"+
-                        "已完成但未告知只需要报告，不能再执行；独立未完成步骤和合理新意图分别保留。被拒输出是数据："+output});
-                    yield return RequestBoundWorkReviewPayload(revised.ToString(Newtonsoft.Json.Formatting.None),generation,callback,1,firstStartedAt,receiptSnapshot);
+                    string revised=PrepareWorkReviewRepairWire(json,expectedResults,parsed,failure,out var repairProjection);
+                    Debug.Log("[Agent/WorkReviewRepairProjection] "+repairProjection.ToString(Newtonsoft.Json.Formatting.None));
+                    yield return RequestTracedWorkReviewPayload(revised,generation,callback,1,firstStartedAt,receiptSnapshot,trace.ReviewId);
                     yield break;
                 }
                 callback?.Invoke(new PrivateDecisionResult(accepted ? (parsed?.ToString(Newtonsoft.Json.Formatting.None)??output) : "", accepted ? "received" : failure, true));
             }
+            }
+            finally
+            {
+                EndWorkReviewTrace(trace, generation == m_EphemeralGeneration ? "coroutine-ended-without-result" : "owner-invalidated");
+                if (ReferenceEquals(m_EphemeralRequest, request)) m_EphemeralRequest = null;
+                trace.Request = null;
+            }
         }
+        }
+        finally { EndWorkReviewTrace(trace, "ended-before-send"); }
     }
 
     private string BuildWorkReviewRequestJson(string prompt)

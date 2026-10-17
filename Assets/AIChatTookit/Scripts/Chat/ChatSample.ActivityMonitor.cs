@@ -27,9 +27,11 @@ public partial class ChatSample
     private JObject m_LastInterruptedSpeechEvidence;
     private string m_ActivityLatePlaybackPrefix = "";
     private readonly ActivityMonitorAttempts m_ActivityAttempts = new ActivityMonitorAttempts();
+    private readonly ActivityCompletedCheckCache m_ActivityCompletedChecks=new ActivityCompletedCheckCache();
     private string m_ActivityPendingKey;
     private JObject m_ActivityPendingFrame;
     private string m_ActivityLastPurpose;
+    private float m_ActivityScheduleLogAt;
     private JObject m_ActivityReplyObservation;
     private int m_ActivityReplyObservationGeneration=-1, m_ActivityPublishedGeneration=-1;
     private int m_ActivityPlanningFailureReportedGeneration=-1;
@@ -42,14 +44,16 @@ public partial class ChatSample
     {
         public Func<JObject> Read;
         public Func<string, string, bool> Stop;
+        internal int Registration;
     }
     public void RegisterMonitoredActivity(string key, MonitoredActivity activity)
     {
         if(string.IsNullOrEmpty(key)||activity?.Read==null)throw new ArgumentException("Activity requires a stable key and observation reader.");
         m_RegisteredActivities[key]=activity;
-        ++m_RegisteredActivityRevision;
+        activity.Registration = ++m_RegisteredActivityRevision;
+        SnapshotActivityOrigins();
     }
-    public void UnregisterMonitoredActivity(string key) { if(key!=null && m_RegisteredActivities.Remove(key))++m_RegisteredActivityRevision; }
+    public void UnregisterMonitoredActivity(string key) { if(key!=null && m_RegisteredActivities.Remove(key)) {++m_RegisteredActivityRevision;ForgetOtherActivityOrigins(key,null);} }
 
     private string ActivityBinding()
     {
@@ -63,10 +67,13 @@ public partial class ChatSample
 
     private bool ActivityMonitoringAvailable => m_EnableActivityMonitor && m_ChatSettings?.m_ChatModel?.SupportsActivityMonitor==true;
     private void CancelActivityMonitoring(bool clearSpeech = false)
+        => CancelActivityMonitoringForReason(clearSpeech,"owner-or-activity-reset");
+    private void CancelActivityMonitoringForReason(bool clearSpeech,string reason)
     {
         ++m_ActivityRequestSerial;m_ActivityRequestPending=false;
-        m_ActivityModel?.CancelActivityMonitor();m_ActivityModel=null;
-        if(clearSpeech) {m_ActivitySpeech.Clear();m_ActivityReviewed.Clear();m_ActivityReviewOrder.Clear();m_ActivityAttempts.Clear();m_ActivityGeneration=-1;m_ActivityLatePlaybackPrefix="";}
+        m_ActivityModel?.CancelActivityMonitorForReason(reason);m_ActivityModel=null;
+        if(clearSpeech) {m_ActivitySpeech.Clear();m_ActivityReviewed.Clear();m_ActivityReviewOrder.Clear();m_ActivityAttempts.Clear();m_ActivityCompletedChecks.Clear();m_ActivityGeneration=-1;m_ActivityLatePlaybackPrefix="";}
+        if(clearSpeech)m_ActivityMeanings.Clear();
     }
     private void RecordActivityInterruption(string text, string source)
     {
@@ -101,6 +108,7 @@ public partial class ChatSample
         EnsureActivityOwner();
         var unit=new ActivityMonitorProtocol.SpeechUnit {Id="speech:"+m_FormalResponseGeneration+":"+(++m_ActivitySerial),
             Text=text,Language=language??"auto",IsCorrection=correction,QueuedAtRealtime=Time.realtimeSinceStartup,ObservedAtCreation=ActivitySpeechStartFacts()};
+        unit.LinguisticContext=new JArray(m_ActivitySpeech.Where(s=>s.State!="superseded"&&!s.IsCorrection).Reverse().Take(2).Reverse().Select(s=>s.Text));
         m_ActivitySpeech.Add(unit);
         if(!correction && SpeechText.NormalizeLanguage(language)!=null)m_ActivityDeliveryLanguage=language;
         BeginSpeechLanguageCheck(unit);
@@ -122,6 +130,8 @@ public partial class ChatSample
         facts["formalObservation"]=ActivityFormalObservation();
         facts.Remove("priorResults");
         facts["completedResultIds"]=new JArray(((JArray)ReadWorkDelivery()["results"]).OfType<JObject>().Select(r=>(string)r["id"]));
+        var inputResolution=ReadTranscriptClarificationEvidence();
+        if(inputResolution!=null)facts["inputResolutionEvent"]=PickRoomFields(inputResolution,"capture","recognitionOutcome","reliablyUnderstood");
         facts["scope"]=(started?"Frozen execution observations when audio started. ":"Frozen execution observations when this phrase was queued, before audio started. ")+
             "Not proof that its wording was true. Compare with current evidence; later changes do not erase past events.";
         ActivityEvidencePolicy.AddReceipts(facts,null,((JArray)ReadWorkDelivery()["results"]).OfType<JObject>());
@@ -212,6 +222,8 @@ public partial class ChatSample
                         ["observedAt"]=x.view.observation.CapturedAtRealtime,
                         ["scope"]="Prior observed description; not proof of current visibility or device state."}))}
         };
+        var clarification=ReadTranscriptClarificationEvidence();
+        if(clarification!=null)facts["input-resolution"]=clarification;
         foreach(var item in adapters) {
             JObject state=null;
             try{state=item.Value.Read();}catch(Exception error){Debug.LogWarning("[Activity/Observation] "+error.GetType().Name,this);}
@@ -235,7 +247,7 @@ public partial class ChatSample
             }
             state["cancellable"]=(bool?)state["cancellable"]==true && item.Value.Stop!=null;
             state["adapter"]=item.Key;actions.Add(state);
-            var task=ActivityTaskContext(state);
+            var task=ActivityTaskContextWithOrigin(state,item.Key);
             if(task!=null)state["task"]=task.DeepClone();
             facts["action:"+(string)state["id"]]=state.DeepClone();
         }
@@ -273,6 +285,8 @@ public partial class ChatSample
                     (string)field.Value["intent"]??(string)field.Value["kind"]??field.Name,(string)field.Value["actionId"]??(string)field.Value["id"]);
             if(field.Name.StartsWith("recalled:",StringComparison.Ordinal))
                 scopes[field.Name]=ActivityMonitorContextPolicy.Scope("history",(string)field.Value["assessment"]=="supported"?new[]{"mistake","uncertainty"}:new[]{"uncertainty"});
+            if(field.Name=="input-resolution")
+                scopes[field.Name]=ActivityMonitorContextPolicy.Scope("history","mistake","uncertainty");
         }
         // Source association is not image inspection. Prior positive object
         // descriptions cannot prove that an unlisted object is absent now.
@@ -370,31 +384,31 @@ public partial class ChatSample
     private void TickActivityMonitor()
     {
         if(!ActivityMonitoringAvailable || !isActiveAndEnabled || m_UserSpeechActiveForAutonomy || m_SceneTimePaused) {
-            if(m_ActivityRequestPending)CancelActivityMonitoring();return;
+            if(m_ActivityRequestPending)CancelActivityMonitoringForReason(false,m_UserSpeechActiveForAutonomy?"user-started-speaking":m_SceneTimePaused?"scene-paused":"monitor-unavailable");return;
         }
         EnsureActivityOwner();
+        ApplySharedWorkDeliveryEvidence();
         float now=Time.realtimeSinceStartup;
         if(m_ActivityRequestPending) {
             if(now>m_ActivityRequestDeadline) {
                 Debug.LogWarning("[Activity/Monitor] watchdog-timeout executionContinues=True",this);
                 if(m_ActivityPendingKey!=null)ActivityMonitorFailed(m_ActivityPendingKey,"watchdog-timeout",frame:m_ActivityPendingFrame);
-                CancelActivityMonitoring();
+                CancelActivityMonitoringForReason(false,"watchdog-timeout");
             }
             return;
         }
         if(now<m_ActivityNextPoll)return;
         m_ActivityNextPoll=now+1f;
         while(m_ActivityRequestTimes.Count>0&&now-m_ActivityRequestTimes.Peek()>60f)m_ActivityRequestTimes.Dequeue();
-        if(m_ActivityRequestTimes.Count>=12)return;
         var adapters=ActivityAdapters();
         var facts=ReadActivityFacts(adapters,out var actions);
         var delivery=ReadActivityDelivery();
-        var units=m_ActivitySpeech.Where(u=>u.State!="superseded" && !u.IsCorrection && !u.CorrectedAfterExposure && u.Corrections<2).ToList();
+        var units=m_ActivitySpeech.Where(u=>u.State!="superseded" && !u.IsCorrection && !u.CorrectedAfterExposure && u.Corrections<2 && ActivitySpeechReadyForSemanticCheck(u)).ToList();
         // Attend to current/next phrases and a bounded completed backlog. Later
         // queued words enter attention as playback advances; memory is retained.
         var speech=new JArray(units.Where(u=>u.State=="starting"||u.State=="playing"||u.State=="queued").Take(2).Select(ActivitySpeechWindow));
         foreach(var unit in units.Where(u=>u.State=="completed"||u.State=="interrupted").Take(48))speech.Add(ActivitySpeechWindow(unit));
-        foreach(var unit in units.Where(u=>m_ActivityVisualEvidence.ContainsKey(u.Id)))
+        foreach(var unit in units.Where(u=>HasActivityVisualEvidence(u.Id)))
             if(!speech.OfType<JObject>().Any(row=>(string)row["id"]==unit.Id))speech.Add(ActivitySpeechWindow(unit));
         // Delivery of one step cannot hide a simultaneous claim about another.
         if(actions.Count==0&&speech.Count==0&&delivery==null)return;
@@ -405,17 +419,29 @@ public partial class ChatSample
         if(delivery!=null)frame["delivery"]=delivery;
         // Each purpose has a small complete schema. Round-robin selection keeps
         // speech and delivery from starving live actions, even on failed frames.
-        var selected=ActivityEvidencePolicy.AttentionFrames(frame)
-            .OrderBy(f=>(string)f["purpose"]==m_ActivityLastPurpose?1:0)
-            .FirstOrDefault(f=>!m_ActivityReviewed.Contains(ActivityEvidencePolicy.SemanticKey(f)) &&
-                m_ActivityAttempts.CanAttempt(ActivityEvidencePolicy.SemanticKey(f),now));
+        var candidates=ActivityMeaningCandidates(frame)
+            .Where(f=>!m_ActivityCompletedChecks.Contains(f) && !m_ActivityReviewed.Contains(ActivityCheckKey(f)) &&
+                m_ActivityAttempts.CanAttempt(ActivityCheckKey(f),now)).ToArray();
+        var selected=candidates.OrderBy(f=>ActivityMonitorSchedulePolicy.Priority(f,m_ActivityLastPurpose))
+            .FirstOrDefault(f=>ActivityMonitorSchedulePolicy.RetryAt(m_ActivityRequestTimes,now,ActivityMonitorSchedulePolicy.Ceiling(f))<=now);
+        if(selected==null && candidates.Length>0 && now>=m_ActivityScheduleLogAt) {
+            m_ActivityScheduleLogAt=now+5f;
+            Debug.Log("[Activity/MonitorSchedule] "+new JObject{["reason"]="shared-rate-window",
+                ["attemptsInWindow"]=m_ActivityRequestTimes.Count,["totalLimit"]=12,
+                ["waiting"]=new JArray(candidates.GroupBy(f=>(string)f["purpose"]).Select(g=>new JObject{
+                    ["purpose"]=g.Key,["frames"]=g.Count(),["retryInSeconds"]=g.Min(f=>ActivityMonitorSchedulePolicy.RetryAt(m_ActivityRequestTimes,now,ActivityMonitorSchedulePolicy.Ceiling(f))-now)})),
+                ["executionContinues"]=true,["deliverySettled"]=false}.ToString(Formatting.None),this);
+        }
         if(selected==null)return;
         frame=selected;m_ActivityLastPurpose=(string)frame["purpose"];
-        string key=ActivityEvidencePolicy.SemanticKey(frame);
+        string key=ActivityCheckKey(frame);
         if(m_ActivityReviewed.Contains(key)||!m_ActivityAttempts.CanAttempt(key,now))return;
         var model=m_ChatSettings.m_ChatModel;
         int request=++m_ActivityRequestSerial,epoch=m_WorkEpoch,generation=m_FormalResponseGeneration,turn=m_ActionConstraints.CurrentUserTurn;
         frame["monitorRequestId"]=Guid.NewGuid().ToString("N");
+        bool reading=NeedsActivityMeaning(frame);
+        string meaningKey=reading?ActivitySpeechMeaningPolicy.Key(frame):null;
+        var meaningSource=reading?(JObject)frame.DeepClone():null;
         var feedback=m_ActivityAttempts.Feedback(key);
         if(feedback!=null && frame["delivery"] is JObject deliveryRetry &&
             new[]{"delivery-","playback-"}.Any(prefix=>((string)feedback["rejection"]??"").StartsWith(prefix,StringComparison.Ordinal))) {
@@ -425,12 +451,15 @@ public partial class ChatSample
             feedback["fieldRepair"]=ResultPlaybackSelection.Repair(deliveryRetry,previous?["delivery"] as JObject,
                 (string)feedback["rejection"],true);
         }
-        if(feedback!=null)frame["previousAttempt"]=feedback;
+        if(feedback!=null) {
+            if(reading)feedback["fieldRepair"]=ActivitySpeechMeaningPolicy.Rejection((string)feedback["rejectedVerdict"],ActivitySpeechMeaningPolicy.Input(frame));
+            frame["previousAttempt"]=feedback;
+        }
         string input,diagnostics;
         var before=ActivityMonitorContextPolicy.Sizes(frame);
         // Admission failures consume the same rate/attempt limits as wire sends.
         m_ActivityRequestTimes.Enqueue(now);
-        try {input=model.PrepareActivityMonitorFrame(ActivityMonitorContextPolicy.Project(frame,0).ToString(Formatting.None),out diagnostics);}
+        try {input=model.PrepareActivityMonitorFrame((reading?ActivitySpeechMeaningPolicy.Input(frame):ActivityMonitorContextPolicy.Project(frame,0)).ToString(Formatting.None),out diagnostics);}
         catch(Exception error) {ActivityMonitorFailed(key,"prepare-"+error.GetType().Name,frame:frame);return;}
         Debug.Log("[Activity/MonitorBudgetPlan] "+new JObject{["requestId"]=frame["monitorRequestId"],
             ["before"]=before,["projection"]=JObject.Parse(diagnostics)}.ToString(Formatting.None),this);
@@ -451,6 +480,21 @@ public partial class ChatSample
                 model!=m_ChatSettings?.m_ChatModel||binding!=ActivityBinding()||
                 m_UserSpeechActiveForAutonomy||m_SceneTimePaused||!isActiveAndEnabled)return;
             JObject decision=null;string rejection=status;
+            if(reading) {
+                JObject meaning=null;
+                bool valid=ok&&ActivitySpeechMeaningPolicy.TryRead(output,frame,out meaning);
+                Debug.Log("[Activity/SpeechMeaning] "+new JObject{["key"]=meaningKey,["requestId"]=frame["monitorRequestId"],
+                    ["accepted"]=valid,["raw"]=output,["scope"]="Literal interpretation only; execution and speech continue. No action or correction authority."}.ToString(Formatting.None),this);
+                if(!valid){ActivityMonitorFailed(key,"speech-meaning-unresolved",output,frame);return;}
+                if(m_ActivityMeanings.Count>=48)m_ActivityMeanings.Remove(m_ActivityMeanings.Keys.First());
+                m_ActivityMeanings[meaningKey]=meaning;
+                foreach(var claim in ActivitySpeechMeaningPolicy.Frames(meaningSource,meaning))
+                    if((string)claim["speechMeaning"]["act"]!="factual-claim")
+                        m_ActivityCompletedChecks.Remember(claim,new JObject{["speechAct"]=claim["speechMeaning"]["act"],
+                            ["speech"]=new JObject{["issue"]="none"}});
+                m_ActivityNextPoll=Time.realtimeSinceStartup;
+                return;
+            }
             if(!ok || !ActivityMonitorProtocol.TryRead(output,frame,out decision,out rejection)) {
                 ActivityMonitorFailed(key,rejection,output,frame);return;
             }
@@ -480,6 +524,7 @@ public partial class ChatSample
             // Only a successful checked frame enters the reviewed cache.
             while(m_ActivityReviewOrder.Count>=32)m_ActivityReviewed.Remove(m_ActivityReviewOrder.Dequeue());
             m_ActivityReviewed.Add(key);m_ActivityReviewOrder.Enqueue(key);
+            m_ActivityCompletedChecks.Remember(frame,decision);
             }
             if(!ConfirmActivityDeliveryLanguage(frame,decision["delivery"] as JObject,CompleteCheckedFrame,
                 failure=>ActivityMonitorFailed(key,failure,output,frame)))CompleteCheckedFrame();

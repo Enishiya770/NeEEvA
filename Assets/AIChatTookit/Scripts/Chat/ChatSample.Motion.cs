@@ -258,7 +258,7 @@ public partial class ChatSample
         ResetSingingPolicyReview("chat-disabled");
         ClearDeferredSingingRequest();
         SuspendSceneTime("chat-disabled");
-        CancelAutonomyIntentProbe();
+        CancelAutonomyIntentProbeForReason("chat-disabled");
         ResetSceneVision("chat-disabled", true);
         CancelClosedRoomPreparation("chat-disabled");
         m_LastMotionProtocolRejection = null;

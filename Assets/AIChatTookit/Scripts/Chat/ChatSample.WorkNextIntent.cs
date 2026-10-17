@@ -54,6 +54,7 @@ public partial class ChatSample
         if (sequence == null && CurrentWorkActionNeedsFailureDelivery()) m_WorkReplyOnly = true;
         if (m_WorkReplyOnly)
         {
+            RememberAfterDeliveryIntent(decision);
             // The executor's admitted next step also owns the writer's purpose.
             // Retaining a rejected retry as prose used to invite promises of an
             // adjustment/retry even though the action dispatcher correctly refused it.

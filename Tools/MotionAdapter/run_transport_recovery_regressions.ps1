@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$Output,
-    [ValidateSet('transport','feedback','room','cognition','speech-view','xr-lifecycle','device-sequence','work-loop','approach','preparation','approach-plan','private-review','quality-recovery','quality-speech','conversation-repair','stream-delay','arrival','stream-pure','control-recovery','follow-handoff','activity-monitor','activity-runtime','activity-handoff','activity-evidence','activity-continuity','task-handoff','spatial-recall','compound-delivery','lifecycle-grounding','routing-delivery','semantic-playback','clarification-delivery','result-autonomy','runtime-failure')][string]$Focus='transport',
+    [ValidateSet('transport','feedback','room','cognition','speech-view','xr-lifecycle','device-sequence','work-loop','approach','preparation','approach-plan','private-review','quality-recovery','quality-speech','conversation-repair','stream-delay','arrival','stream-pure','control-recovery','follow-handoff','activity-monitor','activity-runtime','activity-handoff','activity-evidence','activity-continuity','task-handoff','spatial-recall','compound-delivery','lifecycle-grounding','routing-delivery','semantic-playback','clarification-delivery','result-autonomy','runtime-failure','activity-origin','budget-delivery','semantic-window','playback-evidence','claim-playback')][string]$Focus='transport',
     [string]$LifecycleInput='',
     [string]$QualitySpeechInput='',
     [string]$ConversationRepairInput='',
@@ -90,6 +90,11 @@ elseif($Focus -eq 'spatial-recall') { $taskArguments+=@('-nevaSceneVisionOutput'
 elseif($Focus -eq 'compound-delivery') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-compoundDeliveryRuntime','1') }
 elseif($Focus -eq 'lifecycle-grounding') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput) }
 elseif($Focus -eq 'result-autonomy') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-resultAutonomyRuntime','1') }
+elseif($Focus -eq 'budget-delivery') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-budgetDeliveryRuntime','1') }
+elseif($Focus -eq 'claim-playback') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-claimPlaybackRuntime','1') }
+elseif($Focus -eq 'playback-evidence') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-playbackEvidenceRuntime','1') }
+elseif($Focus -eq 'semantic-window') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-semanticWindowRuntime','1') }
+elseif($Focus -eq 'activity-origin') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-activityOriginRuntime','1') }
 elseif($Focus -eq 'runtime-failure') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-runtimeFailureRuntime','1') }
 elseif($Focus -eq 'clarification-delivery') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-clarificationDeliveryRuntime','1') }
 elseif($Focus -eq 'semantic-playback') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-semanticPlaybackRuntime','1') }

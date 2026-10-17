@@ -28,6 +28,7 @@ public partial class ChatSample
         var search = BuildSceneSearchContext();
         var runtime = new JObject {
             ["version"] = "autonomy-runtime-v1", ["attention"] = attention, ["observedMemory"] = selected,
+            ["deferredWish"] = ReadAfterDeliveryIntent(),
             ["time"] = BuildSceneTimeContext(),
             ["work"] = new JObject {
                 ["open"] = m_WorkReviewOpen, ["status"] = m_WorkStatus, ["epoch"] = m_WorkEpoch,

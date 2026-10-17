@@ -215,10 +215,13 @@ public partial class ChatSample
             decision.next_step_id = ""; decision.next_intent_source = "none";
         }
         else if (WorkResultDeliveryProtocol.MustContinue(decision.work_status, results,
-            decision.remaining_request_quote, m_ActionConstraints.CurrentUserText))
+            decision.remaining_request_quote, m_ActionConstraints.CurrentUserText) ||
+            decision.work_status == "continue" && !decision.proceed && decision.next_intent_source == "current-work" &&
+            !HasWorkToolInFlight() && results.OfType<JObject>().Any(r => (bool?)r["delivered"] != true))
         {
             // A model closure cannot erase unplayed results or an independent answer.
             // Keep this continuation reply-only; this ledger never authorizes actions.
+            RememberAfterDeliveryIntent(decision);
             decision.work_status = "continue"; decision.proceed = true;
             decision.next_step_id = ""; decision.next_intent_source = "current-work";
             decision.planning_focus = "other";

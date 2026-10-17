@@ -191,6 +191,7 @@ public static class ActivityEvidencePolicy
     {
         var selected = new JObject { ["owner"] = frame["owner"]?.DeepClone(), ["purpose"] = frame["purpose"]?.DeepClone(),
             ["reviewOperation"]=frame["reviewOperation"]?.DeepClone(),
+            ["speechMeaning"]=frame["speechMeaning"]?.DeepClone(),["claimIndex"]=frame["claimIndex"]?.DeepClone(),
             ["delivery"] = frame["delivery"] == null ? null : new JObject { ["id"] = frame["delivery"]["id"],
                 ["playbackRevision"] = frame["delivery"]["playbackRevision"] },
             ["speech"] = new JArray((frame["speech"] as JArray ?? new JArray()).OfType<JObject>().Select(u =>
@@ -260,7 +261,8 @@ public static class ActivityEvidencePolicy
             ["required"] = new JArray("revision", "lastRelevantQuote", "finalDisposition"), ["properties"] = new JObject {
                 ["revision"] = result == null ? new JObject { ["type"] = "string", ["maxLength"] = 16 } : Fixed((string)result["playbackRevision"] ?? ""),
                 ["lastRelevantQuote"] = quotation,
-                ["finalDisposition"] = new JObject { ["type"] = "string", ["enum"] = new JArray("consistent", "retracted", "unresolved", "unreported") } } };
+                ["finalDisposition"] = new JObject { ["type"] = "string", ["enum"] = completed.Length==0?
+                    new JArray("unreported"):new JArray("consistent", "retracted", "unresolved", "unreported") } } };
     }
     public static string PlaybackRejection(JObject result, JObject proof, string quote, string completed)
     {

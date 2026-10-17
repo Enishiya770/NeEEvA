@@ -160,7 +160,10 @@ public static class RuntimeFailureRegression
         Check("only-owned-inactive-instructions-projected",((string)text["text"]).Contains("recent_actual_user_inputs")&&((string)text["text"]).Contains("previousUnfinishedWork")&&source!= (string)text["text"]);
         foreach(var r in ((JArray)fixture["history"]).OfType<JObject>().Where(r=>(string)r["role"]=="user"))
             Check("recorded-input-preserved-"+r["line"],source.Contains((string)r["text"])==((string)text["text"]).Contains((string)r["text"]));
-        Check("active-singing-keeps-goal-contract",WorkReviewInstructionProjection.Project(source.Replace("\"active_goal_unfinished\":false","\"active_goal_unfinished\":true"))==source.Replace("\"active_goal_unfinished\":false","\"active_goal_unfinished\":true"));
+        string activeSource=source.Replace("\"active_goal_unfinished\":false","\"active_goal_unfinished\":true");
+        // The new general delivery-tense instruction is appended; every byte
+        // of the active singing goal and its original instructions must remain.
+        Check("active-singing-keeps-goal-contract",WorkReviewInstructionProjection.Project(activeSource)==activeSource+WorkReviewInstructionProjection.ExecutionAndReportTense);
     }
     static JObject Variant(string operation,string text,string language)
     {

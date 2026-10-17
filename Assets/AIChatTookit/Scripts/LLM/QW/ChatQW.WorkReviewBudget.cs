@@ -30,6 +30,9 @@ public partial class ChatQW
         int human = prompt.IndexOf(k_FrameUserMarker, StringComparison.Ordinal);
         string tail = human < 0 ? "" : prompt.Substring(human);
         string facts = human < 0 ? prompt : prompt.Substring(0, human);
+        // The six-field opportunity contract must also match small packets;
+        // it is not an emergency budget-pressure behavior. Human tail is literal.
+        facts=WorkReviewInstructionProjection.Project(facts,true);
         long other = resident.Where(m => m != null).Sum(m => (long)EstimateRoomDecisionTextUnits(m.content));
         int ceiling = Math.Min(24000, Math.Max(4096, m_MaxPromptTokens));
         string projected = null; var attempts = new JArray();
@@ -42,7 +45,9 @@ public partial class ChatQW
             JObject attention = null;
             string source = CommittedSpatialReplyProtocol.ProducerContextMarker + "\n" + facts;
             projected = ProjectReplyFacts(source, Math.Min(pressure, 2), out var fields);
-            if(pressure>0)projected=ProjectPrivateAttention(projected,true,out attention);
+            // Purpose selection also applies to admitted packets with almost
+            // no headroom; it is not only emergency overflow recovery.
+            projected=ProjectPrivateAttention(projected,true,out attention);
             projected+=tail;
             long totalText = other + EstimateRoomDecisionTextUnits(projected);
             var wireBudget = measureWire?.Invoke(projected);
@@ -62,32 +67,80 @@ public partial class ChatQW
 
     private static string ProjectPrivateAttention(string prompt, bool interestOnly, out JObject diagnostic)
     {
-        prompt=WorkReviewInstructionProjection.Project(prompt);
+        prompt=WorkReviewInstructionProjection.ShareGoals(WorkReviewInstructionProjection.Project(prompt,interestOnly));
         // This is a progress packet, not an object/route-selection prompt. Read
         // complete producer documents; never rewrite quoted human evidence.
         string context = prompt.StartsWith(CommittedSpatialReplyProtocol.ProducerContextMarker+"\n",StringComparison.Ordinal)
             ? prompt : CommittedSpatialReplyProtocol.ProducerContextMarker + "\n" + prompt;
-        var blocks = ReadReplyFactBlocks(context, true);
-        // These documents are consumed together by one private request. Share
-        // equal typed subtrees across producers instead of carrying room/work/
-        // playback receipts repeatedly. Literal strings and unknown fields stay.
-        var shared=new Dictionary<string,(string path,JToken value)>();int sharedCount=0;
-        void Share(JToken value,string path) {
-            if(!(value is JContainer container))return;
-            string canonical=ActivityEvidencePolicy.Canonical(value).ToString(Formatting.None);
-            if(canonical.Length>=320 && value.Parent is JProperty) {
-                if(sharedCount<96 && shared.TryGetValue(canonical,out var existing) && JToken.DeepEquals(existing.value,value)) {
-                    value.Replace(new JObject{["privateFactRef"]=existing.path});sharedCount++;return;
-                }
-                if(!shared.ContainsKey(canonical))shared[canonical]=(path,value.DeepClone());
+        JArray priorPool=null;
+        const string poolMarker="\n[Private shared facts] ";
+        int poolStart=context.IndexOf(poolMarker,StringComparison.Ordinal);
+        if(poolStart>=0) {
+            int poolEnd=context.IndexOf('\n',poolStart+poolMarker.Length);
+            if(poolEnd<0)throw new JsonException("Unterminated private pool.");
+            using(var reader=new JsonTextReader(new System.IO.StringReader(context.Substring(poolStart+poolMarker.Length,poolEnd-poolStart-poolMarker.Length)))) {
+                reader.DateParseHandling=DateParseHandling.None;priorPool=JArray.Load(reader);
             }
-            if(value is JObject obj)foreach(var property in obj.Properties().ToArray())Share(property.Value,path+"/"+property.Name.Replace("~","~0").Replace("/","~1"));
-            else if(value is JArray array)for(int i=0;i<array.Count;i++)Share(array[i],path+"/"+i);
+            context=context.Remove(poolStart,poolEnd-poolStart);
         }
+        // Remove only this producer's one-line reference legend before renewing it.
+        context=string.Join("\n",context.Split('\n').Where(line=>!line.StartsWith("[Private fact references] ",StringComparison.Ordinal)));
+        var blocks = ReadReplyFactBlocks(context, true);
+        var legacyBlocks=blocks.Where(b=>b.marker!="[Historical interrupted work; reference only]").ToArray();
+        // A final wire can be projected again after playback changes. Expand
+        // the previous exact references before moving/projecting their targets.
+        JToken Resolve(JToken value, int depth = 0) {
+            if(depth>96)throw new JsonException("Private reference cycle.");
+            if(value is JObject reference && reference.Count==1 && reference["privateFactRef"]?.Type==JTokenType.String) {
+                var parts=((string)reference["privateFactRef"]).Split('/');
+                if(parts.Length==2 && parts[0]=="pool" && int.TryParse(parts[1],out int poolIndex) && priorPool!=null && poolIndex>=0 && poolIndex<priorPool.Count)
+                    return Resolve(priorPool[poolIndex],depth+1);
+                if(parts.Length<2 || parts[0]!="document" || !int.TryParse(parts[1],out int index) || index<0 || index>=legacyBlocks.Length)
+                    throw new JsonException("Unknown private reference.");
+                JToken target=legacyBlocks[index].value;
+                foreach(string part in parts.Skip(2))target=target is JArray array && int.TryParse(part,out int item) && item>=0 && item<array.Count
+                    ? array[item] : (target as JObject)?[part.Replace("~1","/").Replace("~0","~")];
+                if(target==null)throw new JsonException("Missing private reference target.");
+                return Resolve(target,depth+1);
+            }
+            if(value is JObject inherited && inherited["privateFieldsRef"]?.Type==JTokenType.String) {
+                var baseValue=Resolve(new JObject{["privateFactRef"]=inherited["privateFieldsRef"].DeepClone()},depth+1) as JObject;
+                if(baseValue==null)throw new JsonException("Private fields reference must name an object.");
+                foreach(var field in inherited.Properties().Where(p=>p.Name!="privateFieldsRef")) {
+                    if(baseValue.Property(field.Name)!=null)throw new JsonException("Private fields collision.");
+                    baseValue[field.Name]=Resolve(field.Value,depth+1);
+                }
+                return baseValue;
+            }
+            if(value is JObject obj)return new JObject(obj.Properties().Select(p=>new JProperty(p.Name,Resolve(p.Value,depth+1))));
+            if(value is JArray rows)return new JArray(rows.Select(row=>Resolve(row,depth+1)));
+            return value.DeepClone();
+        }
+        var expanded=blocks.Select(b=>(JObject)Resolve(b.value)).ToArray();
+        for(int i=0;i<blocks.Count;i++)blocks[i].value=expanded[i];
+        WorkReviewPlaybackProjection.Apply(blocks.Select(b=>b.value));
+        var sharedValues=new JArray();int sharedCount=0;
         var fields = new JArray();
         var output = new StringBuilder(); int cursor = 0;
         foreach (var block in blocks)
         {
+            if(interestOnly && block.marker=="[Autonomy runtime facts]")block.value=PrivateInterestContextPolicy.Project(block.value);
+            if(interestOnly) {
+                PrivateInterestScopePolicy.Project(block.value);
+                if(block.marker=="[Task progress runtime]" && block.value["speech"] is JObject speech &&
+                    (bool?)speech["currentOutputDrained"]==true && (bool?)speech["audioPlaying"]==false &&
+                    speech["lastPublicPlayback"] is JObject playback && playback["completedPlaybackText"]?.Type==JTokenType.String) {
+                    // Only output drafts/old replacement diagnostics are omitted;
+                    // actual audio and all result/version-bound evidence remain.
+                    if(speech["lastGeneratedText"]?.Type==JTokenType.String)speech.Remove("lastGeneratedText");
+                    if(playback["publicText"]?.Type==JTokenType.String)playback.Remove("publicText");
+                    if(playback["latestPlaybackRevision"] is JObject revision && revision.Properties().All(p=>new[]{"generation","userTurn","actionId","revision","observedUtc","before","after","publicText","currentRelativePose","arrivalObservedUtc","phaseNeutral","disposition","scope"}.Contains(p.Name)) &&
+                        new[]{"before","after"}.All(k=>revision[k] is JObject o && o.Properties().All(p=>new[]{"actionId","phase","operationRevision","reportText","arrivalRelation","expectedReport"}.Contains(p.Name))) &&
+                        revision["currentRelativePose"] is JObject pose && pose.Properties().All(p=>new[]{"currentlyNearAndFacingUser","userTrackingValid","userSupportVerified","actualUserDistance","actualFacingErrorDegrees","desiredUserDistance","observationFrame","observedAtRealtime"}.Contains(p.Name))) {
+                        revision.Remove("before");revision.Remove("after");revision.Remove("currentRelativePose");
+                    }
+                }
+            }
             WorkReviewInstructionProjection.ProjectRecord(block.value);
             foreach(var delivery in block.value.DescendantsAndSelf().OfType<JObject>().Where(o=>o["results"] is JArray).ToArray())
                 foreach(var item in ((JArray)delivery["results"]).OfType<JObject>()) {
@@ -177,25 +230,89 @@ public partial class ChatQW
         // Share after all omission passes so a reference cannot point at a
         // subtree that this same projection subsequently removes.
         var unshared=blocks.Select(b=>b.value.DeepClone()).ToArray();
-        bool existingRefs=blocks.Any(b=>b.value.SelectTokens("$..privateFactRef").Any());
-        if(!existingRefs)for(int i=0;i<blocks.Count;i++)Share(blocks[i].value,"document/"+i);
-        JToken Expand(JToken value,int depth=0) {
-            if(depth>96)throw new InvalidOperationException("Private reference depth exceeded.");
-            if(value is JObject reference && reference.Count==1 && reference["privateFactRef"]?.Type==JTokenType.String) {
-                var parts=((string)reference["privateFactRef"]).Split('/');
-                JToken resolved=blocks[int.Parse(parts[1])].value;
-                foreach(string part in parts.Skip(2))resolved=resolved is JArray array?array[int.Parse(part)]:resolved[part.Replace("~1","/").Replace("~0","~")];
-                if(resolved==null)throw new InvalidOperationException("Missing private reference.");
-                return Expand(resolved,depth+1);
+        // Count across complete producer documents before replacing anything.
+        // The pool stores exact typed values, including complete literal strings.
+        // Partially overlapping receipts often differ only in observation time
+        // or optional diagnostics. Share equal FIELDS, never merge differing
+        // state/time. The complete typed expansion is verified below.
+        var priorRecords=new System.Collections.Generic.List<JObject>();
+        foreach(var node in blocks.SelectMany(b=>b.value.DescendantsAndSelf().OfType<JObject>()).ToArray()) {
+            if(node.Parent==null || node.Count<4 || node["privateFieldsRef"]!=null || node["privateFactRef"]!=null)continue;
+            var original=(JObject)node.DeepClone();JObject best=null;int saving=180;
+            foreach(var prior in priorRecords.Where(p=>p.Parent!=null && p["privateFieldsRef"]==null)) {
+                var common=new JObject(original.Properties().Where(p=>p.Name!="privateFieldsRef" && prior[p.Name]!=null &&
+                    JToken.DeepEquals(prior[p.Name],p.Value)).Select(p=>new JProperty(p.Name,p.Value.DeepClone())));
+                int size=common.ToString(Formatting.None).Length;
+                // A repeated object already has a cheaper whole-value path.
+                if(common.Count>=3 && common.Count<original.Count && size>saving){best=common;saving=size;}
             }
-            if(value is JObject obj)return new JObject(obj.Properties().Select(p=>new JProperty(p.Name,Expand(p.Value,depth+1))));
-            if(value is JArray rows)return new JArray(rows.Select(row=>Expand(row,depth+1)));
-            return value.DeepClone();
+            if(best!=null) {
+                // Reuse an existing identical base; a new base pays its own
+                // wire cost once, so first store a source path into a prior row.
+                var prior=priorRecords.First(p=>p.Parent!=null && p["privateFieldsRef"]==null && best.Properties().All(f=>JToken.DeepEquals(p[f.Name],f.Value)));
+                var existing=sharedValues.OfType<JObject>().FirstOrDefault(v=>JToken.DeepEquals(v,best));
+                int index=existing==null?-1:sharedValues.IndexOf(existing);
+                if(index>=0) {
+                    foreach(var field in best.Properties())node.Remove(field.Name);
+                    node["privateFieldsRef"]="pool/"+index;sharedCount++;
+                } else {
+                    // Materialize the common subset once and factor BOTH rows.
+                    if(prior.Parent!=null && best.Properties().All(f=>prior.Property(f.Name)!=null)) {
+                        index=sharedValues.Count;sharedValues.Add(best);
+                        foreach(var field in best.Properties()){node.Remove(field.Name);prior.Remove(field.Name);}
+                        node["privateFieldsRef"]="pool/"+index;prior["privateFieldsRef"]="pool/"+index;sharedCount+=2;
+                    }
+                }
+            }
+            priorRecords.Add(node);if(priorRecords.Count>128)priorRecords.RemoveAt(0);
         }
-        bool verified=false;
-        try {verified=!existingRefs&&blocks.Select((b,i)=>JToken.DeepEquals(unshared[i],Expand(b.value))).All(x=>x);}
-        catch(Exception){verified=false;}
-        if(!verified) {for(int i=0;i<blocks.Count;i++)blocks[i].value=(JObject)unshared[i];sharedCount=0;}
+        var counts=new Dictionary<string,int>();
+        string Key(JToken node)=>ActivityEvidencePolicy.Canonical(node).ToString(Formatting.None);
+        bool Eligible(JToken node)=>node is JContainer?Key(node).Length>=120:
+            node.Type==JTokenType.String&&((string)node).Length>=64;
+        void Count(JToken node) {
+            if(Eligible(node)){string k=Key(node);counts[k]=counts.TryGetValue(k,out int n)?n+1:1;}
+            if(node is JContainer c)foreach(var child in c.Children())Count(child is JProperty p?p.Value:child);
+        }
+        foreach(var block in blocks)Count(block.value);
+        var indices=new Dictionary<string,int>();
+        JToken Share(JToken node,bool root=false) {
+            string k=Eligible(node)?Key(node):null;
+            if(!root&&k!=null&&counts[k]>1) {
+                if(!indices.TryGetValue(k,out int index)) {
+                    // Pool values may reference earlier pool entries only.
+                    var value=Share(node,true);index=sharedValues.Count;sharedValues.Add(value);indices[k]=index;
+                }
+                sharedCount++;return new JObject{["privateFactRef"]="pool/"+indices[k]};
+            }
+            if(node is JObject o)return new JObject(o.Properties().Select(p=>new JProperty(p.Name,Share(p.Value))));
+            if(node is JArray a)return new JArray(a.Select(v=>Share(v)));
+            return node.DeepClone();
+        }
+        for(int i=0;i<blocks.Count;i++)blocks[i].value=(JObject)Share(blocks[i].value,true);
+        JToken Expand(JToken node,int depth=0) {
+            if(depth>96)throw new JsonException("Private pool cycle.");
+            if(node is JObject r&&r.Count==1&&r["privateFactRef"]?.Type==JTokenType.String) {
+                string key=(string)r["privateFactRef"];
+                if(!key.StartsWith("pool/",StringComparison.Ordinal)||!int.TryParse(key.Substring(5),out int index)||index<0||index>=sharedValues.Count)throw new JsonException("Missing private pool value.");
+                return Expand(sharedValues[index],depth+1);
+            }
+            if(node is JObject inherited && inherited["privateFieldsRef"]?.Type==JTokenType.String) {
+                var restored=Expand(new JObject{["privateFactRef"]=inherited["privateFieldsRef"].DeepClone()},depth+1) as JObject;
+                if(restored==null)throw new JsonException("Invalid private field base.");
+                foreach(var p in inherited.Properties().Where(p=>p.Name!="privateFieldsRef")) {
+                    if(restored.Property(p.Name)!=null)throw new JsonException("Private fields collision.");
+                    restored[p.Name]=Expand(p.Value,depth+1);
+                }
+                return restored;
+            }
+            if(node is JObject o)return new JObject(o.Properties().Select(p=>new JProperty(p.Name,Expand(p.Value,depth+1))));
+            if(node is JArray a)return new JArray(a.Select(v=>Expand(v,depth+1)));
+            return node.DeepClone();
+        }
+        bool verified=blocks.Select((b,i)=>JToken.DeepEquals(ActivityEvidencePolicy.Canonical(unshared[i]),ActivityEvidencePolicy.Canonical(Expand(b.value)))).All(v=>v);
+        int saved=unshared.Sum(v=>v.ToString(Formatting.None).Length)-blocks.Sum(b=>b.value.ToString(Formatting.None).Length)-sharedValues.ToString(Formatting.None).Length;
+        if(!verified||saved<400){for(int i=0;i<blocks.Count;i++)blocks[i].value=(JObject)unshared[i];sharedValues.Clear();sharedCount=0;}
         output.Clear();cursor=0;fields.Clear();
         foreach(var block in blocks) {
             foreach(var field in block.original.Properties())fields.Add(new JObject{["block"]=block.marker,["field"]=field.Name,
@@ -203,7 +320,7 @@ public partial class ChatQW
             output.Append(context,cursor,block.start-cursor).Append(block.value.ToString(Formatting.None));cursor=block.end;
         }
         output.Append(context, cursor, context.Length - cursor);
-        if(sharedCount>0)output.Append("\n[Private fact references] privateFactRef=document/N/JSON-pointer points to the identical typed value in producer JSON document N (zero based). Remaining path uses RFC6901 escaping. Resolve it there, including all constraints, identities and outcomes. It is shared evidence, not missing or newly authorized work.\n");
+        if(sharedCount>0)output.Append("\n[Private shared facts] ").Append(sharedValues.ToString(Formatting.None)).Append("\n[Private fact references] privateFactRef=pool/N is the exact typed value at index N in Private shared facts. Resolve all references including constraints and literal quotations. privateFieldsRef=pool/N copies exactly the fields in that object; inline fields are disjoint. Sharing grants no action.\n");
         var sharing=new SceneFactContextCompactor.Report();
         // Avoid composing two reference dialects which could move each other's targets.
         string result = sharedCount>0?output.ToString():SceneFactContextCompactor.Compact(output.ToString(), out sharing, true);

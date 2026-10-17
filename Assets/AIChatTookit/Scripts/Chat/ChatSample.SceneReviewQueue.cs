@@ -91,8 +91,6 @@ public partial class ChatSample
         public AudioSource audio;
         public AudioClip clip;
         public bool buffered, drained;
-        public int lastSample;
-        public double lastDsp;
     }
     private SceneFinalPlaybackWindow m_SceneFinalPlayback;
     private ScenePlaybackReview m_ScenePlaybackReview;
@@ -120,7 +118,6 @@ public partial class ChatSample
             };
             Debug.Log($"[Agent/Review] final-playback-ready generation={generation} mode={(buffered ? "buffered-wav" : "pcm")} synthesis_complete=True audio_drained=False eligibility={ScenePlaybackEligibility()}", this);
         }
-        value.lastSample = m_AudioSource.timeSamples; value.lastDsp = AudioSettings.dspTime;
     }
 
     private void CompleteFinalScenePlayback(int generation, AudioClip clip, bool succeeded)
@@ -131,9 +128,8 @@ public partial class ChatSample
             value.audio != null && value.audio == m_AudioSource && value.audio.clip == clip && !value.audio.isPlaying;
         // A WAV is normally stopped by Unity reaching its end. An early external
         // AudioSource.Stop is not that receipt, even though isPlaying is false.
-        bool reachedEnd = !value.buffered || (clip != null &&
-            (clip.samples - value.lastSample) / (double)Math.Max(1, clip.frequency) <=
-                Math.Max(0, AudioSettings.dspTime - value.lastDsp) + .10);
+        bool reachedEnd = !value.buffered || (clip==m_PreparedPlaybackEvidenceClip &&
+            generation==m_PreparedPlaybackEvidenceGeneration && (bool?)m_PreparedPlaybackReceipt?["complete"]==true);
         if (!succeeded || !current || !reachedEnd)
         {
             m_SceneFinalPlayback = null;
@@ -168,13 +164,11 @@ public partial class ChatSample
         if (!receipt.drained)
         {
             if (HasCurrentFinalPlaybackWindow()) return true;
-            // Unity Update can observe WAV isPlaying=false one frame before the
-            // player's coroutine records its end. Keep only this short pending
-            // boundary; it is not a drain receipt and cannot authorize handoff.
-            double elapsed = AudioSettings.dspTime - receipt.lastDsp;
+            // Update may run before the player publishes its terminal receipt.
+            // Read the SAME advancement/stop evidence to keep this lease pending;
+            // only the player's successful completion may mark it drained.
             return receipt.buffered && receipt.clip != null && value.audio.clip == receipt.clip &&
-                !value.audio.isPlaying && elapsed >= 0 && elapsed <= .5 &&
-                (receipt.clip.samples - receipt.lastSample) / (double)Math.Max(1, receipt.clip.frequency) <= elapsed + .10;
+                (bool?)ReadPreparedPlaybackTerminal(receipt.clip,receipt.generation)?["complete"]==true;
         }
         // The successful direct player may clear/destroy its owned clip before
         // FinishSpeakingNaturally. Preserve only that exact completed lease;
@@ -428,7 +422,7 @@ public partial class ChatSample
         if (m_ScenePlaybackReview != null && !ScenePlaybackReviewCurrent(m_ScenePlaybackReview))
         {
             bool ownsProbe = m_ScenePlaybackReview.probeGeneration == m_AutonomyProbeGeneration && m_AutonomyProbeInFlight;
-            if (ownsProbe) CancelAutonomyIntentProbe();
+            if (ownsProbe) CancelAutonomyIntentProbeForReason("owner-event-audio-or-resource-changed");
             else ClearScenePlaybackReview("owner-event-audio-or-resource-changed");
         }
         DiscardSupersededSceneActionWake();

@@ -525,6 +525,8 @@ public class LLM:MonoBehaviour
     {
     }
 
+    public virtual void CancelEphemeralMsg(string reason) => CancelEphemeralMsg();
+
     /// <summary>
     /// 持续声响下的轮次边界复核。它与普通投机草稿分开管理：边界判断优先级更高，
     /// 不能被歌唱预反应的逐帧刷新取消或饿死；同样不得写入正式对话历史。
@@ -573,6 +575,7 @@ public class LLM:MonoBehaviour
     public virtual void PostActivityMonitor(string input, Action<bool, string, string> callback)
         => callback?.Invoke(false, "", "activity-monitor-unsupported");
     public virtual void CancelActivityMonitor() { }
+    public virtual void CancelActivityMonitorForReason(string reason) => CancelActivityMonitor();
     public virtual void PostActivityVisualEvidence(string input, string imageDataUrl, Action<bool,string,string> callback)
         => callback?.Invoke(false,"","activity-visual-unsupported");
     public virtual bool SupportsRoomTaskSequences => false;

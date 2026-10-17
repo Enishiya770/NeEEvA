@@ -18,7 +18,7 @@ public partial class ChatQW
     {
         var source=ActivityEvidencePolicy.Parse(input);var attempts=new JArray();
         for(int pressure=0;pressure<=2;pressure++) {
-            var frame=ActivityMonitorContextPolicy.Project(source,pressure);
+            var frame=(string)source["purpose"]=="speech-meaning"?source:ActivityMonitorContextPolicy.Project(source,pressure);
             string value=frame.ToString(Formatting.None),wire=BuildActivityMonitorRequest(value);
             var budget=wire==null?null:MeasureActivityMonitorBudget(wire);
             attempts.Add(new JObject{["pressure"]=pressure,["sizes"]=ActivityMonitorContextPolicy.Sizes(frame),["budget"]=budget});
@@ -29,13 +29,15 @@ public partial class ChatQW
         diagnostics=new JObject{["admitted"]=false,["attempts"]=attempts}.ToString(Formatting.None);return null;
     }
     public override void CancelActivityMonitor()
+        => CancelActivityMonitorForReason("owner-cancel");
+    public override void CancelActivityMonitorForReason(string reason)
     {
         ++m_ActivityMonitorGeneration;
         var completion=m_ActivityMonitorCompletion;
         m_ActivityMonitorCompletion=null;
         if(m_ActivityMonitorRequest!=null) {
             Debug.Log("[Activity/MonitorCancel] "+new JObject{["requestId"]=m_ActivityMonitorCorrelation,
-                ["generation"]=m_ActivityMonitorGeneration-1,["reason"]="owner-cancel-or-watchdog",["abortRequested"]=true}.ToString(Formatting.None));
+                ["generation"]=m_ActivityMonitorGeneration-1,["reason"]=reason??"owner-cancel",["abortRequested"]=true}.ToString(Formatting.None));
             try {m_ActivityMonitorRequest.Abort();} catch(Exception) { }
             m_ActivityMonitorRequest=null;
         }
@@ -43,7 +45,7 @@ public partial class ChatQW
     }
     public override void PostActivityMonitor(string input,Action<bool,string,string> callback)
     {
-        CancelActivityMonitor();
+        CancelActivityMonitorForReason("superseded-monitor-request");
         m_ActivityMonitorCompletion=callback;
         StartCoroutine(RequestActivityMonitor(input,m_ActivityMonitorGeneration,callback));
     }
@@ -65,10 +67,16 @@ public partial class ChatQW
         // Concurrent monitor packets repeat small frozen bodies and bindings.
         // Exact round-trip verification and net wire saving still gate sharing.
         var wireFrame=JObject.Parse(input);
+        if((string)wireFrame["purpose"]=="speech-meaning") {
+            AppendMessage(sb,new SendData("system",ActivitySpeechMeaningPolicy.Contract+(m_Backend==BackendType.Local?"":schema)));
+            sb.Append(',');AppendMessage(sb,new SendData("user",input));sb.Append(']');
+            if(m_Backend==BackendType.Local)sb.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
+            sb.Append('}');return sb.ToString();
+        }
         ResultPlaybackSelection.ProjectWireAudio(wireFrame["delivery"] as JObject);
         string compactInput=SceneFactContextCompactor.CompactJson(wireFrame.ToString(Formatting.None),out var sharing,128,inlineEvidence:true);
         AppendMessage(sb,new SendData("system",(deliveryOnly?ActivityDeliveryProtocol.Contract:noSpeech?ActivityMonitorProtocol.ActionContract:
-            (int?)JObject.Parse(input)["evidenceVersion"]>=2?ActivityMonitorProtocol.BoundEvidenceContract:ActivityMonitorProtocol.Contract)+(delivery!=null?ResultPlaybackSelection.Contract:"")+
+            (int?)wireFrame["evidenceVersion"]>=2?ActivityMonitorProtocol.SpeechContractForFrame(wireFrame):ActivityMonitorProtocol.Contract)+(delivery!=null?ResultPlaybackSelection.Contract:"")+
             (hasAction && !noSpeech || hasAction && deliveryOnly ? "\n"+ActivityMonitorProtocol.ActionContract:"")+
             (delivery!=null?(deliveryOnly?"":ActivityDeliveryProtocol.Contract)+"\n本次补句的实际语言码是 "+(string)delivery["language"]+"，遵守此语言，不跟随较早对话的语言。":"")+
             (!noSpeech && (int?)JObject.Parse(input)["evidenceVersion"]>=2?"\n纠正台词用当前 speech.language；comparison 的中文只用于诊断，不得复制为台词。":"")+
@@ -80,7 +88,7 @@ public partial class ChatQW
     }
     public override void PostActivityVisualEvidence(string input,string imageDataUrl,Action<bool,string,string> callback)
     {
-        CancelActivityMonitor();m_ActivityMonitorCompletion=callback;
+        CancelActivityMonitorForReason("same-source-visual-recheck");m_ActivityMonitorCompletion=callback;
         StartCoroutine(RequestActivityMonitor(input,m_ActivityMonitorGeneration,callback,imageDataUrl));
     }
     private string BuildActivityVisualRequest(string input,string imageDataUrl)

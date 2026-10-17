@@ -79,13 +79,14 @@ public partial class ChatSample
         m_SceneTimeLastRealtime = Time.realtimeSinceStartupAsDouble;
         if (paused)
         {
+            m_PreparedPlaybackEvidence?.Revoke("application-paused");
             CancelSequenceContinuation("application-paused");
             CancelSceneSearchTask("application-paused");
             m_ScenePauseStartedRealtime = Time.realtimeSinceStartupAsDouble;
             PauseSceneAction();
             CancelFirstReplyForPause();
             CancelRoomSpeechReview("application-paused");
-            CancelAutonomyIntentProbe(); m_ScenePoseKnown = false;
+            CancelAutonomyIntentProbeForReason("application-paused"); m_ScenePoseKnown = false;
             m_SceneMotionAt = m_SceneGazeAt = -1;
         }
         else

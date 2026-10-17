@@ -131,7 +131,7 @@ public partial class ChatSample
         if(sequence==null && !results.OfType<JObject>().Any(r=>(string)r["source"]=="independent-answer"))return false;
         if(!WorkResultDeliveryProtocol.CanClose(results,sequence,"") ||
             results.OfType<JObject>().Any(r=>(bool?)r["playbackReviewPending"]==true))return false;
-        CancelAutonomyIntentProbe();
+        CancelAutonomyIntentProbeForReason("delivery-settled");
         m_WorkStatus="closed";m_WorkReviewOpen=false;m_WorkSubstepReviewPending=false;
         m_PrivateDecisionFailure=null;m_PrivateDecisionRetries=0;
         Debug.Log("[Work/DeliverySettled] "+new JObject{["workEpoch"]=m_WorkEpoch,

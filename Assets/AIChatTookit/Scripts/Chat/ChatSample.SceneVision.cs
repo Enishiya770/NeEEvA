@@ -217,7 +217,7 @@ public partial class ChatSample
         CancelSequenceContinuation(reason);
         CancelSceneVisionStopPreparation();
         CancelSceneAction(reason);
-        if (m_AutonomyProbeInFlight) CancelAutonomyIntentProbe();
+        if (m_AutonomyProbeInFlight) CancelAutonomyIntentProbeForReason(reason);
         if (close) m_SceneVisionCapture?.SetObserving(false);
         else m_SceneVisionCapture?.CancelPending(reason);
         m_SceneVisionState = reason;

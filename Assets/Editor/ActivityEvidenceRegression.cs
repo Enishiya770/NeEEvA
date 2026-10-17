@@ -224,7 +224,28 @@ public static class ActivityEvidenceRegression
                 cases.Add(("historical-uncertainty-"+history[0],historyFrame,"uncertainty"));
             }
             foreach(var item in cases) {
-                var source=item.frame;var frame=ActivityEvidencePolicy.AttentionFrames(source).Single();
+                var source=item.frame;
+                var attention=ActivityEvidencePolicy.AttentionFrames(source).ToArray();
+                var selected=new List<JObject>(attention.Where(f=>(string)f["purpose"]!="speech"));
+                var interpretations=new JArray();bool understood=true;
+                foreach(var speechFrame in attention.Where(f=>(string)f["purpose"]=="speech").GroupBy(ActivitySpeechMeaningPolicy.Key).Select(g=>g.First())) {
+                    var input=ActivitySpeechMeaningPolicy.Input(speechFrame);JObject meaning=null;string rawMeaning=null;bool valid=false;
+                    for(int i=0;i<2&&!valid;i++) {
+                        string ready=model.PrepareActivityMonitorFrame(input.ToString(),out string readBudget);bool done=false,ok=false;
+                        if(ready!=null){model.PostActivityMonitor(ready,(a,b,c)=>{done=true;ok=a;rawMeaning=b;});float until=Time.realtimeSinceStartup+11;while(!done&&Time.realtimeSinceStartup<until)yield return null;}
+                        valid=ok&&ActivitySpeechMeaningPolicy.TryRead(rawMeaning,input,out meaning);
+                        interpretations.Add(new JObject{["raw"]=rawMeaning,["valid"]=valid,["budget"]=JObject.Parse(readBudget)});
+                        if(!valid)input["previousAttempt"]=new JObject{["rejectedVerdict"]=rawMeaning,["fieldRepair"]=ActivitySpeechMeaningPolicy.Rejection(rawMeaning,input)};
+                    }
+                    if(valid)selected.AddRange(ActivitySpeechMeaningPolicy.Frames(speechFrame,meaning));else understood=false;
+                }
+                if(!understood) {
+                    all=false;rows.Add(new JObject{["case"]=item.name,["passed"]=false,["interpretations"]=interpretations});
+                    File.WriteAllText(Path.Combine(output,"activity-evidence-native.json"),new JObject{["passed"]=all,["pureChecks"]=pure,["cases"]=rows}.ToString());
+                    continue;
+                }
+                foreach(var selectedFrame in selected) {
+                var frame=selectedFrame;
                 bool parsed=false;JObject verdict=null;string why=null,raw=null,budget=null;var attempts=new JArray();var retries=new ActivityMonitorAttempts();
                 for(int attempt=0;attempt<3&&!parsed;attempt++) {
                     string input=model.PrepareActivityMonitorFrame(frame.ToString(),out budget);
@@ -248,10 +269,11 @@ public static class ActivityEvidenceRegression
                     ActivityEvidencePolicy.Equal(frame["speech"]?[0]?["text"],source["speech"]?[0]?["text"]),
                     "Protected abstention applies no verdict, retains the original speech and exhausts the same-work retry budget.");
                 bool passed=semanticPassed||protectedAbstention;all&=passed;
-                rows.Add(new JObject{["case"]=item.name,["expected"]=item.expected,["source"]=source,["sent"]=frame,["attempts"]=attempts,
+                rows.Add(new JObject{["case"]=item.name,["claimIndex"]=frame["claimIndex"],["interpretations"]=interpretations,["expected"]=item.expected,["source"]=source,["sent"]=frame,["attempts"]=attempts,
                     ["modelSemanticPassed"]=semanticPassed,["protectedAbstention"]=protectedAbstention,["reviewed"]=parsed,
                     ["passed"]=passed,["budget"]=JObject.Parse(budget)});
                 File.WriteAllText(Path.Combine(output,"activity-evidence-native.json"),new JObject{["passed"]=all,["pureChecks"]=pure,["cases"]=rows}.ToString());
+                }
             }
             Check(all,"Native decisions or explicit protected abstentions must preserve actual events, final audio order and autonomy; inspect modelSemanticPassed separately.");
         } finally {model.CancelActivityMonitor();UnityEngine.Object.Destroy(host);}

@@ -76,8 +76,9 @@ public static class ResultAutonomyRegression
         Check("identical-words-keep-selected-audio-owner",(int)selectedEvidence["textStart"]==0&&(string)selectedEvidence.SelectToken("completedAudio[0].audioId")=="first");
         var schema=JObject.Parse(WorkNextIntentProtocol.ExtendReviewSchema((string)typeof(ChatQW).GetField("k_WorkReviewSchema",F).GetValue(null)));WorkResultDeliveryProtocol.BindCoverageSchema(schema,results);
         var rows=schema.SelectTokens("properties.delivery_reports.items.anyOf[*]").OfType<JObject>().ToArray();
-        Check("native-one-quote-and-coherent-covered-types",rows.Length==2&&rows.All(r=>r.SelectToken("properties.quote")==null)&&
-            rows.Where(r=>(string)r.SelectToken("properties.coverage.enum[0]")=="reported").All(r=>!r.SelectToken("properties.reportAct.enum").Values<string>().Contains("acknowledgment")),schema["properties"]["delivery_reports"]);
+        Check("native-one-quote-interpreted-before-coverage",rows.Length==3&&rows.All(r=>r.SelectToken("properties.quote")==null)&&
+            rows.Where(r=>r.SelectToken("properties.reportedStage.enum").Values<string>().Contains("ongoing")).All(r=>
+                JToken.DeepEquals(r.SelectToken("properties.coverage.enum"),new JArray("unreported"))),schema["properties"]["delivery_reports"]);
         Check("native-audio-unit-preserves-ack-plus-outcome",rows.All(r=>r.SelectToken("properties.lastRelevantQuote")==null&&r.SelectToken("properties.selectedPlaybackId")!=null));
         var monitorSchema=ActivityDeliveryProtocol.Schema(result);
         Check("native-consistent-cannot-select-supplement",monitorSchema["anyOf"].OfType<JObject>().All(r=>

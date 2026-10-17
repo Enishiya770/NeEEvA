@@ -7,6 +7,34 @@ public partial class ChatSample
 {
     private string m_TranscriptClarificationInput;
     private string m_TranscriptClarificationOutput;
+    private JObject m_TranscriptClarificationEvidence;
+    private int m_TranscriptClarificationEpoch = -1, m_TranscriptClarificationGeneration = -1;
+
+    private void BindTranscriptClarificationEvidence(string input, int generation)
+    {
+        m_TranscriptClarificationEvidence = null;
+        int start = input?.IndexOf('{') ?? -1;
+        if (start < 0) return;
+        try {
+            var packet = ActivityEvidencePolicy.Parse(input.Substring(start));
+            if ((string)packet["kind"] != "same-capture-transcript-disagreement" ||
+                (bool?)packet["actionAuthorized"] != false) return;
+            var evidence = new JObject { ["capture"] = packet["capture"]?.DeepClone(),
+                ["resolution"] = "clarification-required", ["acceptedInstruction"] = false,
+                ["recognitionOutcome"] = "not-reliably-understood", ["reliablyUnderstood"] = false,
+                ["event"] = "The character could not reliably make out this recording and is asking for clarification." };
+            foreach (string field in new[] { "stream", "full" })
+                evidence[field] = PickRoomFields(packet[field] as JObject, "text", "source", "revision");
+            evidence["scope"] = "Recorded before clarification speech: this input was not reliably understood. Supports only that recognition event, not hearing loss, silence, any scene fact, task or accepted user wording.";
+            m_TranscriptClarificationEvidence = evidence;
+            m_TranscriptClarificationEpoch = m_WorkEpoch;
+            m_TranscriptClarificationGeneration = generation;
+        } catch (System.Exception) { /* The original packet remains in ASR diagnostics. */ }
+    }
+
+    private JObject ReadTranscriptClarificationEvidence() =>
+        m_TranscriptClarificationEpoch == m_WorkEpoch && m_TranscriptClarificationGeneration == m_FormalResponseGeneration
+            ? (JObject)m_TranscriptClarificationEvidence?.DeepClone() : null;
 
     private bool TryResolveTranscriptConflict(string original, bool streamingExit)
     {
@@ -59,11 +87,12 @@ public partial class ChatSample
         m_SingingRequestSubmittedSinceUserTurn = false; m_NoSingingWorkContinuations = 0;
         m_SceneAutonomyIntention = ""; m_QuietAutonomyRound = false;
         m_PostHumBackFeedbackActive = false; m_PostHumBackFeedbackSummary = "";
-        m_AgentCurrentRoundIsTick = false; ClearRoundParsed(); CancelAutonomyIntentProbe();
+        m_AgentCurrentRoundIsTick = false; ClearRoundParsed(); CancelAutonomyIntentProbeForReason("transcript-clarification");
         if (m_UseStreaming && m_IsVoiceMode && m_ChatSettings.m_TextToSpeech != null)
             StartStreaming(input, false);
         else {
             string output = m_TranscriptClarificationOutput;
+            BindTranscriptClarificationEvidence(input, m_FormalResponseGeneration);
             CommitTranscriptClarificationHistory(input, output);
             m_TranscriptClarificationInput = m_TranscriptClarificationOutput = null;
             CallBack(output);
@@ -85,6 +114,7 @@ public partial class ChatSample
     {
         if (m_TranscriptClarificationInput != input || m_TranscriptClarificationOutput == null) return false;
         string output = m_TranscriptClarificationOutput;
+        BindTranscriptClarificationEvidence(input, generation);
         m_TranscriptClarificationInput = m_TranscriptClarificationOutput = null;
         ClearStagedFormalObservation();
         var history = CommitTranscriptClarificationHistory(input, output);

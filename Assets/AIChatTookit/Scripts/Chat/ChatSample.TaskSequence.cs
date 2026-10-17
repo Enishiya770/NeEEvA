@@ -170,6 +170,7 @@ public partial class ChatSample
         step["status"] = "running"; step["goalId"] = goalId; step["actionId"] = m_RoomTaskActionId;
         step["intent"] = m_RoomTaskIntent;
         step["generation"] = m_FormalResponseGeneration;
+        SnapshotActivityOrigins();
         ObserveRoomTaskSequenceProgress(true);
     }
 

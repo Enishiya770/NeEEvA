@@ -21,6 +21,7 @@ public partial class ChatSample
 
     private void RecordAcceptedMotionUserTurn(string text)
     {
+        SnapshotActivityOrigins();
         CancelSceneSearchTask("new-user-turn");
         // Inspector changes must reset the previous mode before accepting this
         // new user's text, not while its response context is being assembled.

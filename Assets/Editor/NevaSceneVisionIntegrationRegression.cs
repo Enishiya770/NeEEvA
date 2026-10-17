@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -66,7 +66,7 @@ public static class NevaSceneVisionIntegrationRegression
     private static bool RoomCognitionRegressionEnabled => Argument("-roomCognitionRegression", "0") == "1";
     private static bool RoomSpeechViewRegressionEnabled => Argument("-roomSpeechViewRegression", "0") == "1";
     private static int RecordedFurnitureIndex => int.Parse(Argument("-nevaRecordedFurnitureIndex", "-1"));
-    private static bool UsesNativeService => NativeEnabled || LiveQwenEnabled || ProductionActionEnabled || ActiveViewEnabled || ObjectApproachNativeEnabled || DecisionRepairNativeEnabled || HalfTurnNativeEnabled || ViewPositionNativeEnabled || ResponseLatencyEnabled || SpatialGoalRunnerNativeEnabled || SceneSearchNativeEnabled || UnifiedDeviceNativeEnabled || Argument("-runtimeFailureRuntime","0")=="1";
+    private static bool UsesNativeService => NativeEnabled || LiveQwenEnabled || ProductionActionEnabled || ActiveViewEnabled || ObjectApproachNativeEnabled || DecisionRepairNativeEnabled || HalfTurnNativeEnabled || ViewPositionNativeEnabled || ResponseLatencyEnabled || SpatialGoalRunnerNativeEnabled || SceneSearchNativeEnabled || UnifiedDeviceNativeEnabled || Argument("-runtimeFailureRuntime","0")=="1" || Argument("-activityOriginRuntime","0")=="1" || Argument("-budgetDeliveryRuntime","0")=="1";
 
     static NevaSceneVisionIntegrationRegression()
     {
@@ -301,6 +301,28 @@ public static class NevaSceneVisionIntegrationRegression
         if (Argument("-lifecycleGroundingRuntime", "0") == "1")
         {
             yield return LifecycleGroundingRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-claimPlaybackRuntime", "0") == "1") {
+            yield return ClaimPlaybackRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-playbackEvidenceRuntime", "0") == "1") {
+            yield return PlaybackEvidenceRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-semanticWindowRuntime", "0") == "1") {
+            yield return SemanticWindowRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-budgetDeliveryRuntime", "0") == "1") {
+            yield return BudgetDeliveryRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-activityOriginRuntime", "0") == "1")
+        {
+            yield return ActivityOriginRegression.Run(chat,bridge,Output);
+            yield return RuntimeFailureRegression.Run(chat,bridge,Output);
             Finish(null);yield break;
         }
         if (Argument("-runtimeFailureRuntime", "0") == "1")

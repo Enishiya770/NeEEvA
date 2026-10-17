@@ -20,7 +20,7 @@ public partial class ChatQW
     }
     public override bool SupportsFirstReplyRouting => m_Backend == BackendType.Local;
 
-    private void OnDisable() => CancelOwnedFirstReply();
+    private void OnDisable() { CancelOwnedFirstReply(); CancelEphemeralMsg("model-disabled"); }
     private void OnApplicationPause(bool paused) { if (paused) CancelOwnedFirstReply(); }
     private void CancelOwnedFirstReply()
     {

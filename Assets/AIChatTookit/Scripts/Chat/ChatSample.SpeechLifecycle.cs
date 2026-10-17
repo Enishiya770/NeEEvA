@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
@@ -77,7 +77,7 @@ public partial class ChatSample
             m_ChatSettings?.m_TextToSpeech?.CancelStreaming();
             m_ChatSettings?.m_TextToSpeech?.CancelPreparedSpeech();
             if (m_AudioSource != null && m_AudioSource.isPlaying) {
-                m_AudioSource.Stop(); m_LastVoiceOutputEndedRealtime = Time.realtimeSinceStartup;
+                StopSpeechAudio(); m_LastVoiceOutputEndedRealtime = Time.realtimeSinceStartup;
             }
             ReleaseSpeechPresentation(owner, reason);
         }

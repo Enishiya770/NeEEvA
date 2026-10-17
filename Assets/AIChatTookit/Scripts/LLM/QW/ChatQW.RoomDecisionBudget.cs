@@ -137,6 +137,30 @@ public partial class ChatQW
         {
             var initial = MeasureRoomDecisionBudget(json, ceiling); diagnostic["original"] = initial;
             var initialWire = ReadRoomTaskRecoveryJson(json);
+            // Historical task telemetry does not need to wait for a budget
+            // failure to yield. Apply the established recallable routing index
+            // before the expensive main planner, preserving current execution.
+            if(TryFindRoomTaskInput(initialWire,out var historyText,out var historyInput) && RestoreRoomDecisionSharedEvidence(historyInput)) {
+                bool changed=false;
+                foreach(string path in new[]{"previousWorkContext","previousUnfinishedWork","workingMemory.previousUnfinishedWork"})
+                    if(historyInput.SelectToken(path) is JObject history) {
+                        var index=TaskContinuationContextPolicy.RoutingHistory(history,path);
+                        if(index.ToString(Formatting.None).Length+128<history.ToString(Formatting.None).Length) {
+                            history.Replace(index);changed=true;
+                        }
+                    }
+                if(changed) {
+                    string text=(string)historyText;
+                    historyText.Replace(text.Substring(0,text.IndexOf('{'))+historyInput.ToString(Formatting.None));
+                    string indexed=initialWire.ToString(Formatting.None);
+                    if(TryCompactRoomTaskRequest(indexed,out string compactHistory))indexed=compactHistory;
+                    var measure=MeasureRoomDecisionBudget(indexed,ceiling);
+                    if((long)measure["estimatedUnits"]<(long)initial["estimatedUnits"]) {
+                        json=admitted=indexed;initial=measure;initialWire=ReadRoomTaskRecoveryJson(json);
+                        diagnostic["historyProjection"]="recallable-task-index-before-planning";
+                    }
+                }
+            }
             bool workingMemory = TryFindRoomTaskInput(initialWire, out _, out var initialInput) && initialInput["workingMemory"] != null;
             // Optional evidence yields before the hard limit. Mandatory facts may
             // exceed this preference and still use the unchanged admission limit.
@@ -233,6 +257,16 @@ public partial class ChatQW
     {
         var result = (JObject)source.DeepClone();
         var changes = new JArray();
+        // Old tasks resolve referents; they are not the current executor plan.
+        // Preserve their requests, outcomes and recall source instead of sending
+        // the complete interrupted pose/readback archive on every new decision.
+        foreach(var field in result.Descendants().OfType<JProperty>().ToArray())
+            if(new[]{"previousUnfinishedWork","previousWorkContext"}.Contains(field.Name) && field.Value is JObject history) {
+                int before=history.ToString(Formatting.None).Length;
+                field.Value=TaskContinuationContextPolicy.RoutingHistory(history,field.Path);
+                changes.Add(new JObject{["path"]=field.Path,["operation"]="historical-task-source-index",
+                    ["beforeCharacters"]=before,["afterCharacters"]=field.Value.ToString(Formatting.None).Length});
+            }
         // Only named observation/diagnostic collections below are projected. Unknown
         // top-level fields, exact speech, authority, route/support facts, active goals
         // and schema facts stay intact; if those do not fit, admission fails locally.

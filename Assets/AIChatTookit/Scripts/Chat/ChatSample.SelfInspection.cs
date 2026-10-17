@@ -43,6 +43,7 @@ public partial class ChatSample
 
     private void ResetWorkReviewState(bool open, bool clearSingingSession)
     {
+        SnapshotActivityOrigins();
         RememberUnfinishedWorkBeforeReset(open);
         m_ReadOnlyWorkRecheckScheduled = false;
         CancelSceneSearchTask("user-work-reset");

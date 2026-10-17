@@ -89,6 +89,10 @@ public partial class ChatSample
                 "generation", "userTurn", "recordedAtUtc", "publicText", "completedPlaybackText", "latestPlaybackRevision"),
             ["currentOutputDrained"] = m_TextOutputDrainedGeneration == m_FormalResponseGeneration,
             ["audioPlaying"] = IsVoiceOutputPlaying,
+            ["pendingAudio"] = new JArray(m_ActivitySpeech.Where(u=>u.Id!=null &&
+                u.Id.StartsWith("speech:"+m_FormalResponseGeneration+":",System.StringComparison.Ordinal) &&
+                new[]{"starting","playing","queued"}.Contains(u.State)).Take(2).Select(u=>new JObject{
+                    ["id"]=u.Id,["version"]=u.Version,["state"]=u.State,["text"]=u.Text,["completed"]=false})),
             ["scope"] = "The active buffer clears after natural playback completion; empty does NOT mean nothing was spoken. " +
                 "completedPlaybackText records completed audio chunks and may supersede the earlier generated publicText after a playback-time correction. " +
                 "currentOutputDrained proves this formal output ended, not action completion or human audibility. Compare actual completed words with task outcomes. " +

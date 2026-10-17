@@ -202,7 +202,7 @@ public partial class ChatSample : MonoBehaviour
                 if (m_AudioSource.clip == null && m_AudioSource.playOnAwake)
                 {
                     m_AudioSource.playOnAwake = false;
-                    m_AudioSource.Stop();
+                    StopSpeechAudio();
                 }
                 EchoReferenceTap = m_AudioSource.gameObject.AddComponent<PlaybackEchoReferenceTap>();
             }
@@ -2414,7 +2414,7 @@ public partial class ChatSample : MonoBehaviour
         m_SpeculativeRequestVersion++;
         m_SpeculativeRequestInFlight = false;
         if (m_ChatSettings != null && m_ChatSettings.m_ChatModel != null)
-            m_ChatSettings.m_ChatModel.CancelEphemeralMsg();
+            m_ChatSettings.m_ChatModel.CancelEphemeralMsg("listening-preparation: " + reason);
     }
 
     private void ScheduleSpeculativeRefreshIfNeeded()
@@ -4719,10 +4719,11 @@ public partial class ChatSample : MonoBehaviour
 
     private void InvalidateFormalResponse(string reason)
     {
+        CancelAutonomyIntentProbeForReason(reason);
         if (m_LatencyFillerPlayed) CommitPlayedLatencyFiller();
         if (IsAISpeaking && m_ActivitySpeech.Exists(u => u.State == "playing" || u.State == "starting"))
             RecordActivityInterruption(m_CurrentlyPlayingText, reason);
-        CancelActivityMonitoring();
+        CancelActivityMonitoringForReason(false,reason);
         FinishRoomSpeechPlaybackHistory(m_AssistantHeardText.ToString());
         ClearStagedFormalObservation();
         CancelDialogueMotion(reason);
@@ -4768,7 +4769,7 @@ public partial class ChatSample : MonoBehaviour
             m_ChatSettings.m_TextToSpeech.CancelStreaming();
         if (m_AudioSource != null && m_AudioSource.isPlaying)
         {
-            m_AudioSource.Stop();
+            StopSpeechAudio();
             m_LastVoiceOutputEndedRealtime = Time.realtimeSinceStartup;
         }
         IsAISpeaking = false;
@@ -4939,7 +4940,7 @@ public partial class ChatSample : MonoBehaviour
             (m_LatencyFillerClip != null && m_AudioSource.clip == m_LatencyFillerClip);
         if (stopPlayedAudio && IsOwnedLatencyFillerPlaying())
         {
-            m_AudioSource.Stop();
+            StopSpeechAudio();
             m_LastVoiceOutputEndedRealtime = Time.realtimeSinceStartup;
         }
         m_LatencyFillerPlayed = false;
@@ -6223,7 +6224,6 @@ public partial class ChatSample : MonoBehaviour
                 bool succeeded = false;
                 float audioDuration = 0f;
                 int preparedLastSample = 0;
-                float preparedPlayAt = 0f;
                 AudioClip directClip = null;
                 RoomPlaybackCheck playbackCheck = RoomPlaybackCheck.Current;
 
@@ -6285,8 +6285,8 @@ public partial class ChatSample : MonoBehaviour
                     m_AudioSource.clip = ownedClip;
                     m_AudioSource.loop = false;
                     ObserveActivitySpeech(speechChunk.ProcessUnit, "starting");
+                    BeginPreparedPlaybackEvidence(ownedClip,responseGeneration);
                     m_AudioSource.Play();
-                    preparedPlayAt = Time.realtimeSinceStartup;
                     started = true;
                 }
                 else
@@ -6351,7 +6351,7 @@ public partial class ChatSample : MonoBehaviour
                         tts.CancelStreaming();
                     if (ownedClip != null)
                     {
-                        if (m_AudioSource != null && m_AudioSource.clip == ownedClip) m_AudioSource.Stop();
+                        if (m_AudioSource != null && m_AudioSource.clip == ownedClip) StopSpeechAudio();
                         tts.ObservePreparedSpeech(ownedClip, "interrupted"); Destroy(ownedClip); ownedClip = null; m_FormalBufferedClip = null;
                     }
                     if (!m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId))
@@ -6426,14 +6426,12 @@ public partial class ChatSample : MonoBehaviour
                     PrefetchNext();
                     ObserveFinalScenePlayback(responseGeneration, tts, ownedClip != null ? ownedClip : m_AudioSource.clip,
                         ownedClip != null, next == null && (ownedClip != null || tts.StreamingSynthesisSucceeded));
+                    if (ownedClip != null) ObservePreparedPlaybackEvidence();
                     if (ownedClip != null && m_AudioSource.isPlaying)
                         preparedLastSample = Math.Max(preparedLastSample, m_AudioSource.timeSamples);
                     if (ownedClip != null && !m_AudioSource.isPlaying)
                     {
-                        // Stop/clip replacement is not whole-clip delivery. Unity
-                        // resets timeSamples on natural completion; retain progress.
-                        succeeded = preparedLastSample >= ownedClip.samples - ownedClip.frequency * .1f &&
-                            Time.realtimeSinceStartup - preparedPlayAt >= ownedClip.length - .05f;
+                        succeeded = FinishPreparedPlaybackEvidence(ownedClip,responseGeneration);
                         completed = true;
                         CompleteFinalScenePlayback(responseGeneration, ownedClip, succeeded);
                     }
@@ -6503,7 +6501,7 @@ public partial class ChatSample : MonoBehaviour
                 tts.ObservePreparedSpeech(ownedClip, "interrupted");
                 if (m_AudioSource != null && m_AudioSource.clip == ownedClip)
                 {
-                    m_AudioSource.Stop(); m_AudioSource.clip = null;
+                    StopSpeechAudio(); m_AudioSource.clip = null;
                 }
                 if (m_FormalBufferedClip == ownedClip) m_FormalBufferedClip = null;
                 Destroy(ownedClip);
@@ -6692,7 +6690,7 @@ public partial class ChatSample : MonoBehaviour
         if (m_LatencyFillerPlayed)
         {
             CommitPlayedLatencyFiller();
-            if (m_AudioSource != null) m_AudioSource.Stop();
+            if (m_AudioSource != null) StopSpeechAudio();
         }
         m_LatencyFillerPlayed = false;
         m_LatencyFillerFromEou = false;
@@ -6795,7 +6793,7 @@ public partial class ChatSample : MonoBehaviour
         //斩断所有出声相关：停音频、清待播、让生产者协程也退出
         m_ChatSettings.m_TextToSpeech.CancelStreaming();
         StopDirectStreamingSubtitle();
-        if (m_AudioSource != null) m_AudioSource.Stop();
+        if (m_AudioSource != null) StopSpeechAudio();
         m_LastVoiceOutputEndedRealtime = Time.realtimeSinceStartup;
         ClearPendingSpeechChunks("queue-cleared");
         ClearPendingSpeechClips("queue-cleared");
@@ -7136,7 +7134,7 @@ public partial class ChatSample : MonoBehaviour
         string context = ConsumeInterruptedReplyContext();
         if (context == null || m_ChatSettings == null || m_ChatSettings.m_ChatModel == null ||
             m_ChatSettings.m_TextToSpeech == null) return;
-        CancelAutonomyIntentProbe();
+        CancelAutonomyIntentProbeForReason("resume-after-empty-input");
         m_UserTurnAwaitingReplySince = Time.realtimeSinceStartup;
         m_AgentCurrentRoundIsTick = false;
         m_AgentRoundInFlight = m_AgentRunning;
@@ -8649,7 +8647,7 @@ public partial class ChatSample : MonoBehaviour
     public void BeginGracefulAgentShutdown()
     {
         m_AgentGracefulShutdownPending = true;
-        CancelAutonomyIntentProbe();
+        CancelAutonomyIntentProbeForReason("agent-graceful-shutdown");
         if (m_PendingTickCo != null)
         {
             StopCoroutine(m_PendingTickCo);
@@ -8710,7 +8708,7 @@ public partial class ChatSample : MonoBehaviour
         m_PendingToolCorrectionFrame = "";
         m_PendingNonCharacterToolNotice = "";
         m_PendingSingingRoutingFact = "";
-        CancelAutonomyIntentProbe();
+        CancelAutonomyIntentProbeForReason("agent-stop");
         m_UserSpeechActiveForAutonomy = false;
         m_DeferredAutonomyIntent = "";
         m_DeferredAutonomyNovelty = "";
@@ -8776,6 +8774,7 @@ public partial class ChatSample : MonoBehaviour
     /// </summary>
     public void NotifyUserStartedSpeaking()
     {
+        CancelAutonomyIntentProbeForReason("user-started-speaking");
         CancelClosedRoomPreparation("new-user-recording");
         CancelDialogueMotion("user-started-speaking");
         // The user opening their mouth ends this delivery. Bumping the generation here is
@@ -8942,16 +8941,18 @@ public partial class ChatSample : MonoBehaviour
         return reason;
     }
 
-    private void CancelAutonomyIntentProbe()
+    private void CancelAutonomyIntentProbe() => CancelAutonomyIntentProbeForReason("probe-owner-cancelled");
+
+    private void CancelAutonomyIntentProbeForReason(string reason)
     {
         var playbackModel = m_ScenePlaybackReview?.model;
-        ClearScenePlaybackReview("autonomy-probe-cancelled");
+        ClearScenePlaybackReview(reason);
         m_AutonomyProbeGeneration++;
         m_AutonomyProbeMustRemainPrivate = false;
         if (!m_AutonomyProbeInFlight) return;
         m_AutonomyProbeInFlight = false;
         var model = playbackModel != null ? playbackModel : m_ChatSettings?.m_ChatModel;
-        if (model != null) model.CancelEphemeralMsg();
+        if (model != null) model.CancelEphemeralMsg(reason);
     }
 
     private void StoreDeferredAutonomyThought(AutonomyIntentDecision decision)
@@ -9194,6 +9195,8 @@ public partial class ChatSample : MonoBehaviour
             m_ChatSettings.m_ChatModel.SetActiveSkills();
         }
         bool reviewingWork = ShouldReviewUserWork();
+        var reviewedDelivery = reviewingWork ? ReadWorkDelivery() : null;
+        int reviewedSpeechGeneration = m_FormalResponseGeneration;
         string frame = reviewingWork ? BuildWorkReviewFrame(triggerReason) : BuildAutonomyIntentFrame(triggerReason);
         if (!playbackReadOnly) HarvestSongIds(frame);
         int generation = ++m_AutonomyProbeGeneration;
@@ -9243,6 +9246,10 @@ public partial class ChatSample : MonoBehaviour
 
             if (playbackReadOnly && !resumingPlaybackReview)
             {
+                // Remember only already-played, versioned coverage. No work
+                // closure or action is applied until the current audio drains.
+                if(reviewingWork && !privateOnly)
+                    m_ReviewedDeliveryEvidence.Remember(workEpoch,reviewedSpeechGeneration,reviewedDelivery,decision.delivery_reports);
                 playbackReview.resume = fresh => {
                     resumingPlaybackReview = true;
                     sceneObservation = fresh; frame = BuildPerceptionFrame(triggerReason);
@@ -9462,7 +9469,7 @@ public partial class ChatSample : MonoBehaviour
         {
             if (m_LogAgentLoop)
                 Debug.Log("[Agent/自主意图] 完整用户轮已到达；取消尚未完成的私人预判");
-            CancelAutonomyIntentProbe();
+            CancelAutonomyIntentProbeForReason("accepted-user-turn");
         }
         m_LastUserTurnTime = Time.realtimeSinceStartup;
         //情境召回:提及扫描同步生效(本帧可见),语境嵌入异步、作用于后续帧
@@ -18104,7 +18111,7 @@ public partial class ChatSample : MonoBehaviour
         ClearUserTurnAwaitingReply(completed ? "回哼播完" : "回哼结束");
         if (m_AudioSource != null && m_AudioSource.clip == m_ActiveHumBackClip)
         {
-            m_AudioSource.Stop();
+            StopSpeechAudio();
             m_AudioSource.clip = null;
         }
         if (m_ActiveHumBackClip != null)
@@ -18413,7 +18420,7 @@ public partial class ChatSample : MonoBehaviour
         }
         if (m_AudioSource != null && m_AudioSource.clip == m_ActiveHumBackClip)
         {
-            m_AudioSource.Stop();
+            StopSpeechAudio();
             m_AudioSource.clip = null;
             m_LastVoiceOutputEndedRealtime = Time.realtimeSinceStartup;
         }

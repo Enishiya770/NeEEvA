@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
@@ -23,6 +23,7 @@ public static class ActivityMonitorContextPolicy
     public static JObject Project(JObject source, int pressure)
     {
         var frame = (JObject)source.DeepClone();
+        ActivitySpeechMeaningPolicy.ProjectFacts(frame);
         if (!(frame["facts"] is JObject)) frame["facts"] = new JObject();
         if (!(frame["evidenceScopes"] is JObject)) frame["evidenceScopes"] = new JObject();
         var facts = (JObject)frame["facts"];
@@ -122,10 +123,29 @@ public static class ActivityMonitorContextPolicy
         if(frame["reviewOperation"] is JObject focus && focus["binding"] is JObject binding) {
             foreach(var capability in scopes.Properties().Where(p=>(string)p.Value["domain"]=="execution").ToArray())
                 if(!ActivityEvidencePolicy.Equal(capability.Value["binding"],binding)) {
+                    if(frame["speechMeaning"]!=null) {
+                        // The utterance's operation is now resolved. Another
+                        // step's running state cannot disprove this step's result.
+                        Drop(capability.Name);
+                        continue;
+                    }
                     if(capability.Name.StartsWith("result:") && facts[capability.Name] is JObject result && result["binding"]==null)
                         result["binding"]=capability.Value["binding"]?.DeepClone();
                     scopes.Remove(capability.Name);
                 }
+            if(frame["speechMeaning"]!=null) {
+                foreach(string key in new[]{"execution","speech-start"})
+                    if(facts[key] is JObject sample && !ActivityEvidencePolicy.Equal(scopes[key]?["binding"]??
+                        ActivityEvidencePolicy.Binding(sample,(string)sample["intent"]??"execution",(string)sample["actionId"]),binding))Drop(key);
+                foreach(var unit in (frame["speech"] as JArray??new JArray()).OfType<JObject>())
+                    foreach(string key in new[]{"observedAtCreation","observedAtSpeechStart"})
+                        if(unit[key] is JObject sample) {
+                            var resolved=key=="observedAtSpeechStart"?ActivityEvidencePolicy.FrozenSpeech(unit,frame)??sample:sample;
+                            if(!ActivityEvidencePolicy.Equal(ActivityEvidencePolicy.Binding(resolved,
+                                (string)resolved["intent"]??"execution",(string)resolved["actionId"]),binding))
+                                unit[key]=new JObject{["completedResultIds"]=sample["completedResultIds"]?.DeepClone()};
+                        }
+            }
             if(pressure>0)foreach(var record in facts.Properties().Where(p=>p.Name.StartsWith("result:")).ToArray())
                 if(record.Value is JObject other && !ActivityEvidencePolicy.Equal(other["binding"]??scopes[record.Name]?["binding"],binding)) {
                     // Keep this event's actual status and identity as context;
@@ -157,7 +177,7 @@ public static class ActivityMonitorContextPolicy
             foreach(var record in facts.Properties().Where(p=>p.Name.StartsWith("recalled:",StringComparison.Ordinal)))
                 if(record.Value is JObject recall) {
                     if((string)recall["sourceCaptureId"]==record.Name.Substring(9))recall.Remove("sourceCaptureId");
-                    if(JToken.DeepEquals(recall["question"],facts["request"]?["text"]))recall.Remove("question");
+                    if(JToken.DeepEquals(recall["question"],facts["request"] is JObject request?request["text"]:facts["request"])) { recall.Remove("question");recall["questionSource"]="request"; }
                 }
             // Empty dialogue and a null failure carry no evidence authority.
             // Keep explicit unknown-history records: those do convey uncertainty.
@@ -265,7 +285,7 @@ public static class ActivityMonitorContextPolicy
                 (scalar?.Parent as JProperty)?.Name=="phase")return "speech-phase-not-entity-state-evidence";
             if(domain=="execution" && issue=="uncertainty" && scalar is JValue state &&
                 new[]{"status","phase"}.Contains((state.Parent as JProperty)?.Name) &&
-                new[]{"completed","succeeded","satisfied","arrived","running","moving"}.Contains((string)state))
+                new[]{"completed","succeeded","satisfied","arrived","running","moving","failed","cancelled","rejected","stopped"}.Contains((string)state))
                 return "speech-uncertainty-with-definite-outcome";
             if(issue=="mistake" && domain=="execution") {
                 var unit=(frame["speech"] as JArray??new JArray()).OfType<JObject>().FirstOrDefault(u=>(string)u["id"]==(string)row["id"]);
@@ -289,6 +309,7 @@ public static class ActivityMonitorContextPolicy
         if(reason!="speech-evidence-domain-or-coverage-mismatch"&&reason!="speech-truth-without-qualified-evidence")return false;
         try {
             var verdict=JObject.Parse(output);
+            if(!ActivityMonitorProtocol.ExpandPredicateTime(verdict))return false;
             string domain=(string)verdict.SelectToken("grounding.claimDomain")??(string)verdict["claimDomain"];
             string proof=(string)verdict.SelectToken("speech.proof.evidenceId");
             if((string)verdict["claimTime"]=="past-event" && (string)verdict["perceptionSource"]!="current-writer-image" &&
@@ -320,7 +341,7 @@ public sealed class ActivityMonitorAttempts
         }
         var priorFeedback=e.Feedback;
         e.Feedback=new JObject{["rejection"]=reason,["rejectedVerdict"]=output!=null&&output.Length<=2600?output:null,
-            ["scope"]=reason=="speech-unknown-assertion-left-unresolved"
+            ["scope"]=reason=="speech-historical-source-required"?ActivityClaimSourcePolicy.Repair:reason=="speech-unknown-assertion-left-unresolved"
                 ?"The provided historical evidence explicitly leaves this event unknown. A definite denial is not justified by absence of disproof. Express narrow uncertainty about the same subject/entity/time; never flip it to a positive claim."
                 :reason=="speech-act-not-factual"?"Reconcile speechAct and issue. An actual unsure guess needs no correction; a definite assertion restricted only to a time/place/entity is factual-claim, not qualified-guess. Re-read the literal claim."
                 :reason=="speech-qualification-not-quoted"?"qualificationQuote was not an exact uncertainty phrase in the original speech. Do not insert ellipses or paraphrase. Time/place/entity qualifiers do not express uncertainty. If the original makes a definite positive or negative assertion, choose factual-claim and correct only its narrow unsupported claim."
@@ -335,7 +356,7 @@ public sealed class ActivityMonitorAttempts
                 :reason=="speech-claim-not-in-current-unit"?"claimQuote came from the user request or adjacent dialogue, not the CURRENT speech.text. Recheck only the actual speech unit. Copy its own atomic assertion; do not assess a different completed step or call a completion statement a personal feeling."
                 :reason=="speech-claim-outside-reviewed-operation"?"Recheck claimOperation from literal words, not proof. Only reviewOperation.claimKey may be corrected here; other operations have their own frame."
                 :reason=="speech-evidence-domain-or-coverage-mismatch"||reason=="speech-perception-domain-conflict"?"Recheck the claim's actual source and time against evidenceScopes. A prior observation belongs to historical evidence, not the current camera merely because it mentions seeing. An explicitly unknown past event permits narrow uncertainty, never definite denial. No source can gain authority by changing its label."
-                :reason=="speech-uncertainty-with-definite-outcome"?"The cited status states a known completed or running operation, not an unknown outcome. Check the operation the original sentence actually describes. Do not reinterpret a completed result as a claim that its following step also ended. Leave supported or ambiguous statements unchanged; uncertainty needs explicit unknown evidence."
+                :reason=="speech-uncertainty-with-definite-outcome"?"The cited status states a known terminal result or running operation, not an unknown outcome. A definite failure/cancellation is also a known result. Check the operation the original sentence actually describes. Do not reinterpret a completed result as a claim that its following step also ended. Leave supported or ambiguous statements unchanged; uncertainty needs explicit unknown evidence."
                 :reason=="speech-phase-not-entity-state-evidence"?"An execution phase describes an action's progress, not the entity's readiness or physical property. Re-read the completed results for the entity. Keep an ambiguous statement already supported by its completed result; do not invent an explicit action claim to justify intervening."
                 :reason=="delivery-repeated-candidate"?"The proposed supplement was already generated or heard. Re-evaluate actual completedPlaybackText against taskContext and the result. Ellipsis can already communicate that outcome, in which case choose covered. Only a genuinely missing meaning needs a different supplement that fully states that meaning; never repeat an action or merely rephrase the same insufficient reassurance."
                 :reason=="playback-quote-precedes-result-correction"?"Read the full playback, but quote only its last relevant clause after latestCorrectionStart. Do not quote the whole paragraph across that boundary. If the final clause already conveys this result in context, choose covered; otherwise describe the actual missing outcome, never replay an action."
@@ -358,6 +379,7 @@ public sealed class ActivityMonitorAttempts
         if(reason=="speech-leadin-repeats-rejected-claim" || (bool?)priorFeedback?["singlePhraseCorrection"]==true)e.Feedback["singlePhraseCorrection"]=true;
         if(output!=null)try {
             var rejected=JObject.Parse(output);
+            if(!ActivityMonitorProtocol.ExpandPredicateTime(rejected))throw new JsonException("Conflicting predicate time aliases.");
             if(new[]{"speech-evidence-domain-or-coverage-mismatch","speech-perception-domain-conflict"}.Contains(reason) && (string)rejected["claimTime"]=="past-event" &&
                 (string)(rejected.SelectToken("grounding.claimDomain")??rejected["claimDomain"])=="visual" &&
                 (string)rejected["perceptionSource"]!="current-writer-image") {
