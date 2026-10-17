@@ -75,6 +75,7 @@ public partial class ChatSample
             model.PostSceneRecallMessage(input.ToString(Formatting.None),preview.ImageDataUrl,(accepted,json,reason)=>{
                 if(!Current()||request!=m_SceneRecallRequestSerial)return;received=true;ok=accepted;output=json;status=reason;
             });
+            if(Current()&&!received)AcknowledgeRequestPreparation(generation,"recall:"+request);
             while(Current()&&request==m_SceneRecallRequestSerial&&!received&&Time.realtimeSinceStartup<deadline)yield return null;
             if(request!=m_SceneRecallRequestSerial)yield break;
             if(!Current()){model.CancelSceneRecallMessage();yield break;}

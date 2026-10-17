@@ -1039,9 +1039,13 @@ public partial class ChatSample
                     sweepImages.Add(new LLM.RoomObservationImage(frame.CaptureId, frame.MetadataJson, frame.ImageDataUrl));
             Debug.Log($"[Vision/Consumer] consumer=room generation={generation} capture={observation?.CaptureId ?? "none"} image={!string.IsNullOrEmpty(imageUrl)} historicalViewImages={sweepImages.Count}", this);
             int requestRevision = ++decisionRevision;
+            bool planningResponded=false;
             model.PostRoomTaskMessageWithObservationHistory(input, imageUrl, sweepImages, (ok, json, status) => {
+                planningResponded=true;
                 if (requestRevision == decisionRevision) OnDecision(ok, json, status, userText, null);
             });
+            if(!autonomous && !planningResponded && CurrentRequest() && requestRevision==decisionRevision)
+                AcknowledgeRequestPreparation(generation,"planning:"+requestRevision);
         }
         if (Application.isPlaying) StartCoroutine(WatchPlannerOwner());
         if (NeedsPendingDeviceClarificationReview(autonomous))

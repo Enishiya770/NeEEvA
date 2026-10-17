@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -301,6 +301,10 @@ public static class NevaSceneVisionIntegrationRegression
         if (Argument("-lifecycleGroundingRuntime", "0") == "1")
         {
             yield return LifecycleGroundingRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-audioSourceRuntime", "0") == "1") {
+            yield return AudioSourceRegression.Run(chat,bridge,Output);
             Finish(null);yield break;
         }
         if (Argument("-claimPlaybackRuntime", "0") == "1") {

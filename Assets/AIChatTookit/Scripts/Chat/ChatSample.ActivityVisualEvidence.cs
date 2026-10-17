@@ -8,6 +8,19 @@ using UnityEngine;
 public partial class ChatSample
 {
     private string m_ActivityReplyImage;
+    private readonly ActivitySourceCheckQueue m_ActivitySourceQueue=new ActivitySourceCheckQueue();
+    private string ActivitySourceOwner()=>m_FormalResponseGeneration+":"+m_WorkEpoch+":"+m_ActionConstraints.CurrentUserTurn+":"+ActivityBinding();
+    private void QueueInterpretedVisualSource(JObject frame)
+    {
+        var meaning=frame["speechMeaning"] as JObject;
+        if((string)meaning?["act"]!="factual-claim" || (string)meaning["domain"]!="visual" ||
+            (string)meaning["source"]!="current-writer-image")return;
+        // Literal parsing identifies what to inspect, not whether it is true.
+        // Avoid a text-only fact call merely to rediscover that it has no pixels.
+        TryActivityVisualRecheck(frame,new JObject{
+            ["claimQuote"]=meaning["quote"],["claimDomain"]=meaning["domain"],["speechAct"]=meaning["act"],
+            ["predicateTense"]=meaning["tense"],["perceptionSource"]=meaning["source"]}.ToString(Formatting.None));
+    }
     private readonly HashSet<string> m_ActivityVisualAttempts=new HashSet<string>();
     private readonly Dictionary<string,JObject> m_ActivityVisualEvidence=new Dictionary<string,JObject>();
     private bool HasActivityVisualEvidence(string id,string quote=null,string capture=null)=>m_ActivityVisualEvidence.Values.Any(row=>
@@ -86,8 +99,7 @@ public partial class ChatSample
         bool sameSource=(string)verdict["perceptionSource"]=="current-writer-image";
         if(!ActivityClaimSourcePolicy.CurrentImageAllowed(frame,verdict) || (domain!="visual" && !sameSource) || act!="factual-claim" || (!sameSource && (string)verdict["claimTime"]=="past-event") || string.IsNullOrWhiteSpace(quote) || quote.Length>360 ||
             ((string)unit?["text"]??"").IndexOf(quote,StringComparison.Ordinal)<0 ||
-            id==null || m_ActivityVisualAttempts.Count>=2 ||
-            ActivityMonitorSchedulePolicy.RetryAt(m_ActivityRequestTimes,Time.realtimeSinceStartup,10)>Time.realtimeSinceStartup ||
+            id==null ||
             m_ActivityReplyObservationGeneration!=m_FormalResponseGeneration || string.IsNullOrEmpty(m_ActivityReplyImage))return;
         var source=ActivityFormalObservation();
         if((bool?)source["formalPixelsProvided"]!=true || HasActivityVisualEvidence(id,quote,(string)source["captureId"]))return;
@@ -116,55 +128,71 @@ public partial class ChatSample
             if(adjacent.Count>=3 || contextCharacters+prior.Text.Length>480)break;
             adjacent.Insert(0,new JObject{["speechId"]=prior.Id,["text"]=prior.Text,["state"]="completed"});contextCharacters+=prior.Text.Length;
         }
-        var following=m_ActivitySpeech.Skip(index+1).ToList();
-        for(int n=0;n<following.Count;n++) {
-            var next=following[n];
-            var observed=next.ObservedAtSpeechStart??next.ObservedAtCreation;
-            if((string)observed?.SelectToken("formalObservation.captureId")!=(string)source["captureId"]||
-                next.State=="superseded"||next.IsCorrection)break;
-            if(claims.Count>=2||context.Length+next.Text.Length>480)break;
-            if(string.IsNullOrWhiteSpace(next.Text)||next.Text.Length>360||HasActivityVisualEvidence(next.Id,next.Text,(string)source["captureId"]))continue;
-            if(m_ActivityCompletedChecks.ContainsNonfactual(frame,ActivitySpeechWindow(next)))continue;
-            string proposition=next.Text;var end=next;
-            while(!ActivitySpeechWindowPolicy.EndsClause(proposition)&&n+1<following.Count) {
-                var suffix=following[n+1];
-                if(suffix.State=="superseded"||suffix.IsCorrection||suffix.Language!=next.Language||
-                    !ActivitySpeechWindowPolicy.Compatible(observed,suffix.ObservedAtSpeechStart??suffix.ObservedAtCreation))break;
-                string joined=ActivitySpeechWindowPolicy.Join(proposition,suffix.Text);
-                if(joined.Length>360||context.Length+joined.Length>480)break;
-                proposition=joined;end=suffix;n++;
-            }
-            // An unfinished queue tail is not a separate visual proposition.
-            // It will be reconsidered as playback/the queue advances.
-            if(!ActivitySpeechWindowPolicy.EndsClause(proposition)&&end.State=="queued")break;
-            claims.Add(new JObject{["id"]="c"+claims.Count,["speechId"]=end.Id,["claimQuote"]=proposition});
-            context=ActivitySpeechWindowPolicy.Join(context,proposition);
-        }
-        string groupKey=(string)source["captureId"]+":"+ActivityEvidencePolicy.Stamp(claims);
-        if(!m_ActivityVisualAttempts.Add(groupKey))return;
+        // Only parsed visual propositions share an image request. Unparsed
+        // neighboring feelings or invitations remain free expression, not pixels.
+        string groupKey=ActivitySourceCheckQueue.Key((string)source["captureId"],claims,(int?)unit["version"]??0);
         var input=new JObject{["purpose"]="visual-evidence",["monitorRequestId"]=Guid.NewGuid().ToString("N"),
             ["speechId"]=id,["speech"]=context,["adjacentContext"]=adjacent,["claimQuote"]=quote,["claims"]=claims,["captureId"]=source["captureId"]?.DeepClone(),
             ["observedAt"]=source["observedAt"]?.DeepClone()};
         input["perceptionSource"]=verdict["perceptionSource"]?.DeepClone();
         input["claimTime"]=verdict["claimTime"]?.DeepClone();
         input["claimDomain"]=domain;
+        input["binding"]=frame["speechMeaning"]?.DeepClone();
+        input["speechVersion"]=unit["version"]?.DeepClone();
+        m_ActivitySourceQueue.Changed=receipt=>Debug.Log("[Activity/SourceQueue] "+receipt.ToString(Formatting.None),this);
+        m_ActivitySourceQueue.Enqueue(groupKey,ActivitySourceOwner(),input,m_ActivityReplyImage,Time.realtimeSinceStartup);
+    }
+
+    private bool DispatchActivitySourceCheck(float now)
+    {
+        m_ActivitySourceQueue.Maintain(ActivitySourceOwner(),now);
+        if(m_ActivitySourceQueue.Count==0)return false;
+        if(m_ActivityVisualAttempts.Count>=2) {
+            m_ActivitySourceQueue.Cancel("source-budget-exhausted-unchecked",now);return false;
+        }
+        var job=m_ActivitySourceQueue.Take(ActivitySourceOwner(),now,
+            ActivityMonitorSchedulePolicy.RetryAt(m_ActivityRequestTimes,now,10));
+        if(job==null)return false;
+        var input=job.Input;string id=(string)input["speechId"];
+        var unit=m_ActivitySpeech.FirstOrDefault(s=>s.Id==id);
+        if(unit==null || unit.State=="superseded" || unit.CorrectedAfterExposure ||
+            (int?)input["speechVersion"]!=unit.Version) {
+            m_ActivitySourceQueue.Close(job,"speech-replaced-unchecked",now);return false;
+        }
+        if(HasActivityVisualEvidence(id,(string)input["claimQuote"],(string)input["captureId"])) {
+            m_ActivitySourceQueue.Close(job,"shared-evidence-available",now);return false;
+        }
+        if(!m_ActivityVisualAttempts.Add(job.Key)) {
+            m_ActivitySourceQueue.Close(job,"attempt-already-consumed-unchecked",now);return false;
+        }
+        input["monitorRequestId"]=Guid.NewGuid().ToString("N");
         int request=++m_ActivityRequestSerial,epoch=m_WorkEpoch,generation=m_FormalResponseGeneration;
         string binding=ActivityBinding();
         var model=m_ChatSettings.m_ChatModel;
-        m_ActivityRequestTimes.Enqueue(Time.realtimeSinceStartup);
-        m_ActivityRequestPending=true;m_ActivityModel=model;m_ActivityRequestDeadline=Time.realtimeSinceStartup+9f;
+        m_ActivityRequestTimes.Enqueue(now);m_ActivityLastPurpose="visual-evidence";
+        m_ActivityRequestPending=true;m_ActivityModel=model;m_ActivityRequestDeadline=now+9f;
         m_ActivityPendingKey="visual:"+id;m_ActivityPendingFrame=input;
-        model.PostActivityVisualEvidence(input.ToString(Formatting.None),m_ActivityReplyImage,(ok,result,status)=>{
+        try { model.PostActivityVisualEvidence(input.ToString(Formatting.None),job.Image,(ok,result,status)=>{
             if(request!=m_ActivityRequestSerial)return;
             m_ActivityRequestPending=false;
-            if(epoch!=m_WorkEpoch||generation!=m_FormalResponseGeneration||binding!=ActivityBinding()||m_UserSpeechActiveForAutonomy||m_SceneTimePaused||
-                !ReferenceEquals(model,m_ChatSettings?.m_ChatModel)||!isActiveAndEnabled)return;
+            var currentUnit=m_ActivitySpeech.FirstOrDefault(s=>s.Id==id);
+            if(job.State!="requesting"||epoch!=m_WorkEpoch||generation!=m_FormalResponseGeneration||binding!=ActivityBinding()||m_UserSpeechActiveForAutonomy||m_SceneTimePaused||
+                currentUnit==null||currentUnit.State=="superseded"||currentUnit.CorrectedAfterExposure||currentUnit.Version!=(int?)input["speechVersion"]||
+                !ReferenceEquals(model,m_ChatSettings?.m_ChatModel)||!isActiveAndEnabled) {
+                m_ActivitySourceQueue.Close(job,"owner-revoked-unchecked",Time.realtimeSinceStartup);return;
+            }
             JArray evidence=null;
             bool accepted=ok&&ActivityVisualEvidenceProtocol.TryReadGroup(result,input,out evidence);
             if(accepted&&evidence!=null)RememberActivityVisualEvidence(evidence);
+            m_ActivitySourceQueue.Close(job,accepted?"evidence-received":"provider-"+status+"-unchecked",Time.realtimeSinceStartup);
+            m_ActivityNextPoll=Time.realtimeSinceStartup;
             Debug.Log("[Activity/VisualEvidence] "+new JObject{["requestId"]=input["monitorRequestId"],["speechId"]=id,
                 ["accepted"]=accepted,["status"]=status,["evidence"]=evidence,["rawVerdict"]=result,
                 ["actionSubmitted"]=false}.ToString(Formatting.None),this);
-        });
+        }); } catch(Exception error) {
+            m_ActivitySourceQueue.Close(job,"provider-exception-"+error.GetType().Name+"-unchecked",Time.realtimeSinceStartup);
+            CancelActivityMonitoringForReason(false,"visual-provider-exception");
+        }
+        return true;
     }
 }

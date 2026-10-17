@@ -33,6 +33,7 @@ public partial class ChatSample
 
     private void TickSpeechLifecycle()
     {
+        ObservePreparedPlaybackEvidence();
         if (m_SceneTimePaused || Time.timeScale <= 0) return;
         ObserveLatencyFillerProgress();
         if (m_LatencyFillerPlayed && !m_RealFirstAudioStarted && m_LatencyFillerClip != null &&
@@ -41,11 +42,7 @@ public partial class ChatSample
         {
             m_SettledOpeningClip = m_LatencyFillerClip;
             m_SettledOpeningStartedAt = m_LatencyFillerStartedAt;
-            if(m_LatencyProgressComplete)RecordActivityDialogue("assistant",m_LatencyFillerText,"completed-opening:"+m_FormalResponseGeneration);
-            Debug.Log("[Speech/OpeningReceipt] "+new JObject{["generation"]=m_FormalResponseGeneration,
-                ["candidateText"]=m_LatencyFillerText,["wholeTextPlayed"]=m_LatencyProgressComplete,
-                ["playedSamples"]=m_LatencyProgressSamples,["sourceSamples"]=m_LatencyFillerClip.samples}.ToString(Formatting.None),this);
-            ReleaseSpeechPresentation(m_FormalResponseGeneration,
+            ReleaseSpeechPresentation(m_OpeningOwner,
                 m_LatencyProgressComplete ? "opening-audio-completed" : "opening-ended-without-completion-proof");
             // Keep the receipt and prefix until the formal handoff consumes it.
             // The delayed Played flag is NOT a speaking/microphone lock.
@@ -64,8 +61,12 @@ public partial class ChatSample
     private void CancelOwnedSpeechOutput(int owner, string reason)
     {
         if (owner != m_FormalResponseGeneration) return;
+        SettleEndedPreparedPlayback();
         ObserveLatencyFillerProgress();
-        if (m_LatencyFillerPlayed) CommitPlayedLatencyFiller();
+        if (m_LatencyFillerPlayed) {
+            if(IsOwnedLatencyFillerPlaying())FreezeOpeningPlayback(reason);
+            CommitPlayedLatencyFiller();
+        }
         else if (IsAISpeaking && !string.IsNullOrEmpty(m_CurrentlyPlayingText))
             RecordActivityInterruption(m_CurrentlyPlayingText, reason);
         FinishRoomSpeechPlaybackHistory(m_AssistantHeardText.ToString());

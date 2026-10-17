@@ -70,6 +70,7 @@ public partial class ChatSample
         => CancelActivityMonitoringForReason(clearSpeech,"owner-or-activity-reset");
     private void CancelActivityMonitoringForReason(bool clearSpeech,string reason)
     {
+        m_ActivitySourceQueue.Cancel(reason+"-unchecked",Time.realtimeSinceStartup);
         ++m_ActivityRequestSerial;m_ActivityRequestPending=false;
         m_ActivityModel?.CancelActivityMonitorForReason(reason);m_ActivityModel=null;
         if(clearSpeech) {m_ActivitySpeech.Clear();m_ActivityReviewed.Clear();m_ActivityReviewOrder.Clear();m_ActivityAttempts.Clear();m_ActivityCompletedChecks.Clear();m_ActivityGeneration=-1;m_ActivityLatePlaybackPrefix="";}
@@ -78,7 +79,14 @@ public partial class ChatSample
     private void RecordActivityInterruption(string text, string source)
     {
         if(string.IsNullOrEmpty(text))return;
-        var unit=m_ActivitySpeech.LastOrDefault(u=>u.State=="playing");
+        SettleEndedPreparedPlayback();
+        if(m_PreparedPlaybackReported && m_PreparedPlaybackText==text &&
+            m_PreparedPlaybackEvidenceGeneration==m_FormalResponseGeneration &&
+            m_AudioSource!=null && m_AudioSource.clip==m_PreparedPlaybackEvidenceClip)return;
+        if(m_LatencyFillerPlayed && text==m_OpeningText) {
+            ObserveLatencyFillerProgress();FreezeOpeningPlayback(source);RecordOpeningInterruption();return;
+        }
+        var unit=m_ActivitySpeech.LastOrDefault(u=>u.State=="playing" && u.Text==text);
         if(unit!=null)ObserveActivitySpeech(unit,"interrupted");
         m_LastInterruptedSpeechEvidence=new JObject{["generation"]=m_FormalResponseGeneration,["source"]=source,
             ["candidateText"]=text,["wholeTextPlayed"]=false,["exactSpokenPrefixKnown"]=false,
@@ -389,6 +397,7 @@ public partial class ChatSample
         EnsureActivityOwner();
         ApplySharedWorkDeliveryEvidence();
         float now=Time.realtimeSinceStartup;
+        m_ActivitySourceQueue.Maintain(ActivitySourceOwner(),now);
         if(m_ActivityRequestPending) {
             if(now>m_ActivityRequestDeadline) {
                 Debug.LogWarning("[Activity/Monitor] watchdog-timeout executionContinues=True",this);
@@ -411,7 +420,7 @@ public partial class ChatSample
         foreach(var unit in units.Where(u=>HasActivityVisualEvidence(u.Id)))
             if(!speech.OfType<JObject>().Any(row=>(string)row["id"]==unit.Id))speech.Add(ActivitySpeechWindow(unit));
         // Delivery of one step cannot hide a simultaneous claim about another.
-        if(actions.Count==0&&speech.Count==0&&delivery==null)return;
+        if(actions.Count==0&&speech.Count==0&&delivery==null) {DispatchActivitySourceCheck(now);return;}
         string binding=ActivityBinding();
         var frame=new JObject{["evidenceVersion"]=2,["capturedAtRealtime"]=now,["owner"]=new JObject{["generation"]=m_FormalResponseGeneration,["workEpoch"]=m_WorkEpoch,["binding"]=binding,
             ["userTurn"]=m_ActionConstraints.CurrentUserTurn},["facts"]=facts,["actions"]=actions,["speech"]=speech,
@@ -424,6 +433,11 @@ public partial class ChatSample
                 m_ActivityAttempts.CanAttempt(ActivityCheckKey(f),now)).ToArray();
         var selected=candidates.OrderBy(f=>ActivityMonitorSchedulePolicy.Priority(f,m_ActivityLastPurpose))
             .FirstOrDefault(f=>ActivityMonitorSchedulePolicy.RetryAt(m_ActivityRequestTimes,now,ActivityMonitorSchedulePolicy.Ceiling(f))<=now);
+        // Share the rate window, but do not let old literal/filler checks starve
+        // same-source evidence forever. Delivery/live actions retain their slots.
+        if((selected==null || (string)selected["purpose"]!="delivery" &&
+            ((string)selected["purpose"]=="speech" || m_ActivityLastPurpose=="action")) &&
+            DispatchActivitySourceCheck(now))return;
         if(selected==null && candidates.Length>0 && now>=m_ActivityScheduleLogAt) {
             m_ActivityScheduleLogAt=now+5f;
             Debug.Log("[Activity/MonitorSchedule] "+new JObject{["reason"]="shared-rate-window",
@@ -488,10 +502,12 @@ public partial class ChatSample
                 if(!valid){ActivityMonitorFailed(key,"speech-meaning-unresolved",output,frame);return;}
                 if(m_ActivityMeanings.Count>=48)m_ActivityMeanings.Remove(m_ActivityMeanings.Keys.First());
                 m_ActivityMeanings[meaningKey]=meaning;
-                foreach(var claim in ActivitySpeechMeaningPolicy.Frames(meaningSource,meaning))
+                foreach(var claim in ActivitySpeechMeaningPolicy.Frames(meaningSource,meaning)) {
                     if((string)claim["speechMeaning"]["act"]!="factual-claim")
                         m_ActivityCompletedChecks.Remember(claim,new JObject{["speechAct"]=claim["speechMeaning"]["act"],
                             ["speech"]=new JObject{["issue"]="none"}});
+                    else QueueInterpretedVisualSource(claim);
+                }
                 m_ActivityNextPoll=Time.realtimeSinceStartup;
                 return;
             }

@@ -17,6 +17,19 @@ public sealed class ActivityCompletedCheckCache
     static bool Speech(JObject f)=>(string)f["purpose"]=="speech" && f["speech"] is JArray rows && rows.Count==1 &&
         new[]{"queued","starting","playing","completed"}.Contains((string)rows[0]["state"]);
     static bool Nonfactual(JObject d)=>new[]{"personal-expression","invitation-or-question","qualified-guess"}.Contains((string)d["speechAct"]);
+    static bool SameCaptureVisual(JObject f,JObject d)
+    {
+        var meaning=f["speechMeaning"];
+        if((string)meaning?["domain"]!="visual" || (string)meaning["source"]!="current-writer-image" ||
+            (string)d["truthWhenSaid"]!="supported")return false;
+        var unit=(f["speech"] as JArray)?.FirstOrDefault() as JObject;
+        string capture=(string)ActivityEvidencePolicy.FrozenSpeech(unit,f,true)?["formalObservation"]?["captureId"];
+        var ids=(d["truthEvidenceIds"] as JArray??new JArray()).Values<string>().ToArray();
+        return !string.IsNullOrEmpty(capture) && ids.Length>0 && ids.All(id=>
+            (string)f["facts"]?[id]?["source"]=="same-capture-visual-check" &&
+            (string)f["facts"][id]["assessment"]=="supported" && (string)f["facts"][id]["captureId"]==capture &&
+            (string)f["facts"][id]["claimQuote"]==(string)meaning["quote"]);
+    }
     static string Fingerprint(JObject f,JObject d)
     {
         // Runtime keeps the full frozen sample; wire packets may alias it as
@@ -37,7 +50,7 @@ public sealed class ActivityCompletedCheckCache
         return ActivityEvidencePolicy.Stamp(selected);
     }
     public bool Contains(JObject frame)=>Speech(frame)&&entries.TryGetValue(Identity(frame),out var e)&&
-        (Nonfactual(e.Decision)||Completed(frame))&&
+        (Nonfactual(e.Decision)||Completed(frame)||SameCaptureVisual(frame,e.Decision))&&
         e.Fingerprint==Fingerprint(frame,e.Decision);
     public bool ContainsNonfactual(JObject context,JObject unit)
     {
@@ -48,7 +61,7 @@ public sealed class ActivityCompletedCheckCache
     public void Remember(JObject frame,JObject decision)
     {
         if(!Speech(frame)||(string)decision["speech"]?["issue"]!="none")return;
-        if(!Nonfactual(decision) && (!Completed(frame)||((string)decision["claimTime"]!="past-event"&&ActivitySpeechMeaningPolicy.KnownOngoingTruth(frame)!="supported")||
+        if(!Nonfactual(decision) && !SameCaptureVisual(frame,decision) && (!Completed(frame)||((string)decision["claimTime"]!="past-event"&&ActivitySpeechMeaningPolicy.KnownOngoingTruth(frame)!="supported")||
             (string)decision["truthWhenSaid"]!="supported"||((decision["truthEvidenceIds"] as JArray)?.Count??0)<=0))return;
         string stamp=Fingerprint(frame,decision);if(stamp==null)return;
         if(entries.Count>=48)entries.Remove(entries.Keys.First());

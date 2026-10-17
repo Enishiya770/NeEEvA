@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 public partial class ChatSample
@@ -13,21 +15,61 @@ public partial class ChatSample
     private int m_LatencyProgressSamples;
     private double m_LatencyProgressDsp;
     private bool m_LatencyProgressComplete;
+    private PreparedPlaybackEvidence m_OpeningPlaybackEvidence;
+    private JObject m_OpeningPlaybackReceipt;
+    private int m_OpeningOwner,m_OpeningSerial;
+    private string m_OpeningText,m_OpeningId;
+
+    private void BeginOpeningPlaybackEvidence()
+    {
+        if(m_OpeningPlaybackEvidence!=null && m_OpeningPlaybackReceipt==null)FreezeOpeningPlayback("opening-replaced");
+        m_LatencyProgressClip=m_LatencyFillerClip;m_LatencyProgressSamples=0;m_LatencyProgressComplete=false;
+        m_OpeningOwner=m_FormalResponseGeneration;m_OpeningText=m_LatencyFillerText;
+        m_OpeningId="opening:"+m_OpeningOwner+":"+(++m_OpeningSerial);m_OpeningPlaybackReceipt=null;
+        m_OpeningPlaybackEvidence=new PreparedPlaybackEvidence(m_LatencyProgressClip.samples,m_LatencyProgressClip.frequency,
+            AudioSettings.dspTime,Time.realtimeSinceStartupAsDouble,m_AudioSource.pitch,PlaybackDspQuantum());
+    }
+
+    private void FreezeOpeningPlayback(string reason=null)
+    {
+        if(m_OpeningPlaybackEvidence==null || m_OpeningPlaybackReceipt!=null)return;
+        if(reason!=null)m_OpeningPlaybackEvidence.Revoke(reason);
+        bool current=m_OpeningOwner==m_FormalResponseGeneration && m_AudioSource!=null && m_AudioSource.clip==m_LatencyProgressClip;
+        m_OpeningPlaybackReceipt=m_OpeningPlaybackEvidence.Freeze(AudioSettings.dspTime,Time.realtimeSinceStartupAsDouble,
+            current,m_SceneTimePaused||AudioListener.pause);
+        m_LatencyProgressComplete=(bool)m_OpeningPlaybackReceipt["complete"];
+        m_OpeningPlaybackReceipt["generation"]=m_OpeningOwner;m_OpeningPlaybackReceipt["id"]=m_OpeningId;
+        m_OpeningPlaybackReceipt["candidateText"]=m_OpeningText;
+        m_OpeningPlaybackReceipt["wholeTextPlayed"]=m_LatencyProgressComplete;
+        m_OpeningPlaybackReceipt["playedSamples"]=m_LatencyProgressSamples;
+        m_OpeningPlaybackReceipt["sourceSamples"]=m_LatencyProgressClip!=null?m_LatencyProgressClip.samples:0;
+        if(current && m_LatencyProgressComplete)RecordActivityDialogue("assistant",m_OpeningText,m_OpeningId);
+        Debug.Log("[Speech/OpeningReceipt] "+m_OpeningPlaybackReceipt.ToString(Formatting.None),this);
+    }
+
+    private void RecordOpeningInterruption()
+    {
+        // This opening has no formal SpeechUnit. Never look up a newer playing
+        // unit or read samples from the shared source after it has changed hands.
+        if(m_OpeningPlaybackReceipt==null)return;
+        var receipt=(JObject)m_OpeningPlaybackReceipt.DeepClone();
+        receipt["source"]="opening-interrupted";receipt["exactSpokenPrefixKnown"]=false;
+        if(m_OpeningOwner==m_FormalResponseGeneration)m_LastInterruptedSpeechEvidence=receipt;
+        Debug.Log("[Activity/InterruptedSpeech] "+receipt.ToString(Formatting.None),this);
+    }
 
     private void ObserveLatencyFillerProgress()
     {
-        if(m_LatencyFillerClip==null)return;
-        if(m_LatencyProgressClip!=m_LatencyFillerClip) {
-            m_LatencyProgressClip=m_LatencyFillerClip;m_LatencyProgressSamples=0;m_LatencyProgressComplete=false;
-        }
-        if(m_AudioSource==null||m_AudioSource.clip!=m_LatencyProgressClip)return;
+        if(m_OpeningPlaybackEvidence==null||m_OpeningPlaybackReceipt!=null)return;
+        if(m_OpeningOwner!=m_FormalResponseGeneration||m_AudioSource==null||m_AudioSource.clip!=m_LatencyProgressClip)
+        { FreezeOpeningPlayback("owner-or-clip-changed");return; }
+        if(m_SceneTimePaused||AudioListener.pause){FreezeOpeningPlayback("paused");return;}
         if(m_AudioSource.isPlaying) {
+            m_OpeningPlaybackEvidence.Observe(m_AudioSource.timeSamples,AudioSettings.dspTime,
+                Time.realtimeSinceStartupAsDouble,m_AudioSource.pitch);
             m_LatencyProgressSamples=Math.Max(m_LatencyProgressSamples,m_AudioSource.timeSamples);
             m_LatencyProgressDsp=AudioSettings.dspTime;
-        } else if(m_LatencyProgressSamples>0 &&
-            (m_LatencyProgressClip.samples-m_LatencyProgressSamples)/(double)Math.Max(1,m_LatencyProgressClip.frequency)<=
-                Math.Min(.10,Math.Max(0,AudioSettings.dspTime-m_LatencyProgressDsp))+.05)
-            m_LatencyProgressComplete=true;
+        } else FreezeOpeningPlayback();
     }
 
     private static bool SourceHasSampleProgress(AudioSource source)

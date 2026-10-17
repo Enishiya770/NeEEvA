@@ -257,7 +257,7 @@ public class GPTSoVITSFASTAPI : TTS
         }
         foreach (Language language in languages)
             foreach (var entry in m_LatencyFillerClips[language])
-                if (entry.Context == "accepted-task") result.Add(new LatencyFillerWarmTarget(language, entry));
+                if (entry.Context == "accepted-task" || entry.Context == "preparing-request") result.Add(new LatencyFillerWarmTarget(language, entry));
         if (!m_WarmUpLatencyFillerVariants) return result;
 
         AddRemainingWarmUpTargets(result, m_TargetTextLan);
@@ -328,6 +328,8 @@ public class GPTSoVITSFASTAPI : TTS
         m_LatencyFillerClips[language] = entries;
         entries.Add(new LatencyFillerEntry("accepted-task", language == Language.日文 ? "うん、取りかかるわ。" :
             language == Language.英文 ? "Okay, I'll get started." : "好，我来处理。"));
+        entries.Add(new LatencyFillerEntry("preparing-request",language==Language.日文?"まず確認するね。":
+            language==Language.英文?"Let me check first.":"我先确认一下。"));
     }
 
     private bool HasAllRequiredWarmUps()
@@ -349,7 +351,7 @@ public class GPTSoVITSFASTAPI : TTS
             if (entries[i].Clip == null) return false;
         }
         foreach (var entry in entries)
-            if (entry.Context == "accepted-task" && entry.Clip == null) return false;
+            if ((entry.Context == "accepted-task" || entry.Context == "preparing-request") && entry.Clip == null) return false;
         return required > 0;
     }
 
@@ -1183,7 +1185,7 @@ public class GPTSoVITSFASTAPI : TTS
         duration = 0f;
         if (output == null) return false;
 
-        bool acceptedTask = contextHint == "accepted-task";
+        bool acceptedTask = contextHint == "accepted-task" || contextHint == "preparing-request";
         Language predictedLanguage = acceptedTask && languageHint == "ja" ? Language.日文 :
             acceptedTask && languageHint == "en" ? Language.英文 : acceptedTask && languageHint == "zh" ? Language.中文 : PredictTargetLanguage(languageHint);
         EnsureLatencyFillerEntries(predictedLanguage);
@@ -1197,7 +1199,7 @@ public class GPTSoVITSFASTAPI : TTS
         {
             foreach (LatencyFillerEntry entry in entries)
             {
-                if (entry.Clip != null && entry.Context != "accepted-task") candidates.Add(entry);
+                if (entry.Clip != null && entry.Context != "accepted-task" && entry.Context != "preparing-request") candidates.Add(entry);
             }
         }
         if (candidates.Count == 0) return false;
@@ -1238,7 +1240,7 @@ public class GPTSoVITSFASTAPI : TTS
 
     private static string NormalizeLatencyFillerContext(string contextHint)
     {
-        if (contextHint == "accepted-task") return contextHint;
+        if (contextHint == "accepted-task" || contextHint == "preparing-request") return contextHint;
         if (string.Equals(contextHint, "singing", StringComparison.OrdinalIgnoreCase)) return "singing";
         if (string.Equals(contextHint, "thinking", StringComparison.OrdinalIgnoreCase)) return "thinking";
         return "neutral";

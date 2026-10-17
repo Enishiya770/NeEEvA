@@ -75,11 +75,13 @@ public partial class ChatSample
 
     private void OnApplicationPause(bool paused)
     {
+        if(paused)ObserveLatencyFillerProgress();
         SceneMonotonicNow(); m_SceneTimePaused = paused;
         m_SceneTimeLastRealtime = Time.realtimeSinceStartupAsDouble;
         if (paused)
         {
             m_PreparedPlaybackEvidence?.Revoke("application-paused");
+            FreezeOpeningPlayback("application-paused");
             CancelSequenceContinuation("application-paused");
             CancelSceneSearchTask("application-paused");
             m_ScenePauseStartedRealtime = Time.realtimeSinceStartupAsDouble;

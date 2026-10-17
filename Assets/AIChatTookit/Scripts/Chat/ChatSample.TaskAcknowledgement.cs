@@ -8,13 +8,21 @@ public partial class ChatSample
     // Called only after an executor/search lease accepts current user work.
     // It has no target/state/completion claim and never delays the action.
     private void AcknowledgeAcceptedTask(int generation, string owner)
+        => PlayOwnedRequestAcknowledgement(generation,owner,"accepted-task");
+
+    // A real owned planning/recall request is in flight. This says only that
+    // checking has begun, never that the requested operation was accepted/done.
+    private void AcknowledgeRequestPreparation(int generation,string owner)
+        => PlayOwnedRequestAcknowledgement(generation,owner,"preparing-request");
+
+    private void PlayOwnedRequestAcknowledgement(int generation,string owner,string context)
     {
         if (!m_EnableLatencyFiller || generation != m_FormalResponseGeneration || string.IsNullOrEmpty(owner) ||
             m_AgentCurrentRoundIsTick || m_RealFirstAudioStarted || m_LatencyFillerPlayed ||
             m_AcceptedTaskAcknowledgementGeneration == generation || m_AudioSource == null ||
             m_AudioSource.isPlaying || m_ChatSettings?.m_TextToSpeech == null) return;
         string language = SpatialGoalReportLanguage(null);
-        if (!m_ChatSettings.m_TextToSpeech.TryPlayLatencyFiller(language, "accepted-task", m_AudioSource,
+        if (!m_ChatSettings.m_TextToSpeech.TryPlayLatencyFiller(language, context, m_AudioSource,
                 out string text, out float duration)) return;
         m_AcceptedTaskAcknowledgementGeneration = generation;
         m_LatencyFillerGeneration = generation;
@@ -24,12 +32,15 @@ public partial class ChatSample
         m_LatencyFillerText = text;
         m_LatencyFillerStartedAt = Time.realtimeSinceStartup;
         m_LatencyFillerDuration = duration;
+        BeginOpeningPlaybackEvidence();
         m_CurrentlyPlayingText = text;
         if (m_TextBack != null) m_TextBack.text = text;
         SetAnimator("state", 2); IsAISpeaking = true;
-        Debug.Log("[Room/AcceptedTaskAcknowledgement] " + new JObject {
+        Debug.Log((context=="accepted-task"?"[Room/AcceptedTaskAcknowledgement] ":"[Room/PreparationAcknowledgement] ") + new JObject {
             ["generation"]=generation, ["owner"]=owner, ["language"]=language, ["text"]=text,
-            ["scope"]="Current task accepted; no completion asserted. Playback progress is measured separately."
+            ["stage"]=context,["scope"]=context=="accepted-task"?
+                "Current task accepted; no completion asserted. Playback progress is measured separately.":
+                "Current request is being checked. No acceptance, execution, success or result delivery asserted."
         }.ToString(Newtonsoft.Json.Formatting.None), this);
     }
 }
