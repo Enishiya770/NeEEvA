@@ -448,6 +448,8 @@ public class GPTSoVITSFASTAPI : TTS
                 requestId, generation, languageCode, textCharacters=text.Length,
                 httpStatus=request.responseCode, transportResult=request.result.ToString(), transportError=request.error,
                 transportDone=request.isDone, receivedBytes=pcm.ReceivedBytes, pcm.ContentComplete, pcm.FormatError,
+                errorBody=valid?null:pcm.ErrorResponsePrefix, errorBodyTruncated=pcm.ReceivedBytes>2048,
+                serverRequestId=request.GetResponseHeader("X-Request-ID"), contentType=request.GetResponseHeader("Content-Type"),
                 synthesisSucceeded=valid, completePlaybackConfirmed=false, cancellation=current?null:"superseded",
                 elapsedSeconds=Time.realtimeSinceStartup-began,
                 scope="Prepared PCM is not playback. Consumer must report advancement and completion separately."
@@ -753,6 +755,9 @@ public class GPTSoVITSFASTAPI : TTS
                 requestId, generation, languageCode, textCharacters = text.Length,
                 httpStatus = request.responseCode, transportResult = request.result.ToString(),
                 transportError = request.error, transportDone = operation.isDone,
+                errorBody = success ? null : pcmHandler.ErrorResponsePrefix,
+                errorBodyTruncated = !success && pcmHandler.ReceivedBytes > 2048,
+                serverRequestId = request.GetResponseHeader("X-Request-ID"),
                 receivedBytes = request.downloadedBytes, handlerBytes = pcmHandler.ReceivedBytes,
                 contentType = request.GetResponseHeader("Content-Type"),
                 contentLength = request.GetResponseHeader("Content-Length"),
@@ -862,6 +867,16 @@ public class GPTSoVITSFASTAPI : TTS
         private bool m_HasOddByte;
         private byte m_OddByte;
         private long m_ReceivedBytes;
+        private readonly List<byte> m_ResponsePrefix = new List<byte>(2048);
+        public string ErrorResponsePrefix { get { lock(m_Gate) {
+            if(HeaderReady && !FormatError)return null;
+            var value=System.Text.Encoding.UTF8.GetString(m_ResponsePrefix.ToArray());
+            // Do not print binary WAV data on format errors. JSON/text service
+            // failures remain bounded and independently diagnosable.
+            if(value.StartsWith("RIFF",StringComparison.Ordinal))return null;
+            foreach(char c in value)if(char.IsControl(c)&&c!='\r'&&c!='\n'&&c!='\t')return null;
+            return value;
+        } } }
         private bool m_ContentComplete;
         public long ReceivedBytes { get { lock (m_Gate) return m_ReceivedBytes; } }
         public bool ContentComplete { get { lock (m_Gate) return m_ContentComplete; } }
@@ -943,6 +958,7 @@ public class GPTSoVITSFASTAPI : TTS
             lock (m_Gate)
             {
                 m_ReceivedBytes += dataLength;
+                for(int i=0;i<dataLength && m_ResponsePrefix.Count<2048;i++)m_ResponsePrefix.Add(data[i]);
                 int offset = 0;
                 while (m_Header.Count < 44 && offset < dataLength)
                 {

@@ -22,6 +22,55 @@ public static partial class SpatialGoalRunnerRegression
         try
         {
             Run run = null;
+            model.TaskSequencesEnabled = true;
+            yield return Begin(chat, bridge, model, lamp, "failed-parent-continued-to-return", OffRequest + "然后回到我身边。", "off", "inspect-object", v => run = v);
+            string resumedGoal = (string)Goal(chat)["goalId"];
+            Call(chat, "FinishSpatialGoalRunner", Get(chat, "m_SpatialGoalRunner"), "controlled-search-budget-failure", false);
+            Require(Get(chat, "m_SpatialGoalRunner") == null && (string)Goal(chat)["status"] == "blocked" && lamp.ReadState().on,
+                "Actual failed runner settles and releases ownership without operating the device.");
+            const string resumeText = "你怎么不动了，继续呀。";
+            Call(chat, "SetCurrentUserInput", resumeText, resumeText);
+            Call(chat, "RecordAcceptedMotionUserTurn", resumeText);
+            SceneVisionObservation resumedView = null;
+            Call(chat, "RequestSceneObservation", "resumed-parent-source", new Action<SceneVisionObservation>(v => resumedView = v));
+            yield return Wait(() => resumedView?.HasImage == true, 8, "fresh continued-task view");
+            int resumeReviews = model.DeviceGoalReviews.Count;
+            run.searches = model.SceneSearchRequests.Count; run.matches = model.Matches.Count; run.speech = model.Speech.Count;
+            Call(chat, "StartStreaming", resumeText, false, null, false, false, false, null, false, resumedView, true);
+            yield return Wait(() => model.DeviceGoalReviews.Count == resumeReviews + 1, 8, "independent whole-parent continuation review");
+            var resumeReview = model.DeviceGoalReviews.Last(); Export("failed-parent-continue-review", resumeReview);
+            Require(JObject.Parse(resumeReview.Input)["parentTask"] is JObject,
+                "Continuation semantics receives the actual failed parent ledger.");
+            resumeReview.Complete(true, new JObject { ["verdict"] = "approved", ["relation"] = "continue", ["responseMode"] = "act",
+                ["referentGoalId"] = resumedGoal, ["referentEntityId"] = "", ["resumeParentTask"] = true,
+                ["reason"] = "Current user resumes the whole unfinished parent without changing its constraints." }.ToString(), "controlled-parent-resume");
+            run.generation = (int)Get(chat, "m_FormalResponseGeneration");
+            yield return Wait(() => Get(chat, "m_SpatialGoalRunner") != null, 8, "reviewed parent resumes without re-planning old quotes");
+            var resumedSequence = (JObject)Call(chat, "ReadRoomTaskSequence");
+            Require(RoomPlans(model) == run.rooms + 1 && (string)resumedSequence["originalRequest"] == run.text &&
+                (string)resumedSequence["request"] == resumeText && (string)resumedSequence.SelectToken("steps[1].status") == "pending",
+                "Current ownership, original parent constraints and dependent return survive the real new-turn entry.");
+            yield return Drive(chat, bridge, model, lamp, run);
+            Require(run.concurrentReturn && !lamp.ReadState().on && (string)Goal(chat)["status"] == "satisfied",
+                "Fresh execution and actual device readback unlock the original return after a short continue utterance.");
+            AddCase(run, "failed-parent-continued-fresh-execution-readback-and-return", chat);
+            bridge.StopMovement("resumed-parent-test-end", "End checked return submission");
+            model.TaskSequencesEnabled = false;
+            yield return Begin(chat, bridge, model, lamp, "quick-stop-approved-next-task", OffRequest, "off", "inspect-object", v => run = v, holdApproval: true);
+            StageOwnedFollow(bridge, "quick-stop-old-follow");
+            Call(chat, "BeginSceneVisionStopPreparation", (int)Get(chat, "m_FormalResponseGeneration"));
+            var quickControl = model.ControlReviews.Last();
+            quickControl.Complete(true, "{\"explicitStopNow\":true,\"bodyDirective\":\"other-task\",\"force\":\"command-now\",\"reason\":\"Current task replaces following.\"}", "controlled-quick-stop");
+            string quickStop = bridge.ActionId;
+            Require(!bridge.IsFollowing && bridge.Phase == "stopped", "Preparation really stops its owned old follow before new-goal approval.");
+            Approve(run.review, null);
+            Require(Get(chat, "m_SpatialGoalRunner") != null, "Already committed quick stop must hand off the independently approved next goal.");
+            yield return Drive(chat, bridge, model, lamp, run);
+            Require((string)Goal(chat)["status"] == "satisfied" && !lamp.ReadState().on,
+                "Quick-stop successor reaches actual same-entity readback, not merely a promise or stop receipt.");
+            yield return Audit(chat, model, lamp, run);
+            AddCase(run, "quick-stop-then-approved-target-actual-readback", chat);
+
             yield return Begin(chat, bridge, model, lamp, "follow-direct-device", OffRequest, "off", "inspect-object", v => run = v, holdApproval: true);
             StageOwnedFollow(bridge, "handoff-direct-follow");
             int reviews = model.ControlReviews.Count;

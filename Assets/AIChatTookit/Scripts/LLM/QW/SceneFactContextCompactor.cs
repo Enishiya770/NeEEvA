@@ -2,18 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-/// <summary>Request-only, exactly reversible sharing of repeated scene JSON and scope descriptions.
+/// <summary>Request-only, exactly reversible sharing of repeated scene JSON, scope descriptions and hearing evidence.
 /// Current action/selection/state remain inline. No summaries, inference, truncation,
 /// numeric rounding, history mutations or changes to the scene observation occur.</summary>
 public static class SceneFactContextCompactor
 {
     public const string ReferenceKey = "$sceneFactRef";
     private const int MinimumSubtreeCharacters = 384, MaximumReferences = 96;
-    private const string Intro = "[Scene fact sharing v1] $sceneFactRef copies the EXACT earlier JSON value (object, array or scope-description string) at blockId#JSON-pointer (RFC6901). Read that earlier full value here too; this is NOT a new observation, action, permission or confirmation. Action/selection/device results appear in full at their first occurrence; an entirely identical later snapshot or objectContext may refer back. Different timestamps or state values are never merged.\n";
+    private const string Intro = "[Scene fact sharing v1] $sceneFactRef copies the EXACT earlier JSON value (object, array, scope-description or hearing-evidence string) at blockId#JSON-pointer (RFC6901). Read that earlier full value here too; this is NOT a new observation, action, permission or confirmation. Action/selection/device results appear in full at their first occurrence; an entirely identical later snapshot or objectContext may refer back. Different timestamps or state values are never merged.\n";
     private static readonly string[] Markers = {
         "[视觉关注与行动事实]",
         "[只读场景问答]",
@@ -31,7 +32,7 @@ public static class SceneFactContextCompactor
 
     // Standalone search packets have no text block markers. Share identical
     // subtrees only in this request and verify exact expansion before sending.
-    public static string CompactJson(string json, out Report report)
+    public static string CompactJson(string json, out Report report, int minimumSubtreeCharacters = MinimumSubtreeCharacters, bool inlineEvidence = false)
     {
         report = new Report { beforeCharacters = json?.Length ?? 0, afterCharacters = json?.Length ?? 0 };
         if (string.IsNullOrEmpty(json) || json.Length > 2000000) return json;
@@ -41,14 +42,24 @@ public static class SceneFactContextCompactor
             using (var reader = new JsonTextReader(new StringReader(json)))
             {
                 reader.DateParseHandling = DateParseHandling.None;
-                reader.FloatParseHandling = FloatParseHandling.Decimal; reader.MaxDepth = 96;
+                reader.FloatParseHandling = FloatParseHandling.Double; reader.MaxDepth = 96;
                 original = JObject.Load(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
                 if (reader.Read()) throw new JsonException("Trailing content is not a standalone JSON packet.");
             }
+            // Unity can emit signed zero or very small floats. Decimal parsing
+            // silently rounds those before sharing, causing the entire large
+            // request to fall back unchanged. Retain each validated JSON number
+            // lexeme, not a new approximation, including its sign/exponent.
+            var numbers = NumberLiterals(json).ToArray();
+            var values = original.Descendants().OfType<JValue>()
+                .Where(v => v.Type == JTokenType.Integer || v.Type == JTokenType.Float).ToArray();
+            if (numbers.Length != values.Length) throw new JsonException("Numeric token count changed.");
+            for (int i = 0; i < values.Length; ++i) values[i].Replace(new JRaw(numbers[i]));
             VerifyNumericValues(json, original.ToString(Formatting.None));
             if (original.SelectTokens("$..['" + ReferenceKey + "']").GetEnumerator().MoveNext()) return json;
             int references = 0, stored = 0;
-            var compact = (JObject)Share(original, "root#", true, new Dictionary<string, string>(StringComparer.Ordinal), ref references, ref stored);
+            var compact = (JObject)Share(original, "root#", true, new Dictionary<string, string>(StringComparer.Ordinal), ref references, ref stored,
+                minimumSubtreeCharacters:Math.Max(128,minimumSubtreeCharacters), inlineEvidence:inlineEvidence);
             var expanded = Expand(compact, new Dictionary<string, JObject> { ["root"] = compact }, 0);
             if (!JToken.DeepEquals(original, expanded)) { report.reason = "round-trip-mismatch"; return json; }
             VerifyNumericValues(json, expanded.ToString(Formatting.None));
@@ -193,7 +204,9 @@ public static class SceneFactContextCompactor
             }
     }
 
-    private static IEnumerable<string> NumericValues(string json)
+    private static IEnumerable<string> NumericValues(string json) => NumberLiterals(json).Select(CanonicalNumber);
+
+    private static IEnumerable<string> NumberLiterals(string json)
     {
         bool quoted = false, escaped = false;
         for (int i = 0; i < json.Length; i++)
@@ -210,7 +223,7 @@ public static class SceneFactContextCompactor
             if (c != '-' && (c < '0' || c > '9')) continue;
             int start = i;
             while (i + 1 < json.Length && "0123456789eE+-.".IndexOf(json[i + 1]) >= 0) i++;
-            yield return CanonicalNumber(json.Substring(start, i - start + 1));
+            yield return json.Substring(start, i - start + 1);
         }
     }
 
@@ -257,14 +270,17 @@ public static class SceneFactContextCompactor
     }
 
     private static JToken Share(JToken value, string pointer, bool historical,
-        Dictionary<string, string> known, ref int references, ref int storedCharacters, string field = null)
+        Dictionary<string, string> known, ref int references, ref int storedCharacters, string field = null,
+        int minimumSubtreeCharacters = MinimumSubtreeCharacters, bool inlineEvidence = false)
     {
         // Only explicit program scope/capability descriptions may share scalar text.
         // Current reason, intent, entity, timestamps, speech and unknowns stay direct.
         bool description = value.Type == JTokenType.String && (field == "scope" || field == "capability" ||
+            field == "latestUserText" || field == "fullInputEvidence" ||
             field != null && field.EndsWith("Scope", StringComparison.Ordinal));
         string exact = value is JContainer || description ? value.ToString(Formatting.None) : null;
-        bool large = exact != null && exact.Length >= (description ? 180 : MinimumSubtreeCharacters);
+        bool large = exact != null && exact.Length >= (description ? 180 : minimumSubtreeCharacters);
+        if (inlineEvidence && new[] { "binding", "body", "execution", "speech-start", "observedAtSpeechStart", "observedAtCreation" }.Contains(field)) large = false;
         bool wholeRepeatedScene = value is JObject scene && scene["enabled"]?.Type == JTokenType.Boolean &&
             scene["active"]?.Type == JTokenType.Boolean && scene["objectContext"] is JObject && scene.Property("lastAction") != null;
         bool identicalObjectContext = field == "objectContext" && value is JObject;
@@ -281,14 +297,14 @@ public static class SceneFactContextCompactor
                 bool history = historical || ShareableDetail(property.Name);
                 // These locations describe the CURRENT execution, even if a future schema nests them in history.
                 if (property.Name == "selected" || property.Name == "lastAction" || property.Name == "stateResult" || property.Name == "currentAction") history = false;
-                result[property.Name] = Share(property.Value, pointer + "/" + Escape(property.Name), history, known, ref references, ref storedCharacters, property.Name);
+                result[property.Name] = Share(property.Value, pointer + "/" + Escape(property.Name), history, known, ref references, ref storedCharacters, property.Name,minimumSubtreeCharacters,inlineEvidence);
             }
             return result;
         }
         if (value is JArray array)
         {
             var result = new JArray();
-            for (int i = 0; i < array.Count; i++) result.Add(Share(array[i], pointer + "/" + i, historical, known, ref references, ref storedCharacters));
+            for (int i = 0; i < array.Count; i++) result.Add(Share(array[i], pointer + "/" + i, historical, known, ref references, ref storedCharacters,minimumSubtreeCharacters:minimumSubtreeCharacters,inlineEvidence:inlineEvidence));
             return result;
         }
         return value.DeepClone();

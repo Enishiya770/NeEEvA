@@ -4,8 +4,10 @@ public partial class ArdyRoomDialogueBridge
     {
         public string actionId, targetKind, phase, reason;
         public int operationRevision;
-        public bool currentlyNearAndFacingUser;
-        public bool userTrackingValid, userSupportVerified;
+        public bool? currentlyNearAndFacingUser;
+        public bool? userTrackingValid, userSupportVerified;
+        public int observationFrame;
+        public float observedAtRealtime;
         public float actualUserDistance = -1, actualFacingErrorDegrees = -1, desiredUserDistance;
         public string arrivalObservedUtc;
         public string approachRetargetStatus;
@@ -18,17 +20,17 @@ public partial class ArdyRoomDialogueBridge
         if (latestDiagnostic == null) return null;
         // Live relative pose is distinct from the immutable completion diagnostic.
         // This read checks support but never plans or submits another route.
-        var current = IsConnected && latestDiagnostic.phase == "arrived" && latestDiagnostic.targetKind == "user"
-            ? PeekCurrentTargetEvidence() : null;
+        var current = IsConnected ? PeekCurrentTargetEvidence() : null;
         return new MovementSpeechReceipt {
             actionId = latestDiagnostic.actionId, targetKind = latestDiagnostic.targetKind,
             phase = IsConnected ? latestDiagnostic.phase : "disconnected", reason = latestDiagnostic.reason,
             operationRevision = latestDiagnostic.operationRevision,
             approachRetargetStatus = latestDiagnostic.approachRetargetStatus,
-            currentlyNearAndFacingUser = IsConnected && latestDiagnostic.phase == "arrived" &&
-                latestDiagnostic.targetKind == "user" && current != null && current.currentlyNearAndFacingUser,
-            userTrackingValid = current != null && current.userTrackingValid,
-            userSupportVerified = current != null && current.userSupportVerified,
+            currentlyNearAndFacingUser = current?.currentlyNearAndFacingUser,
+            userTrackingValid = current?.userTrackingValid,
+            userSupportVerified = current?.userSupportVerified,
+            observationFrame = UnityEngine.Time.frameCount,
+            observedAtRealtime = UnityEngine.Time.realtimeSinceStartup,
             actualUserDistance = current?.actualUserDistance ?? -1,
             actualFacingErrorDegrees = current?.actualFacingErrorDegrees ?? -1,
             desiredUserDistance = current?.desiredUserDistance ?? approachDistance,

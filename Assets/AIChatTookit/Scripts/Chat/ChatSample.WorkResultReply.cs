@@ -1,35 +1,62 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Linq;
 
 public partial class ChatSample
 {
     private bool UseWorkResultReplyPacket(int generation)
     {
         string kind = (string)ReadMovementReplySemantics(generation)?["requestKind"];
+        var sequence = ReadRoomTaskSequence();
+        bool plannedActionOnly = kind == null && sequence?["steps"] is JArray steps && steps.Count > 0 &&
+            sequence["coverage"] is JArray coverage && coverage.Count > 0 &&
+            !coverage.OfType<JObject>().Any(row => (string)row["kind"] == "answer") &&
+            (sequence["answerObligations"] as JArray)?.Count == 0;
         return m_WorkReplyOnly && m_WorkReviewOpen && m_WorkStatus == "continue" &&
             m_AgentCurrentRoundIsTick && ShouldGuardWorkSceneFeedback(generation) && RoomTaskSequenceCurrent() &&
-            !HasWorkToolInFlight() && !SceneActionIsBusy && (kind == "action" || kind == "control") &&
+            !HasWorkToolInFlight() && !SceneActionIsBusy && (kind == "action" || kind == "control" || plannedActionOnly) &&
             ReadRoomEvidenceReplyFacts(generation) == null;
     }
 
     // Result delivery is selected by the work ledger, not words such as lamp or
     // return. Mixed questions retain their evidence route rather than silently
     // losing an independent answer. Runtime memory is never changed here.
-    private JObject BuildWorkResultReplyFacts(int generation) => new JObject {
+    private JObject BuildWorkResultReplyFacts(int generation)
+    {
+        var delivery=ReadWorkDelivery();
+        var sequence=ReadRoomTaskSequence();
+        // The ledger contains the canonical identity, status and outcome for
+        // each report. Retain plan coverage/questions, without copying every
+        // search trace and full receipt into a reply-only request again.
+        if(sequence?["steps"] is JArray steps)
+            foreach(var step in steps.OfType<JObject>()) {
+                if(new[]{"completed","failed"}.Contains((string)step["status"])) {
+                    step.Remove("receipt");
+                    step["resultSource"]="delivery.results source=step:"+(string)step["id"];
+                }
+            }
+        return new JObject {
         ["workResultOnly"] = true,
         ["attentionState"] = ReadAttentionState("work-result"),
         ["humanInput"] = BuildCommittedReplyHumanInput(generation),
         ["originalUserRequest"] = m_ActionConstraints.CurrentUserText,
         ["currentRequestSemantics"] = ReadMovementReplySemantics(generation),
         ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
-        ["taskSequence"] = ReadRoomTaskSequence(),
-        ["delivery"] = ReadWorkDelivery(),
+        ["taskSequence"] = sequence,
+        ["delivery"] = delivery,
+        ["reportingNow"] = new JObject {
+            ["resultIds"] = new JArray(((JArray)delivery["results"]).OfType<JObject>().Where(r=>
+                (bool?)r["delivered"]!=true || (bool?)r["playbackReviewPending"]==true).Select(r=>r["id"].DeepClone())),
+            ["purpose"] = "先自然告知这些项已经发生的真实结果。不是重新接受请求，也不是复述之前的开场或承诺。"+
+                "可以保留感受和合理新愿望，但它们不代替结果报告；没有新执行回执时不得把愿望说成已经开始。"
+        },
         ["currentExecution"] = BuildWorkResultExecution(),
         ["eventContext"] = BuildReplyEventContext(generation),
-        ["priorTaskResults"] = BuildMovementPriorResults(),
-        ["pendingResults"] = CreateObservationReceipt()?.Facts,
-        ["workProgress"] = m_WorkProgressFact,
-        ["lastMotionExecution"] = m_LastMotionExecutionFeedback == null ? null : MotionFeedbackJson(m_LastMotionExecutionFeedback),
+        ["pendingNotes"] = new JArray((CreateObservationReceipt()?.Facts??new JArray()).OfType<JObject>().Where(note=>
+            !new[]{nameof(m_PendingSelfInspection),nameof(m_LastSongSearchResult),nameof(m_LastSongCatalogResult),
+                nameof(m_LastSongMemoryResult),nameof(m_LastSpeakerManageResult),nameof(m_LastPracticeDropResult),
+                nameof(m_LastPracticeEditResult),nameof(m_LastHumBackResult)}.Contains((string)note["kind"]))),
+        ["resultSource"] = "Versioned delivery.results and taskSequence.answerEvidence; runtime history remains available outside this report-only projection.",
         ["recentPublicReplies"] = ReadRecentRoomReplies(),
         ["decisionFailure"] = ReadRoomTaskDecisionFailure(),
         ["previousReplyFailureReceipt"] = ReadPreviousReplyFailureReceipt(),
@@ -43,7 +70,8 @@ public partial class ChatSample
             "Preserve observedStateStatement's meaning in the dialogue language: an explicit runtime failure is established, not a guess or an unknown final result. " +
             "Deliver a pending inspection answer if present. Earlier accepted words are not proof of playback or execution. " +
             "No new perception, tool selection, or whole-scene description is requested by this result-only stage."
-    };
+        };
+    }
 
     private JObject BuildWorkResultExecution()
     {
@@ -51,7 +79,7 @@ public partial class ChatSample
         if (result != null)
             result["observedStateStatement"] = MovementProgressText(result["currentRoomFacts"] as JObject,
                 (string)result["intent"], (string)result["actionId"], "zh", false);
-        return result;
+        return ResultDeliveryContextPolicy.Execution(result);
     }
 
     private string BuildWorkResultReplyContext(int generation)

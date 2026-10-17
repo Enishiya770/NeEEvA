@@ -193,5 +193,19 @@ namespace NeEEvA.Perception
                 pageIndex, PageCount, TotalCandidates, out view, out reason)) return false;
             historicalPages.Add(pageIndex, view); return true;
         }
+
+        public bool TryBuildHistoricalFocus(string referenceId, out SceneObjectCandidateView view, out string reason)
+        {
+            view = null;
+            int index = Array.FindIndex(entries, e => e.referenceId == referenceId);
+            if (index < 0) { reason = "Reference does not belong to retained pixels."; return false; }
+            // Render the same frozen RGB with ONE mask and marker. The local
+            // marker is c1; the caller separately binds it to the original ID.
+            // Do not query the scene again or move a historical world point.
+            var mask = ordered[index];
+            return SceneObjectCandidateView.TryRenderHistorical(source, observation, mask.sample,
+                new List<SceneObjectCandidateView.Mask> { mask }, entryMasks, null,
+                0, 1, TotalCandidates, out view, out reason);
+        }
     }
 }

@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$Output,
-    [ValidateSet('transport','feedback','room','cognition','speech-view','xr-lifecycle','device-sequence','work-loop','approach','preparation','approach-plan','private-review','quality-recovery','quality-speech','conversation-repair','stream-delay','arrival','stream-pure','control-recovery','follow-handoff','activity-monitor','activity-runtime')][string]$Focus='transport',
+    [ValidateSet('transport','feedback','room','cognition','speech-view','xr-lifecycle','device-sequence','work-loop','approach','preparation','approach-plan','private-review','quality-recovery','quality-speech','conversation-repair','stream-delay','arrival','stream-pure','control-recovery','follow-handoff','activity-monitor','activity-runtime','activity-handoff','activity-evidence','activity-continuity','task-handoff','spatial-recall','compound-delivery','lifecycle-grounding','routing-delivery','semantic-playback','clarification-delivery','result-autonomy','runtime-failure')][string]$Focus='transport',
     [string]$LifecycleInput='',
     [string]$QualitySpeechInput='',
     [string]$ConversationRepairInput='',
@@ -43,6 +43,7 @@ $taskManifest=@(foreach($taskCode in $taskCodePaths) {
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskOutput 'source-manifest.json') -Encoding utf8
 $taskMethod=if($Focus -eq 'transport'){'FormalStreamRecoveryRegression.RunBatch'}elseif($Focus -eq 'feedback'){'FeedbackStageHttpRegression.RunBatch'}elseif($Focus -eq 'xr-lifecycle'){'ReloadSafeTrackedDeviceGraphicRaycasterRegression.RunBatch'}elseif($Focus -eq 'work-loop'){'AgentWorkLoopRegression.RunBatch'}elseif($Focus -eq 'approach'){'ArdyRoomDialogueIntegrationRegression.RunBatch'}elseif($Focus -eq 'approach-plan'){'ArdyRoomApproachRegression.RunBatch'}elseif($Focus -eq 'quality-recovery'){'ArdyRoomStreamDelayRegression.RunBatch'}else{'NevaSceneVisionIntegrationRegression.RunBatch'}
 $taskArguments=@('-batchmode','-projectPath',$taskValidationRoot,'-executeMethod',$taskMethod,'-logFile',(Join-Path $taskOutput 'unity.log'))
+if($Focus -eq 'lifecycle-grounding') { $taskArguments+=@('-lifecycleGroundingRuntime','1') }
 if($Focus -eq 'activity-monitor') {
     $taskArguments=@('-batchmode','-nographics','-projectPath',$taskValidationRoot,'-executeMethod','ActivityMonitorRegression.RunBatch',
         '-logFile',(Join-Path $taskOutput 'unity.log'),'-activityMonitorOutput',$taskOutput)
@@ -82,6 +83,18 @@ elseif($Focus -eq 'quality-speech') {
     if (-not (Test-Path -LiteralPath (Join-Path $QualitySpeechInput 'latest-quality-follow-failure/review-input.json'))) { throw 'Explicit recorded speech input is required.' }
     $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-qualitySpeechInput',[IO.Path]::GetFullPath($QualitySpeechInput))
 }
+elseif($Focus -eq 'activity-handoff') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-activityInterventionRuntime','1') }
+elseif($Focus -eq 'activity-evidence') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-activityEvidenceRuntime','1') }
+elseif($Focus -eq 'activity-continuity') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-activityContinuityRuntime','1') }
+elseif($Focus -eq 'spatial-recall') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-spatialRecallRuntime','1') }
+elseif($Focus -eq 'compound-delivery') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-compoundDeliveryRuntime','1') }
+elseif($Focus -eq 'lifecycle-grounding') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput) }
+elseif($Focus -eq 'result-autonomy') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-resultAutonomyRuntime','1') }
+elseif($Focus -eq 'runtime-failure') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-runtimeFailureRuntime','1') }
+elseif($Focus -eq 'clarification-delivery') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-clarificationDeliveryRuntime','1') }
+elseif($Focus -eq 'semantic-playback') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-semanticPlaybackRuntime','1') }
+elseif($Focus -eq 'routing-delivery') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-routingDeliveryRuntime','1') }
+elseif($Focus -eq 'task-handoff') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-taskHandoffRuntime','1') }
 elseif($Focus -eq 'activity-runtime') { $taskArguments+=@('-nevaSceneVisionOutput',$taskOutput,'-activityMonitorRuntime','1') }
 elseif($Focus -eq 'conversation-repair' -or $Focus -eq 'preparation' -or $Focus -eq 'activity-monitor') { }
 elseif($Focus -eq 'stream-delay' -or $Focus -eq 'arrival' -or $Focus -eq 'follow-handoff' -or $Focus -eq 'control-recovery' -or $Focus -eq 'stream-pure') { }
@@ -109,4 +122,6 @@ if($taskChanges.Count) { throw 'Source changed during verification; rerun a fres
 if($Focus -eq 'work-loop') { Copy-Item -LiteralPath (Join-Path $taskValidationRoot 'Tools/MotionAdapter/reports/agent-work-loop-regression.json') -Destination $taskOutput }
 if($Focus -eq 'work-loop') { Copy-Item -LiteralPath (Join-Path $taskValidationRoot 'Tools/MotionAdapter/reports/work-next-intent-model-cases.json') -Destination $taskOutput }
 if($taskProcess.ExitCode -ne 0) { throw "Unity exited with $($taskProcess.ExitCode). Inspect this run's log." }
+if(Select-String -LiteralPath (Join-Path $taskOutput 'unity.log') -Pattern 'error CS\d+|Scripts have compiler errors' -Quiet) { throw 'Unity compilation failed even though its process returned zero.' }
+if($Focus -eq 'activity-monitor' -and -not(Test-Path -LiteralPath (Join-Path $taskOutput 'regression.json'))) { throw 'Activity regression did not execute.' }
 Write-Output "Completed $Focus validation: $taskOutput"

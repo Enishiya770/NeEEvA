@@ -41,7 +41,7 @@ public partial class ChatSample
         return new JObject {
             ["receipt"] = m_LastRoomPlanningFailure.DeepClone(),
             ["historical"] = true,
-            ["scope"] = "A previous planning diagnostic in this scene. Its generation/userTurn/date identify the failed request; it is not a failure of the current answer, a persistent inability, an attempted movement, or permission to retry. Use only when relevant to the user's question."
+            ["scope"] = "Historical request diagnostic; stage/request/turn/date identify that attempt. Not a current failure, inability, world outcome or retry permission. Use only for a related question."
         };
     }
 
@@ -127,6 +127,11 @@ public partial class ChatSample
         {
             if (consumed) return;
             if (!Current()) { ReleaseInvalidCaptureOwner(); return; }
+            if(TryBeginSceneRecall(observation,understanding,generation,()=> {
+                if(!Current()){ReleaseInvalidCaptureOwner();return;}
+                // Recall latency must not turn an old camera pose into 'current'.
+                RequestSceneObservation("evidence-after-recall",Send);
+            })) return;
             consumed = true;
             m_PendingSceneFormalCaptureGeneration = -1;
             BindFormalSceneObservation(observation, generation);
@@ -142,7 +147,7 @@ public partial class ChatSample
         {
             // RequestSceneObservation normally completes within four seconds.
             // Keep ownership bounded even if a cancelled capture never calls back.
-            float deadline = Time.realtimeSinceStartup + 5f;
+            float deadline = Time.realtimeSinceStartup + (NeedsSceneRecall(understanding)?28f:5f);
             while (!consumed)
             {
                 if (!Current()) { ReleaseInvalidCaptureOwner(); yield break; }

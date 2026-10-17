@@ -49,10 +49,11 @@ public partial class ChatSample
         if (m_WorkReplyOnly) return null;
         var sequence = ReadRoomTaskSequence();
         if (sequence != null && !WorkNextIntentProtocol.HasReadyStep(sequence, m_WorkNextStepId)) return null;
+        bool readyOwnedStep = WorkNextIntentProtocol.HasReadyStep(sequence, m_WorkNextStepId);
         bool recovering = IsCurrentReadOnlyWorkRequest() && m_WorkContinuations == 0;
         if (!HasRoomTaskPlanner || !m_WorkReviewOpen || m_WorkStatus != "continue" || m_WorkNoProgress ||
             m_WorkContinuations >= MaxWorkContinuations || (!recovering && (m_WorkRoomTaskEpoch != m_WorkEpoch ||
-            m_WorkRoomTaskUserTurn != m_ActionConstraints.CurrentUserTurn || m_WorkRoomTaskIntent == "none" ||
+            m_WorkRoomTaskUserTurn != m_ActionConstraints.CurrentUserTurn || m_WorkRoomTaskIntent == "none" && !readyOwnedStep ||
             m_WorkRoomRequestText != m_ActionConstraints.CurrentUserText)) ||
             string.IsNullOrWhiteSpace(m_ActionConstraints.CurrentUserText) || m_UserSpeechActiveForAutonomy ||
             HasWorkToolInFlight() || SceneActionIsBusy) return null;
@@ -111,7 +112,7 @@ public partial class ChatSample
 
     private bool ShouldGuardWorkSceneFeedback(int generation) =>
         generation == m_FormalResponseGeneration && m_WorkRoomTaskEpoch == m_WorkEpoch &&
-        m_WorkRoomTaskIntent != "none" && m_WorkRoomTaskIntent == m_RoomTaskIntent &&
+        (m_WorkRoomTaskIntent != "none" || ReadRoomTaskSequence() != null) && m_WorkRoomTaskIntent == m_RoomTaskIntent &&
         m_WorkRoomTaskActionId == m_RoomTaskActionId &&
         m_ChatSettings?.m_ChatModel?.SupportsRoomTaskMessages == true;
 

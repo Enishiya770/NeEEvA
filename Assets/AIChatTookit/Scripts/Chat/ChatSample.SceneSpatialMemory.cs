@@ -302,6 +302,7 @@ public partial class ChatSample
             ["source"] = "Unity-known-object-capture-memory",
             ["viewCaptureId"] = viewValid ? current.CaptureId : null,
             ["objects"] = objects,
+            ["historicalRecall"] = ReadSceneRecallFacts(current),
             ["selfPose"] = viewValid ? BuildSceneSelfPoseContext(current) : null,
             ["viewSamples"] = viewValid ? SceneSpatialViewHistory() : new JArray(),
             ["dialogueViews"] = viewValid ? BuildSceneDialogueViewContext(current) : new JArray(),

@@ -1,4 +1,5 @@
 using Newtonsoft.Json.Linq;
+using System.Linq;
 using UnityEngine;
 
 public partial class ChatSample
@@ -7,8 +8,28 @@ public partial class ChatSample
     private JObject m_WorkRequestSemantics;
     private LLM m_WorkRequestSemanticsModel;
     private PrivateDecisionResult m_PrivateDecisionFailure;
+    private int m_PrivateDecisionFailureEpoch = -1, m_PrivateDecisionFailureTurn = -1;
+    private bool PrivateDecisionBlocksCurrentWork() => m_PrivateDecisionFailure != null && m_WorkReviewOpen &&
+        m_PrivateDecisionFailureEpoch == m_WorkEpoch && m_PrivateDecisionFailureTurn == m_ActionConstraints.CurrentUserTurn;
     private int m_PrivateDecisionRetries;
     private JObject m_PreviousUnfinishedWork;
+    private void RecordHistoricalWorkTermination(string previousActionId, JObject receipt, string reason)
+    {
+        if (string.IsNullOrEmpty(previousActionId) || receipt==null || m_PreviousUnfinishedWork==null ||
+            !new[]{"stopped","cancelled","disconnected"}.Contains((string)receipt["phase"])) return;
+        var steps=m_PreviousUnfinishedWork.SelectToken("taskSequence.steps") as JArray;
+        bool owned=(string)m_PreviousUnfinishedWork.SelectToken("executionAtInterruption.actionId")==previousActionId ||
+            steps!=null && steps.OfType<JObject>().Any(s=>(string)s["actionId"]==previousActionId);
+        if(!owned)return;
+        // Keep the immutable earlier steps and their completion states. This is
+        // the executor's later termination, never completion or replay authority.
+        m_PreviousUnfinishedWork["termination"]=new JObject{
+            ["committed"]=true,["previousActionId"]=previousActionId,["reason"]=reason,
+            ["receipt"]=TaskContinuationContextPolicy.Outcome(receipt),
+            ["replacementUserTurn"]=m_ActionConstraints.CurrentUserTurn,
+            ["scope"]="Actual termination after this snapshot. Earlier successful effects remain; unfinished steps did not become successful and are not automatically owed again."};
+        Debug.Log("[Work/HistoricalTermination] "+m_PreviousUnfinishedWork["termination"].ToString(Newtonsoft.Json.Formatting.None),this);
+    }
     private bool m_ReadOnlyWorkRecheckScheduled;
     private JObject m_WorkDeviceResult;
     private SpatialDeviceGoal m_WorkDeviceResultGoal;
@@ -18,7 +39,16 @@ public partial class ChatSample
     {
         // A completed event survives a later speech generation. It is never an
         // execution lease or a claim that an unseen device is still unchanged.
-        m_WorkDeviceResult = SpatialGoalResultContextPolicy.ProjectResultFacts(BuildSpatialGoalExecutionFacts());
+        var facts = BuildSpatialGoalExecutionFacts();
+        try { m_WorkDeviceResult = SpatialGoalResultContextPolicy.ProjectResultFacts(facts) ?? facts; }
+        catch (System.Exception error)
+        {
+            // A reporting optimisation must never discard an engine receipt or
+            // prevent the executor from settling. Full facts still face the
+            // final request budget before they can be sent to a model.
+            m_WorkDeviceResult = facts;
+            Debug.LogWarning("[Work/ResultProjectionFailure] " + error, this);
+        }
         m_WorkDeviceResultGoal = m_SpatialDeviceGoal;
         m_WorkDeviceResultEpoch = m_WorkEpoch;
         m_WorkDeviceResultTurn = m_ActionConstraints.CurrentUserTurn;
@@ -34,22 +64,41 @@ public partial class ChatSample
     private void RememberUnfinishedWorkBeforeReset(bool opening)
     {
         if (!opening) { m_PreviousUnfinishedWork = null; return; }
-        if (!m_WorkReviewOpen) { m_PreviousUnfinishedWork = null; return; }
+        // A closed correction/answer is not proof that its parent request was
+        // completed. Keep bounded historical outcomes, never an execution lease.
         // Retain one complete request and its outcome, never an action permission.
         // A new read-only follow-up must not overwrite it with the assistant's promise.
-        if (m_WorkRequestSemantics == null ||
-            (bool?)m_WorkRequestSemantics["requiresActionOrControl"] != true) return;
+        // The first-reply classifier can fail while the full planner succeeds.
+        // Prefer the owned canonical task, never an earlier classifier's route.
+        var sequence = ReadRoomTaskSequence();
+        bool planned = sequence?["steps"] is JArray steps && steps.Count > 0;
+        if (!planned && (m_WorkRequestSemantics == null ||
+            (bool?)m_WorkRequestSemantics["requiresActionOrControl"] != true)) return;
         var room = ReadCompactRoomTaskFacts(GetComponent<ArdyRoomDialogueBridge>());
+        var earlier = new JArray();
+        if (m_PreviousUnfinishedWork != null) {
+            foreach (var row in (m_PreviousUnfinishedWork["earlierRequests"] as JArray ?? new JArray())) earlier.Add(row.DeepClone());
+            var previous = (JObject)m_PreviousUnfinishedWork.DeepClone(); previous.Remove("earlierRequests");
+            earlier.Add(previous);
+            earlier = new JArray(earlier.Reverse().Take(3).Reverse());
+        }
         m_PreviousUnfinishedWork = new JObject {
-            ["request"] = m_WorkRequestSemantics["currentUserText"]?.DeepClone(),
-            ["userTurn"] = m_WorkRequestSemantics["userTurn"]?.DeepClone(),
+            ["request"] = planned ? sequence["request"]?.DeepClone() : m_WorkRequestSemantics["currentUserText"]?.DeepClone(),
+            ["userTurn"] = planned ? sequence["userTurn"]?.DeepClone() : m_WorkRequestSemantics["userTurn"]?.DeepClone(),
             ["workEpoch"] = m_WorkEpoch, ["statusAtInterruption"] = m_WorkStatus,
             ["bodyAtInterruption"] = PickRoomFields(room["currentFacts"] as JObject,
                 "connected", "currentlyNearAndFacingUser", "actualUserDistance", "activeActionId", "executionTargetKind"),
             ["executionAtInterruption"] = room["execution"]?.DeepClone(),
             ["resultAtInterruption"] = room["lastActionResults"]?.DeepClone(),
             ["privateFailure"] = m_PrivateDecisionFailure?.Status,
-            ["scope"] = "Historical unfinished whole request, not a new instruction or permission. A satisfied device subgoal or arrival at an object does not establish arrival at the user. Re-read the complete current utterance: explanation-only, cancellation and negation override resumption."
+            ["taskSequence"] = sequence,
+            ["executionProgress"] = WorkNextIntentProtocol.Progress(sequence),
+            ["taskReceiptSource"] = planned ? "owned-task-sequence" : "reviewed-request",
+            ["currentStepNotStarted"] = planned && ((JArray)sequence["steps"]).OfType<JObject>().Any(s =>
+                (string)s["status"] == "pending" && string.IsNullOrEmpty((string)s["actionId"])),
+            ["planningFailure"] = ReadRoomTaskDecisionFailure(),
+            ["earlierRequests"] = earlier,
+            ["scope"] = "Historical requests and actual outcomes, never permission. Scheduler closed does not prove the parent task completed. A correction of a prerequisite may concern an earlier request; resolve this from ALL later human turns, preserving cancellations/replacements. Completed events remain completed. Explanation-only, cancellation and negation override resumption; no historical request is automatically executed."
         };
     }
 
@@ -138,11 +187,14 @@ public partial class ChatSample
         if (result.Status != "context-budget" && m_PrivateDecisionRetries++ == 0)
         { ScheduleNextTick(5f, "private-decision-retry"); return; }
         m_PrivateDecisionFailure = result;
+        m_PrivateDecisionFailureEpoch = m_WorkEpoch;
+        m_PrivateDecisionFailureTurn = m_ActionConstraints.CurrentUserTurn;
         // Never send the same oversized packet via the larger formal planner.
         // Keep the unmet request and diagnosis; a new user turn resets the hold.
         m_WorkSubstepReviewPending = false;
         ClearScheduledAgentWake();
         if (m_WorkReviewOpen) m_WorkStatus = "review-blocked:" + result.Status;
+        else ScheduleNextTick(30f, "independent-attention-after-review-failure");
         HandleSystemNotice(new SystemNotice("private_review_failed", SystemNoticeSeverity.Error,
             "任务进度复核未完成，自动续接已暂停。", result.Status, "Agent", false));
     }

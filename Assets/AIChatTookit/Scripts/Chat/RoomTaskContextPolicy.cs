@@ -68,8 +68,48 @@ public static class RoomTaskContextPolicy
                     for(int i=0;i<originalRows.Count;i++)
                         if(originalRows[i] is JObject row && protectObjectRow(row))projectedRows[i]=row.DeepClone();
         result["visibleObjectCatalog"] = projected["visibleCatalog"].DeepClone();
-        result["planningObservationScope"] = "All catalog entities, captures, names, constraints, frozen world points, current pixels and derived bearings remain. currentPoseRef=planningCatalogPose supplies exactly equal current capture/time/relative-angle metadata; each historical delta remains inline. Redundant raw renderer/pose diagnostics stay in Unity. Historical pixels are not current pixels. The executor independently checks geometry, route, identity and permission; engine memory is unchanged.";
+        SharePlanningObservations(result,protectObjectRow);
+        result["planningObservationScope"] = result["planningObservationSharing"]==null ? "All catalog entities, captures, names, constraints, frozen world points, current pixels and derived bearings remain. currentPoseRef=planningCatalogPose supplies exactly equal current capture/time/relative-angle metadata; each historical delta remains inline. Redundant raw renderer/pose diagnostics stay in Unity. Historical pixels are not current pixels. The executor independently checks geometry, route, identity and permission; engine memory is unchanged." : "All catalog entities, captures, names, constraints, frozen world points, current pixels and derived bearings remain. currentPoseRef=planningCatalogPose supplies exactly equal current capture/time/relative-angle metadata; each historical delta remains inline. observationFieldsFrom copies ONLY fields named in inheritedObservationFields from that earlier input path; all other fields remain inline. This is exact sharing of the SAME entity AND capture, never a new observation or authority. Redundant raw renderer/pose diagnostics stay in Unity. Historical pixels are not current pixels. The executor independently checks geometry, route, identity and permission; engine memory is unchanged.";
         return result;
+    }
+
+    private static void SharePlanningObservations(JObject input,Func<JObject,bool> protectedRow)
+    {
+        int originalCharacters=input.ToString(Newtonsoft.Json.Formatting.None).Length;
+        var changed=new System.Collections.Generic.List<(JArray rows,int index,JObject original)>();
+        var canonical=new System.Collections.Generic.Dictionary<string,(string path,JObject value)>();
+        var diagnostics=new JArray();
+        foreach(string path in new[]{"visibleObjectCatalog.current.candidates","visibleObjectCatalog.memory","sceneSpatialMemory.objects",
+            "sceneActionFacts.objectContext.recentObservations","sceneActionFacts.objectContext.knownObjectHistory"}) {
+            if(!(input.SelectToken(path) is JArray rows))continue;
+            for(int i=0;i<rows.Count;i++) {
+                if(!(rows[i] is JObject row)||row["observationFieldsFrom"]!=null||protectedRow?.Invoke(row)==true)continue;
+                string entity=(string)row["entityId"],capture=(string)row["sourceCaptureId"];
+                if(string.IsNullOrEmpty(entity)||string.IsNullOrEmpty(capture))continue;
+                string key=entity+"\n"+capture,sourcePath=path+"["+i+"]";
+                if(!canonical.TryGetValue(key,out var first)){canonical[key]=(sourcePath,(JObject)row.DeepClone());continue;}
+                var shared=row.Properties().Where(p=>!new[]{"entityId","sourceCaptureId","referenceId","candidateId","selectionId"}.Contains(p.Name)&&
+                    first.value[p.Name]!=null&&JToken.DeepEquals(first.value[p.Name],p.Value)).Select(p=>p.Name).ToArray();
+                if(shared.Length==0)continue;
+                var projected=(JObject)row.DeepClone();foreach(string field in shared)projected.Remove(field);
+                projected["observationFieldsFrom"]=first.path;projected["inheritedObservationFields"]=new JArray(shared);
+                var restored=(JObject)projected.DeepClone();restored.Remove("observationFieldsFrom");restored.Remove("inheritedObservationFields");
+                foreach(string field in shared)restored[field]=first.value[field].DeepClone();
+                if(!JToken.DeepEquals(ActivityEvidencePolicy.Canonical(row),ActivityEvidencePolicy.Canonical(restored)))continue;
+                int saved=row.ToString(Newtonsoft.Json.Formatting.None).Length-projected.ToString(Newtonsoft.Json.Formatting.None).Length;
+                if(saved<128)continue;
+                changed.Add((rows,i,(JObject)row.DeepClone()));rows[i]=projected;diagnostics.Add(new JObject{["path"]=sourcePath,["source"]=first.path,["savedCharacters"]=saved,["roundTripVerified"]=true});
+            }
+        }
+        if(diagnostics.Count>0) {
+            input["planningObservationSharing"]=diagnostics;
+            // Include diagnostic/reference explanation overhead. Tiny repeated
+            // rows must never make the final planning packet larger.
+            if(input.ToString(Newtonsoft.Json.Formatting.None).Length+500>=originalCharacters) {
+                foreach(var edit in changed)edit.rows[edit.index]=edit.original;
+                input.Remove("planningObservationSharing");
+            }
+        }
     }
 
     // Keep the exact old human constraints, but do not present a past command as
@@ -112,6 +152,7 @@ public static class RoomTaskContextPolicy
             (string)attention?["source"] == "current-private-intent-review" &&
             (bool?)attention?["actionAuthorization"] == false &&
             (string)attention?["kind"] == "current-user-body" &&
+            attention?["workEpoch"]?.Type == JTokenType.Integer && attention?["userTurn"]?.Type == JTokenType.Integer &&
             !string.IsNullOrWhiteSpace((string)input["autonomousIntention"]) &&
             (string)attention["intention"] == (string)input["autonomousIntention"];
     }
@@ -126,6 +167,34 @@ public static class RoomTaskContextPolicy
             (string)semantics.SelectToken("planningFocus.kind") == "current-user-body" &&
             !string.IsNullOrWhiteSpace((string)input["currentUserText"]) &&
             (string)semantics.SelectToken("planningFocus.currentUserText") == (string)input["currentUserText"];
+    }
+
+    public static bool ContinuedBodyAttention(JObject input)
+    {
+        var attention = input?["autonomousAttention"] as JObject;
+        var work = input?["workContinuation"] as JObject;
+        return (bool?)input?["autonomous"] == false &&
+            (string)work?["source"] == "approved-same-user-work-next-step" &&
+            (string)attention?["source"] == "current-private-intent-review" &&
+            (bool?)attention?["actionAuthorization"] == false &&
+            (string)attention?["kind"] == "current-user-body" &&
+            (int?)attention?["workEpoch"] == (int?)work?["workEpoch"] &&
+            (int?)attention?["userTurn"] == (int?)work?["userTurn"] &&
+            !string.IsNullOrWhiteSpace((string)work?["nextStepIntention"]) &&
+            (string)attention?["intention"] == (string)work?["nextStepIntention"] &&
+            (string)work?["originalRequest"] == (string)input?["currentUserText"];
+    }
+
+    public static bool InitialUserViewAttention(JObject input)
+    {
+        var semantics=input?["currentRequestSemantics"] as JObject;
+        return (bool?)input?["autonomous"]==false &&
+            (string)semantics?["source"]=="independent-first-reply-current-request-review" &&
+            (bool?)semantics["actionAuthorization"]==false &&
+            new[]{"action","control"}.Contains((string)semantics["requestKind"]) &&
+            (string)semantics.SelectToken("planningFocus.kind")=="current-view" &&
+            !string.IsNullOrWhiteSpace((string)input["currentUserText"]) &&
+            (string)semantics.SelectToken("planningFocus.currentUserText")== (string)input["currentUserText"];
     }
 
     public static JObject DeviceEvent(JObject receipt)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using Newtonsoft.Json.Linq;
 using NeEEvA.Motion;
 using NeEEvA.Perception;
 using UniVRM10;
@@ -176,6 +177,15 @@ public partial class ChatSample
             return null;
         }
         var observation = GetFormalSceneObservation(generation);
+        m_ActivityReplyObservationGeneration=generation;
+        m_ActivityReplyImage=observation?.HasImage==true?observation.ImageDataUrl:null;
+        m_ActivityReplyObservation=new JObject {
+            ["formalPixelsProvided"]=observation?.HasImage==true,
+            ["captureId"]=observation?.CaptureId,
+            ["observedAt"]=observation?.CapturedAtRealtime,
+            ["source"]=observation?.Source,
+            ["scope"]="Exact source resolved for the formal answer. Source metadata does not give the process monitor image pixels."
+        };
         if (observation?.HasImage == true) RememberSceneDialogueView(observation);
         return observation?.HasImage == true ? observation.ImageDataUrl : null;
     }

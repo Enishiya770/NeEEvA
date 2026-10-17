@@ -85,6 +85,10 @@ public static class SceneSpatialMemoryRegression
         string unknownId = unknown.GetComponent<SceneObjectIdentity>().EntityId;
         SceneVisionObservation source = null;
         yield return Capture(capture, "initial", value => source = value);
+        if(((ChatSetting)Get(chat,"m_ChatSettings")).m_ChatModel.SupportsSceneRecallMessages) {
+            yield return SpatialRecallRegression.OrdinaryViewRecall(chat,bridge,capture,attention,source,unknown);
+            yield return Capture(capture,"after-ordinary-recall",value=>source=value);
+        }
         Check(capture.TryFindObservedObject(source, firstId, out var seenFirst, out string reason), "Actual first known opaque entity exists: " + reason);
         Check(capture.TryFindObservedObject(source, otherId, out var seenOther, out reason), "Actual other known opaque entity exists: " + reason);
         Check(capture.TryFindObservedObject(source, unknownId, out _, out reason), "Unknown fixture is genuinely visible, not missing from RGB: " + reason);

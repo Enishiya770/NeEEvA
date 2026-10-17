@@ -91,7 +91,20 @@ public partial class ChatSample
         BindRoomSpeechPlayback(generation, SpatialGoalReportLanguage(null), null, m_ChatSettings?.m_ChatModel, history);
         Debug.Log($"[ASR/Clarification] generation={generation} sceneFactsIncluded=false actionSubmitted=false attempts=1", this);
         m_FormalResponseInFlight = false;
-        OnStreamDelta(output); OnStreamComplete(output);
+        // The player consumes typed public runs, not the provider's envelope.
+        // Use exactly the same boundary/language parser as an ordinary reply.
+        var speech = new SpeechTextBuffer();
+        var channels = new RoleOutputChannels(part => speech.Append(part), RoleOutputBoundaryPolicy.ExplicitPublicSay);
+        channels.Push(output); channels.Finish();
+        if (!channels.HasSpeech || channels.HasInvalidPublicBoundary || channels.HasInvalidLanguage ||
+            channels.HasInvalidSpeechPhase || channels.HasUndeclaredSpeech || channels.HasAnyActionTag || channels.HasActions)
+        {
+            Debug.LogWarning("[ASR/Clarification] public-boundary-failed; reply remains undelivered", this);
+            m_StreamComplete = true;
+            return true;
+        }
+        foreach (var part in speech.Snapshot()) OnSpeechStreamDelta(part);
+        OnStreamComplete(channels.ToExecutableText(false, true));
         return true;
     }
 }

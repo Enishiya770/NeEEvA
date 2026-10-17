@@ -8,6 +8,24 @@ public partial class ChatSample
     private string m_WorkNextStepId;
     private JObject m_SceneAutonomyAttention;
 
+    private bool ValidateHistoricalWorkAssessment(AutonomyIntentDecision decision)
+    {
+        string expected = WorkNextIntentProtocol.HistoricalStatus(m_PreviousUnfinishedWork);
+        // Legacy adapters may omit the field; the production schema requires it.
+        if (decision.previous_work_status == null || decision.previous_work_status == expected) return true;
+        UnityEngine.Debug.LogWarning("[Work/HistoricalAssessmentCorrected] " + new JObject {
+            ["workEpoch"] = m_WorkEpoch, ["claimed"] = decision.previous_work_status, ["actual"] = expected,
+            ["previousUserTurn"] = m_PreviousUnfinishedWork?["userTurn"]?.DeepClone(),
+            ["newActionSubmitted"] = false,
+            ["scope"] = "Canonical historical state replaces this derived field only. Current delivery still requires its own versioned audio proof; no action or historical success is authorized."
+        }.ToString(Formatting.None), this);
+        // This is an engine-derived ledger field, not an independent semantic
+        // verdict. Do not discard correct current reports because it was copied
+        // incorrectly. Keep all actual action/quote/ownership validation below.
+        decision.previous_work_status = expected;
+        return true;
+    }
+
     private bool AcceptWorkAutonomousHandoff(AutonomyIntentDecision decision, JObject sequence)
     {
         if (decision.next_intent_source != "autonomous" || !decision.proceed ||
@@ -18,7 +36,7 @@ public partial class ChatSample
             IsSingingGoalAwaitingExecution() && !HasAutonomousSingingGoal() ||
             !string.IsNullOrEmpty(decision.remaining_request_quote) ||
             sequence?["steps"] is JArray steps && steps.Count > 0 && !steps.OfType<JObject>().All(s =>
-                (string)s["status"] == "completed" || FailedStepReportDelivered(s))) return false;
+                (string)s["status"] == "completed" || UnsuccessfulStepReportDelivered(s))) return false;
         m_WorkStatus = "closed"; m_WorkReviewOpen = false; m_WorkAutonomousHandoff = true;
         LogWorkNextIntent(decision, "new-autonomous-intention", sequence);
         return true;

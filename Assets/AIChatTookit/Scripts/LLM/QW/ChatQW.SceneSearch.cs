@@ -37,7 +37,7 @@ public partial class ChatQW
         sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":768,\"response_format\":{\"type\":\"json_object\"");
         if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(schema);
         sb.Append("},\"messages\":[");
-        AppendMessage(sb, new SendData("system", SceneSearchProtocol.Contract + "\n" + schema +
+        AppendMessage(sb, new SendData("system", SceneSearchProtocol.Contract + (m_Backend == BackendType.Local ? "" : "\n" + schema) +
             (sharing.applied ? "\n" + SceneFactContextCompactor.JsonSharingContract : ""))); sb.Append(',');
         AppendMessage(sb, new SendData("user", input ?? "") { imageDataUrl = imageDataUrl });
         sb.Append(']');
@@ -52,7 +52,10 @@ public partial class ChatQW
         bool allowed = AdmitSceneSearchWire(payload, out var budget);
         budget["generation"] = generation;
         Debug.Log("[SceneSearch/Budget] " + budget.ToString(Newtonsoft.Json.Formatting.None));
-        if (!allowed) { callback?.Invoke(false, "", "scene-search-context-budget"); yield break; }
+        if (!allowed) {
+            Debug.LogWarning("[SceneSearch/UnadmittedRequest] " + WorkReviewDiagnosticWire(payload));
+            callback?.Invoke(false, "", "scene-search-context-budget"); yield break;
+        }
         float started = Time.realtimeSinceStartup;
         using (var request = new UnityWebRequest(url, "POST"))
         {

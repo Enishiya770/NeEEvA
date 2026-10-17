@@ -48,6 +48,7 @@ public partial class ChatQW
         string replyAction = documents.Select(r => (string)r.SelectToken("currentActionReceipt.requestedActionId"))
             .FirstOrDefault(v => !string.IsNullOrEmpty(v));
         string replyNeed = documents.Select(r => (string)r["replyEvidenceNeed"]).FirstOrDefault(v => v != null);
+        if(replyNeed==null)replyNeed=documents.Select(r=>(string)r.SelectToken("currentRequestSemantics.questionUnderstanding.needsEvidence")).FirstOrDefault(v=>v!=null);
         var collections = new List<AttentionCollection>();
         var pinned = new HashSet<string>(StringComparer.Ordinal);
         var referred = new HashSet<string>(StringComparer.Ordinal);
@@ -102,10 +103,14 @@ public partial class ChatQW
                 if (collection.currentPage || pinned.Contains((string)row["entityId"] ?? "") || !SceneAttentionOptional(row))
                     selected.Add(RoomWorkingMemoryObjectKey(row));
         var terms = SceneAttentionTerms(query.ToString());
-        int remaining = Math.Max(0, slots - selected.Count), spent = 0;
+        // Mandatory offered pages do not consume the ordinary recall slots.
+        // Historical questions allocate those slots to history first, within the
+        // same detail ceiling. Runtime recency cannot outvote the question's time.
+        int remaining = Math.Max(0, slots), spent = 0;
         foreach (var group in all.Where(SceneAttentionOptional).GroupBy(RoomWorkingMemoryObjectKey)
             .Where(group => !selected.Contains(group.Key))
-            .OrderByDescending(group => group.Max(row => SceneAttentionRank(row, terms, referred) +
+            .OrderByDescending(group => replyNeed=="memory-or-direction" && group.Any(row=>(bool?)row["historical"]==true))
+            .ThenByDescending(group => group.Max(row => SceneAttentionRank(row, terms, referred) +
                 (attended.Contains((string)row["entityId"] ?? "") ? 40 : 0) +
                 (replyNeed == "current-visual" && (bool?)row["currentOpaquePixels"] == true ? 25 : 0) +
                 (replyNeed == "memory-or-direction" && (bool?)row["historical"] == true ? 25 : 0)))

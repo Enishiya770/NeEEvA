@@ -127,6 +127,12 @@ public partial class ChatQW
         // Ordinary conversation still uses the original generation/publication
         // checks below, and an unavailable classifier cannot authorize actions.
         string preflight = BuildFirstReplyPreflightWire(current, context);
+        if(preflight==null) {
+            var failure=FirstReplyCompletion.Failed("first-reply-review-input-budget");
+            SettleFirstReplyUserLease(userLease,failure,new List<SendData>(m_DataList));
+            if(m_FirstReplyOwnedGeneration==generation)m_FirstReplyOwnedGeneration=-1;
+            onComplete?.Invoke(failure);yield break;
+        }
         if (preflight != null)
         {
             string route = null, kind = null, demand = null, status = null, focus = null;
@@ -136,6 +142,12 @@ public partial class ChatQW
                 route = r; understanding = u; kind = k; sufficient = s; demand = d; status = state; proof = p; focus = f;
             });
             if (!Current()) yield break;
+            if(route==null) {
+                var failure=FirstReplyCompletion.Failed(status??"first-reply-review-unavailable");
+                SettleFirstReplyUserLease(userLease,failure,new List<SendData>(m_DataList));
+                if(m_FirstReplyOwnedGeneration==generation)m_FirstReplyOwnedGeneration=-1;
+                onComplete?.Invoke(failure);yield break;
+            }
             bool handoff = route != null && !(kind == "answer-only" && demand == "short-conversation");
             Debug.Log("[LLM/FirstReplyPreflight] " + new JObject { ["requestGeneration"] = generation,
                 ["requestKind"] = kind, ["route"] = route, ["handoff"] = handoff,
@@ -319,21 +331,40 @@ public partial class ChatQW
         // stale or external context cannot swap the source used for quotations.
         if (string.IsNullOrWhiteSpace(utterance) || (current.content ?? "").IndexOf(utterance, StringComparison.Ordinal) < 0)
             utterance = current.content ?? "";
-        string input = new JObject {
+        var reviewFacts = new JObject {
             ["latestUserText"] = current.content ?? "", ["recentDialogue"] = dialogue,
             ["recentDialogueIncomplete"] = incomplete, ["runtimeContext"] = runtimeContext,
             ["candidateSpeech"] = speech, ["currentUtterance"] = utterance
-        }.ToString(Formatting.None);
-        if (input.Length > FirstReplyProtocol.MaximumReviewInputCharacters) return null;
+        };
+        var before = TaskContinuationContextPolicy.Sizes(reviewFacts);
+        if (runtimeContext is JObject typed) reviewFacts["runtimeContext"] = TaskContinuationContextPolicy.FirstReply(typed);
+        string input = reviewFacts.ToString(Formatting.None);
+        input = SceneFactContextCompactor.CompactJson(input, out var sharing);
+        Debug.Log("[LLM/FirstReplyReviewBudget] " + new JObject {
+            ["before"] = before, ["after"] = TaskContinuationContextPolicy.Sizes(reviewFacts),
+            ["runtimeFields"] = reviewFacts["runtimeContext"] is JObject runtimeFacts ? TaskContinuationContextPolicy.Sizes(runtimeFacts) : null,
+            ["inputCharacters"] = input.Length, ["maximumInputCharacters"] = FirstReplyProtocol.MaximumReviewInputCharacters,
+            ["admitted"] = input.Length <= FirstReplyProtocol.MaximumReviewInputCharacters,
+            ["exactSharing"] = JObject.FromObject(sharing),
+            ["scope"] = "Routing projection only; unknown constraints and full utterance retained. Rejection is not a completed classification or task."
+        }.ToString(Formatting.None));
+        if (input.Length > FirstReplyProtocol.MaximumReviewInputCharacters) {
+            Debug.LogWarning("[LLM/FirstReplyUnadmittedFacts] " + input);
+            return null;
+        }
         var wire = new StringBuilder("{\"model\":"); AppendJsonString(wire, CurrentModelName);
         wire.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":")
             .Append(FirstReplyProtocol.ReviewMaximumOutputTokens).Append(",\"response_format\":{\"type\":\"json_object\",\"schema\":")
             .Append(FirstReplyProtocol.ReviewSchema).Append("},\"messages\":[");
-        AppendMessage(wire, new SendData("system", FirstReplyProtocol.ReviewContract));
+        AppendMessage(wire, new SendData("system", FirstReplyProtocol.ReviewContract + FirstReplyProtocol.HistoryRoutingScope +
+            (sharing.applied ? "\n" + SceneFactContextCompactor.JsonSharingContract : "")));
         wire.Append(','); AppendMessage(wire, new SendData("user", input)); wire.Append(']');
         wire.Append(",\"chat_template_kwargs\":{\"enable_thinking\":false}");
         AppendSlot(wire, k_SlotAuxiliary); wire.Append('}');
-        return wire.ToString();
+        string completeWire = wire.ToString();
+        var completeBudget = MeasureRoomDecisionBudget(completeWire, RoomDecisionRecoveryBudget);
+        Debug.Log("[LLM/FirstReplyReviewWireBudget] " + completeBudget.ToString(Formatting.None));
+        return (bool?)completeBudget["allowed"] == true ? completeWire : null;
     }
 
     private IEnumerator RequestFirstReplyReview(string wire, int generation, Action<string, JObject, string, bool?, string, string, JObject, string> callback,
@@ -341,6 +372,19 @@ public partial class ChatQW
     {
         bool Current() => generation == m_StreamRequestGeneration;
         if (!Current()) yield break;
+        // Repairs add evidence and must be admitted as complete requests too.
+        var finalBudget = MeasureRoomDecisionBudget(wire, RoomDecisionRecoveryBudget);
+        string finalReviewInputText = (string)JObject.Parse(wire)["messages"][1]["content"];
+        bool admitted = finalReviewInputText.Length <= FirstReplyProtocol.MaximumReviewInputCharacters && (bool?)finalBudget["allowed"] == true;
+        Debug.Log("[LLM/FirstReplyReviewAttemptBudget] " + new JObject {
+            ["generation"] = generation, ["attempt"] = groundingAttempt, ["admitted"] = admitted,
+            ["inputCharacters"] = finalReviewInputText.Length, ["completeRequest"] = finalBudget
+        }.ToString(Formatting.None));
+        if (!admitted) {
+            Debug.LogWarning("[LLM/FirstReplyUnadmittedFacts] " + finalReviewInputText);
+            callback?.Invoke(null, null, null, null, null, "first-reply-review-budget-exceeded", null, null);
+            yield break;
+        }
         float started = Time.realtimeSinceStartup;
         using (var request = new UnityWebRequest(url, "POST"))
         {
@@ -379,6 +423,7 @@ public partial class ChatQW
                 ["candidateSufficient"] = candidateSufficient, ["rawRoute"] = rawRoute,
                 ["responseDemand"] = responseDemand,
                 ["currentTurnEvidence"] = proof, ["groundingAttempt"] = groundingAttempt,
+                ["groundingErrors"] = received && route == null ? FirstReplyProtocol.ReviewGroundingErrors(output,(string)reviewInput["currentUtterance"]) : null,
                 ["elapsed"] = Time.realtimeSinceStartup - started, ["rawResponse"] = output
             }.ToString(Formatting.None));
             if (received && route != null && route != "tools" && requestKind == "answer-only" &&

@@ -45,7 +45,7 @@ public static class RoomSpeechPartsProtocol
         int protectedStart = string.IsNullOrEmpty(evidence) ? -1 : speech.IndexOf(evidence, StringComparison.Ordinal);
         var ends = new SortedSet<int> { speech.Length };
         for (int i = 0; i < speech.Length; i++)
-            if ("。！？!?；;，,".IndexOf(speech[i]) >= 0 || speech[i] == '.' &&
+            if ("。！？!?；;，,、".IndexOf(speech[i]) >= 0 || speech[i] == '.' &&
                 !(i > 0 && i + 1 < speech.Length && char.IsDigit(speech[i - 1]) && char.IsDigit(speech[i + 1])))
                 if (!spans.Any(s => s.start < i + 1 && s.end > i + 1)) ends.Add(i + 1);
         foreach (var span in spans) ends.Add(span.end);
@@ -54,7 +54,7 @@ public static class RoomSpeechPartsProtocol
         var adjusted = new SortedSet<int>();
         foreach (int end in ends) {
             int at = end;
-            while (at < speech.Length && (char.IsWhiteSpace(speech[at]) || "。！？!?.,，;；".IndexOf(speech[at]) >= 0)) at++;
+            while (at < speech.Length && (char.IsWhiteSpace(speech[at]) || "。！？!?.,，;；、".IndexOf(speech[at]) >= 0)) at++;
             adjusted.Add(at);
         }
         var result = new JArray(); int start = 0;
@@ -115,8 +115,8 @@ public static class RoomSpeechPartsProtocol
         if (trimmed.Length == 0) return text;
         // Only repair punctuation left by removing a joined movement clause;
         // never rewrite an independently reviewed word or infer a new assertion.
-        if (",，;；".IndexOf(trimmed[trimmed.Length - 1]) >= 0)
-            return trimmed.TrimEnd(',', '，', ';', '；') + (english ? ". " : "。");
+        if (",，;；、".IndexOf(trimmed[trimmed.Length - 1]) >= 0)
+            return trimmed.TrimEnd(',', '，', ';', '；', '、') + (english ? ". " : "。");
         if (".。！？!?".IndexOf(trimmed[trimmed.Length - 1]) < 0)
             return trimmed + (english ? ". " : "。");
         return text;

@@ -564,11 +564,17 @@ public class LLM:MonoBehaviour
     /// <summary>Same-model, request-local spatial decision and speech consistency check. No history or side effects.</summary>
     public virtual bool SupportsRoomTaskMessages => false;
     public virtual bool SupportsActivityMonitor => false;
+    public virtual bool SupportsSpeechLanguageCheck => false;
+    public virtual void PostSpeechLanguage(string text,Action<bool,string,string> callback)=>callback?.Invoke(false,null,"unsupported");
+    public virtual string PrepareActivityMonitorFrame(string input, out string diagnostics)
+    { diagnostics = "{}"; return input; }
     [NonSerialized] public bool OngoingSpeechMonitoring;
     /// <summary>Independent, bounded process feedback. Never writes public history or executes actions.</summary>
     public virtual void PostActivityMonitor(string input, Action<bool, string, string> callback)
         => callback?.Invoke(false, "", "activity-monitor-unsupported");
     public virtual void CancelActivityMonitor() { }
+    public virtual void PostActivityVisualEvidence(string input, string imageDataUrl, Action<bool,string,string> callback)
+        => callback?.Invoke(false,"","activity-visual-unsupported");
     public virtual bool SupportsRoomTaskSequences => false;
     /// <summary>Cancel only the private room planner; keep a newly started public result stream intact.</summary>
     public virtual void CancelRoomTaskPlanningMessage() { }
@@ -584,6 +590,10 @@ public class LLM:MonoBehaviour
     public virtual void PostSceneSearchDecisionMessage(string input, string imageDataUrl, Action<bool, string, string> callback)
         => callback?.Invoke(false, "", "scene-search-provider-unavailable");
     public virtual void CancelSceneSearchDecisionMessage() { }
+    public virtual bool SupportsSceneRecallMessages => false;
+    public virtual void PostSceneRecallMessage(string input, string image, Action<bool,string,string> callback)
+        => callback?.Invoke(false,"","recall-provider-unavailable");
+    public virtual void CancelSceneRecallMessage() { }
     public virtual bool SupportsSceneObjectMatchMessages => false;
     public virtual void PostSceneObjectMatchMessage(string input, string imageDataUrl,
         Action<bool, string, string> callback)
@@ -631,6 +641,7 @@ public class LLM:MonoBehaviour
     public virtual void CancelActiveResponse()
     {
         CancelSceneSearchDecisionMessage();
+        CancelSceneRecallMessage();
         CancelSceneObjectMatchMessage();
         CancelRoomDeviceGoalReviewMessage();
     }

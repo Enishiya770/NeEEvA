@@ -246,7 +246,7 @@ public static partial class AgentWorkLoopRegression
         Check(Get(f.chat, "m_SentenceBuffer").ToString() == sentenceBefore && ((ICollection)Get(f.chat, "m_PendingChunks")).Count == chunksBefore,
             "A delta received after its callback completed entered the newer continue response.");
         f.model.Complete("<silent/>");
-        Check(!(bool)Get(f.chat, "m_PracticeEditResultPending"), "An effective completed response did not acknowledge the delivered result.");
+        Check((bool)Get(f.chat, "m_PracticeEditResultPending"), "A silent response cleared an unreported confirmation result without completed playback evidence.");
         Check((string)Get(f.chat, "m_LastUnknownTagNote") == "", "A valid response did not acknowledge the metadata event it actually received.");
         foreach (JObject request in f.model.Requests)
             Check(LastSystem(request).Length > 0, "Execution observations were not positioned after the completed assistant reply.");
@@ -276,7 +276,7 @@ public static partial class AgentWorkLoopRegression
         Check((bool)Get(f.chat, "m_HumBackResultPending"), "Renderer evidence was acknowledged before response completion.");
         // The transport completes without claiming the requested musical content was correct.
         f.model.Complete("<silent/>");
-        Check(!(bool)Get(f.chat, "m_HumBackResultPending"), "Delivered renderer evidence remained perpetually pending.");
+        Check((bool)Get(f.chat, "m_HumBackResultPending"), "A silent response settled renderer evidence before a spoken result report was validated.");
         Check((bool)Get(f.chat, "m_WorkReviewOpen"), "Unity playback completion automatically declared the user's goal satisfied.");
         SaveScenario(f); f.Dispose(); fixture = null;
     }
@@ -565,8 +565,8 @@ public static partial class AgentWorkLoopRegression
         Check((string)Get(f.chat, "m_DroppedSongTitleNote") == note && (bool)Get(f.chat, "m_SongMemoryResultPending"),
             "Dispatching a ready result acknowledged it before a formal response completed.");
         f.model.Complete("<silent/>");
-        Check((string)Get(f.chat, "m_DroppedSongTitleNote") == "" && !(bool)Get(f.chat, "m_SongMemoryResultPending"),
-            "A valid response failed to acknowledge the completed result and accompanying note it received.");
+        Check((string)Get(f.chat, "m_DroppedSongTitleNote") == "" && (bool)Get(f.chat, "m_SongMemoryResultPending"),
+            "Receiving a metadata note must acknowledge only that note; a silent response cannot settle the unreported save result.");
         SaveScenario(f); f.Dispose(); fixture = null;
     }
 

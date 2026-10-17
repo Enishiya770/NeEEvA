@@ -434,8 +434,17 @@ public static class SceneGoalReferentRegression
                     ((JArray)LastReport["cases"]).Add(new JObject { ["name"]=item.Id,["goal"]=Goal(chat),["proposalReviews"]=2,["reinterpretations"]=1 });
                     continue;
                 }
-                yield return Wait(()=>model.Decisions.Count==rooms+3,8,"A second rejected interpretation leaves the bounded device proposal route");
-                ++rooms;++reviews;
+                yield return Wait(()=>model.Speech.Count==speech+1,8,"Exhausted interpretation hands its actual failure to the writer");
+                var failure=(JObject)Call(chat,"ReadRoomTaskDecisionFailure");
+                Check(model.Decisions.Count==rooms+2 && model.DeviceGoalReviews.Count==reviews+2 &&
+                    (bool?)failure?["newActionSubmittedByThisDecision"]==false &&
+                    model.Speech.Last().Context.Contains("device-goal-not-independently-approved") &&
+                    model.Matches.Count==matches && model.SceneSearchRequests.Count==searches &&
+                    bridge.Controller.OperationRevision==operation && Call(chat,"GetActiveSpatialGoalId")==null,
+                    "Finite proposal failure remains unexecuted, with its original cause; no third generic replanning round.");
+                ((JArray)LastReport["cases"]).Add(new JObject { ["name"]=item.Id,["failure"]=failure,
+                    ["proposalReviews"]=2,["reinterpretations"]=1,["actionSubmitted"]=false });
+                continue;
             }
             var current=model.Decisions.Last();var input=JObject.Parse(current.Input);var receipt=(JObject)Get(chat,"m_SpatialGoalLatestReview");
             Check((bool?)input["currentRequestOnly"]==true&&(string)input["currentUserText"]==item.Text&&

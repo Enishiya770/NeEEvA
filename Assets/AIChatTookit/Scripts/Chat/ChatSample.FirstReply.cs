@@ -33,7 +33,7 @@ public partial class ChatSample
     {
         var current = ReadCurrentRequestSemantics(generation);
         return current == null ? null : PickRoomFields(current, "source", "generation", "workEpoch", "userTurn",
-            "requestKind", "planningFocus", "currentTurnEvidence", "requiresActionOrControl", "effectiveRoute", "actionAuthorization");
+            "requestKind", "planningFocus", "questionUnderstanding", "currentTurnEvidence", "requiresActionOrControl", "effectiveRoute", "actionAuthorization");
     }
 
     private void RememberFirstReplyRequestSemantics(FirstReplyCompletion result, int generation, LLM model)
@@ -47,8 +47,9 @@ public partial class ChatSample
             ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
             ["currentUserText"] = m_ActionConstraints.CurrentUserText,
             ["requestKind"] = result.RequestKind,
+            ["questionUnderstanding"] = result.QuestionUnderstanding?.DeepClone(),
             ["planningFocus"] = new JObject { ["kind"] = result.PlanningFocus ?? "general",
-                ["currentUserText"] = result.PlanningFocus == "current-user-body" ? new JValue(m_ActionConstraints.CurrentUserText) : JValue.CreateNull() },
+                ["currentUserText"] = result.PlanningFocus == "current-user-body" || result.PlanningFocus == "current-view" ? new JValue(m_ActionConstraints.CurrentUserText) : JValue.CreateNull() },
             ["currentTurnEvidence"] = result.CurrentTurnEvidence?.DeepClone(),
             ["responseDemand"] = result.ResponseDemand,
             ["requiresActionOrControl"] = FirstReplyProtocol.RequiresActionOrControl(result.RequestKind),
@@ -128,6 +129,26 @@ public partial class ChatSample
                 }
                 if (!publicDeltaDelivered && result?.SpeechDelivered != true)
                 {
+                    if(result == null || result.Disposition == FirstReplyDisposition.Failed) {
+                        // An unchecked classifier is not a request for tools or
+                        // a whole-scene planner. Its bounded recovery already
+                        // ran in the provider. Keep the accepted turn and expose
+                        // this failure without granting or replaying any action.
+                        m_FormalResponseInFlight=false;
+                        ClearStagedFormalObservation();
+                        string language=SpatialGoalReportLanguage(null);
+                        RecordFirstReplyFailure(generation,epoch,result?.Failure??"missing-completion");
+                        string message=FirstReplyFailureText(m_FirstReplyFailure,language);
+                        m_PendingToolCorrectionFrame="[首答分类未完成] "+(result?.Failure??"missing-completion")+
+                            "；本轮未由此派发新动作，原用户输入与任务记录保留。这不是执行失败、取消或任务完成。";
+                        Debug.LogWarning("[FirstReply/Unresolved] "+new JObject{["generation"]=generation,["workEpoch"]=epoch,
+                            ["reason"]=result?.Failure,["actionAuthorized"]=false,["scenePlannerDispatched"]=false,
+                            ["scope"]="Retained accepted human turn; failed classification is not an ordinary/tools verdict."}.ToString(Formatting.None),this);
+                        if(recordHistory)model.m_DataList.Add(new LLM.SendData("assistant",message));
+                        BindActivityOrdinaryHistory(generation,model);
+                        OnSpeechStreamDelta(new SpeechText(message,language,"first-reply-unresolved",SpeechActionDependency.Independent));
+                        OnStreamComplete(message);return;
+                    }
                     if (result?.Disposition == FirstReplyDisposition.Evidence)
                     {
                         // This reviewed handoff only reads facts. It cannot approve,
@@ -149,8 +170,8 @@ public partial class ChatSample
                 // This does not accept the malformed completion or replay tools.
                 m_FirstReplyFailureDrainGeneration = generation;
                 m_SentenceBuffer.Length = 0;
-                m_PendingChunks.Clear();
-                m_PendingClips.Clear();
+                ClearPendingSpeechChunks("queue-cleared");
+                ClearPendingSpeechClips("queue-cleared");
                 m_FormalResponseInFlight = false;
                 m_PendingToolCorrectionFrame = "[首答流未正常完成] " + (result?.Failure ?? "missing-completion") +
                     "；本轮未执行工具，未提交完整答复。到错误发生前已经完整播放的句子：" + m_AssistantHeardText +
@@ -175,8 +196,8 @@ public partial class ChatSample
         InvalidateFormalResponse("first-reply-application-paused");
         if (model != null && !ReferenceEquals(model, m_ChatSettings?.m_ChatModel)) model.CancelActiveResponse();
         m_SentenceBuffer.Length = 0;
-        m_PendingChunks.Clear();
-        m_PendingClips.Clear();
+        ClearPendingSpeechChunks("queue-cleared");
+        ClearPendingSpeechClips("queue-cleared");
         m_StreamComplete = true;
         m_TTSSenderDone = true;
         m_AgentRoundInFlight = false;
@@ -200,13 +221,14 @@ public partial class ChatSample
                     !string.IsNullOrEmpty(m_PendingToolCorrectionFrame) || m_SongSearchResultPending ||
                     m_SongCatalogResultPending || m_SongMemoryResultPending || m_HumBackResultPending
             },
-            ["previousUnfinishedWork"] = m_PreviousUnfinishedWork?.DeepClone(),
+            ["previousUnfinishedWork"] = TaskContinuationContextPolicy.RoutingHistory(m_PreviousUnfinishedWork),
+            ["previousRequestFailure"] = ReadPreviousRoomPlanningFailure(),
             ["interfaces"] = room["controlEntryPoints"],
             ["body"] = PickRoomFields(room["currentFacts"] as JObject,
                 "connected", "taskMode", "followActive", "bodyReserved", "poseReturning",
                 "observedAtRealtime", "currentlyNearAndFacingUser", "actualUserDistance",
                 "actualFacingErrorDegrees", "activeActionId", "executionTargetKind"),
-            ["lastActionResults"] = room["lastActionResults"]?.DeepClone(),
+            ["lastActionResults"] = TaskContinuationContextPolicy.Outcome(room["lastActionResults"] as JObject),
             ["spatialGoal"] = PickRoomFields(BuildSpatialGoalContext(),
                 "goalId", "status", "ownerCurrent", "originalRequest", "boundEntityId", "executionSuspended", "registered"),
             ["pendingObservationGoal"] = PickRoomFields(SceneObjectTargetContext()?["observationGoal"] as JObject,

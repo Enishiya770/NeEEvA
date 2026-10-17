@@ -123,6 +123,9 @@ public partial class ChatSample
         m_RoomTaskGeneration = generation; m_RoomSpeechGuardGeneration = generation;
         m_RoomSpeechReviewModel = lease.model; m_FormalResponseInFlight = true;
         m_RoomTaskIntent = "device-task"; m_RoomTaskDispatch = "unified-device-task-started";
+        // This runner now owns the accepted task. A neutral acceptance can play
+        // while its fresh observation/target checks continue; no success claim.
+        AcknowledgeAcceptedTask(generation, lease.goalId);
         Debug.Log($"[SpatialGoal/Runner] goal={goalId} generation={generation} controller=unified-device-task started", this);
         StartCoroutine(WatchSpatialGoalRunner(lease));
         StartCoroutine(RunSpatialGoalRunnerSafely(lease));
@@ -138,7 +141,10 @@ public partial class ChatSample
             {
                 var current = stack.Peek(); bool moved = false; Exception failure = null;
                 try { moved = current.MoveNext(); } catch (Exception error) { failure = error; }
-                if (failure != null) { FinishSpatialGoalRunner(lease, "device-task-exception:" + failure.GetType().Name, false); yield break; }
+                if (failure != null) {
+                    Debug.LogError("[SpatialGoal/RunnerException] " + failure, this);
+                    FinishSpatialGoalRunner(lease, "device-task-exception:" + failure.GetType().Name, false); yield break;
+                }
                 if (!moved) { (stack.Pop() as IDisposable)?.Dispose(); continue; }
                 if (current.Current is IEnumerator nested) stack.Push(nested);
                 else yield return current.Current;
@@ -362,13 +368,22 @@ public partial class ChatSample
 
     private void EndSpatialGoalRunner(SpatialGoalRunnerLease lease, string reason, string outcome)
     {
+        if (!ReferenceEquals(m_SpatialGoalRunner, lease) || lease.ending) return;
         lease.terminalReason = reason; lease.phase = outcome;
         lease.latestFailureReason = outcome == "satisfied" ? null : reason;
-        m_SpatialGoalRunnerLastReport = BuildSpatialGoalRunnerContext(lease.generation);
-        m_SpatialGoalRunnerLastReport["active"] = false;
-        RememberCompletedDeviceStep();
-        lease.ending = true; m_SpatialGoalRunner = null;
-        ReleaseSpatialGoalRunnerWork(lease, reason, true);
+        try {
+            m_SpatialGoalRunnerLastReport = BuildSpatialGoalRunnerContext(lease.generation);
+            m_SpatialGoalRunnerLastReport["active"] = false;
+            RememberCompletedDeviceStep();
+        }
+        catch (Exception error) {
+            Debug.LogError("[SpatialGoal/TerminalReceiptFailure] " + error, this);
+        }
+        finally {
+            lease.ending = true;
+            if (ReferenceEquals(m_SpatialGoalRunner, lease)) m_SpatialGoalRunner = null;
+            ReleaseSpatialGoalRunnerWork(lease, reason, true);
+        }
         Debug.Log($"[SpatialGoal/Runner] goal={lease.goalId} generation={lease.generation} controller=unified-device-task outcome={outcome} steps={lease.steps} reason={reason}", this);
         if (outcome != "satisfied" || !TryStartRoomSequenceContinuation(lease.generation,
             () => DispatchSpatialGoalTerminalReply(lease.generation))) DispatchSpatialGoalTerminalReply(lease.generation);

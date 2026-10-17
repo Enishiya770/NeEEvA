@@ -12,7 +12,7 @@ namespace NeEEvA.Motion
     public enum ArdyRoomExecutionReason
     {
         None, AlreadyAtTarget, Completed, CancelledByCaller, NavigationRejected,
-        GeneratedPathRejected, GenerationFailed, TerrainBlocked, OwnershipLost, AvatarUnavailable
+        GeneratedPathRejected, GenerationFailed, TerrainBlocked, OwnershipLost, AvatarUnavailable, LocalHistoryUnavailable
     }
 
     [Serializable] public sealed class ArdyRoomHistoryFrame
@@ -153,6 +153,7 @@ namespace NeEEvA.Motion
         private bool boundVrmEnabled;
         private ArdyRoomHistoryFrame latestObservedFrame;
         private float latestObservedTime;
+        private int latestObservedUnityFrame;
 
         public void Configure(Vrm10Instance target, ArdyLocomotionAvatarReference importedReference, ArdyRoomNavigation nav)
         {
@@ -342,11 +343,19 @@ namespace NeEEvA.Motion
             Stage = "pose-history";
             SetStatus("正在采集角色实际全身姿态（0.75 秒历史）", ArdyRoomExecutionState.Preparing);
             var frames = new List<ArdyRoomHistoryFrame>(16);
+            var historyWindow = new ArdyPoseHistoryWindow(Time.realtimeSinceStartup);
             latestObservedFrame = null;
             captureHistory = true;
             // Capture in LateUpdate after VRM (11000). WaitForEndOfFrame stalls when an Editor user
             // switches from Game view to Scene view, which is exactly this tool's target-picking flow.
-            while (latestObservedFrame == null && Current(token)) yield return null;
+            while (latestObservedFrame == null && Current(token)) {
+                CheckWaitingAnchor();
+                if(historyWindow.Expired(Time.realtimeSinceStartup)) {
+                    LogPoseHistoryDeadline(token,historyWindow,frames.Count);
+                    throw new ExecutionException("姿态历史采样超时；未发送动作生成请求。",ArdyRoomExecutionReason.LocalHistoryUnavailable);
+                }
+                yield return null;
+            }
             if (!Current(token)) yield break;
             CheckWaitingAnchor();
             float firstTime = latestObservedTime;
@@ -358,9 +367,24 @@ namespace NeEEvA.Motion
                 yield return null;
                 if (!Current(token)) yield break;
                 CheckWaitingAnchor();
+                if(historyWindow.Expired(Time.realtimeSinceStartup)) {
+                    LogPoseHistoryDeadline(token,historyWindow,frames.Count);
+                    throw new ExecutionException("姿态历史在有限时间内仍不连续；未发送动作生成请求。",ArdyRoomExecutionReason.LocalHistoryUnavailable);
+                }
                 float now = latestObservedTime;
                 if (now <= previousTime) continue;
-                if (now - previousTime > .15f) throw new InvalidOperationException("画面帧间隔过大，无法采集连续的全身历史；请恢复流畅运行后重试。");
+                if (now - previousTime > ArdyPoseHistoryWindow.MaximumGap) {
+                    bool reacquire=historyWindow.TryRestart(Time.realtimeSinceStartup,now-previousTime,Current(token));
+                    Debug.Log("[ARDY room/pose-history] "+Newtonsoft.Json.JsonConvert.SerializeObject(new {
+                        operation=token,stage=Stage,observationFrame=latestObservedUnityFrame,previousTime,observedTime=now,
+                        gapSeconds=now-previousTime,collectedSamples=frames.Count,restarts=historyWindow.Restarts,
+                        elapsedSeconds=Time.realtimeSinceStartup-historyWindow.StartedAt,
+                        ownerCurrent=Current(token),anchorValidated=true,requestSent=false,
+                        disposition=reacquire?"reacquire-contiguous-window":"bounded-recovery-exhausted"}),this);
+                    if(!reacquire)throw new ExecutionException("画面帧间隔过大，有限重新采样后仍无法获得连续的全身历史；未发送生成请求，请恢复流畅运行后重试。",ArdyRoomExecutionReason.LocalHistoryUnavailable);
+                    frames.Clear();firstTime=previousTime=now;previous=latestObservedFrame;frames.Add(previous);
+                    continue;
+                }
                 var next = latestObservedFrame;
                 while (frames.Count < 16 && firstTime + frames.Count / 20f <= now)
                 {
@@ -370,6 +394,10 @@ namespace NeEEvA.Motion
                 previous = next; previousTime = now;
             }
             captureHistory = false;
+            if(historyWindow.Restarts>0)Debug.Log("[ARDY room/pose-history] "+Newtonsoft.Json.JsonConvert.SerializeObject(new {
+                operation=token,stage=Stage,restarts=historyWindow.Restarts,elapsedSeconds=Time.realtimeSinceStartup-historyWindow.StartedAt,
+                collectedSamples=frames.Count,observationFrame=latestObservedUnityFrame,ownerCurrent=Current(token),requestSent=false,
+                disposition="contiguous-window-ready"}),this);
             Vector3 initialForward = frames[frames.Count - 1].globalRotations[0] * Vector3.forward;
             initialForward.y = 0;
             if (initialForward.sqrMagnitude < .0001f) throw new InvalidOperationException("当前骨盆朝向不适合地面行走。");
@@ -562,6 +590,14 @@ namespace NeEEvA.Motion
             anchorGround.y = floorY;
             if (Mathf.Abs(floorY - Route.GroundY) > .035f)
                 throw new InvalidOperationException("模型脚底与导航地面没有对齐；请先正确放置角色，移动不会将角色吸附到地板。");
+        }
+
+        private void LogPoseHistoryDeadline(int token,ArdyPoseHistoryWindow window,int samples)
+        {
+            Debug.Log("[ARDY room/pose-history] "+Newtonsoft.Json.JsonConvert.SerializeObject(new {
+                operation=token,stage=Stage,observationFrame=latestObservedUnityFrame,observedTime=latestObservedTime,
+                collectedSamples=samples,restarts=window.Restarts,elapsedSeconds=Time.realtimeSinceStartup-window.StartedAt,
+                ownerCurrent=Current(token),anchorValidated=true,requestSent=false,disposition="local-history-deadline"}),this);
         }
 
         private void CheckWaitingAnchor()
@@ -765,6 +801,7 @@ namespace NeEEvA.Motion
                     CheckWaitingAnchor();
                     latestObservedFrame = CaptureFrame();
                     latestObservedTime = Time.realtimeSinceStartup;
+                    latestObservedUnityFrame = Time.frameCount;
                 }
                 catch (Exception error) { Fail(error.Message); return; }
             }

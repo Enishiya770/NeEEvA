@@ -74,6 +74,19 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
     private float snapshotDistance;
     private CurrentTargetAssessment currentAssessment;
     private string lastAttemptActionId = "", lastAttemptPhase = "", lastAttemptReason = "";
+    private string lastAttemptIntent = "";
+    public bool SuppressesAutonomousAttempt(string intent, string replacedActionId)
+    {
+        var current=ReadCurrentTargetEvidence();
+        bool failedSharedPrerequisite=lastAttemptPhase!="cancelled" && RoomMovementResultPolicy.IsTerminalFailure(lastAttemptPhase);
+        bool suppressed=AutonomousAttemptPolicy.Suppress(current.lastAttemptAppliesToCurrentTarget,
+            lastAttemptIntent,intent,lastAttemptPhase,lastAttemptActionId,replacedActionId,failedSharedPrerequisite);
+        Debug.Log("[Room/AutonomousAttempt] "+Newtonsoft.Json.JsonConvert.SerializeObject(new {
+            intent,previousIntent=lastAttemptIntent,previousActionId=lastAttemptActionId,previousPhase=lastAttemptPhase,
+            sameTarget=current.lastAttemptAppliesToCurrentTarget,replacedActionId,failedSharedPrerequisite,suppressed,
+            scope="Attempt admission only; current constraints, body ownership and fresh executor checks still apply."}),this);
+        return suppressed;
+    }
     private float lastAttemptTime;
     private bool followActive, followNeedsNewTarget;
     private Transform followUser;
@@ -291,6 +304,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         actionId = id ?? "";
         actionIntent = followActive ? "follow" : "approach";
         lastAttemptActionId = actionId;
+        lastAttemptIntent = actionIntent;
         lastAttemptTargetRevision = currentTargetRevision;
         lastAttemptPhase = "preparing"; lastAttemptReason = "正在验证本次实际走近请求。";
         lastAttemptTime = Time.realtimeSinceStartup;
@@ -394,6 +408,7 @@ public sealed partial class ArdyRoomDialogueBridge : MonoBehaviour
         actionId = id ?? "";
         actionIntent = "follow";
         lastAttemptActionId = actionId; lastAttemptTargetRevision = currentTargetRevision;
+        lastAttemptIntent = actionIntent;
         actionStartedAt = Time.realtimeSinceStartup; lastAttemptTime = actionStartedAt;
         plan = null; attemptObservation = null; hasControllerOperation = false;
         if (!ValidUser(out failure) ||

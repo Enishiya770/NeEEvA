@@ -73,7 +73,7 @@ public partial class ChatSample
         // production source, not a test-specific reconstruction of room results.
         return "[Task progress runtime]\n" + frame.ToString(Formatting.None) +
             BuildContinuationExecutionFact(m_NoSingingWorkContinuations, IsSingingRuntimeActivityActive()) +
-            BuildSingingExecutionState() + BuildSessionSongLedgerClause() +
+            BuildSingingExecutionState() + (NeedsSingingReviewDetails() ? BuildSessionSongLedgerClause() : BuildSingingGoalContext()) +
             BuildSingingMaterialFacts(capture) +
             m_PracticeSemanticResolutionNote + m_PracticeSessionCarryNote + m_PendingSingingRoutingFact;
     }
@@ -110,10 +110,7 @@ public partial class ChatSample
             if (!(property.Value is JObject report)) continue;
             if (report["required"] != null) { report["requiredByOriginalPublicReply"] = report["required"].DeepClone(); report.Remove("required"); }
             report.Remove("outcomeScope"); // Writer wording rules; expected state/failure/identity remain verbatim.
-            report["scope"] = "Original reply's reporting criterion, not a fresh obligation. Compare expectedReport and owner-bound outcomes against " +
-                "speech.lastPublicPlayback.completedPlaybackText and actual dialogue. A criterion already covered by completed playback is fulfilled; " +
-                "other pending results do not make it unreported again. Continue only genuinely unfinished steps or distinct unreported results. " +
-                "No action is authorized by this historical reporting contract.";
+            report["scope"] = WorkReviewInstructionProjection.ReportScope;
         }
         return result;
     }

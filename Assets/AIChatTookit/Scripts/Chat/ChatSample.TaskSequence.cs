@@ -14,6 +14,27 @@ public partial class ChatSample
     private readonly System.Collections.Generic.HashSet<string> m_RoomTaskSequenceReviewedSteps = new System.Collections.Generic.HashSet<string>();
     private float m_RoomTaskSequenceProgressCheckAt;
 
+    private bool AdoptReviewedParentTask(string goalId, string request)
+    {
+        var bridge = GetComponent<ArdyRoomDialogueBridge>();
+        var previous = m_PreviousUnfinishedWork?["taskSequence"] as JObject;
+        if (RoomTaskSequenceCurrent() || request != m_ActionConstraints.CurrentUserText || bridge == null ||
+            m_RoomTaskSequenceModel != m_ChatSettings?.m_ChatModel || bridge != m_RoomTaskSequenceBridge ||
+            bridge.avatar != m_RoomTaskSequenceAvatar || bridge.environmentRoot != m_RoomTaskSequenceEnvironment ||
+            !(previous?["steps"] is JArray steps)) return false;
+        var step = steps.OfType<JObject>().FirstOrDefault(s => (string)s["goalId"] == goalId && !string.IsNullOrEmpty(goalId));
+        if (step == null) return false;
+        var resumed = TaskContinuationContextPolicy.Resume(previous, (string)step["id"], request,
+            m_WorkEpoch, m_ActionConstraints.CurrentUserTurn);
+        if (resumed == null) return false;
+        m_RoomTaskSequence = resumed;
+        m_RoomTaskSequenceSelection = ((JArray)resumed["readyStepIds"]).Values<string>().Contains((string)step["id"]) ? (string)step["id"] : null;
+        m_RoomTaskSequenceReviewedSteps.Clear(); m_RoomTaskSequenceProgressCheckAt = 0;
+        m_SequenceBodyAttempts.Clear(); m_SequenceBodySubmission = null;
+        Debug.Log("[Work/ParentTaskResumed] " + resumed.ToString(Formatting.None), this);
+        return true;
+    }
+
     private bool RoomTaskSequenceCurrent()
     {
         var bridge = GetComponent<ArdyRoomDialogueBridge>();
@@ -59,15 +80,16 @@ public partial class ChatSample
                     !m_RoomTaskSequenceBridge.IsFollowing && !m_RoomTaskSequenceBridge.ReservesBody &&
                     new[] { "stopped", "cancelled", "idle" }.Contains((string)execution?["phase"])) { receipt = execution; complete = true; }
                 else if ((string)execution?["actionId"] == action && RoomMovementResultPolicy.IsTerminalFailure((string)execution?["phase"])) receipt = execution;
-                else if ((string)scene?["actionId"] == action && new[] { "failed", "rejected", "cancelled", "arrived-object-unconfirmed" }.Contains((string)scene?["phase"])) receipt = scene;
+                else if ((string)scene?["actionId"] == action && new[] { "failed", "rejected", "cancelled", "arrived-object-unconfirmed", "observed-target-unconfirmed" }.Contains((string)scene?["phase"])) receipt = scene;
             }
             if (receipt == null) continue;
             step["status"] = complete ? "completed" : "failed";
             step["receipt"] = !string.IsNullOrEmpty(goal) ? receipt.DeepClone() : PickRoomFields(receipt,
                 "taskId", "actionId", "intent", "targetKind", "sceneTargetId", "entityId", "phase", "status", "reason", "stage",
                 "generation", "workEpoch", "userTurn", "observedUtc", "operationRevision", "stateChanged", "objectReobserved", "reached",
-                "approachRetargetStatus", "approachRetargetCount", "approachRetargetTravel");
+                "approachRetargetStatus", "approachRetargetCount", "approachRetargetTravel", "historyReferenceId", "resultCaptureId", "viewVerification", "viewFinding");
         }
+        TaskAttemptSettlementPolicy.Reconcile(m_RoomTaskSequence);
         var result = (JObject)m_RoomTaskSequence.DeepClone();
         result["readyStepIds"] = RoomTaskSequenceProtocol.Ready((JArray)result["steps"]);
         result["scope"] = "Whole current request with engine-recorded progress. Pending predecessors forbid their successors. Receipts are historical events, not fresh state or permission; speech alone never completes a step. Each next action still needs current target, semantic and execution checks.";
@@ -83,14 +105,19 @@ public partial class ChatSample
             if (plan.Count == 0)
                 return RoomTaskSequenceProtocol.TrySelect(json, decision, plan, out m_RoomTaskSequenceSelection, out reason);
             foreach (var step in plan.OfType<JObject>()) step["status"] = "pending";
+            // Commit a plan only together with a compatible current selection.
+            // A rejected proposal must not freeze the next repair into its plan.
+            if (!RoomTaskSequenceProtocol.TrySelect(json, decision, plan, out var selection, out reason)) return false;
             m_RoomTaskSequence = new JObject { ["workEpoch"] = m_WorkEpoch, ["userTurn"] = m_ActionConstraints.CurrentUserTurn,
                 ["request"] = m_ActionConstraints.CurrentUserText, ["steps"] = plan,
                 ["coverage"] = JObject.Parse(json)["taskCoverage"]?.DeepClone(),
-                ["answerObligations"] = ReplyAnswerObligationProtocol.FromSemantics(m_ActionConstraints.CurrentUserText, ReadCompactCurrentRequestSemantics(m_FormalResponseGeneration)) };
+                ["answerObligations"] = ReplyAnswerObligationProtocol.FromPlan(m_ActionConstraints.CurrentUserText,
+                    JObject.Parse(json)["taskCoverage"] as JArray, ReadCompactCurrentRequestSemantics(m_FormalResponseGeneration)) };
             if (((JArray)m_RoomTaskSequence["answerObligations"]).Count > 0)
                 m_RoomTaskSequence["answerEvidence"] = new JObject {
                     ["observedHistory"] = BuildVerifiedObservedDeviceReferentHistory(),
                     ["eventHistory"] = ReadHistoricalDeviceEvents(),
+                    ["requestFailureHistory"] = ReadPreviousRoomPlanningFailure(),
                     ["scope"] = "Frozen before dispatch of this task plan. Records retain their own entity/time. Missing records mean evidence unavailable, not proof an event never happened. This snapshot cannot establish current state." };
             m_RoomTaskSequenceReviewedSteps.Clear(); m_RoomTaskSequenceProgressCheckAt = 0;
             m_SequenceBodyAttempts.Clear(); m_SequenceBodySubmission = null;
@@ -186,11 +213,11 @@ public partial class ChatSample
         m_RoomTaskSequenceProgressCheckAt = Time.realtimeSinceStartup + .5f;
         var sourceSteps = (JArray)m_RoomTaskSequence["steps"];
         if (!sourceSteps.OfType<JObject>().Any(s => !m_RoomTaskSequenceReviewedSteps.Contains((string)s["id"]) &&
-            new[] { "running", "completed", "failed" }.Contains((string)s["status"]))) return;
+            new[] { "running", "completed", "failed", "blocked" }.Contains((string)s["status"]))) return;
         var state = ReadRoomTaskSequence();
         foreach (var step in ((JArray)state["steps"]).OfType<JObject>())
         {
-            if (!new[] { "completed", "failed" }.Contains((string)step["status"]) ||
+            if (!new[] { "completed", "failed", "blocked" }.Contains((string)step["status"]) ||
                 !m_RoomTaskSequenceReviewedSteps.Add((string)step["id"])) continue;
             // Queue once per real terminal receipt, including synchronous stops.
             // A pending or running step and generated speech never unlock a sequel.
@@ -208,7 +235,7 @@ public partial class ChatSample
         var state = ReadRoomTaskSequence();
         if (!(state?["steps"] is JArray steps)) return;
         foreach (var step in steps.OfType<JObject>())
-            if (new[] { "completed", "failed" }.Contains((string)step["status"]))
+            if (new[] { "completed", "failed", "blocked" }.Contains((string)step["status"]))
                 m_RoomTaskSequenceReviewedSteps.Add((string)step["id"]);
     }
 }

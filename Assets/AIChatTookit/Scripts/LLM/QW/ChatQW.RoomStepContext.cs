@@ -5,13 +5,16 @@ public partial class ChatQW
 {
     private static void FocusRoomStepContext(JObject input)
     {
+        FocusRoomDecisionRepair(input);
         FocusRuntimeAutonomousContext(input);
         FocusRoomPlanningEvidence(input);
         if (input["taskSequence"] is JObject sequence) input["taskSequence"] = RoomTaskContextPolicy.Sequence(sequence);
         var intents = RoomTaskContextPolicy.ReadyUserIntents(input);
         bool initialBody = RoomTaskContextPolicy.InitialUserBodyAttention(input);
+        bool initialView = RoomTaskContextPolicy.InitialUserViewAttention(input);
         bool autonomousBody = RoomTaskContextPolicy.AutonomousBodyAttention(input);
-        if (intents == null && !initialBody && !autonomousBody) return;
+        bool continuedBody = RoomTaskContextPolicy.ContinuedBodyAttention(input);
+        if (intents == null && !initialBody && !initialView && !autonomousBody && !continuedBody) return;
         var omitted = new JObject();
         foreach (string path in new[] { "visibleObjectCatalog.current.candidates", "visibleObjectCatalog.memory", "sceneSpatialMemory.objects",
             "sceneCognitionSummary.currentObjects", "sceneCognitionSummary.historicalObjects",
@@ -27,11 +30,28 @@ public partial class ChatQW
         }
         // A new, independently classified body-only request has no object
         // referent. Compound continuations still need predecessor evidence.
-        if ((initialBody || autonomousBody) && !(input["taskSequence"] is JObject)) FocusInitialBodyHistory(input, omitted);
+        if ((initialBody || initialView || autonomousBody || continuedBody) && !(input["taskSequence"] is JObject)) FocusInitialBodyHistory(input, omitted);
         input["stepAttention"] = new JObject { ["intents"] = intents == null ? null : new JArray(intents),
-            ["source"] = autonomousBody ? "current-autonomous-intent-attention" : initialBody ? "current-turn-semantic-attention" : "approved-ready-step", ["omittedObservedRows"] = omitted,
+            ["source"] = continuedBody ? "current-work-intent-attention" : autonomousBody ? "current-autonomous-intent-attention" : initialView ? "current-view-semantic-attention" : initialBody ? "current-turn-semantic-attention" : "approved-ready-step", ["omittedObservedRows"] = omitted,
             ["engineMemoryMutated"] = false,
-            ["scope"] = "Current-user movement attention. Original request, dependencies, user pose/route/support, failures and unknown constraints remain. Object records stay in runtime for a fresh search/match when needed. An initial semantic focus does NOT narrow the action menu or authorize a move. Omission proves neither absence nor permission." };
+            ["scope"] = "Current body/view attention. Original request, dependencies, user pose/route/support, failures and unknown constraints remain. Object records stay in runtime for a fresh search/match when needed. An initial semantic focus does NOT narrow the action menu or authorize a move. Omission proves neither absence nor permission." };
+    }
+
+    private static void FocusRoomDecisionRepair(JObject input)
+    {
+        if (!(input["decisionRepair"] is JObject repair) ||
+            !(repair["sequenceSelectionFeedback"] is JObject) ||
+            !(repair["rejectedDecision"] is JValue rejected) || rejected.Type != JTokenType.String) return;
+        // The controller/log retains the rejected draft. Repeating a complete
+        // invalid decision in the model's next input anchors the same mistake.
+        // Keep the concrete mismatch, current request and authoritative state.
+        repair["rejectedDecisionChars"] = ((string)rejected)?.Length ?? 0;
+        repair.Remove("rejectedDecision");
+        repair["repairScope"] = "Build one complete new decision from the current request and authoritative task state. The rejected draft is diagnostic only, not a plan to continue. Correct the selected operation and its prerequisites; do not repeat an incompatible operation. An uncommitted plan may be rebuilt; committed state and cancellation remain authoritative.";
+        if ((string)repair["rejectionReason"] == "invalid-task-sequence-action-kind" &&
+            repair.SelectToken("sequenceSelectionFeedback.proposedOperation") is JObject &&
+            (string)repair.SelectToken("sequenceSelectionFeedback.selectedStep.kind") != "device-state")
+            repair["executionFieldRepair"] = "This single repair defers the incompatible deviceGoal field: keep later operations in the parent plan and select only the current ordinary operation, or abstain with none and null taskStep. It does not grant permission or erase any user request. A later operation requires its own normal planning after prerequisites complete.";
     }
 
     private static void FocusRuntimeAutonomousContext(JObject input)

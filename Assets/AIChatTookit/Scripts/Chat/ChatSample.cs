@@ -215,6 +215,8 @@ public partial class ChatSample : MonoBehaviour
     private void LateUpdate()
     {
         UpdateSceneTimePose();
+        TickSpeechLifecycle();
+        TickActivityHandoff();
         TickSceneAttention();
         TickActivityMonitor();
         StepUrge();
@@ -4476,8 +4478,8 @@ public partial class ChatSample : MonoBehaviour
 
         //重置状态（m_TextBack保留"正在思考中..."占位，等首句音频到达再清空）
         m_SentenceBuffer.Length = 0;
-        m_PendingChunks.Clear();
-        m_PendingClips.Clear();
+        ClearPendingSpeechChunks("queue-cleared");
+        ClearPendingSpeechClips("queue-cleared");
         m_SilencedSpeechRoundIds.Clear();
         m_CurrentSpeechRoundId = ++m_SpeechRoundSequence;
         m_StreamComplete = false;
@@ -4717,6 +4719,7 @@ public partial class ChatSample : MonoBehaviour
 
     private void InvalidateFormalResponse(string reason)
     {
+        if (m_LatencyFillerPlayed) CommitPlayedLatencyFiller();
         if (IsAISpeaking && m_ActivitySpeech.Exists(u => u.State == "playing" || u.State == "starting"))
             RecordActivityInterruption(m_CurrentlyPlayingText, reason);
         CancelActivityMonitoring();
@@ -4756,8 +4759,8 @@ public partial class ChatSample : MonoBehaviour
         m_LatencyFillerFromEou = false;
         m_LatencyFillerText = "";
         m_SentenceBuffer.Length = 0;
-        m_PendingChunks.Clear();
-        m_PendingClips.Clear();
+        ClearPendingSpeechChunks("queue-cleared");
+        ClearPendingSpeechClips("queue-cleared");
         m_StreamComplete = true;
         m_TTSSenderDone = true;
         StopDirectStreamingSubtitle();
@@ -5444,7 +5447,7 @@ public partial class ChatSample : MonoBehaviour
             //歌曲保存与真实演唱都采用工具结果作为事实来源。整段普通正文不播、不进入
             //角色已说出口历史，避免“已经记住”或用朗读歌词/舞台说明冒充唱歌。
             m_SentenceBuffer.Length = 0;
-            m_PendingChunks.Clear();
+            ClearPendingSpeechChunks("queue-cleared");
             cleanFull = "";
             if (heldForSongMemory && m_LogAgentLoop)
                 Debug.Log("[SongMemory] 已扣留落盘前回复，等待本机曲库结果后再确认");
@@ -5899,7 +5902,9 @@ public partial class ChatSample : MonoBehaviour
             //内心独白／纯沉默不经过 FinishSpeakingNaturally，等待标志得在这里清。
             //漏掉的话，她每次选择"这轮不出声"都会把自己闷到 75 秒兜底才恢复自主发言——
             //而 <silent/> 正是她常用的表达。
-            ClearUserTurnAwaitingReply(note);
+            // Finishing an empty producer is not delivery of a user's answer.
+            // The scheduler has its own bounded wait; retain the unmet reply.
+            if (m_AgentCurrentRoundIsTick) ClearUserTurnAwaitingReply(note);
             //让 StreamAudioPlayer 能干净退出
             m_TTSSenderDone = true;
             //UI 复位
@@ -6051,6 +6056,15 @@ public partial class ChatSample : MonoBehaviour
             PendingSpeechChunk speechChunk = m_PendingChunks.Dequeue();
             if (m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId)) continue;
             if (RefreshRoomSpeechForPlayback(speechChunk, responseGeneration) == RoomPlaybackCheck.Drop) continue;
+            yield return AwaitSpeechLanguage(speechChunk,responseGeneration);
+            if(responseGeneration!=m_FormalResponseGeneration)yield break;
+            if(m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId))continue;
+            var afterLanguage=RefreshRoomSpeechForPlayback(speechChunk,responseGeneration);
+            if(afterLanguage!=RoomPlaybackCheck.Current) {
+                if(afterLanguage==RoomPlaybackCheck.Replaced)PrependSpeechChunk(speechChunk);
+                continue;
+            }
+            speechChunk.LanguageCode=speechChunk.ProcessUnit?.Language??speechChunk.LanguageCode;
             string chunk = speechChunk.Text;
             //双重过滤：FlushCompleteSentences已经挡过一次，这里防止旧路径或者其他来源。
             //StripAgentTagsForTTS 也会截掉未闭合的已知标签后缀。
@@ -6136,6 +6150,7 @@ public partial class ChatSample : MonoBehaviour
         {
             if (m_PendingChunks.Count == 0) { if (next != null) ClearNext(); return; }
             PendingSpeechChunk queued = m_PendingChunks.Peek();
+            if(queued.ProcessUnit?.LanguageCheckPending==true)return;
             if (Time.realtimeSinceStartup >= nextRefreshAt)
             {
                 nextRefreshAt = Time.realtimeSinceStartup + .1f;
@@ -6148,7 +6163,7 @@ public partial class ChatSample : MonoBehaviour
             // Long paragraphs keep the PCM-streaming path; waiting for an entire
             // long WAV could cost more than the lookahead saves. No text is truncated.
             if (string.IsNullOrWhiteSpace(future) || !SpeechChunkPolicy.Bounded(future) || IsPurePunctuation(future)) return;
-            SpeechText preparedSpeech = tts.ResolveSpeech(new SpeechText(future, queued.LanguageCode));
+            SpeechText preparedSpeech = tts.ResolveSpeech(new SpeechText(future, queued.ProcessUnit?.Language??queued.LanguageCode));
             var slot = new PendingSpeechClip { RoundId = queued.RoundId, Text = future, LanguageCode = preparedSpeech.LanguageCode,
                 RoomState = queued.RoomState, RoomStateVersion = queued.RoomStateVersion, RoomPrefixOnly = queued.RoomPrefixOnly,
                 ProcessUnit = queued.ProcessUnit, ProcessVersion = queued.ProcessVersion };
@@ -6192,7 +6207,15 @@ public partial class ChatSample : MonoBehaviour
                 text = StripAgentTagsForTTS(text);
                 if (string.IsNullOrEmpty(text) || IsPurePunctuation(text)) continue;
 
-                SpeechText speechRequest = tts.ResolveSpeech(new SpeechText(text, speechChunk.LanguageCode));
+                yield return AwaitSpeechLanguage(speechChunk,responseGeneration);
+                if(responseGeneration!=m_FormalResponseGeneration)yield break;
+                if(m_SilencedSpeechRoundIds.Contains(speechChunk.RoundId))continue;
+                var afterLanguage=RefreshRoomSpeechForPlayback(speechChunk,responseGeneration);
+                if(afterLanguage!=RoomPlaybackCheck.Current) {
+                    if(afterLanguage==RoomPlaybackCheck.Replaced)PrependSpeechChunk(speechChunk);
+                    continue;
+                }
+                SpeechText speechRequest = tts.ResolveSpeech(new SpeechText(text, speechChunk.ProcessUnit?.Language??speechChunk.LanguageCode));
                 speechChunk.LanguageCode = speechRequest.LanguageCode;
 
                 bool started = false;
@@ -6437,7 +6460,8 @@ public partial class ChatSample : MonoBehaviour
                 {
                     ObserveActivitySpeech(speechChunk.ProcessUnit, "completed");
                     m_AssistantHeardText.Append(text);
-                    RecordRoomSpeechPlayed(speechChunk.RoomState, text);
+                    RecordRoomSpeechPlayedForResult(speechChunk.RoomState, text, speechChunk.ProcessUnit?.CorrectedResultId);
+                    RecordWorkCompletedAudio(text,speechChunk.ProcessUnit?.CorrectedResultId,speechChunk.ProcessUnit,speechChunk.ProcessVersion);
                     RecordReviewedGoalAnswerPlayedChunk(responseGeneration, text);
                     if (m_LogStreamTimings)
                     {
@@ -6596,7 +6620,8 @@ public partial class ChatSample : MonoBehaviour
                 m_AudioSource == null || m_AudioSource.clip != clip) yield break;
             m_AssistantHeardText.Append(text);
             ObserveActivitySpeech(pendingClip.ProcessUnit, "completed");
-            RecordRoomSpeechPlayed(pendingClip.RoomState, text);
+            RecordRoomSpeechPlayedForResult(pendingClip.RoomState, text, pendingClip.ProcessUnit?.CorrectedResultId);
+                    RecordWorkCompletedAudio(text,pendingClip.ProcessUnit?.CorrectedResultId,pendingClip.ProcessUnit,pendingClip.ProcessVersion);
             RecordReviewedGoalAnswerPlayedChunk(responseGeneration, text);
             m_CurrentlyPlayingText = "";
 
@@ -6714,7 +6739,10 @@ public partial class ChatSample : MonoBehaviour
 
         //正文后面没有真实歌唱动作才算本轮已完整回应。
         //有歌唱时由 FinishHumBack / song_sing 失败收尾路径清除。
-        if (!CurrentMotionResponseRejected) ClearUserTurnAwaitingReply("回复播完");
+        if (!CurrentMotionResponseRejected)
+        {
+            if (!string.IsNullOrWhiteSpace(heard)) ClearUserTurnAwaitingReply("回复播完");
+        }
         else if (m_PendingMotionRepair == null && m_ActiveMotionRepair == null)
             EndMotionResponseAsFailure("motion-rejected-after-speech-drained");
 
@@ -6769,8 +6797,8 @@ public partial class ChatSample : MonoBehaviour
         StopDirectStreamingSubtitle();
         if (m_AudioSource != null) m_AudioSource.Stop();
         m_LastVoiceOutputEndedRealtime = Time.realtimeSinceStartup;
-        m_PendingChunks.Clear();
-        m_PendingClips.Clear();
+        ClearPendingSpeechChunks("queue-cleared");
+        ClearPendingSpeechClips("queue-cleared");
         m_StreamComplete = true;     //StreamTTSSender见到队列空+这个flag就yield break
         m_TTSSenderDone = true;      //StreamAudioPlayer的退出条件
 
@@ -7026,7 +7054,7 @@ public partial class ChatSample : MonoBehaviour
         if (m_UserTurnAwaitingReplySince <= 0f) return;
         m_UserTurnAwaitingReplySince = -1f;
         if (m_LogAgentLoop)
-            Debug.Log($"[Agent] 本轮已回应用户({reason})，自主发言解除等待");
+            Debug.Log($"[Agent] 解除回应等待({reason})；实际交付以播放或文本交付回执为准");
     }
     private bool m_AgentCurrentRoundIsTick = false;   // 当前 round 是 tick 触发(true) 还是用户开口触发(false)
     private Coroutine m_PendingTickCo = null;
@@ -7041,6 +7069,7 @@ public partial class ChatSample : MonoBehaviour
         public string work_evidence;
         public string work_status;
         public string next_intent_source, next_step_id, planning_focus;
+        public string previous_work_status;
         public WorkResultDeliveryProtocol.Report[] delivery_reports;
         public string remaining_request_quote;
         public string singing_goal_status;
@@ -8860,7 +8889,7 @@ public partial class ChatSample : MonoBehaviour
     private void StepUrge()
     {
         if (!m_AgentRunning || m_AgentGracefulShutdownPending || !isActiveAndEnabled || m_SceneTimePaused || Time.timeScale <= 0) return;
-        if (m_PrivateDecisionFailure != null) return;
+        if (PrivateDecisionBlocksCurrentWork()) return;
         if (m_SceneTimeSuspended) BeginSceneTimeSession();
         ValidateSceneReviewQueue();
         double now = SceneMonotonicNow();
@@ -8970,7 +8999,7 @@ public partial class ChatSample : MonoBehaviour
     private static bool ShouldBypassAutonomyIntentProbe(string triggerReason)
     {
         string reason = triggerReason ?? "";
-        return reason == "session-start" || reason == "shutdown-cancelled" || reason == "self-inspection-result" ||
+        return reason == "session-start" || reason == "shutdown-cancelled" || reason == "self-inspection-result" || reason == "activity-monitor-feedback" ||
             reason == "song-search-result" || reason == "song-catalog-result" ||
             reason == "song-memory-result" || reason == "speaker-manage-result" ||
             reason.StartsWith("skill-request:", StringComparison.Ordinal);
@@ -9112,7 +9141,7 @@ public partial class ChatSample : MonoBehaviour
             m_ConsecutiveAITurns >= ((m_Urge != null && m_Urge.Enabled) ? m_MonologueBackstopTurns : m_MaxConsecutiveAITurns);
         if (m_QuietAutonomyRound) frame += "\n[主动发言冷却：本轮可以观察和行动，正式文本只作为不发声内容；不要重复开口。]";
         m_SceneAutonomyIntention = decision?.intent ?? "";
-        BindAutonomyAttention(workContinuation ? null : decision);
+        BindAutonomyAttention(decision);
         frame += ConsumeDeferredAutonomyThought();
 
         if (!workContinuation)
@@ -9192,7 +9221,8 @@ public partial class ChatSample : MonoBehaviour
             if (!m_AgentRunning || m_AgentGracefulShutdownPending || !isActiveAndEnabled || workEpoch != m_WorkEpoch) return;
 
             if (!TryParseAutonomyIntentDecision(response, out AutonomyIntentDecision decision) ||
-                (reviewingWork && !IsWorkReviewDecision(decision)))
+                (reviewingWork && (!IsWorkReviewDecision(decision) ||
+                    !ValidateHistoricalWorkAssessment(decision))))
             {
                 if (playbackReadOnly && !resumingPlaybackReview)
                 { ClearScenePlaybackReview("private-playback-response-invalid"); ScheduleNextTick(15f, "private-probe-invalid"); return; }
@@ -9377,6 +9407,7 @@ public partial class ChatSample : MonoBehaviour
         if (TryResumeSpatialGoalAfterDialogue()) return;
         //连续 AI 轮次上限——工具结果仍允许回到角色手里一次，否则可能“查到了但不说”
         bool isSongToolResult = string.Equals(triggerReason, "self-inspection-result", StringComparison.Ordinal) ||
+            string.Equals(triggerReason, "activity-monitor-feedback", StringComparison.Ordinal) ||
             string.Equals(triggerReason, "song-search-result", StringComparison.Ordinal) ||
             string.Equals(triggerReason, "song-catalog-result", StringComparison.Ordinal) ||
             string.Equals(triggerReason, "song-memory-result", StringComparison.Ordinal) ||
@@ -9405,6 +9436,7 @@ public partial class ChatSample : MonoBehaviour
         }
 
         PrepareActiveSkillsForRound(null, triggerReason);
+        ObserveActivityHandoffDispatch(triggerReason);
         DispatchPreparedAgentTick(triggerReason, BuildPerceptionFrame(triggerReason));
     }
 
@@ -9477,7 +9509,7 @@ public partial class ChatSample : MonoBehaviour
         m_AgentRoundInFlight = false;
         m_UserTurnSkillPins.Clear();
 
-        if (m_PrivateDecisionFailure != null)
+        if (PrivateDecisionBlocksCurrentWork())
         { ClearScheduledAgentWake(); ClearRoundParsed(); return; }
 
         if (m_AgentGracefulShutdownPending)
@@ -12812,6 +12844,7 @@ public partial class ChatSample : MonoBehaviour
         m_RoundContinue = false;
         m_RoundNextInSec = null;
         DiscardPendingSpeechForRound(m_CurrentSpeechRoundId);
+        RecordActivityRepeatedCandidate(spoken);
         m_SelfRepeatNote =
             $"上一轮你要说的是「{TruncateForFrame(spoken, 24)}」，" +
             $"和你 {ago} 前说过的**一字不差**，而用户中间没有开口。" +
@@ -19001,6 +19034,12 @@ public partial class ChatSample : MonoBehaviour
         }
 
         //切换到等待动作
+        if (responseGeneration == m_FormalResponseGeneration && currentPos >= _msg.Length && !string.IsNullOrWhiteSpace(_msg))
+        {
+            ClearUserTurnAwaitingReply("文本已完整显示");
+            Debug.Log("[Speech/TextDelivery] " + new Newtonsoft.Json.Linq.JObject { ["generation"] = responseGeneration,
+                ["text"] = _msg, ["audioPlayed"] = false, ["complete"] = true }.ToString(Newtonsoft.Json.Formatting.None), this);
+        }
         SetAnimator("state",0);
     }
 

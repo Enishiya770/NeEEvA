@@ -55,6 +55,7 @@ public partial class ChatSample
         public float trackingFocusAppliedDegrees;
         public Vector3 measuredSurface, actualRoot;
         public float requestedYaw, requestedPitch, actualViewChangeDegrees;
+        public string historyReferenceId, historyBearing, viewVerification, viewFinding;
         public bool active, reached, canReobserveTarget;
         public string scope = "visualLabel is the model's image interpretation, not verified object identity/function. " +
             "Surface and root are engine measurements. Turning/confirmation/submission are not arrival. " +
@@ -292,6 +293,12 @@ public partial class ChatSample
         else if (decision.viewChange == null || observation == null || observation.CaptureId != decision.viewChange.captureId ||
             !IsFreshSceneObservation(observation)) failure = "view-change-reference-not-current";
         float now = Time.realtimeSinceStartup;
+        JObject historyBearing=null;
+        if(failure==null&&!string.IsNullOrEmpty(decision.viewChange.historyReferenceId)) {
+            if(!ResolveSceneRecallOrientation(decision.viewChange.historyReferenceId,observation,decision.intent=="turn-in-place",
+                out var yaw,out var pitch,out historyBearing))failure="historical-orientation-reference-invalid-or-head-range-exceeded";
+            else {decision.viewChange.yaw=yaw;decision.viewChange.pitch=pitch;}
+        }
         while (m_SceneViewStarts.Count > 0 && now - m_SceneViewStarts.Peek() > 30f) m_SceneViewStarts.Dequeue();
         if (failure == null && decision.origin == "autonomous" && m_SceneViewStarts.Count >= 3)
             failure = "view-change-short-window-budget: consider the acquired observations before another turn";
@@ -307,6 +314,7 @@ public partial class ChatSample
         var fact = new SceneActionFact { actionId = motion.ActionId, intent = decision.intent, origin = decision.origin,
             captureId = observation.CaptureId, visualLabel = decision.evidence,
             requestedYaw = decision.viewChange.yaw, requestedPitch = decision.viewChange.pitch,
+            historyReferenceId=decision.viewChange.historyReferenceId,historyBearing=historyBearing?.ToString(Newtonsoft.Json.Formatting.None),
             scope = "Purpose is the model's intention, not a claim about unseen space. Angles are relative requests; only actual head/body motion and a new image establish a changed view. No root teleport, object identity or arrival is implied." };
         m_SceneActionActive = true; int epoch = ++m_SceneActionEpoch;
         m_SceneViewStarts.Enqueue(now); m_PendingSceneFormalCaptureGeneration = generation;
@@ -356,6 +364,7 @@ public partial class ChatSample
                 if (!m_SceneAttention.TryOrientView(fact.actionId, fact.requestedYaw, fact.requestedPitch, out string error))
                 { Fail(error); yield break; }
                 RecordSceneAction(fact, "looking", "head and eyes are moving toward the requested unknown direction");
+                if(decision.origin=="user")AcknowledgeAcceptedTask(generation,fact.actionId);
                 float deadline = Time.realtimeSinceStartup + 4.5f;
                 while (Current() && !m_SceneAttention.IsSettled && Time.realtimeSinceStartup < deadline) yield return null;
                 if (!Current()) yield break;
@@ -378,6 +387,7 @@ public partial class ChatSample
                 { EndSceneOrientWatch(); Fail(error); yield break; }
                 sweep = BeginSceneSweep(fact, source, bridge, generation, epoch);
                 RecordSceneAction(fact, "turning-body", "native ARDY is turning on the current validated floor; bounded historical images may be sampled during motion, without continuous sight or a claim about unseen contents");
+                if(decision.origin=="user")AcknowledgeAcceptedTask(generation,fact.actionId);
                 deadline = Time.realtimeSinceStartup + 100f;
                 while (Current() && m_SceneOrientResult == null && Time.realtimeSinceStartup < deadline)
                 { TickSceneSweep(sweep); yield return null; }
@@ -402,6 +412,14 @@ public partial class ChatSample
             ObserveSpatialGoalView(next, "scene-view-change-result");
             CompleteSceneSweep(sweep, next);
             BindFormalSceneObservation(next, generation);
+            if(!string.IsNullOrEmpty(fact.historyReferenceId)) {
+                yield return VerifyReorientedScene(next,fact,Current);
+                if(!Current())yield break;
+                if(fact.viewVerification!="supported") {
+                    Finish("observed-target-unconfirmed",fact.viewFinding??"new view acquired; target verification unavailable","view-changed-target-unconfirmed");
+                    yield break;
+                }
+            }
             Finish("observed", "actual view changed and a new image was acquired; decide from these pixels, not assumed unseen contents", "view-change-completed");
         }
         finally

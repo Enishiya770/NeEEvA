@@ -38,7 +38,8 @@ public partial class ChatSample
             ["currentFacts"] = new JObject { ["currentlyNearAndFacingUser"] = value.currentlyNearAndFacingUser,
                 ["userTrackingValid"] = value.userTrackingValid, ["userSupportVerified"] = value.userSupportVerified,
                 ["actualUserDistance"] = value.actualUserDistance, ["actualFacingErrorDegrees"] = value.actualFacingErrorDegrees,
-                ["desiredUserDistance"] = value.desiredUserDistance }
+                ["desiredUserDistance"] = value.desiredUserDistance,
+                ["observationFrame"] = value.observationFrame, ["observedAtRealtime"] = value.observedAtRealtime }
         };
     }
 
@@ -95,11 +96,16 @@ public partial class ChatSample
 
     private void RemoveQueuedRoomSpeech(RoomSpeechPlaybackLease lease, bool keepPrefix = false)
     {
+        foreach(var chunk in m_PendingChunks.Where(c=>c.RoomState==lease&&!(keepPrefix&&c.RoomPrefixOnly)))
+            RetireUnplayedActivitySpeech(chunk.ProcessUnit,"room-playback-replaced-or-cancelled");
         m_PendingChunks = new Queue<PendingSpeechChunk>(m_PendingChunks.Where(c => c.RoomState != lease || keepPrefix && c.RoomPrefixOnly));
         var keep = new Queue<PendingSpeechClip>();
         foreach (var clip in m_PendingClips)
             if (clip.RoomState != lease || keepPrefix && clip.RoomPrefixOnly) keep.Enqueue(clip);
-            else if (clip.Clip != null) Destroy(clip.Clip);
+            else {
+                RetireUnplayedActivitySpeech(clip.ProcessUnit,"room-playback-replaced-or-cancelled");
+                if (clip.Clip != null) Destroy(clip.Clip);
+            }
         m_PendingClips = keep;
         if (lease.roundId == m_CurrentSpeechRoundId) m_SentenceBuffer.Length = 0;
     }
@@ -111,6 +117,7 @@ public partial class ChatSample
         var result = m_SilencedSpeechRoundIds.Contains(chunk.RoundId) ? RoomPlaybackCheck.Drop :
             RefreshRoomSpeechForPlayback(chunk, generation);
         if (result != RoomPlaybackCheck.Drop) PrependSpeechChunk(chunk);
+        else RetireUnplayedActivitySpeech(chunk.ProcessUnit,"queued-playback-dropped");
         return result;
     }
 
@@ -120,17 +127,20 @@ public partial class ChatSample
         if (process != RoomPlaybackCheck.Current) return process;
         var lease = chunk.RoomState;
         if (lease == null) return RoomPlaybackCheck.Current;
-        if (!RoomSpeechLeaseCurrent(lease, generation) || !chunk.RoomPrefixOnly && chunk.RoomStateVersion != lease.version)
+        if (!RoomSpeechLeaseCurrent(lease, generation) || !chunk.RoomPrefixOnly && chunk.RoomStateVersion != lease.version) {
+            RetireUnplayedActivitySpeech(chunk.ProcessUnit,"room-playback-lease-expired");
             return RoomPlaybackCheck.Drop;
+        }
         if (lease.compound && (!ValidateSpatialGoalTerminalProof(generation) ||
             !RoomRequestProgressOwnerCurrent(lease.actionId, generation)))
-        { lease.cancelled = true; RemoveQueuedRoomSpeech(lease); return RoomPlaybackCheck.Drop; }
+        { lease.cancelled = true; RemoveQueuedRoomSpeech(lease); RetireUnplayedActivitySpeech(chunk.ProcessUnit,"room-playback-owner-expired"); return RoomPlaybackCheck.Drop; }
         var room = ReadMovementPlaybackFacts(lease.bridge);
         var state = MovementPlaybackStamp(room, lease.intent, lease.actionId);
         if (state == null || new[] { "replaced", "disconnected" }.Contains((string)state["phase"]))
         {
             lease.cancelled = true;
             RemoveQueuedRoomSpeech(lease);
+            RetireUnplayedActivitySpeech(chunk.ProcessUnit,"room-playback-owner-expired");
             Debug.Log("[Room/SpeechPlaybackRefresh] " + new JObject {
                 ["generation"] = generation, ["actionId"] = lease.actionId, ["disposition"] = "dropped-owner-no-longer-current"
             }.ToString(Formatting.None));
@@ -141,7 +151,9 @@ public partial class ChatSample
         if (chunk.RoomPrefixOnly) return RoomPlaybackCheck.Current;
         bool terminal = RoomMovementResultPolicy.IsTerminalFailure((string)state["phase"]) ||
             (string)state["phase"] == "arrived" || (string)state["expectedReport"] == "stopped";
-        if (SameMovementReport(lease.state, state) || lease.neutral && !terminal) return RoomPlaybackCheck.Current;
+        bool normalFollow = lease.intent=="follow" && NormalFollowProgress(state);
+        if (SameMovementReport(lease.state, state) || lease.neutral && !terminal &&
+            (lease.intent!="follow" || normalFollow && NormalFollowProgress(lease.state))) return RoomPlaybackCheck.Current;
         // Once neutral, live pose changes after a committed arrival must not
         // churn synthesis. A new terminal verdict still overrides intermediate
         // wording, even after the ordinary replacement budget is consumed.
@@ -159,7 +171,9 @@ public partial class ChatSample
             // The refresh cap must not invent missing evidence or uncertainty.
             text = lease.language == "ja" ? "さっきあなたのそばに着いたわ。" :
                 lease.language == "en" ? "I reached your side a moment ago." : "刚才已经到你身边了。";
-        else if (lease.neutral && !terminal)
+        else if (lease.neutral && !terminal && normalFollow)
+            text=ContinuousFollowText(lease.language);
+        else if (lease.neutral && !terminal && lease.intent!="follow")
             text = lease.language == "ja" ? "移動の依頼は受け付けたわ。状況が変わっているので、最終結果はまだ断言できないの。" :
                 lease.language == "en" ? "The movement request was accepted. Its state is changing, so I can't confirm a final result yet. " :
                 "移动请求已受理，状态还在变化，我暂时不能确认最终结果。";
@@ -195,6 +209,14 @@ public partial class ChatSample
         return RoomPlaybackCheck.Replaced;
     }
 
+    private static bool NormalFollowProgress(JObject state) =>
+        new[]{"moving","waiting","preparing","returning"}.Contains((string)state?["expectedReport"]);
+
+    private static string ContinuousFollowText(string language) => language=="ja"
+        ?"引き続きあなたについていくわ。ここで待つときも、あなたが動いたらまたついていくね。"
+        :language=="en"?"I'll stay with you, and follow as you move."
+        :"我会继续跟着你。在附近等候时，你移动了我会再跟上。";
+
     private int RoomSpeechPrefixBoundary(string text)
     {
         var lease = m_RoomSpeechPlayback;
@@ -212,8 +234,11 @@ public partial class ChatSample
     }
 
     private void RecordRoomSpeechPlayed(RoomSpeechPlaybackLease lease, string text)
+        => RecordRoomSpeechPlayedForResult(lease, text, null);
+
+    private void RecordRoomSpeechPlayedForResult(RoomSpeechPlaybackLease lease, string text, string resultId)
     {
-        RecordWorkCompletedSpeech(text);
+        RecordWorkCompletedSpeechForResult(text, resultId);
         if (lease == null && (int?)m_LastFormalReplyReceipt?["generation"] == m_FormalResponseGeneration)
             m_LastFormalReplyReceipt["completedPlaybackText"] = ((string)m_LastFormalReplyReceipt["completedPlaybackText"] ?? "") + text;
         if (lease == null) return;

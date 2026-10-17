@@ -80,7 +80,8 @@ public static class DialogueSemanticsRegression
         var bound=JObject.Parse(WorkNextIntentProtocol.ExtendReviewSchema("{\"type\":\"object\",\"properties\":{},\"required\":[]}"));
         WorkResultDeliveryProtocol.BindCoverageSchema(bound,results);
         Check((int)bound.SelectToken("properties.delivery_reports.minItems")==2 &&
-            ((JArray)bound.SelectToken("properties.delivery_reports.items.properties.id.enum")).Count==2,"Native coverage is bound to exact pending versions.");
+            ((JArray)bound.SelectToken("properties.delivery_reports.items.anyOf")).Count==2 &&
+            (string)bound.SelectToken("properties.delivery_reports.items.anyOf[0].properties.id.enum[0]")==(string)resultA["id"],"Native coverage is bound to exact pending versions.");
         resultA["delivered"]=true;
         Check(WorkResultDeliveryProtocol.ReviewIds(results).SequenceEqual(new[]{(string)resultB["id"]}),"Settled results do not require repeated model reporting.");
         var many=new JArray(Enumerable.Range(0,14).Select(i=>WorkResultDeliveryProtocol.Result("step:"+i,"failed",new JObject())));

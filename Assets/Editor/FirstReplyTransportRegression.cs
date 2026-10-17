@@ -224,7 +224,7 @@ public static class FirstReplyTransportRegression
             var wire = JObject.Parse(raw); var messages = (JArray)wire["messages"];
             var input = JObject.Parse((string)messages[1]["content"]);
             Check(messages.Count == 2 && (string)input["latestUserText"] == (string)item["user"] &&
-                input["runtimeContext"] is JObject && JToken.DeepEquals(input["runtimeContext"], JObject.Parse((string)item["context"])) && input["candidateSpeech"] is JArray &&
+                input["runtimeContext"] is JObject && JToken.DeepEquals(input["runtimeContext"], TaskContinuationContextPolicy.FirstReply(JObject.Parse((string)item["context"]))) && input["candidateSpeech"] is JArray &&
                 input["recentDialogue"] is JArray dialogue && dialogue.Count == 2 &&
                 !raw.Contains("MUST_NOT_REVIEW_CANARY") && !raw.Contains("image_url") &&
                 (int?)wire["id_slot"] == 1 && (bool?)wire["stream"] == false && (int?)wire["max_tokens"] == FirstReplyProtocol.ReviewMaximumOutputTokens &&

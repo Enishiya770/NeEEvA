@@ -465,6 +465,12 @@ public static class SpatialGoalResultContextPolicy
             result["roomDecision"] = Scalars(decision, "intent", "dispatch");
         result["scope"] = "Reporting-only projection of engine-owned current result facts. Same-entity fresh runtime readback proves only the registered device state; baked illumination may remain and no physical hand press is implied. Historical identity cues are not current visibility or action authority. A review relation is not an applied cancellation. Search attempts are not completed searches or proof of absence.";
         result["resultReportRequirement"] = BuildReportRequirement(result);
+        // JObject represents a missing optional child as JValue(null). The
+        // null-conditional operator only guards CLR null, not a JSON scalar.
+        var sequence = result["taskSequence"] as JObject;
+        var selectedStep=(sequence?["steps"] as JArray)?.OfType<JObject>().FirstOrDefault(s=>
+            !string.IsNullOrEmpty((string)goal["goalId"]) && (string)s["goalId"]==(string)goal["goalId"]);
+        if(selectedStep!=null)result["reportingScope"]=WorkResultDeliveryProtocol.ReportingScope(sequence,(string)selectedStep["id"]);
         // A projection must not alter any engine-derived reporting obligation.
         if (RequiredReport(result) != RequiredReport(facts) || FailureReason(result) != FailureReason(facts)) return null;
         return result;

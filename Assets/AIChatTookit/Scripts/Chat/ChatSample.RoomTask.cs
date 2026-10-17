@@ -30,6 +30,7 @@ public partial class ChatSample
         // A reset may already have advanced the formal generation. Clear the old
         // guard, but never cancel a replacement model request or formal owner.
         if (owner < 0 || owner != m_FormalResponseGeneration) return;
+        CancelOwnedSpeechOutput(owner, reason);
         CancelSceneSearchTask("room-transaction-cancelled: " + reason);
         PauseSpatialGoal("room-transaction-cancelled: " + reason);
         ++m_FormalResponseGeneration;
@@ -164,12 +165,13 @@ public partial class ChatSample
             currentUserText = userText, autonomous,
             ongoingActivityMonitoring = ActivityMonitoringAvailable,
             taskSequenceRequired = !autonomous && m_ChatSettings.m_ChatModel.SupportsRoomTaskSequences &&
-                !(SpatialGoalExecutionCurrent(m_SpatialDeviceGoal) && SpatialGoalUnfinished(m_SpatialDeviceGoal)),
+                (RoomTaskSequenceCurrent() || !(SpatialGoalExecutionCurrent(m_SpatialDeviceGoal) && SpatialGoalUnfinished(m_SpatialDeviceGoal))),
             taskSequence = autonomous ? null : ReadRoomTaskSequence(),
             bodyTaskHandoff = new { following = bridge.IsFollowing, reservesBody = bridge.ReservesBody,
                 scope = "See execution for the current body task. This is not permission to cancel it. Interpret the complete request including stopping/replacing/retaining it. Finish an explicit stop prerequisite before a new body task; device cancellation cannot erase a newly requested operation." },
             currentRequestSemantics = autonomous ? null : ReadCompactCurrentRequestSemantics(m_FormalResponseGeneration),
-            autonomousAttention = autonomous ? ReadAutonomyAttention() : null,
+            previousWorkContext = m_PreviousUnfinishedWork?.DeepClone(),
+            autonomousAttention = ReadAutonomyAttention(),
             attentionState = ReadAttentionState("planner"),
             latestUserText = autonomous ? "" : m_ActionConstraints.CurrentUserText,
             recentDialogue = JArray.Parse(RecentRoomDialogue()), currentFacts = roomFacts["currentFacts"],
@@ -199,7 +201,7 @@ public partial class ChatSample
                 allowedObservationGoalIds = continuableGoal == null ? new string[0] : new[] { (string)continuableGoal["goalId"] },
                 goalReferenceRule = "No listed goal means omit observationGoalId. An already identified object can be approached by entityTarget without an observation goal. Entity IDs, action IDs and capture IDs never substitute for goal IDs.",
                 headYawLimit = 50, headPitchLimit = 25, bodyYawLimit = 180,
-                turnRule = "Turn around uses turn-in-place, never a 180 degree neck turn. Return a new complete decision; the runtime does not clamp or rewrite an invalid action."
+                turnRule = "Use the whole dialogue and the missing observation purpose to choose head or body motion. Repeated corrections that the body did not turn cannot be satisfied by another neck-only turn. A fresh image or a view adjustment does not itself prove complete target coverage. Turn around uses turn-in-place, never a 180 degree neck turn. Return a new complete decision; runtime never clamps or rewrites it."
             },
             sceneTime = JObject.Parse(SceneTimeContextJson),
             autonomousIntention = autonomous ? m_SceneAutonomyIntention : "",
@@ -247,6 +249,7 @@ public partial class ChatSample
         int visualRefreshes = 0, targetCorrections = 0, decisionRevision = 0, decisionRepairs = 0;
         int searchesStarted = 0, searchStartRefreshes = 0, proposalReinterpretations = 0;
         bool deviceGoalReviewComplete = false, deviceGoalReviewRejected = false;
+        bool recallDeferredForReceipts = false, forceHistoricalRecall = false;
         PendingDeviceClarification reviewedPendingClarification = null;
         string deviceGoalReviewFailure = null;
         Action<bool, string, string> pendingDeviceGoalReview = null;
@@ -255,6 +258,7 @@ public partial class ChatSample
         float controlReviewDeadline = -1f;
         string equivalenceCandidate = null;
         bool equivalenceApproved = false, bodyHandoffAttempted = false, preparedStopContinuationRequested = false;
+        bool coverageGapReviewAttempted = false;
         string committedPreparationId = null, committedPreparationDispatch = null;
         float deviceGoalReviewDeadline = -1f;
         JObject visualCorrection = null, decisionRepair = null, proposalInterpretationCorrection = null;
@@ -360,6 +364,7 @@ public partial class ChatSample
                         control.intent == "stop-moving";
                     string stopId = m_MotionIdentityPrefix + ":handoff:" + generation + ":" + (++m_MotionSequence);
                     bool stopped = approved && bridge.StopForTaskIfCurrent(stopId, oldAction, oldOperation, out failure, oldFollowing);
+                    if(stopped)RecordHistoricalWorkTermination(oldAction,ReadCompactRoomTaskFacts(bridge)["execution"] as JObject,"replaced-by-current-task");
                     Debug.Log("[Room/BodyHandoff] " + new JObject {
                         ["generation"] = generation, ["userTurn"] = userTurn, ["goalId"] = goalId,
                         ["previousActionId"] = oldAction, ["previousOperation"] = oldOperation,
@@ -422,6 +427,25 @@ public partial class ChatSample
                 ? RoomTaskProtocol.TryReviewedGoalStepDecision(executionJson, sourceText, m_ActionConstraints.CurrentUserText, out decision, out validationFailure)
                 : autonomous ? RoomTaskProtocol.TryAutonomousDecision(executionJson, autonomousIntention, preserveAutonomousNoAction, out decision, out validationFailure)
                 : RoomTaskProtocol.TryDecision(executionJson, sourceText, false, out decision, out validationFailure));
+            if (valid && sequenceRequired && ReadRoomTaskSequence() == null && !coverageGapReviewAttempted &&
+                !RoomTaskSequenceProtocol.TryPlan(json, m_ActionConstraints.CurrentUserText, out _, out string planFailure) &&
+                planFailure == "invalid-task-sequence-coverage" &&
+                RoomTaskSequenceProtocol.TryCoverageGapCandidate(json, m_ActionConstraints.CurrentUserText, out string gapCandidate, out var gaps))
+            {
+                coverageGapReviewAttempted = true;
+                var input = RoomControlReviewProtocol.CoverageInput(m_ActionConstraints.CurrentUserText, gapCandidate);
+                input["proposedContextGaps"] = gaps;
+                ReviewControl(input.ToString(Formatting.None), (reviewOk, result, reviewStatus) => {
+                    if (!CurrentRequest()) return;
+                    bool accepted = reviewOk && RoomControlReviewProtocol.AcceptsCoverage(result);
+                    Debug.Log("[Room/CoverageGapReview] " + new JObject { ["generation"] = generation,
+                        ["accepted"] = accepted, ["gaps"] = gaps, ["wireStatus"] = reviewStatus,
+                        ["review"] = result, ["planChanged"] = false }.ToString(Formatting.None), this);
+                    if (accepted) { equivalenceCandidate = gapCandidate; equivalenceApproved = true; }
+                    OnDecision(ok, accepted ? gapCandidate : json, status, sourceText, prepared);
+                });
+                return;
+            }
             if (TryGetSceneVisionPreparedStop(generation, out string preparedStopId, out string preparedStopDispatch))
             { committedPreparationId = preparedStopId; committedPreparationDispatch = preparedStopDispatch; }
             string sceneStopId = committedPreparationId, sceneStopDispatch = committedPreparationDispatch;
@@ -489,6 +513,9 @@ public partial class ChatSample
             if (valid && !stopFallbackOnly && !(sceneStopCommitted && decision.intent == "stop-moving") && sequenceRequired &&
                 decision.deviceGoal?.operation != "cancel" && !ValidateRoomTaskSequence(json, decision, out string sequenceFailure))
             { valid = false; validationFailure = sequenceFailure; }
+            if(valid && recallDeferredForReceipts && decision.deviceGoal==null) {
+                forceHistoricalRecall=true;recallDeferredForReceipts=false;consumed=false;RequestFresh();return;
+            }
             if (valid && decision.deviceGoal != null && !SpatialGoalProposalAlreadyRegistered(decision, sourceText))
             {
                 if (standingGoalStep)
@@ -526,6 +553,18 @@ public partial class ChatSample
                         RoomTaskProtocol.DeviceGoalReview review = null;
                         bool reviewed = reviewOk && RoomTaskProtocol.TryDeviceGoalProposalReview(reviewJson, out review) &&
                             RoomTaskProtocol.TryValidateListedDeviceReferent(review, proposalReferentSources, out deviceGoalReviewFailure);
+                        if(recallDeferredForReceipts && !(reviewed && review.verdict=="approved" && review.referentKind=="operated-goal")) {
+                            // A receipt is only a candidate until the independent
+                            // reviewer binds this request to its listed source.
+                            // Unrelated history must not hide ordinary visual recall.
+                            forceHistoricalRecall=true;recallDeferredForReceipts=false;
+                            deviceGoalReviewComplete=false;consumed=false;RequestFresh();return;
+                        }
+                        if(recallDeferredForReceipts)Debug.Log("[Vision/RecallSource] "+new JObject{
+                            ["generation"]=generation,["workEpoch"]=workEpoch,["sourceId"]=review.referentSourceId,
+                            ["kind"]="reviewed-operation-receipt",["newVisualConfirmationRequired"]=true,
+                            ["scope"]="Historical actor/operation evidence; no claim about current pixels or permission to execute."}.ToString(Formatting.None),this);
+                        recallDeferredForReceipts=false;
                         if (reviewed) review.referenceContext = RoomTaskProtocol.BuildDeviceReferenceContext(proposalDialogue);
                         bool registered = reviewed && TryRegisterReviewedSpatialGoal(decision, sourceText, review, out deviceGoalReviewFailure);
                         deviceGoalReviewRejected = !registered;
@@ -643,7 +682,9 @@ public partial class ChatSample
             if (valid && answerThenResume && decision.IsViewChange && IsFreshSceneObservation(observation) &&
                 decision.viewChange?.captureId == observation.CaptureId && DeferReviewedObservationUntilAfterAnswer(decision))
                 decision = new RoomTaskProtocol.Decision { intent="none", origin="none", evidence="" };
-            if (valid && !sceneStopCommitted && HandoffDeviceGoal(decision)) return;
+            // A settled preparation belongs to the old executor. It cannot
+            // veto the independently reviewed next step's new execution lease.
+            if (valid && !stopFallbackOnly && HandoffDeviceGoal(decision)) return;
             if (valid && !sequenceRequired && !TryValidateSpatialGoalStep(decision, out string goalStepFailure))
             { valid = false; validationFailure = goalStepFailure; }
             if (valid && !TryValidateSceneDevicePlanningConditions(decision, observation, out string preconditionFailure))
@@ -688,6 +729,7 @@ public partial class ChatSample
                     ["violatedConstraint"] = RoomTaskProtocol.DecisionRepairConstraint(validationFailure),
                     ["sequenceQuoteFeedback"] = sequenceRequired ? RoomTaskSequenceProtocol.LiteralQuoteFeedback(rejected, sourceText) : null,
                     ["sequenceStructureFeedback"] = sequenceRequired && ReadRoomTaskSequence() == null ? RoomTaskSequenceProtocol.StructureFeedback(rejected) : null,
+                    ["sequenceSelectionFeedback"] = sequenceRequired ? RoomTaskSequenceProtocol.SelectionFeedback(rejected, ReadRoomTaskSequence()) : null,
                     ["rejectedDecision"] = rejected.Substring(0, Math.Min(1800, rejected.Length)),
                     ["preserveNoAction"] = preserveAutonomousNoAction,
                     ["scope"] = preserveAutonomousNoAction ?
@@ -880,7 +922,10 @@ public partial class ChatSample
                     // A scheduled tick cannot repeat the same completed/failed attempt.
                     if (decision.intent == "follow" && bridge.IsFollowing)
                     { m_RoomTaskDispatch = "follow-already-active"; m_RoomTaskActionId = bridge.ActiveTaskId; }
-                    else if (autonomous && current.lastAttemptAppliesToCurrentTarget)
+                    else if (autonomous && bridge.SuppressesAutonomousAttempt(decision.intent,
+                        (bool?)m_PreviousUnfinishedWork?.SelectToken("termination.committed")==true &&
+                        (string)m_PreviousUnfinishedWork.SelectToken("termination.reason")=="replaced-by-current-task"
+                            ? (string)m_PreviousUnfinishedWork.SelectToken("termination.previousActionId") : null))
                         m_RoomTaskDispatch = "same-target-autonomous-retry-suppressed";
                     else
                     {
@@ -938,6 +983,14 @@ public partial class ChatSample
             evidence = bridge.ReadCurrentTargetEvidence(true);
             imageUrl = ResolveFormalSceneImage(generation);
             observation = GetFormalSceneObservation(generation);
+            recallDeferredForReceipts=!forceHistoricalRecall && !autonomous && !deviceGoalReviewComplete &&
+                ResultDeliveryContextPolicy.PreferReceiptReview(ReadCurrentRequestSemantics(generation),BuildVerifiedDeviceReferentHistory(),answerRequired);
+            if(!recallDeferredForReceipts && TryBeginSceneRecall(observation,ReadCurrentRequestSemantics(generation)?["questionUnderstanding"] as JObject,generation,()=> {
+                if(!CurrentRequest())return;
+                RequestSceneObservation("planning-after-recall",fresh=>{
+                    if(!CurrentRequest())return;BindFormalSceneObservation(fresh,generation);RequestFresh();
+                });
+            })) return;
             m_RoomTaskTargetRevision = evidence.currentTargetRevision;
             input = AddWorkRoomStepDecisionContext(
                 BuildRoomDecisionInputWithObservation(userText, autonomous, prompt, bridge, observation), workStep);
@@ -1098,6 +1151,7 @@ public partial class ChatSample
                 ["mode"]="goal-user-update", ["currentUserText"]=latestUserText, ["latestUserText"]=latestUserText,
                 ["currentRequestSemantics"]=ReadCompactCurrentRequestSemantics(generation),
                 ["existingGoal"]=BuildSpatialGoalContext(), ["verifiedDeviceHistory"]=BuildVerifiedDeviceReferentHistory(),
+                ["parentTask"]=m_PreviousUnfinishedWork?["taskSequence"]?.DeepClone(),
                 ["verifiedObservedDeviceHistory"]=BuildVerifiedObservedDeviceReferentHistory(),
                 ["referentSources"]=BuildSpatialGoalReferentSources(),
                 ["recentDialogue"]=JArray.Parse(RecentRoomDialogue()),
@@ -1114,6 +1168,8 @@ public partial class ChatSample
                 string reviewedResponseMode=update?.responseMode;
                 bool continueGoal=false;
                 bool updated=parsed && TryApplySpatialGoalUserUpdate(update,latestUserText,out continueGoal,out updateFailure);
+                bool parentResumed = updated && continueGoal && update.resumeParentTask &&
+                    AdoptReviewedParentTask(update.referentGoalId, latestUserText);
                 bool independentRequest=!updated || update?.relation == "cancel" ||
                     update?.relation == "unrelated" && update.responseMode == "act";
                 if (!updated && string.IsNullOrEmpty(updateFailure))
@@ -1162,6 +1218,11 @@ public partial class ChatSample
                 autonomous=false;
                 userText=standingGoalStep ? m_SpatialDeviceGoal.originalRequest : latestUserText;
                 consumed=false;
+                // The whole parent was just independently reconciled with the
+                // current human turn. Resume its selected existing goal through
+                // the normal executor; do not invent a second set proposal
+                // whose old quote cannot be found in the word "continue".
+                if (parentResumed && HandoffDeviceGoal()) return;
                 RequestFresh();
             };
             pendingDeviceGoalReview=OnGoalUserUpdate;
@@ -1192,6 +1253,8 @@ public partial class ChatSample
         string validationReason = reason ?? "decision-unavailable";
         m_RoomTaskDecisionFailure = new JObject {
             ["generation"] = generation, ["userTurn"] = userTurn,
+            ["workEpoch"] = m_WorkEpoch, ["request"] = m_ActionConstraints.CurrentUserText,
+            ["intent"] = "request-processing", ["entityId"] = "request:" + userTurn,
             ["stage"] = preflightBudgetFailure ? "decision-preflight" : "action-planning",
             ["kind"] = preflightBudgetFailure ? "input-budget-exceeded" : transportFailure ? "service-request-failed" : "decision-not-executable",
             ["wireAccepted"] = wireAccepted,
@@ -1221,6 +1284,10 @@ public partial class ChatSample
 
     private JObject ReadRoomTaskDecisionFailure()
     {
+        if ((int?)m_FirstReplyFailure?["generation"] == m_FormalResponseGeneration &&
+            (int?)m_FirstReplyFailure?["userTurn"] == m_ActionConstraints.CurrentUserTurn &&
+            (int?)m_FirstReplyFailure?["workEpoch"] == m_WorkEpoch)
+            return (JObject)m_FirstReplyFailure.DeepClone();
         if (!(m_RoomTaskIntent == "unresolved" && m_RoomTaskDispatch == "decision-unavailable") &&
             !((bool?)m_RoomTaskDecisionFailure?["remainingAfterCommittedStop"] == true && m_RoomTaskIntent == "stop-moving" &&
                 m_RoomTaskDispatch == "stop-submitted" && (string)m_RoomTaskDecisionFailure["completedStopActionId"] == m_RoomTaskActionId) ||

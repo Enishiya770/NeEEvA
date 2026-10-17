@@ -24,6 +24,8 @@ public partial class ChatSample
             steps.OfType<JObject>().Any(s => new[] { "pending", "running", "preparing" }.Contains((string)s["status"]));
         bool active = pendingSteps || HasWorkToolInFlight() || SceneActionIsBusy || SpatialGoalUnfinished(m_SpatialDeviceGoal) || bridge.ReservesBody;
         bool uncertain = ReadRoomTaskDecisionFailure() != null || RoomMovementResultPolicy.IsTerminalFailure(bridge.Phase) && active;
+        uncertain |= NeedsSceneRecall(ReadCurrentRequestSemantics(m_FormalResponseGeneration)?["questionUnderstanding"] as JObject) &&
+            (m_FormalResponseInFlight || m_SceneRecallStatus=="pending");
         bool autonomous = m_AgentCurrentRoundIsTick && !m_WorkReviewOpen;
         string topic = autonomous ? m_SceneAutonomyIntention : m_ActionConstraints.CurrentUserText;
         string purpose = autonomous ? "autonomous:" + topic : "user:" + m_ActionConstraints.CurrentUserTurn + ":" + m_WorkEpoch;

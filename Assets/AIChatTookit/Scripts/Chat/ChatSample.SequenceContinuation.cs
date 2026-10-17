@@ -93,6 +93,7 @@ public partial class ChatSample
         }));
         var input = new JObject { ["roomControlReview"] = RoomControlReviewProtocol.Continuation,
             ["currentUserText"] = lease.request, ["selectedStep"] = PickRoomFields(selected, "id", "quote", "kind", "after"),
+            ["resumedParentRequest"] = state["resumedFrom"] is JObject ? state["originalRequest"]?.DeepClone() : null,
             ["steps"] = summaries, ["priorResultSpeechCompleted"] = false,
             ["scope"] = "Statuses are engine-recorded completion receipts. Body is available now. This executor can only track the current user; independently determine the requested target from the complete utterance. No new visual/object decision or user confirmation was performed." };
         string wireInput = input.ToString(Formatting.None);
@@ -107,7 +108,8 @@ public partial class ChatSample
                 try { lease.review = PickRoomFields(JObject.Parse(json), "target", "readiness", "stepId", "reason"); }
                 catch (JsonException) { }
             }
-            bool approved = ok && RoomControlReviewProtocol.AcceptsContinuation(json, lease.step, lease.request, (string)lease.candidate["quote"]);
+            string citationSource = lease.sequence["resumedFrom"] is JObject ? (string)lease.sequence["originalRequest"] : lease.request;
+            bool approved = ok && RoomControlReviewProtocol.AcceptsContinuation(json, lease.step, citationSource, (string)lease.candidate["quote"]);
             if (!approved) { FinishSequenceContinuation(lease, false, "review-deferred:" + status); return; }
             if (!SequenceContinuationBodyAvailable(lease))
             { FinishSequenceContinuation(lease, false, "body-ownership-changed"); return; }

@@ -24,6 +24,19 @@ public static class ReplyAnswerObligationProtocol
     public static JArray Read(JObject input) => input?["answerObligations"] as JArray ??
         input?.SelectToken("sceneActionFacts.answerObligations") as JArray ??
         input?.SelectToken("taskSequence.answerObligations") as JArray ?? new JArray();
+    public static JArray FromPlan(string request, JArray coverage, JObject semantics)
+    {
+        var result = FromSemantics(request, semantics);
+        foreach (var row in (coverage ?? new JArray()).OfType<JObject>().Where(r => (string)r["kind"] == "answer")) {
+            string quote = (string)row["quote"];
+            if (string.IsNullOrWhiteSpace(quote) || !(request ?? "").Contains(quote) ||
+                result.OfType<JObject>().Any(q => ((string)q["questionQuote"]).Contains(quote))) continue;
+            foreach (var narrow in result.OfType<JObject>().Where(q => quote.Contains((string)q["questionQuote"])).ToArray()) narrow.Remove();
+            result.Add(new JObject { ["questionQuote"] = quote,
+                ["scope"] = "Question from the validated complete task plan; reporting only, never action authority." });
+        }
+        return result;
+    }
     public static JObject DeliveryResult(JObject question) => WorkResultDeliveryProtocol.Result(
         "independent-answer", "answer-required", new JObject { ["questionQuote"] = question["questionQuote"]?.DeepClone(), ["deliveryCriterion"] = DeliveryCriterion });
     public static void AddReviewSchema(JObject schema,JObject input)

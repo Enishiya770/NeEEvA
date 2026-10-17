@@ -28,13 +28,16 @@ public static partial class RoomSpeechFactScopeRegression
             initial.Complete(true, wrong.ToString(Formatting.None), "controlled-latest-wrong-order");
             yield return Wait(() => model.Decisions.Count > decisions, "One bounded plan correction for an unmet predecessor");
             var correction = model.Decisions.Last(); var input = JObject.Parse(correction.Input);
-            Require(bridge.Controller.OperationRevision == revision &&
-                (string)input.SelectToken("taskSequence.steps[0].status") == "pending" &&
+            var rejectedPlan=JObject.Parse((string)input.SelectToken("decisionRepair.rejectedDecision"));
+            Require(bridge.Controller.OperationRevision == revision && Call(chat,"ReadRoomTaskSequence")==null &&
+                (bool?)input.SelectToken("decisionRepair.sequenceSelectionFeedback.planCommitted")==false &&
+                (string)rejectedPlan.SelectToken("taskPlan[0].id")=="s1" &&
                 (string)input.SelectToken("decisionRepair.rejectionReason") == "invalid-task-sequence-prerequisite",
-                "Production callback rejects the latest Play's wrong-order approach before submitting movement; repair retains the first step.");
+                "Wrong-order output remains an uncommitted candidate; bounded repair retains its first-step evidence without granting movement.");
             File.WriteAllText(Path.Combine(output, "sequence-wrong-order-repair.request.json"), correction.Wire);
-            // The rejected planner cannot erase its first step in its retry.
-            wrong.Remove("taskPlan"); correction.Complete(true, wrong.ToString(Formatting.None), "controlled-repeat-wrong-order");
+            // Repeat the same complete wrong-order candidate. Rejected plans
+            // have not entered the ledger and cannot supply an implicit plan.
+            correction.Complete(true, wrong.ToString(Formatting.None), "controlled-repeat-wrong-order");
             Require(bridge.Controller.OperationRevision == revision && model.Decisions.Count == decisions + 1 &&
                 (string)((JObject)Call(chat, "ReadRoomTaskDecisionFailure"))?["validationReason"] == "invalid-task-sequence-prerequisite",
                 "A second wrong order settles as an explicit planning failure with no action or unbounded retry.");

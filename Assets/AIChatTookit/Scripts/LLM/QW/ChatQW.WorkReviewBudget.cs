@@ -8,6 +8,19 @@ using UnityEngine;
 
 public partial class ChatQW
 {
+    private static string WorkReviewDiagnosticWire(string json)
+    {
+        var packet=JObject.Parse(json);
+        foreach(var message in (packet["messages"] as JArray??new JArray()).OfType<JObject>())
+            if(message["content"] is JArray parts)foreach(var part in parts.OfType<JObject>())
+                if((string)part["type"]=="image_url" && part["image_url"] is JObject image) {
+                    string value=(string)image["url"]??"";
+                    image["url"]="[image bytes omitted from diagnostic]";
+                    image["diagnosticCharacters"]=value.Length;image["diagnosticStamp"]=ActivityEvidencePolicy.Stamp(new JValue(value));
+                }
+        return packet.ToString(Formatting.None);
+    }
+
     private string ProjectAutonomyIntentPacket(List<SendData> resident, string prompt, out JObject diagnostic)
         => ProjectAutonomyIntentWirePacket(resident, prompt, null, out diagnostic);
 
@@ -27,9 +40,10 @@ public partial class ChatQW
             // catalog/geometry detail. A private interest decision has the image;
             // selecting an executable object/route still needs the full planner.
             JObject attention = null;
-            string source = pressure == 3 ? ProjectPrivateAttention(facts, true, out attention) :
-                CommittedSpatialReplyProtocol.ProducerContextMarker + "\n" + facts;
-            projected = ProjectReplyFacts(source, Math.Min(pressure, 2), out var fields) + tail;
+            string source = CommittedSpatialReplyProtocol.ProducerContextMarker + "\n" + facts;
+            projected = ProjectReplyFacts(source, Math.Min(pressure, 2), out var fields);
+            if(pressure>0)projected=ProjectPrivateAttention(projected,true,out attention);
+            projected+=tail;
             long totalText = other + EstimateRoomDecisionTextUnits(projected);
             var wireBudget = measureWire?.Invoke(projected);
             attempts.Add(new JObject { ["pressure"] = pressure, ["otherMessageTextUnits"] = other,
@@ -48,14 +62,55 @@ public partial class ChatQW
 
     private static string ProjectPrivateAttention(string prompt, bool interestOnly, out JObject diagnostic)
     {
+        prompt=WorkReviewInstructionProjection.Project(prompt);
         // This is a progress packet, not an object/route-selection prompt. Read
         // complete producer documents; never rewrite quoted human evidence.
-        string context = CommittedSpatialReplyProtocol.ProducerContextMarker + "\n" + prompt;
+        string context = prompt.StartsWith(CommittedSpatialReplyProtocol.ProducerContextMarker+"\n",StringComparison.Ordinal)
+            ? prompt : CommittedSpatialReplyProtocol.ProducerContextMarker + "\n" + prompt;
         var blocks = ReadReplyFactBlocks(context, true);
+        // These documents are consumed together by one private request. Share
+        // equal typed subtrees across producers instead of carrying room/work/
+        // playback receipts repeatedly. Literal strings and unknown fields stay.
+        var shared=new Dictionary<string,(string path,JToken value)>();int sharedCount=0;
+        void Share(JToken value,string path) {
+            if(!(value is JContainer container))return;
+            string canonical=ActivityEvidencePolicy.Canonical(value).ToString(Formatting.None);
+            if(canonical.Length>=320 && value.Parent is JProperty) {
+                if(sharedCount<96 && shared.TryGetValue(canonical,out var existing) && JToken.DeepEquals(existing.value,value)) {
+                    value.Replace(new JObject{["privateFactRef"]=existing.path});sharedCount++;return;
+                }
+                if(!shared.ContainsKey(canonical))shared[canonical]=(path,value.DeepClone());
+            }
+            if(value is JObject obj)foreach(var property in obj.Properties().ToArray())Share(property.Value,path+"/"+property.Name.Replace("~","~0").Replace("/","~1"));
+            else if(value is JArray array)for(int i=0;i<array.Count;i++)Share(array[i],path+"/"+i);
+        }
         var fields = new JArray();
         var output = new StringBuilder(); int cursor = 0;
         foreach (var block in blocks)
         {
+            WorkReviewInstructionProjection.ProjectRecord(block.value);
+            foreach(var delivery in block.value.DescendantsAndSelf().OfType<JObject>().Where(o=>o["results"] is JArray).ToArray())
+                foreach(var item in ((JArray)delivery["results"]).OfType<JObject>()) {
+                    ResultPlaybackSelection.Annotate(item);
+                    ResultPlaybackSelection.ProjectWireAudio(item);
+                }
+            // Runtime work packets also nest these under task/current-work.
+            // Applying the same source-preserving index only at the root left
+            // whole old result archives repeated in autonomous final requests.
+            foreach (var property in block.value.Descendants().OfType<JProperty>().ToArray())
+                if (new[] { "previousUnfinishedWork", "previousWorkContext" }.Contains(property.Name) && property.Value is JObject history)
+                    property.Value = TaskContinuationContextPolicy.RoutingHistory(history, property.Path);
+            if (interestOnly)
+                foreach (var property in block.value.Descendants().OfType<JProperty>().ToArray())
+                    if (new[] { "resultAtInterruption", "executionAtInterruption", "completedDeviceResult" }.Contains(property.Name) && property.Value is JObject outcome)
+                        property.Value = TaskContinuationContextPolicy.IndexOutcome(outcome);
+            if(block.value["previousUnfinishedWork"] is JObject previous)
+                block.value["previousUnfinishedWork"]=TaskContinuationContextPolicy.RoutingHistory(previous);
+            foreach(var property in block.value.Descendants().OfType<JProperty>().ToArray())
+                if(new[]{"currentRoomTask","currentExecution"}.Contains(property.Name) && property.Value is JObject execution)
+                    property.Value=ResultDeliveryContextPolicy.Execution(execution);
+            if(block.marker=="[Historical interrupted work; reference only]" && block.value["snapshot"] is JObject snapshot)
+                block.value["snapshot"]=TaskContinuationContextPolicy.RoutingHistory(snapshot,"previousUnfinishedWork");
             var omitted = new JObject();
             void Omit(JObject node, string field, string path)
             {
@@ -107,7 +162,7 @@ public partial class ChatQW
             if (block.marker == "[视觉关注与行动事实]") Scene(block.value, "");
             // Known nested scene producers can occur in the task/result document.
             foreach (var property in block.value.Descendants().OfType<JProperty>().ToArray())
-                if (property.Name == "sceneActionFacts" && property.Value is JObject nested) Scene(nested, property.Path + ".");
+                if ((property.Name == "sceneActionFacts" || property.Name == "sceneAction") && property.Value is JObject nested) Scene(nested, property.Path + ".");
             if (omitted.Count > 0) block.value["workReviewAttention"] = new JObject {
                 ["omittedDetails"] = omitted,
                 ["scope"] = (interestOnly ? "Private interest/attention view. " : "Progress-only view. ") +
@@ -119,13 +174,44 @@ public partial class ChatQW
             output.Append(context, cursor, block.start - cursor).Append(block.value.ToString(Formatting.None));
             cursor = block.end;
         }
+        // Share after all omission passes so a reference cannot point at a
+        // subtree that this same projection subsequently removes.
+        var unshared=blocks.Select(b=>b.value.DeepClone()).ToArray();
+        bool existingRefs=blocks.Any(b=>b.value.SelectTokens("$..privateFactRef").Any());
+        if(!existingRefs)for(int i=0;i<blocks.Count;i++)Share(blocks[i].value,"document/"+i);
+        JToken Expand(JToken value,int depth=0) {
+            if(depth>96)throw new InvalidOperationException("Private reference depth exceeded.");
+            if(value is JObject reference && reference.Count==1 && reference["privateFactRef"]?.Type==JTokenType.String) {
+                var parts=((string)reference["privateFactRef"]).Split('/');
+                JToken resolved=blocks[int.Parse(parts[1])].value;
+                foreach(string part in parts.Skip(2))resolved=resolved is JArray array?array[int.Parse(part)]:resolved[part.Replace("~1","/").Replace("~0","~")];
+                if(resolved==null)throw new InvalidOperationException("Missing private reference.");
+                return Expand(resolved,depth+1);
+            }
+            if(value is JObject obj)return new JObject(obj.Properties().Select(p=>new JProperty(p.Name,Expand(p.Value,depth+1))));
+            if(value is JArray rows)return new JArray(rows.Select(row=>Expand(row,depth+1)));
+            return value.DeepClone();
+        }
+        bool verified=false;
+        try {verified=!existingRefs&&blocks.Select((b,i)=>JToken.DeepEquals(unshared[i],Expand(b.value))).All(x=>x);}
+        catch(Exception){verified=false;}
+        if(!verified) {for(int i=0;i<blocks.Count;i++)blocks[i].value=(JObject)unshared[i];sharedCount=0;}
+        output.Clear();cursor=0;fields.Clear();
+        foreach(var block in blocks) {
+            foreach(var field in block.original.Properties())fields.Add(new JObject{["block"]=block.marker,["field"]=field.Name,
+                ["before"]=RoomDecisionValueMeasure(field.Value),["after"]=RoomDecisionValueMeasure(block.value[field.Name])});
+            output.Append(context,cursor,block.start-cursor).Append(block.value.ToString(Formatting.None));cursor=block.end;
+        }
         output.Append(context, cursor, context.Length - cursor);
-        string result = SceneFactContextCompactor.Compact(output.ToString(), out var sharing, true);
+        if(sharedCount>0)output.Append("\n[Private fact references] privateFactRef=document/N/JSON-pointer points to the identical typed value in producer JSON document N (zero based). Remaining path uses RFC6901 escaping. Resolve it there, including all constraints, identities and outcomes. It is shared evidence, not missing or newly authorized work.\n");
+        var sharing=new SceneFactContextCompactor.Report();
+        // Avoid composing two reference dialects which could move each other's targets.
+        string result = sharedCount>0?output.ToString():SceneFactContextCompactor.Compact(output.ToString(), out sharing, true);
         diagnostic = new JObject { ["version"] = "work-progress-facts-v2", ["engineMemoryMutated"] = false,
             ["beforeCharacters"] = context.Length, ["afterCharacters"] = result.Length,
             ["beforeTextUnits"] = EstimateRoomDecisionTextUnits(context), ["afterTextUnits"] = EstimateRoomDecisionTextUnits(result),
             ["preservedOtherCharacters"] = context.Length - blocks.Sum(b => b.end - b.start),
-            ["fields"] = fields, ["exactSharing"] = JObject.FromObject(sharing),
+            ["fields"] = fields, ["sharedSubtrees"] = sharedCount, ["privateReferencesRoundTripVerified"]=verified, ["exactSharing"] = JObject.FromObject(sharing),
             ["scope"] = "Field projection followed by full-wire hard admission. Oversized mandatory text is retained and rejected locally, never silently shortened." };
         return result;
     }

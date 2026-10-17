@@ -147,8 +147,6 @@ public partial class ChatQW
             string best = !recovery && (bool)initial["allowed"] ? json : null;
             JObject bestMeasure = best == null ? null : initial;
             string bestProjection = "none"; JObject bestSummary = null; int? bestRows = null;
-            if (!recovery && !workingMemory && (bool)initial["allowed"])
-            { diagnostic["final"] = initial.DeepClone(); diagnostic["admitted"] = true; return true; }
             // Cheap exact sharing first; this can be enough without omitting any facts.
             if (TryCompactRoomTaskRequest(json, out string shared))
             {
@@ -412,7 +410,7 @@ public partial class ChatQW
         "sceneLabel", "identitySource", "requiresReobservation", "semanticIdentityConfirmed", "candidateId", "marker", "selectionId",
         "localHierarchy", "directionFromCurrentPose", "cameraPositionAtCapture", "cameraRotationAtCapture", "bodyPositionAtCapture",
         "bodyRotationAtCapture", "viewDirectionWorldAtCapture", "capabilities", "samplePurpose", "rootPositionAtCapture", "rootRotationAtCapture",
-        "rootScaleAtCapture", "positionInvalidReason", "sampleAgeSeconds", "ageSecondsAtCognitionRead", "selfPose", "observationCount" };
+        "rootScaleAtCapture", "positionInvalidReason", "sampleAgeSeconds", "ageSecondsAtCognitionRead", "selfPose", "observationCount" , "bearing", "currentOpaquePixels", "observationFieldsFrom", "inheritedObservationFields" };
 
     // Current producer keys inside authored hints, geometry, pose, bearing and
     // diagnostic boxes/hierarchy. New nested constraints protect their whole row

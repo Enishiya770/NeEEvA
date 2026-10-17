@@ -6,6 +6,63 @@ public partial class ChatSample
     private string m_RequestProgressSpeechPrefix;
     private JObject m_RequestProgressSpeechState;
     private int m_RequestProgressSpeechGeneration = -1;
+    private int m_ProcessSpeechBindingGeneration=-1;
+    private string m_ProcessSpeechBindingSource,m_ProcessSpeechBindingPrefix,m_ProcessSpeechBindingLanguage,m_ProcessSpeechBindingAction;
+
+    private bool TryBindProcessSpeechStep(SpeechTextBuffer buffer,string executable,int generation,
+        bool recordHistory,ObservationReceipt observations)
+    {
+        var step=BuildRoomSpeechProgressOwner(generation);
+        string speech=buffer.ToString();
+        if(step==null||m_ProcessSpeechBindingGeneration==generation&&m_ProcessSpeechBindingSource==speech&&
+            m_ProcessSpeechBindingAction==(string)step["actionId"])return false;
+        var model=m_ChatSettings?.m_ChatModel;
+        if(model==null)return false;
+        m_ProcessSpeechBindingGeneration=generation;m_ProcessSpeechBindingSource=speech;
+        m_ProcessSpeechBindingAction=(string)step["actionId"];
+        m_ProcessSpeechBindingPrefix=null;m_ProcessSpeechBindingLanguage=buffer.LanguageCode;
+        var input=StepSpeechPartitionProtocol.Input(m_ActionConstraints.CurrentUserText,speech,step,
+            BuildRoomRequestProgress()?["steps"] as JArray);
+        int epoch=m_WorkEpoch,turn=m_ActionConstraints.CurrentUserTurn;
+        bool completed=false;
+        bool Current()=>generation==m_FormalResponseGeneration&&epoch==m_WorkEpoch&&turn==m_ActionConstraints.CurrentUserTurn&&
+            m_ProcessSpeechBindingSource==speech&&m_ProcessSpeechBindingAction==(string)step["actionId"]&&
+            model==m_ChatSettings?.m_ChatModel&&!m_UserSpeechActiveForAutonomy&&!m_SceneTimePaused&&isActiveAndEnabled&&
+            GetComponent<ArdyRoomDialogueBridge>()?.ActionId==(string)step["actionId"]&&
+            RoomRequestProgressOwnerCurrent((string)step["actionId"],generation);
+        void Finish(bool ok,string raw,string status) {
+            if(completed)return;completed=true;
+            if(!Current()) {
+                if(generation==m_FormalResponseGeneration&&epoch==m_WorkEpoch&&turn==m_ActionConstraints.CurrentUserTurn&&
+                    m_ProcessSpeechBindingAction==(string)step["actionId"]&&model==m_ChatSettings?.m_ChatModel&&
+                    !m_UserSpeechActiveForAutonomy&&!m_SceneTimePaused&&isActiveAndEnabled) {
+                    m_FormalResponseInFlight=false;
+                    m_WorkSubstepReviewPending=true;ScheduleNextTick(1f,"speech-step-owner-changed");
+                    UnityEngine.Debug.Log("[Speech/StepBinding] generation="+generation+" status=owner-changed publication=False",this);
+                }
+                return;
+            }
+            string prefix=null,failure=null;
+            bool bound=ok&&StepSpeechPartitionProtocol.Resolve(input,raw,out prefix,out failure);
+            if(bound)m_ProcessSpeechBindingPrefix=prefix;
+            UnityEngine.Debug.Log("[Speech/StepBinding] "+new JObject{["generation"]=generation,["step"]=step,
+                ["bound"]=bound,["status"]=status,["failure"]=failure,["raw"]=raw,["originalSpeech"]=speech,
+                ["independentSpeech"]=prefix,["scope"]="Text ownership only; execution continued. No factual preapproval or action permission."}.ToString(Newtonsoft.Json.Formatting.None),this);
+            // A failed classification preserves original words under ongoing
+            // monitoring and leaves delivery pending; it never deletes an
+            // independent answer or marks that classification as checked.
+            TryPublishProcessMonitoredSpeech(buffer,executable,generation,recordHistory,observations);
+        }
+        try {model.PostRoomPreparationMessage(input.ToString(Newtonsoft.Json.Formatting.None),Finish);}
+        catch(System.Exception error) {Finish(false,"","speech-step-binding-exception:"+error.GetType().Name);}
+        StartCoroutine(Deadline());
+        System.Collections.IEnumerator Deadline() {
+            float until=UnityEngine.Time.realtimeSinceStartup+3f;
+            while(!completed&&Current()&&UnityEngine.Time.realtimeSinceStartup<until)yield return null;
+            if(!completed)Finish(false,"","speech-step-binding-timeout");
+        }
+        return true;
+    }
 
     private JObject BuildRoomSpeechProgressOwner(int generation)
     {

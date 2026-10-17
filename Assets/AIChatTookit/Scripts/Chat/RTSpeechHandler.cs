@@ -503,6 +503,25 @@ public class RTSpeechHandler : MonoBehaviour
     /// 开始检测声音
     /// </summary>
     /// <returns></returns>
+    private string m_InputModeDiagnostic;
+    private float m_InputModeDiagnosticAt, m_VadDiagnosticAt;
+    private void ObserveInputMode(bool speaking, bool protectedPlayback)
+    {
+        string mode = m_IsRecording ? "recording" : speaking ? "barge-in" : protectedPlayback ? "echo-tail" : "normal-listening";
+        if (mode == m_InputModeDiagnostic && Time.realtimeSinceStartup < m_InputModeDiagnosticAt) return;
+        m_InputModeDiagnostic = mode; m_InputModeDiagnosticAt = Time.realtimeSinceStartup + 15f;
+        Debug.Log($"[Input/Mode] mode={mode} logicalSpeaking={speaking} actualPlaying={m_ChatSample?.IsVoiceOutputPlaying} " +
+            $"protected={protectedPlayback} recording={m_IsRecording} rms={m_SmoothedRms:F4} vadPending={m_NeuralVadProbeInFlight} " +
+            $"bargeSeconds={m_BargeInTimer:F2} awake={m_AwakeState}");
+    }
+    private void ObserveVadDecision(string reason)
+    {
+        if (Time.realtimeSinceStartup < m_VadDiagnosticAt) return;
+        m_VadDiagnosticAt = Time.realtimeSinceStartup + 1f;
+        Debug.Log($"[Input/VadDecision] sequence={m_NeuralVadSequence} reason={reason} mode={m_InputModeDiagnostic} " +
+            $"logicalSpeaking={m_ChatSample?.IsAISpeaking} actualPlaying={m_ChatSample?.IsVoiceOutputPlaying} recording={m_IsRecording}");
+    }
+
     private IEnumerator DetectRecording()
     {
         while (true)
@@ -571,6 +590,7 @@ public class RTSpeechHandler : MonoBehaviour
             bool aiSpeaking = (m_ChatSample != null && m_ChatSample.IsAISpeaking);
             bool playbackProtected = m_ChatSample != null &&
                 m_ChatSample.IsAIPlaybackProtected(m_PostPlaybackEchoGuardSeconds);
+            ObserveInputMode(aiSpeaking, playbackProtected);
             //完整最终录音独立于临时 partial 的回声保护持续累计。用户可能正是在
             //角色出声时插话；若像 WebSocket 一样跳过保护窗，会丢掉 barge-in 开头。
             if (m_IsRecording) CaptureRecordingAudio(position, false);
@@ -1156,6 +1176,8 @@ public class RTSpeechHandler : MonoBehaviour
             float retrySeconds = forBargeIn ? m_BargeInVadRetrySeconds : m_NeuralVadRetrySeconds;
             m_NextNeuralVadProbeTime = Time.realtimeSinceStartup + Mathf.Max(0.05f, retrySeconds);
             bool isSpeech = vadResult != null && vadResult.IsSpeech;
+            ObserveVadDecision($"probe speech={isSpeech} barge={forBargeIn} speaker={vadResult?.SpeakerKind} " +
+                $"status={vadResult?.SpeakerStatus} confidence={vadResult?.SpeakerConfidence} aecResidual={handlingAecResidual}");
             //探测长度是关键变量：只给 FSMN m_NeuralVadProbeSeconds(默认 0.5s)，还要求其中
             //至少 min_speech_ms 是语音，而探测发生在起音瞬间。服务端 [VAD] 那行有对应细节。
             if (m_LogTimings)
@@ -1367,6 +1389,9 @@ public class RTSpeechHandler : MonoBehaviour
 
     private void ResetNeuralVadGate(string reason)
     {
+        // Reset reasons remain visible even when verbose timing logs are off.
+        m_VadDiagnosticAt = 0f;
+        ObserveVadDecision(reason);
         if (m_LogTimings && (m_NeuralVadProbeInFlight || m_PendingSpeechStartPos >= 0))
             Debug.Log($"[VAD] 重置门控: {reason}");
         m_NeuralVadSequence++;

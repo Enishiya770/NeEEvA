@@ -1,0 +1,485 @@
+{
+  "source": "Logs\\routing-delivery-repair-20261016\\activity6\\activity-monitor-native.json",
+  "scope": "Actual rejected native responses and accepted false no-op, preserved without rewriting.",
+  "cases": [
+    {
+      "case": "current-history-ja",
+      "input": {
+        "capturedAtRealtime": 12.0,
+        "facts": {
+          "dialogue": [
+            {
+              "text": "こんなふうに話していましたよ。",
+              "source": null
+            },
+            {
+              "text": "ふふっ、了解。ただいま行くね。",
+              "source": null
+            }
+          ],
+          "request": "嗯，这呃然后你刚才有看到电视柜上有一盏呃小灯吗？能去把它关掉，然后回到我身边吗？试一下。",
+          "historyAnswers": {
+            "observedHistory": [],
+            "eventHistory": [],
+            "scope": "Frozen before dispatch of this task plan. Records retain their own entity/time. Missing records mean evidence unavailable, not proof an event never happened. This snapshot cannot establish current state."
+          }
+        },
+        "speech": [
+          {
+            "id": "speech:1",
+            "version": 0,
+            "text": "その瞬間にはテレビ台の灯りを見ていなかったの。",
+            "language": "ja",
+            "state": "playing",
+            "isCorrection": false,
+            "wholeTextPlayed": false,
+            "queuedAtRealtime": 0.0,
+            "startedAtRealtime": 10.0,
+            "observedAtCreation": null,
+            "observedAtSpeechStart": null
+          }
+        ],
+        "actions": [],
+        "evidenceScopes": {
+          "dialogue": {
+            "domain": "other",
+            "issues": []
+          },
+          "request": {
+            "domain": "request",
+            "issues": [
+              "uncertainty",
+              "mistake"
+            ]
+          },
+          "historyAnswers": {
+            "domain": "history",
+            "issues": [
+              "uncertainty"
+            ]
+          }
+        },
+        "evidenceVersion": 2,
+        "fixtureProvenance": {
+          "sessionSha256": "ee1d34821f2d8bcbcf987c1763e73dddbd76cfefaf15b5fb49d5bd7d621bb2ea",
+          "pastDialogueRows": 20,
+          "originalMonitorFactsLogged": false,
+          "scope": "Source metadata, historical-answer snapshot and result ledger reconstructed explicitly from their recorded owning events."
+        },
+        "purpose": "speech",
+        "projection": {
+          "pressure": 0,
+          "omitted": [],
+          "scope": "Omissions are unknown; full constraints retained."
+        }
+      },
+      "output": "{\"claimQuote\":\"その瞬間にはテレビ台の灯りを見ていなかったの。\",\"claimEntity\":\"unspecified\",\"comparison\":\"说话者声称在特定时刻未看到电视柜上的灯\",\"claimSubject\":\"character\",\"claimTime\":\"past-event\",\"claimKind\":\"entity-state\",\"grounding\":{\"speechAct\":\"factual-claim\",\"claimDomain\":\"visual\",\"truthWhenSaid\":\"unknown\",\"qualificationQuote\":\"\",\"truthEvidenceIds\":[]},\"perceptionSource\":\"not-applicable\",\"speech\":{\"issue\":\"none\"}}",
+      "appliedDecision": {
+        "claimQuote": "その瞬間にはテレビ台の灯りを見ていなかったの。",
+        "claimEntity": "unspecified",
+        "comparison": "说话者声称在特定时刻未看到电视柜上的灯",
+        "claimSubject": "character",
+        "claimTime": "past-event",
+        "claimKind": "entity-state",
+        "grounding": {
+          "speechAct": "factual-claim",
+          "claimDomain": "visual",
+          "truthWhenSaid": "unknown",
+          "qualificationQuote": "",
+          "truthEvidenceIds": []
+        },
+        "perceptionSource": "not-applicable",
+        "speech": {
+          "issue": "none",
+          "id": "",
+          "version": 0,
+          "evidenceIds": [],
+          "groundedUpdate": "",
+          "correctionLeadIn": "",
+          "reason": "说话者声称在特定时刻未看到电视柜上的灯"
+        },
+        "action": {
+          "operation": "continue",
+          "id": "",
+          "version": "",
+          "reason": "",
+          "evidenceIds": [],
+          "nextIntent": ""
+        },
+        "claimDomain": "visual",
+        "truthWhenSaid": "unknown",
+        "truthEvidenceIds": [],
+        "speechAct": "factual-claim",
+        "qualificationQuote": ""
+      },
+      "status": "valid",
+      "attempts": [
+        {
+          "attempt": 1,
+          "accepted": true,
+          "rejection": "valid",
+          "raw": "{\"claimQuote\":\"その瞬間にはテレビ台の灯りを見ていなかったの。\",\"claimEntity\":\"unspecified\",\"comparison\":\"说话者声称在特定时刻未看到电视柜上的灯\",\"claimSubject\":\"character\",\"claimTime\":\"past-event\",\"claimKind\":\"entity-state\",\"grounding\":{\"speechAct\":\"factual-claim\",\"claimDomain\":\"visual\",\"truthWhenSaid\":\"unknown\",\"qualificationQuote\":\"\",\"truthEvidenceIds\":[]},\"perceptionSource\":\"not-applicable\",\"speech\":{\"issue\":\"none\"}}"
+        }
+      ],
+      "budgetPlan": {
+        "admitted": true,
+        "attempts": [
+          {
+            "pressure": 0,
+            "sizes": {
+              "fields": {
+                "capturedAtRealtime": 4,
+                "facts": 425,
+                "speech": 246,
+                "actions": 2,
+                "evidenceScopes": 172,
+                "evidenceVersion": 1,
+                "fixtureProvenance": 273,
+                "purpose": 8,
+                "projection": 87
+              },
+              "facts": {
+                "dialogue": 83,
+                "request": 46,
+                "historyAnswers": 254
+              }
+            },
+            "budget": {
+              "estimatedTextUnits": 1491,
+              "schemaReserve": 1527,
+              "completionReserve": 640,
+              "framingReserve": 2048,
+              "estimatedTotalUnits": 5706,
+              "textCeiling": 6144,
+              "totalCeiling": 8192,
+              "imageCount": 0,
+              "imageReserve": 0,
+              "wireBytes": 8493,
+              "allowed": true,
+              "scope": "Complete monitor request estimate, including bounded reasoning/output; not tokenizer usage. No change to main planner/reply budgets."
+            }
+          }
+        ]
+      },
+      "modelSemanticPassed": false,
+      "protectedAbstention": false,
+      "passed": false
+    },
+    {
+      "case": "current-history-zh",
+      "input": {
+        "capturedAtRealtime": 12.0,
+        "facts": {
+          "dialogue": [
+            {
+              "text": "こんなふうに話していましたよ。",
+              "source": null
+            },
+            {
+              "text": "ふふっ、了解。ただいま行くね。",
+              "source": null
+            }
+          ],
+          "request": "我之前保存过这份笔记吗？",
+          "historyAnswers": {
+            "observedHistory": [],
+            "eventHistory": [],
+            "scope": "No evidence of the asked prior event is available; neither confirms nor denies it."
+          }
+        },
+        "speech": [
+          {
+            "id": "speech:1",
+            "version": 0,
+            "text": "你之前没有保存过这份笔记。",
+            "language": "zh",
+            "state": "playing",
+            "isCorrection": false,
+            "wholeTextPlayed": false,
+            "queuedAtRealtime": 0.0,
+            "startedAtRealtime": 10.0,
+            "observedAtCreation": null,
+            "observedAtSpeechStart": null
+          }
+        ],
+        "actions": [],
+        "evidenceScopes": {
+          "dialogue": {
+            "domain": "other",
+            "issues": []
+          },
+          "request": {
+            "domain": "request",
+            "issues": [
+              "uncertainty",
+              "mistake"
+            ]
+          },
+          "historyAnswers": {
+            "domain": "history",
+            "issues": [
+              "uncertainty"
+            ]
+          }
+        },
+        "evidenceVersion": 2,
+        "fixtureProvenance": {
+          "sessionSha256": "ee1d34821f2d8bcbcf987c1763e73dddbd76cfefaf15b5fb49d5bd7d621bb2ea",
+          "pastDialogueRows": 20,
+          "originalMonitorFactsLogged": false,
+          "scope": "Source metadata, historical-answer snapshot and result ledger reconstructed explicitly from their recorded owning events."
+        },
+        "purpose": "speech",
+        "previousAttempt": {
+          "rejection": "speech-evidence-domain-or-coverage-mismatch",
+          "scope": "Recheck the claim's actual source and time against evidenceScopes. A prior observation belongs to historical evidence, not the current camera merely because it mentions seeing. An explicitly unknown past event permits narrow uncertainty, never definite denial. No source can gain authority by changing its label.",
+          "unknownOnlySource": "request",
+          "citedSourceCapability": {
+            "domain": "request",
+            "issues": [
+              "uncertainty",
+              "mistake"
+            ]
+          }
+        },
+        "projection": {
+          "pressure": 0,
+          "omitted": [
+            "previousAttempt.raw-verdict; retained-in-diagnostics"
+          ],
+          "scope": "Omissions are unknown; full constraints retained."
+        }
+      },
+      "output": "{\"claimQuote\":\"你之前没有保存过这份笔记。\",\"claimEntity\":\"unspecified\",\"comparison\":\"用户询问是否保存过笔记，AI断言未保存。\",\"claimSubject\":\"user\",\"claimTime\":\"past-event\",\"claimKind\":\"action-event\",\"grounding\":{\"speechAct\":\"factual-claim\",\"claimDomain\":\"history\",\"truthWhenSaid\":\"unknown\",\"qualificationQuote\":\"\",\"truthEvidenceIds\":[]},\"perceptionSource\":\"not-applicable\",\"speech\":{\"issue\":\"mistake\",\"id\":\"speech:1\",\"version\":0,\"proof\":{\"evidenceId\": \"request\",\"evidencePath\": \"scope\",\"evidenceQuote\": \"No evidence of the asked prior event is available; neither confirms nor denies it.\",\"scope\": \"same-explicit-proposition\"},\"groundedUpdate\": \"我无法确认你之前是否保存过这份笔记，因为系统没有相关记录。\",\"correctionLeadIn\": \"抱歉，\"}}",
+      "appliedDecision": null,
+      "status": "speech-evidence-domain-or-coverage-mismatch",
+      "attempts": [
+        {
+          "attempt": 1,
+          "accepted": false,
+          "rejection": "speech-evidence-domain-or-coverage-mismatch",
+          "raw": "{\"claimQuote\":\"你之前没有保存过这份笔记。\",\"claimEntity\":\"unspecified\",\"comparison\":\"用户询问是否保存过笔记，AI断言未保存。\",\"claimSubject\":\"user\",\"claimTime\":\"past-event\",\"claimKind\":\"entity-state\",\"grounding\":{\"speechAct\":\"factual-claim\",\"claimDomain\":\"history\",\"truthWhenSaid\":\"unknown\",\"qualificationQuote\":\"\",\"truthEvidenceIds\":[]},\"perceptionSource\":\"not-applicable\",\"speech\":{\"issue\":\"mistake\",\"id\":\"speech:1\",\"version\":0,\"proof\":{\"evidenceId\": \"request\",\"evidencePath\": \"request\",\"evidenceQuote\": \"我之前保存过这份笔记吗？\",\"scope\": \"same-explicit-proposition\"},\"groundedUpdate\": \"抱歉，我无法确认您之前是否保存过这份笔记，因为系统没有相关记录。\",\"correctionLeadIn\": \"抱歉，\"}}"
+        },
+        {
+          "attempt": 2,
+          "accepted": false,
+          "rejection": "speech-evidence-domain-or-coverage-mismatch",
+          "raw": "{\"claimQuote\":\"你之前没有保存过这份笔记。\",\"claimEntity\":\"unspecified\",\"comparison\":\"用户询问是否保存过笔记，AI断言未保存。\",\"claimSubject\":\"user\",\"claimTime\":\"past-event\",\"claimKind\":\"action-event\",\"grounding\":{\"speechAct\":\"factual-claim\",\"claimDomain\":\"history\",\"truthWhenSaid\":\"unknown\",\"qualificationQuote\":\"\",\"truthEvidenceIds\":[]},\"perceptionSource\":\"not-applicable\",\"speech\":{\"issue\":\"mistake\",\"id\":\"speech:1\",\"version\":0,\"proof\":{\"evidenceId\": \"request\",\"evidencePath\": \"scope\",\"evidenceQuote\": \"No evidence of the asked prior event is available; neither confirms nor denies it.\",\"scope\": \"same-explicit-proposition\"},\"groundedUpdate\": \"我无法确认你之前是否保存过这份笔记，因为系统没有相关记录。\",\"correctionLeadIn\": \"抱歉，\"}}"
+        },
+        {
+          "attempt": 3,
+          "accepted": false,
+          "rejection": "speech-evidence-domain-or-coverage-mismatch",
+          "raw": "{\"claimQuote\":\"你之前没有保存过这份笔记。\",\"claimEntity\":\"unspecified\",\"comparison\":\"用户询问是否保存过笔记，AI断言未保存。\",\"claimSubject\":\"user\",\"claimTime\":\"past-event\",\"claimKind\":\"action-event\",\"grounding\":{\"speechAct\":\"factual-claim\",\"claimDomain\":\"history\",\"truthWhenSaid\":\"unknown\",\"qualificationQuote\":\"\",\"truthEvidenceIds\":[]},\"perceptionSource\":\"not-applicable\",\"speech\":{\"issue\":\"mistake\",\"id\":\"speech:1\",\"version\":0,\"proof\":{\"evidenceId\": \"request\",\"evidencePath\": \"scope\",\"evidenceQuote\": \"No evidence of the asked prior event is available; neither confirms nor denies it.\",\"scope\": \"same-explicit-proposition\"},\"groundedUpdate\": \"我无法确认你之前是否保存过这份笔记，因为系统没有相关记录。\",\"correctionLeadIn\": \"抱歉，\"}}"
+        }
+      ],
+      "budgetPlan": {
+        "admitted": true,
+        "attempts": [
+          {
+            "pressure": 0,
+            "sizes": {
+              "fields": {
+                "capturedAtRealtime": 4,
+                "facts": 272,
+                "speech": 236,
+                "actions": 2,
+                "evidenceScopes": 172,
+                "evidenceVersion": 1,
+                "fixtureProvenance": 273,
+                "purpose": 8,
+                "previousAttempt": 492,
+                "projection": 141
+              },
+              "facts": {
+                "dialogue": 83,
+                "request": 14,
+                "historyAnswers": 133
+              }
+            },
+            "budget": {
+              "estimatedTextUnits": 1602,
+              "schemaReserve": 1527,
+              "completionReserve": 640,
+              "framingReserve": 2048,
+              "estimatedTotalUnits": 5817,
+              "textCeiling": 6144,
+              "totalCeiling": 8192,
+              "imageCount": 0,
+              "imageReserve": 0,
+              "wireBytes": 8839,
+              "allowed": true,
+              "scope": "Complete monitor request estimate, including bounded reasoning/output; not tokenizer usage. No change to main planner/reply budgets."
+            }
+          }
+        ]
+      },
+      "modelSemanticPassed": false,
+      "protectedAbstention": false,
+      "passed": false
+    },
+    {
+      "case": "current-history-ja",
+      "input": {
+        "capturedAtRealtime": 12.0,
+        "facts": {
+          "dialogue": [
+            {
+              "text": "こんなふうに話していましたよ。",
+              "source": null
+            },
+            {
+              "text": "ふふっ、了解。ただいま行くね。",
+              "source": null
+            }
+          ],
+          "request": "嗯，这呃然后你刚才有看到电视柜上有一盏呃小灯吗？能去把它关掉，然后回到我身边吗？试一下。",
+          "historyAnswers": {
+            "observedHistory": [],
+            "eventHistory": [],
+            "scope": "Frozen before dispatch of this task plan. Records retain their own entity/time. Missing records mean evidence unavailable, not proof an event never happened. This snapshot cannot establish current state."
+          }
+        },
+        "speech": [
+          {
+            "id": "speech:1",
+            "version": 0,
+            "text": "その瞬間にはテレビ台の灯りを見ていなかったの。",
+            "language": "ja",
+            "state": "playing",
+            "isCorrection": false,
+            "wholeTextPlayed": false,
+            "queuedAtRealtime": 0.0,
+            "startedAtRealtime": 10.0,
+            "observedAtCreation": null,
+            "observedAtSpeechStart": null
+          }
+        ],
+        "actions": [],
+        "evidenceScopes": {
+          "dialogue": {
+            "domain": "other",
+            "issues": []
+          },
+          "request": {
+            "domain": "request",
+            "issues": [
+              "uncertainty",
+              "mistake"
+            ]
+          },
+          "historyAnswers": {
+            "domain": "history",
+            "issues": [
+              "uncertainty"
+            ]
+          }
+        },
+        "evidenceVersion": 2,
+        "fixtureProvenance": {
+          "sessionSha256": "ee1d34821f2d8bcbcf987c1763e73dddbd76cfefaf15b5fb49d5bd7d621bb2ea",
+          "pastDialogueRows": 20,
+          "originalMonitorFactsLogged": false,
+          "scope": "Source metadata, historical-answer snapshot and result ledger reconstructed explicitly from their recorded owning events."
+        },
+        "purpose": "speech",
+        "projection": {
+          "pressure": 0,
+          "omitted": [],
+          "scope": "Omissions are unknown; full constraints retained."
+        }
+      },
+      "output": "{\n  \"claimQuote\": \"その瞬間にはテレビ台の灯りを見ていなかったの。\",\n  \"claimEntity\": \"unspecified\",\n  \"comparison\": \"说话者声称在特定时刻未看到电视柜上的灯。\",\n  \"claimSubject\": \"character\",\n  \"claimTime\": \"past-event\",\n  \"claimKind\": \"entity-state\",\n  \"grounding\": {\n    \"speechAct\": \"factual-claim\",\n    \"claimDomain\": \"visual\",\n    \"truthWhenSaid\": \"unknown\",\n    \"qualificationQuote\": \"\",\n    \"truthEvidenceIds\": [\n       ]\n  },\n  \"perceptionSource\": \"earlier-observation\",\n  \"speech\": {\n    \"issue\": \"none\"\n  }\n}",
+      "appliedDecision": {
+        "claimQuote": "その瞬間にはテレビ台の灯りを見ていなかったの。",
+        "claimEntity": "unspecified",
+        "comparison": "说话者声称在特定时刻未看到电视柜上的灯。",
+        "claimSubject": "character",
+        "claimTime": "past-event",
+        "claimKind": "entity-state",
+        "grounding": {
+          "speechAct": "factual-claim",
+          "claimDomain": "visual",
+          "truthWhenSaid": "unknown",
+          "qualificationQuote": "",
+          "truthEvidenceIds": []
+        },
+        "perceptionSource": "earlier-observation",
+        "speech": {
+          "issue": "none",
+          "id": "",
+          "version": 0,
+          "evidenceIds": [],
+          "groundedUpdate": "",
+          "correctionLeadIn": "",
+          "reason": "说话者声称在特定时刻未看到电视柜上的灯。"
+        },
+        "action": {
+          "operation": "continue",
+          "id": "",
+          "version": "",
+          "reason": "",
+          "evidenceIds": [],
+          "nextIntent": ""
+        },
+        "claimDomain": "visual",
+        "truthWhenSaid": "unknown",
+        "truthEvidenceIds": [],
+        "speechAct": "factual-claim",
+        "qualificationQuote": ""
+      },
+      "status": "valid",
+      "attempts": [
+        {
+          "attempt": 1,
+          "accepted": true,
+          "rejection": "valid",
+          "raw": "{\n  \"claimQuote\": \"その瞬間にはテレビ台の灯りを見ていなかったの。\",\n  \"claimEntity\": \"unspecified\",\n  \"comparison\": \"说话者声称在特定时刻未看到电视柜上的灯。\",\n  \"claimSubject\": \"character\",\n  \"claimTime\": \"past-event\",\n  \"claimKind\": \"entity-state\",\n  \"grounding\": {\n    \"speechAct\": \"factual-claim\",\n    \"claimDomain\": \"visual\",\n    \"truthWhenSaid\": \"unknown\",\n    \"qualificationQuote\": \"\",\n    \"truthEvidenceIds\": [\n       ]\n  },\n  \"perceptionSource\": \"earlier-observation\",\n  \"speech\": {\n    \"issue\": \"none\"\n  }\n}"
+        }
+      ],
+      "budgetPlan": {
+        "admitted": true,
+        "attempts": [
+          {
+            "pressure": 0,
+            "sizes": {
+              "fields": {
+                "capturedAtRealtime": 4,
+                "facts": 425,
+                "speech": 246,
+                "actions": 2,
+                "evidenceScopes": 172,
+                "evidenceVersion": 1,
+                "fixtureProvenance": 273,
+                "purpose": 8,
+                "projection": 87
+              },
+              "facts": {
+                "dialogue": 83,
+                "request": 46,
+                "historyAnswers": 254
+              }
+            },
+            "budget": {
+              "estimatedTextUnits": 1498,
+              "schemaReserve": 1527,
+              "completionReserve": 640,
+              "framingReserve": 2048,
+              "estimatedTotalUnits": 5713,
+              "textCeiling": 6144,
+              "totalCeiling": 8192,
+              "imageCount": 0,
+              "imageReserve": 0,
+              "wireBytes": 8515,
+              "allowed": true,
+              "scope": "Complete monitor request estimate, including bounded reasoning/output; not tokenizer usage. No change to main planner/reply budgets."
+            }
+          }
+        ]
+      },
+      "modelSemanticPassed": false,
+      "protectedAbstention": false,
+      "passed": false
+    }
+  ]
+}

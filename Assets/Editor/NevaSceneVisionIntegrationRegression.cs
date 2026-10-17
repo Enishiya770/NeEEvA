@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -66,7 +66,7 @@ public static class NevaSceneVisionIntegrationRegression
     private static bool RoomCognitionRegressionEnabled => Argument("-roomCognitionRegression", "0") == "1";
     private static bool RoomSpeechViewRegressionEnabled => Argument("-roomSpeechViewRegression", "0") == "1";
     private static int RecordedFurnitureIndex => int.Parse(Argument("-nevaRecordedFurnitureIndex", "-1"));
-    private static bool UsesNativeService => NativeEnabled || LiveQwenEnabled || ProductionActionEnabled || ActiveViewEnabled || ObjectApproachNativeEnabled || DecisionRepairNativeEnabled || HalfTurnNativeEnabled || ViewPositionNativeEnabled || ResponseLatencyEnabled || SpatialGoalRunnerNativeEnabled || SceneSearchNativeEnabled || UnifiedDeviceNativeEnabled;
+    private static bool UsesNativeService => NativeEnabled || LiveQwenEnabled || ProductionActionEnabled || ActiveViewEnabled || ObjectApproachNativeEnabled || DecisionRepairNativeEnabled || HalfTurnNativeEnabled || ViewPositionNativeEnabled || ResponseLatencyEnabled || SpatialGoalRunnerNativeEnabled || SceneSearchNativeEnabled || UnifiedDeviceNativeEnabled || Argument("-runtimeFailureRuntime","0")=="1";
 
     static NevaSceneVisionIntegrationRegression()
     {
@@ -282,6 +282,67 @@ public static class NevaSceneVisionIntegrationRegression
         Check(!chat.IsVoiceOutputPlaying, "The isolated silent fixture AudioSource is not physically idle.");
         int operation = bridge.Controller.OperationRevision;
         Vector3 root = avatar.transform.position;
+
+        if (Argument("-activityContinuityRuntime", "0") == "1")
+        {
+            yield return TaskContinuityRegression.Run(chat, bridge, Output);
+            Finish(null); yield break;
+        }
+        if (Argument("-taskHandoffRuntime", "0") == "1")
+        {
+            yield return TaskHandoffRegression.Run(chat, bridge, Output);
+            Finish(null); yield break;
+        }
+        if (Argument("-spatialRecallRuntime", "0") == "1")
+        {
+            yield return SpatialRecallRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-lifecycleGroundingRuntime", "0") == "1")
+        {
+            yield return LifecycleGroundingRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-runtimeFailureRuntime", "0") == "1")
+        {
+            yield return RuntimeFailureRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-resultAutonomyRuntime", "0") == "1")
+        {
+            yield return ResultAutonomyRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-clarificationDeliveryRuntime", "0") == "1")
+        {
+            yield return ClarificationDeliveryRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-semanticPlaybackRuntime", "0") == "1")
+        {
+            yield return SemanticPlaybackRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-routingDeliveryRuntime", "0") == "1")
+        {
+            yield return RoutingDeliveryRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-compoundDeliveryRuntime", "0") == "1")
+        {
+            yield return CompoundDeliveryRegression.Run(chat,bridge,Output);
+            Finish(null);yield break;
+        }
+        if (Argument("-activityEvidenceRuntime", "0") == "1")
+        {
+            yield return ActivityEvidenceRegression.RunNative(Output);
+            Finish(null); yield break;
+        }
+        if (Argument("-activityInterventionRuntime", "0") == "1")
+        {
+            yield return ActivityInterventionRegression.Run(chat, bridge, Output);
+            Finish(null); yield break;
+        }
 
         if (Argument("-activityMonitorRuntime", "0") == "1")
         {
@@ -1060,10 +1121,14 @@ public sealed class NevaSceneVisionIntegrationModel : LLM
     public bool TaskSequencesEnabled;
     public override bool SupportsRoomTaskSequences => TaskSequencesEnabled;
     public bool ControlReviewsEnabled;
+    public bool ThrowOnControlReview;
+    public bool ActivityMonitorEnabled;
+    public override bool SupportsActivityMonitor => ActivityMonitorEnabled;
     public readonly List<Request> ControlReviews = new List<Request>();
     public override bool SupportsRoomPreparationMessages => ControlReviewsEnabled;
     public override void PostRoomPreparationMessage(string input, Action<bool, string, string> callback)
     {
+        if(ThrowOnControlReview)throw new InvalidOperationException("controlled-preparation-exception");
         if (!ControlReviewsEnabled) { callback(false, "", "controlled-preparation-disabled"); return; }
         var request = new Request { Kind = "control-review", Input = input, RoomCallback = callback };
         request.Wire = (string)NevaSceneVisionIntegrationRegression.Call(serializer, "BuildRoomPreparationRequestJson", input);

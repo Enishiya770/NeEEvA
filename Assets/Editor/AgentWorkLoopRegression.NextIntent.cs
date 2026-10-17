@@ -40,7 +40,8 @@ public static partial class AgentWorkLoopRegression
         pending.BeginUser("检查运行状态并解释结果。"); pending.PreviousReply("我先检查。");
         Set(pending.chat, "m_PendingSelfInspection", "{\"status\":\"observed\",\"readOnly\":true}");
         var proposal = NextDecision(NextReview("closed", "autonomous", "另外聊一个话题"));
-        Check(!(bool)Call(pending.chat, "ApplyWorkReviewDecision", proposal) && !(bool)Get(pending.chat, "m_WorkAutonomousHandoff") &&
+        Check((bool)Call(pending.chat, "ApplyWorkReviewDecision", proposal) && !(bool)Get(pending.chat, "m_WorkAutonomousHandoff") &&
+            (string)proposal.GetType().GetField("next_intent_source").GetValue(proposal)=="current-work" &&
             (bool)Get(pending.chat, "m_WorkReviewOpen") && !string.IsNullOrEmpty((string)Get(pending.chat, "m_PendingSelfInspection")),
             "Unconsumed tool evidence was discarded by new autonomy.");
         SaveScenario(pending); pending.Dispose(); fixture = null;

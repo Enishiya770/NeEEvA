@@ -5,9 +5,10 @@ using Newtonsoft.Json.Linq;
 public static class WorkNextIntentProtocol
 {
     public const string Contract =
+        "\nprevious_work_status只核对previousUnfinishedWork任务表的历史完成状态：none=没有历史表，unfinished=仍有pending/running/failed步骤，completed=全部步骤有completed回执，terminated=有真实停止/替换回执但不代表原步骤成功，unknown=无可靠步骤表。调度关闭、台词、同物件另一操作不能填completed。当前追问的解释义务和旧任务完成状态分别判断；真实取消/替换不会把旧任务改为成功，历史未完成也不强制重启或禁止合理新自主意图。" +
         "\n[事项与下一意图分别判定] work_status只描述原用户事项。next_intent_source=none/current-work/autonomous；" +
         "current-work表示仍欠原请求的执行或回答，next_step_id填写taskSequence中尚可执行的步骤id；" +
-        "仅欠回答/结果解释或没有步骤表时留空。失败步骤不能凭意图重新变为pending，恢复须有执行器的明确预算和条件。" +
+        "仅欠回答/结果解释或没有当前步骤表时留空。previousUnfinishedWork里的历史步骤id不属于当前taskSequence，不能填到next_step_id。当前追问原因先交付解释，历史未完成不自动授予重启；真正续接或重述由规划重新核对。失败步骤不能凭意图重新变为pending，恢复须有执行器的明确预算和条件。" +
         "failedStepIds中的步骤没有可执行的next_step_id；若只欠失败说明，intent应写说明实际原因和尚未完成部分，planning_focus=other。" +
         "不要把解释失败写成再次执行；有执行器正在恢复时等待真实结果，不同时另起重试。" +
         "完成事件与当前状态要按时间分别判断：任务按约定完成条件实际完成后，环境随后变化不会撤销那次完成。" +
@@ -26,6 +27,7 @@ public static class WorkNextIntentProtocol
     public static bool ValidExtension(JObject value)
     {
         return WorkResultDeliveryProtocol.ValidExtension(value) && OptionalEnum(value, "next_intent_source", "none", "current-work", "autonomous") &&
+            OptionalEnum(value, "previous_work_status", "none", "unfinished", "completed", "terminated", "unknown") &&
             OptionalEnum(value, "planning_focus", "current-user-body", "scene", "other", "unknown") &&
             (value["next_step_id"] == null || value["next_step_id"].Type == JTokenType.String && ((string)value["next_step_id"]).Length <= 64);
     }
@@ -37,6 +39,8 @@ public static class WorkNextIntentProtocol
         fields["next_intent_source"] = new JObject { ["type"] = "string", ["enum"] = new JArray("none", "current-work", "autonomous") };
         fields["next_step_id"] = new JObject { ["type"] = "string", ["maxLength"] = 64 };
         fields["planning_focus"] = new JObject { ["type"] = "string", ["enum"] = new JArray("current-user-body", "scene", "other", "unknown") };
+        fields["previous_work_status"] = new JObject { ["type"] = "string", ["enum"] = new JArray("none", "unfinished", "completed", "terminated", "unknown") };
+        ((JArray)result["required"]).Add("previous_work_status");
         foreach (string name in new[] { "next_intent_source", "next_step_id", "planning_focus" }) ((JArray)result["required"]).Add(name);
         WorkResultDeliveryProtocol.ExtendSchema(result);
         return result.ToString(Newtonsoft.Json.Formatting.None);
@@ -47,6 +51,11 @@ public static class WorkNextIntentProtocol
 
     public static bool AllStepsCompleted(JObject sequence) => sequence?["steps"] is JArray steps && steps.Count > 0 &&
         steps.OfType<JObject>().Count() == steps.Count && steps.OfType<JObject>().All(s => (string)s["status"] == "completed");
+
+    public static string HistoricalStatus(JObject history) => history == null ? "none" :
+        (bool?)history.SelectToken("termination.committed")==true ? "terminated" :
+        !((history["taskSequence"] as JObject)?["steps"] is JArray steps) || steps.Count == 0 ? "unknown" :
+        AllStepsCompleted(history["taskSequence"] as JObject) ? "completed" : "unfinished";
 
     public static bool HasReadyStep(JObject sequence, string selected = null) => sequence?["steps"] is JArray steps &&
         RoomTaskSequenceProtocol.Ready(steps).Values<string>().Any(id => string.IsNullOrEmpty(selected) || selected == id);
@@ -60,8 +69,10 @@ public static class WorkNextIntentProtocol
         if (!(sequence?["steps"] is JArray steps)) return null;
         return new JObject {
             ["allStepsCompleted"] = AllStepsCompleted(sequence),
+            ["allCurrentAttemptsTerminal"] = steps.OfType<JObject>().All(s=>TaskAttemptSettlementPolicy.Terminal((string)s["status"])),
             ["readyStepIds"] = RoomTaskSequenceProtocol.Ready(steps),
             ["failedStepIds"] = new JArray(steps.OfType<JObject>().Where(s => (string)s["status"] == "failed").Select(s => s["id"].DeepClone())),
+            ["blockedStepIds"] = new JArray(steps.OfType<JObject>().Where(s => (string)s["status"] == "blocked").Select(s => s["id"].DeepClone())),
             ["scope"] = "Execution ledger only. An independent answer can still be owed. Completed events stay completed after the world changes; a new autonomous intention needs its own current decision and action identity. Failed steps require executor-supported bounded recovery, never implicit replay."
         };
     }

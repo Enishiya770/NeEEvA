@@ -12,7 +12,10 @@ public partial class ChatQW
     {
         if (!current()) yield break;
         var input = new JObject { ["streamText"] = packet.SelectToken("stream.text")?.DeepClone(),
-            ["fullText"] = packet.SelectToken("full.text")?.DeepClone() };
+            ["fullText"] = packet.SelectToken("full.text")?.DeepClone(),
+            ["streamSource"] = packet.SelectToken("stream.source")?.DeepClone(),
+            ["fullSource"] = packet.SelectToken("full.source")?.DeepClone(),
+            ["provenance"] = packet["provenance"]?.DeepClone() };
         var format = new JObject { ["type"] = "json_object" };
         if (m_Backend == BackendType.Local) format["schema"] = JObject.Parse(TranscriptDisagreementPolicy.ReviewSchema);
         var wire = new JObject { ["model"] = CurrentModelName, ["stream"] = false, ["temperature"] = 0,

@@ -154,6 +154,21 @@ public partial class ChatQW
                 }
         }
         ApplySceneAttention(attentionRoots, slots, detailUnits, true);
+        // A result-only writer also repeats task receipts in delivery/current
+        // execution. Share exact values within its bound document, with a verified
+        // inverse, before final wire admission. Runtime ledgers stay untouched.
+        var resultSharing = new JArray();
+        foreach (var block in blocks.Where(b => (bool?)b.value["workResultOnly"] == true))
+        {
+            string packed = SceneFactContextCompactor.CompactJson(block.value.ToString(Formatting.None), out var sharedResult, 256);
+            resultSharing.Add(JObject.FromObject(sharedResult));
+            if (sharedResult.applied && sharedResult.roundTripVerified)
+            {
+                block.value = ReadRoomTaskRecoveryJson(packed);
+                block.value["resultFactReferences"] = "Within this JSON document, root#JSON-pointer in $sceneFactRef resolves to the exact earlier value in THIS document. It retains all identities, outcomes and restrictions; not missing evidence or new action authority.";
+            }
+        }
+        diagnostic["resultOnlySharing"] = resultSharing;
         var fields = new JArray();
         var output = new StringBuilder(); int cursor = 0;
         foreach (var block in blocks)

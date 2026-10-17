@@ -319,7 +319,7 @@ public partial class ChatSample
 
     private static bool SpatialGoalTerminalPhase(string phase) => phase == "observed" || phase == "confirmed" || phase == "performed" ||
         phase == "already-satisfied" || phase == "arrived" || phase == "arrived-object-unconfirmed" || phase == "repositioned" ||
-        phase == "rejected" || phase == "failed" || phase == "cancelled" || phase == "state-applied-unconfirmed";
+        phase == "rejected" || phase == "failed" || phase == "cancelled" || phase == "state-applied-unconfirmed" || phase == "observed-target-unconfirmed";
 
     private void ObserveSpatialGoalAction(SceneActionFact fact)
     {
@@ -348,7 +348,7 @@ public partial class ChatSample
             ["mainGoalSatisfied"]=false
         });
         while (goal.steps.Count > 16) goal.steps.RemoveAt(0);
-        if (fact.phase == "rejected" || fact.phase == "failed" || fact.phase == "arrived-object-unconfirmed" || fact.phase == "state-applied-unconfirmed")
+        if (fact.phase == "rejected" || fact.phase == "failed" || fact.phase == "arrived-object-unconfirmed" || fact.phase == "state-applied-unconfirmed" || fact.phase == "observed-target-unconfirmed")
         {
             goal.failures.Add(new JObject { ["actionId"]=fact.actionId, ["entityId"]=fact.entityId ?? fact.requestedEntityId,
                 ["captureId"]=fact.matchCaptureId ?? fact.captureId, ["verdict"]=fact.targetMatchVerdict,

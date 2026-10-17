@@ -26,6 +26,7 @@ public static class RoomTaskSequenceProtocol
         "只列用户真实要求，问答/旧动作/已经搁置的话题不列步骤。没有动作要求输出空数组。" +
         "after列必须先完成的早先步骤id，明确的先后关系不能省略。独立步骤可以无依赖；不把接近设备当作已完成设备目标。" +
         "ORDERING: Before writing taskCoverage, resolve the FINAL valid actions and their execution order. Assign s1, s2, ... in that order, not the order of an abandoned mention. taskPlan must list prerequisites BEFORE their dependents; every after ID must already appear earlier in taskPlan. Only taskCoverage follows the original text order, including withdrawn clauses as context. Use those planned IDs in coverage. Never concatenate nonadjacent source spans into a quote." +
+        "父任务的最终目的与当前步骤的立即操作必须分开。先观察/检索/准备，再修改/播放/返回：当前前置步骤只能带自身执行字段，后续操作保留在taskPlan，不得提前塞入当前决定。观察步骤的deviceGoal必须省略；只有选中device-state步骤才带set目标。询问是否看见是answer义务，不必凭空变成独立操作；若确需观察则单独规划并保留回答义务。" +
         "已有taskSequence时沿用其步骤，不输出新taskPlan；其中状态和回执由引擎提供，不能自行宣称完成或删除未完成项。" +
         "taskStep选择readyStepIds中的一个；执行必须符合该步骤kind与目标，device-state首次须附deviceGoal，其requestQuote须对应所选步骤的quote，不能选同类型的后续物件，不得用approach代替。" +
         "新taskPlan中无前置步骤的未完成项就是就绪步骤；决定执行时必须选择它的id。即使intent=none且附deviceGoal来启动统一设备任务，taskStep仍必须指向本次device-state，不能是null。纯粹说明无法形成可靠执行方案时，intent=none且无deviceGoal，taskStep=null；保留全部待办及前置，不把说明当成动作或完成。" +
@@ -45,6 +46,7 @@ public static class RoomTaskSequenceProtocol
     {
         if ((bool?)input?["taskSequenceRequired"] != true) return schema;
         var sequence = input["taskSequence"] as JObject;
+        bool operationRepair = (string)input.SelectToken("decisionRepair.rejectionReason") == "invalid-task-sequence-action-kind";
         var ready = sequence?["readyStepIds"] as JArray;
         var step = new JObject { ["type"] = new JArray("string", "null") };
         if (ready != null) step["enum"] = new JArray(ready.Select(x => x.DeepClone()).Concat(new[] { JValue.CreateNull() }));
@@ -71,6 +73,14 @@ public static class RoomTaskSequenceProtocol
                 if (sequence == null) { ordered["taskPlan"] = plan.DeepClone(); ordered["taskCoverage"] = coverage.DeepClone(); }
                 ordered["taskStep"] = step.DeepClone();
                 foreach (var p in properties.Properties()) ordered[p.Name] = p.Value.DeepClone();
+                if (operationRepair && properties["deviceGoal"] == null &&
+                    (properties["intent"]?["enum"] as JArray)?.Count == 1 && (string)properties["intent"]["enum"][0] == "none") {
+                    // A repair can abstain, but cannot call that an executing
+                    // observation/other step or retain an action-origin claim.
+                    ordered["taskStep"] = new JObject { ["type"]="null" };
+                    ordered["origin"]["enum"] = new JArray("none");
+                    ordered["evidence"]["enum"] = new JArray("");
+                }
                 node["properties"] = ordered;
                 if (!(node["required"] is JArray required)) node["required"] = required = new JArray();
                 if (sequence == null) { required.Add("taskCoverage"); required.Add("taskPlan"); }
@@ -153,6 +163,38 @@ public static class RoomTaskSequenceProtocol
             if (!covered) return false;
         }
         reason = null; return true;
+    }
+
+    // This is only a review candidate, never accepted without independent
+    // semantics. Missing commands/conditions may NOT be silently called context.
+    public static bool TryCoverageGapCandidate(string json, string request, out string candidate, out JArray gaps)
+    {
+        candidate = null; var proposedGaps = new JArray(); gaps = proposedGaps;
+        try {
+            var value = Parse(json);
+            if (!(value["taskCoverage"] is JArray coverage) || !(value["taskPlan"] is JArray)) return false;
+            var repaired = new JArray(); int cursor = 0;
+            void Gap(int end) {
+                string text = request.Substring(cursor, end - cursor);
+                if (text.Any(c => !char.IsWhiteSpace(c) && !char.IsPunctuation(c))) {
+                    proposedGaps.Add(text);
+                    repaired.Add(new JObject { ["quote"] = text, ["kind"] = "context", ["stepIds"] = new JArray() });
+                }
+            }
+            foreach (var item in coverage.OfType<JObject>()) {
+                string quote = (string)item["quote"];
+                if (string.IsNullOrWhiteSpace(quote)) return false;
+                int start = request.IndexOf(quote, cursor, StringComparison.Ordinal);
+                if (start < cursor) return false;
+                Gap(start); repaired.Add(item.DeepClone()); cursor = start + quote.Length;
+            }
+            Gap(request.Length);
+            if (proposedGaps.Count == 0 || proposedGaps.Count > 4 || proposedGaps.Values<string>().Sum(s => s.Length) > 80) return false;
+            value["taskCoverage"] = repaired;
+            string proposed = value.ToString(Formatting.None);
+            if (!TryPlan(proposed, request, out _, out _)) return false;
+            candidate = proposed; return true;
+        } catch (Exception) { return false; }
     }
 
     public static bool RequiresEquivalenceReview(string json)
@@ -247,6 +289,41 @@ public static class RoomTaskSequenceProtocol
     public static JArray Ready(JArray steps) => new JArray(steps.OfType<JObject>().Where(s => (string)s["status"] == "pending" &&
         ((JArray)s["after"]).Values<string>().All(id => steps.OfType<JObject>().Any(p => (string)p["id"] == id && (string)p["status"] == "completed")))
         .Select(s => s["id"].DeepClone()));
+
+    public static JObject SelectionFeedback(string json, JObject sequence)
+    {
+        try {
+            var value = Parse(json);
+            var steps = sequence?["steps"] as JArray ?? value["taskPlan"] as JArray;
+            var selected = steps?.OfType<JObject>().FirstOrDefault(s => (string)s["id"] == (string)value["taskStep"]);
+            return new JObject { ["selectedStep"] = selected?.DeepClone(),
+                ["proposedIntent"] = value["intent"]?.DeepClone(), ["proposedOperation"] = value["deviceGoal"]?.DeepClone(),
+                ["planCommitted"] = sequence != null,
+                ["rule"] = "The current selection must match its step kind and prerequisites. observation cannot contain deviceGoal; later operations remain in the parent plan. device-state requires its own set goal. An uncommitted rejected plan may be rebuilt; committed steps/receipts cannot be rewritten. No operation was authorized by this feedback." };
+        } catch (Exception) { return null; }
+    }
+
+    public static string RepairExecutionSchema(string schema, JObject input)
+    {
+        var repair=input?["decisionRepair"] as JObject;
+        var feedback=repair?["sequenceSelectionFeedback"] as JObject;
+        string kind=(string)feedback?.SelectToken("selectedStep.kind");
+        if((int?)repair?["attempt"]!=1 || (int?)repair?["maximumAttempts"]!=1 ||
+            (string)repair?["rejectionReason"]!="invalid-task-sequence-action-kind" ||
+            !(feedback?["proposedOperation"] is JObject) || !Kinds.Contains(kind) || kind=="device-state")return schema;
+        // One structural repair may defer an incompatible extra operation,
+        // never turn it into an execution. Keep all ordinary action choices and
+        // abstention, the complete parent request/plan, and normal validation.
+        // Initial proposals and valid device-step proposals are unrestricted.
+        // A different goal interpretation requires normal subsequent planning;
+        // this retry cannot silently carry that later operation into this step.
+        var result=Parse(schema);
+        if(!(result["oneOf"] is JArray branches))return schema;
+        foreach(var branch in branches.OfType<JObject>().ToArray())
+            if(branch["properties"]?["deviceGoal"]!=null)branch.Remove();
+        (result["properties"] as JObject)?.Remove("deviceGoal");
+        return result.ToString(Formatting.None);
+    }
 
     public static bool TrySelect(string json, RoomTaskProtocol.Decision decision, JArray steps, out string id, out string reason)
     {

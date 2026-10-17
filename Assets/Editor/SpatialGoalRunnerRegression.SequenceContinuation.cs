@@ -112,11 +112,33 @@ public static partial class SpatialGoalRunnerRegression
         var progress = (JObject)Call(chat, "BuildRoomRequestProgress");
         Require((string)progress?.SelectToken("body.actionId") == action &&
             (string)progress.SelectToken("steps[0].status") == "completed", "Compound progress binds real predecessor and current successor receipts.");
-        string combined = (string)Call(chat, "AppendRoomRequestProgress", prefix, "en", generation);
+        // Enter the actual ongoing-monitor publication path. Previously the
+        // test installed progress manually and missed this producer entirely.
+        object monitorEnabled=Get(chat,"m_EnableActivityMonitor");
+        bool modelMonitor=model.ActivityMonitorEnabled;
+        Set(chat,"m_EnableActivityMonitor",true);model.ActivityMonitorEnabled=true;
+        Set(chat,"m_ProcessSpeechBindingGeneration",-1);
+        Call(Get(chat,"m_PendingChunks"),"Clear");
+        ((SpeechTextBuffer)Get(chat,"m_SentenceBuffer")).Length=0;
+        var publication=new SpeechTextBuffer();publication.Append(new SpeechText(candidate,"en"));
+        int bindingRequests=model.ControlReviews.Count;
+        try {
+            Require((bool)Call(chat,"TryPublishProcessMonitoredSpeech",publication,candidate,generation,true,null) &&
+                model.ControlReviews.Count==bindingRequests+1,"Ongoing publication binds its successor fragments without re-planning an action.");
+            var binding=model.ControlReviews.Last();
+            Require((string)JObject.Parse(binding.Input)["roomControlReview"]==StepSpeechPartitionProtocol.Kind,
+                "Only a narrow text-ownership request is made.");
+            var bindingInput=JObject.Parse(binding.Input);
+            var bindingRows=new JObject(((JArray)bindingInput["fragments"]).OfType<JObject>().Select(f=>new JProperty((string)f["id"],
+                new JArray((string)f["id"]=="p1"?"Current return progress":"Independent outcome",(string)f["id"]=="p1"?"current":"other"))));
+            binding.Complete(true,new JObject{["bindings"]=bindingRows}.ToString(),"controlled-step-binding");
+        } finally {Set(chat,"m_EnableActivityMonitor",monitorEnabled);model.ActivityMonitorEnabled=modelMonitor;}
+        string combined=model.m_DataList.Last().content;
+        Require((string)Get(chat,"m_RequestProgressSpeechPrefix")==prefix,
+            "Production continuous publisher preserves all independent results and binds only the successor.");
         Require(combined.StartsWith(prefix) && combined.Length > prefix.Length,
             "Current movement progress is appended to the audited outcome/answer without dropping it.");
-        var history = new LLM.SendData("assistant", combined); model.m_DataList.Add(history);
-        Call(chat, "BindRoomSpeechPlayback", generation, "en", bridge, model, history);
+        var history = model.m_DataList.Last();
         var lease = Get(chat, "m_RoomSpeechPlayback");
         Require(lease != null && (bool)Get(lease, "compound"), "The compound result installs the same playback gate as movement replies.");
         var type = typeof(ChatSample).GetNestedType("PendingSpeechChunk", Flags);
@@ -129,11 +151,8 @@ public static partial class SpatialGoalRunnerRegression
         try {
             // Exercise the actual sentence queue before any audio starts. The
             // result/answer must stay separate from a fast-changing successor.
-            Call(Get(chat, "m_PendingChunks"), "Clear");
-            var sentenceBuffer = (SpeechTextBuffer)Get(chat, "m_SentenceBuffer");
-            sentenceBuffer.Length = 0;
-            sentenceBuffer.Append(new SpeechText(combined, "en"));
-            Call(chat, "FlushCompleteSentences", true);
+            // Publication already flushed the production queue. Rebuilding it
+            // here would reset text without resetting its prefix ownership.
             var queue = Get(chat, "m_PendingChunks");
             var queued = ((System.Collections.IEnumerable)queue).Cast<object>().ToArray();
             LastReport["continuationQueueDiagnostic"] = new JArray(queued.Select(c=>new JObject {
@@ -174,6 +193,25 @@ public static partial class SpatialGoalRunnerRegression
             LastReport["requestProgressPlayback"] = new JObject { ["status"] = "passed", ["originalCandidate"] = candidate,
                 ["retainedPrefix"] = prefix, ["published"] = combined,
                 ["afterResume"] = history.content, ["scope"] = "Real owned goal/sequence and actual playback gate; controlled body phases, no audible playback claim." };
+            Set(chat,"m_EnableActivityMonitor",true);model.ActivityMonitorEnabled=true;
+            try {
+                Set(chat,"m_ProcessSpeechBindingGeneration",-1);
+                Call(Get(chat,"m_PendingChunks"),"Clear");((SpeechTextBuffer)Get(chat,"m_SentenceBuffer")).Length=0;
+                var retry=new SpeechTextBuffer();retry.Append(new SpeechText(candidate,"en"));
+                Require((bool)Call(chat,"TryPublishProcessMonitoredSpeech",retry,candidate,generation,true,null),"Failed text binding uses the bounded ongoing path.");
+                model.ControlReviews.Last().Complete(false,"","controlled-binding-timeout");
+                Require(Get(chat,"m_RoomSpeechPlayback")==null && model.m_DataList.Last().content==candidate &&
+                    bridge.ActionId==action && bridge.Controller.OperationRevision==revision,
+                    "Unchecked partition preserves words under monitoring, creates no immutable prefix or repeated action.");
+                Set(chat,"m_ProcessSpeechBindingGeneration",-1);
+                model.ThrowOnControlReview=true;
+                try {
+                    Require((bool)Call(chat,"TryPublishProcessMonitoredSpeech",retry,candidate,generation,true,null) &&
+                        !(bool)Get(chat,"m_FormalResponseInFlight") && Get(chat,"m_RoomSpeechPlayback")==null &&
+                        bridge.ActionId==action && bridge.Controller.OperationRevision==revision,
+                        "A synchronous provider exception releases speech without an immutable prefix or another action.");
+                } finally {model.ThrowOnControlReview=false;}
+            } finally {Set(chat,"m_EnableActivityMonitor",monitorEnabled);model.ActivityMonitorEnabled=modelMonitor;}
         }
         finally {
             Set(bridge, "phase", phase); Set(bridge, "reason", reason); Set(bridge, "latestDiagnostic", diagnostic);

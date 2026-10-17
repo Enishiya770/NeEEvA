@@ -60,7 +60,8 @@ public partial class ChatQW
             RoomTaskProtocol.DeviceGoalUserUpdateReviewSchema;
         string contract = unbound ? RoomTaskProtocol.UnboundDeviceGoalReviewContract :
             pending ? RoomTaskProtocol.TypedPendingDeviceClarificationReviewContract :
-            typed ? RoomTaskProtocol.TypedDeviceGoalReviewContract : RoomTaskProtocol.DeviceGoalUserUpdateReviewContract;
+            typed ? RoomTaskProtocol.TypedDeviceGoalReviewContract : RoomTaskProtocol.DeviceGoalUserUpdateReviewContract +
+            "\nresumeParentTask只在parentTask存在，完整当前话语明确继续其未完成部分、没有取消/替换/新增限制且responseMode=act时为true。检查父任务所有后续步骤，不能只审设备子步。仅解释原因/询问、只继续一个子步、修改后续步骤或不确定时false。历史完成结果保留，不重做。";
         var sb = new StringBuilder("{\"model\":"); AppendJsonString(sb, CurrentModelName);
         sb.Append(",\"stream\":false,\"enable_thinking\":false,\"temperature\":0,\"max_tokens\":384,\"response_format\":{\"type\":\"json_object\"");
         if (m_Backend == BackendType.Local) sb.Append(",\"schema\":").Append(schema);

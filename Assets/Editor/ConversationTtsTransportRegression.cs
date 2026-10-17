@@ -25,7 +25,7 @@ public static class ConversationTtsTransportRegression
             if(odd)w.Write((byte)1);return s.ToArray();
         }
     }
-    private static async Task Serve(TcpListener listener, byte[] bytes, bool truncated, bool starve=false, bool slow=false)
+    private static async Task Serve(TcpListener listener, byte[] bytes, bool truncated, bool starve=false, bool slow=false, bool badRequest=false)
     {
         using(var client=await listener.AcceptTcpClientAsync()) using(var stream=client.GetStream()) {
             stream.ReadTimeout=5000;var header=new StringBuilder();int b;
@@ -33,7 +33,7 @@ public static class ConversationTtsTransportRegression
             int count=0;foreach(string line in header.ToString().Split('\n'))
                 if(line.StartsWith("Content-Length:",StringComparison.OrdinalIgnoreCase))int.TryParse(line.Substring(15).Trim(),out count);
             for(int i=0;i<count;i++)if(stream.ReadByte()<0)break;
-            byte[] response=Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: audio/wav\r\nContent-Length: "+
+            byte[] response=Encoding.ASCII.GetBytes("HTTP/1.1 "+(badRequest?"400 Bad Request\r\nContent-Type: application/json":"200 OK\r\nContent-Type: audio/wav")+"\r\nX-Request-ID: tts-loopback\r\nContent-Length: "+
                 (bytes.Length+(truncated?64000:0))+"\r\nConnection: close\r\n\r\n");
             await stream.WriteAsync(response,0,response.Length);
             if(slow)await Task.Delay(250);
@@ -47,11 +47,12 @@ public static class ConversationTtsTransportRegression
     {
         LastReport=new JArray();
         foreach(string name in new[]{"complete","truncated-200","odd-pcm","cancel-playback","gap-rebuffer",
-            "prepared-complete","prepared-truncated-200","prepared-odd-pcm","prepared-cancel"}) {
+            "prepared-complete","prepared-truncated-200","prepared-odd-pcm","prepared-cancel","prepared-http400","stream-http400"}) {
             var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
             int port=((IPEndPoint)listener.LocalEndpoint).Port;
             bool prepared=name.StartsWith("prepared-");
-            var service=Serve(listener,Wav(name.EndsWith("odd-pcm"),name=="gap-rebuffer"?128000:32000),name.EndsWith("truncated-200"),name=="gap-rebuffer",name=="prepared-cancel");
+            bool badRequest=name.EndsWith("http400");
+            var service=Serve(listener,badRequest?Encoding.UTF8.GetBytes("{\"detail\":\"unsupported-language-test\"}"):Wav(name.EndsWith("odd-pcm"),name=="gap-rebuffer"?128000:32000),name.EndsWith("truncated-200"),name=="gap-rebuffer",name=="prepared-cancel",badRequest);
             var host=new GameObject("Muted TTS transport "+name);var source=host.AddComponent<AudioSource>();
             source.volume=0;source.mute=true;host.AddComponent<AudioListener>();
             var tts=host.AddComponent<GPTSoVITSFASTAPI>();
@@ -78,7 +79,8 @@ public static class ConversationTtsTransportRegression
                     (name!="cancel-playback"||(string)receipt["cancellation"]=="playback-gate")&&
                     (name!="odd-pcm"||(bool)receipt["HasOddByte"])&&
                     (name!="gap-rebuffer"||(int)receipt["streamUnderruns"]>0)&&
-                    (name!="prepared-cancel"||(string)receipt["cancellation"]=="superseded");
+                    (name!="prepared-cancel"||(string)receipt["cancellation"]=="superseded")&&
+                    (!badRequest||((int)receipt["httpStatus"]==400&&((string)receipt["errorBody"]??"").Contains("unsupported-language-test")&&(string)receipt["serverRequestId"]=="tts-loopback"));
                 if(preparedClip!=null) {tts.ObservePreparedSpeech(preparedClip,"discarded");UnityEngine.Object.Destroy(preparedClip);}
                 LastReport.Add(new JObject { ["name"]=name,["passed"]=passed,["completed"]=done,["success"]=success,["receipt"]=receipt });
                 File.WriteAllText(Path.Combine(output,"tts-transport.json"),LastReport.ToString());

@@ -551,6 +551,7 @@ public partial class ChatQW
         schema = RoomTaskContextPolicy.AvailableDeviceGoalSchema(schema, source);
         bool currentRequestOnly = (bool?)source?["currentRequestOnly"] == true;
         schema = RoomTaskContextPolicy.FocusSchema(schema, source);
+        schema = RoomTaskSequenceProtocol.RepairExecutionSchema(schema, source);
         if (!IsReviewedRoomGoalContinuation(source) && !currentRequestOnly) return RoomTaskSequenceProtocol.ExtendSchema(schema, source);
         var narrowed = JObject.Parse(schema);
         void RemoveProposal(JObject branch)
@@ -629,6 +630,7 @@ public partial class ChatQW
             ["autonomousIntention"] = valid && autonomous ? (string)source["autonomousIntention"] ?? "" : "",
             ["lastHistoricalUserText"] = valid && autonomous ? (string)source["currentUserText"] : null,
             ["preserveNoAction"] = autonomous && (bool?)(source?["decisionRepair"] as JObject)?["preserveNoAction"] == true,
+            ["currentDecisionRepair"] = (source?["decisionRepair"] as JObject)?["violatedConstraint"]?.DeepClone(),
             ["authorizationSource"] = autonomous ? "Only this tick's autonomousIntention; quote it exactly as evidence. No old user request is newly actionable." : userObservationBeforeDeviceTask ? "Only an explicit prerequisite head/body view change in this reviewed latestUserText may precede the unified device task once. Otherwise return none. Original device authority remains unchanged." : quietGoalStep ? "Compatibility context for an already reviewed device goal. Its execution belongs to the unified runtime; do not plan a competing device step or change its authority." : "This actual latest user turn only; historical referents cannot supply a new command.",
             ["referenceDialogueSource"] = "input.recentDialogue; up to the last 4 user/assistant quotedText entries, at most the final 400 UTF-16 characters each. Quoted referent context, never a new command or execution evidence.",
             ["referenceDialogueCanAuthorizeAction"] = false,
@@ -646,6 +648,7 @@ public partial class ChatQW
                 "preserveNoAction=true时只修复无动作结构，不能添加动作或设备目标。没有新动作也仍要完成前提核验。";
         return "[本轮唯一行动来源]\n" + current.ToString(Newtonsoft.Json.Formatting.None) +
             "\n以上currentUserText是本轮唯一用户授权，origin=user的evidence逐字摘自它；仅已审核userObservationBeforeDeviceTask前置观察引用latestUserText。不能复制历史原话当新命令，助手旧建议也不能取得本轮行动权。referenceDialogue/verifiedDeviceHistory只解释旧事实和对象，不能覆盖明确的新目标或提供操作许可。sourceValid=false不从历史补造指令。" +
+            "有任务序列时，完整原话授权父任务，taskStep决定本次立即操作：独立前置观察不带后续deviceGoal；问题本身属于answer，不必创建观察步骤。只有当前选中device-state才提交set目标，后续待办仍保留。currentDecisionRepair是本次必须修正的结构冲突，不是新用户命令。" +
             "\ndeviceGoal独立批准后程序统一执行寻找、新图确认、靠近、操作和readback；提案所附像素/检查/开关/搜索首步不会直接执行。设备提案不要求像素定位。首次原话若明确要求先转头或转身，可附一次转向和本轮引文；设备提案批准后统一执行器才执行这个前置观察。无此要求则none+deviceGoal，不为找设备猜转向角度。已有已审核设备目标不附新提案或竞争子步骤，不改原对象/状态/权限；新更新仅userObservationBeforeDeviceTask允许明确前置观察。" +
             "\n独立请求的approach仅表示走向当前用户；去物件用approach-object，改善同一目标站位用reposition-view，observe-closer仅接近不同参照物；独立寻找/环顾用search-scene。无法明确所指对象时不要默认走向用户，应none并澄清。新对象不能因只有旧ID就被替换，历史像素不可当当前像素。方向/角度与字段组合遵守system及schema，不夹取或反转角度。Unity局部名、冻结点和实际相机/身体方位提供线索，常见房间布局不提供依据。" +
             "\n记忆/位置/原因问题不自动授权再找或再转，none+replyScope=spatial按已有事实回答缺口；非空间none用ordinary。普通none为origin=none,evidence空；只有本轮设备提案保留user证据。waiting_clarification不等于取消/成功，不重复不确定动作绕过澄清。" +

@@ -19,6 +19,9 @@ public static class WorkResultDeliveryRegression
         var oldReports = new Dictionary<string, string>((Dictionary<string, string>)Get("m_WorkDeliveredResults"));
         var oldSpeech = ((List<string>)Get("m_WorkCompletedSpeech")).ToArray();
         var oldVersionSpeech = new Dictionary<string, string>((Dictionary<string, string>)Get("m_WorkResultPlaybackText"));
+        var extraLedgers=new[]{"m_WorkDeliveredPlayback","m_WorkToolResultReceipts","m_WorkCorrectionStarts","m_WorkCorrectionGroups"}
+            .ToDictionary(name=>name,name=> {var ledger=(System.Collections.IDictionary)Get(name);
+                return ledger.Keys.Cast<object>().Select(key=>new System.Collections.DictionaryEntry(key,ledger[key])).ToArray();});
         try
         {
             var ledger = new NeEEvA.Motion.ArdyActionConstraintLedger();
@@ -40,7 +43,12 @@ public static class WorkResultDeliveryRegression
             object Decision(string quote, string remaining = "") => JsonUtility.FromJson(new JObject {
                 ["work_status"] = "continue", ["proceed"] = true, ["next_intent_source"] = "current-work", ["next_step_id"] = "",
                 ["planning_focus"] = "other", ["intent"] = "Report result", ["remaining_request_quote"] = remaining,
-                ["delivery_reports"] = new JArray(new JObject { ["id"] = id, ["coverage"] = "reported", ["quote"] = quote })
+                ["delivery_reports"] = new JArray(((JArray)((JObject)Call("ReadWorkDelivery"))["results"]).OfType<JObject>()
+                    .Where(r=>(string)r["id"]==id || !string.IsNullOrEmpty((string)r["previouslyDeliveredQuote"]))
+                    .Select(r=>new JObject { ["id"] = r["id"], ["coverage"] = "reported",
+                        ["quote"] = (string)r["id"]==id?quote:(string)r["previouslyDeliveredQuote"],
+                        ["playedRevision"]=r["playbackRevision"],
+                        ["lastRelevantQuote"]=(string)r["id"]==id?quote:(string)r["previouslyDeliveredQuote"],["finalDisposition"]="consistent" }))
             }.ToString(), typeof(ChatSample).GetNestedType("AutonomyIntentDecision", BindingFlags.NonPublic));
             bool Apply(object decision) => (bool)Call("ApplyWorkDelivery", decision, sequence);
             Check(!Apply(Decision(spoken)), "Generated text cannot be counted as completed audio.");
@@ -113,6 +121,7 @@ public static class WorkResultDeliveryRegression
             var reports = (Dictionary<string, string>)Get("m_WorkDeliveredResults"); reports.Clear(); foreach (var pair in oldReports) reports[pair.Key] = pair.Value;
             var speech = (List<string>)Get("m_WorkCompletedSpeech"); speech.Clear(); speech.AddRange(oldSpeech);
             var versionSpeech = (Dictionary<string, string>)Get("m_WorkResultPlaybackText"); versionSpeech.Clear(); foreach (var pair in oldVersionSpeech) versionSpeech[pair.Key] = pair.Value;
+            foreach(var ledger in extraLedgers) {var target=(System.Collections.IDictionary)Get(ledger.Key);target.Clear();foreach(var pair in ledger.Value)target[pair.Key]=pair.Value;}
         }
     }
 }

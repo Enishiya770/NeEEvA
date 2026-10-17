@@ -37,8 +37,19 @@ public partial class SenseVoiceSpeechToText
     {
         var evidence = m_TranscriptComparison;
         m_TranscriptComparison = null;
-        return TranscriptDisagreementPolicy.Compare(evidence, InputCaptureSessionSerial,
+        var packet = TranscriptDisagreementPolicy.Compare(evidence, InputCaptureSessionSerial,
             LastFinalCaptureSerial, LastFinalTranscriptSource, LastText, Time.realtimeSinceStartup);
+        if (packet != null && HasTimeOrderedTranscript) {
+            packet["full"]["source"] = "segmented-primary-via-" + LastFinalTranscriptSource;
+            packet["provenance"] = new Newtonsoft.Json.Linq.JObject {
+                ["capture"] = InputCaptureSessionSerial,
+                ["wholeText"] = m_LastWholeTurnText,
+                ["segmentedText"] = m_LastSegmentedPrimaryText,
+                ["segments"] = Newtonsoft.Json.Linq.JArray.FromObject(m_LastTurnSegments),
+                ["scope"] = "Same recording. Segment boundaries/alternatives are uncertain hypotheses, not extra utterances. Whole text and stream are also hypotheses, not authority."
+            };
+        }
+        return packet;
     }
 
     private void PublishFinalTranscriptOutcome(int capture, string source, string rejection, string rawText)

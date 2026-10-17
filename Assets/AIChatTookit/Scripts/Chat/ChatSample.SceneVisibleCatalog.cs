@@ -32,6 +32,11 @@ public partial class ChatSample
     }
     private readonly List<SceneVisibleCatalogView> m_SceneVisibleCatalogViews = new List<SceneVisibleCatalogView>();
     private readonly List<SceneVisibleMemory> m_SceneVisibleMemory = new List<SceneVisibleMemory>();
+    private sealed class SceneVisiblePointValidity { public bool invalidated; }
+    // Revocation belongs to the sampled source point, not a particular recall
+    // record. Rereading an old image cannot revive geometry that already moved.
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<SceneVisibleObjectCatalog.Entry,SceneVisiblePointValidity>
+        m_SceneVisiblePointValidity=new System.Runtime.CompilerServices.ConditionalWeakTable<SceneVisibleObjectCatalog.Entry,SceneVisiblePointValidity>();
     private SceneVisibleCatalogView m_SceneVisibleCurrent;
     // Derived data lives exactly as long as an already-retained observation. This
     // weak table does not add another image-history owner or grow its frame budget.
@@ -196,9 +201,11 @@ public partial class ChatSample
 
     private bool SceneVisibleMemoryPositionValid(SceneVisibleMemory memory)
     {
-        if (memory.positionInvalidated) return false;
+        var validity=m_SceneVisiblePointValidity.GetValue(memory.entry,_=>new SceneVisiblePointValidity());
+        if (memory.positionInvalidated) validity.invalidated=true;
+        if (validity.invalidated) { memory.positionInvalidated=true; return false; }
         // Live geometry may revoke a historical point, never silently update it.
-        if (!memory.entry.observed.entry.TryValidateObserved(true, out _)) memory.positionInvalidated = true;
+        if (!memory.entry.observed.entry.TryValidateObserved(true, out _)) memory.positionInvalidated = validity.invalidated = true;
         return !memory.positionInvalidated;
     }
 

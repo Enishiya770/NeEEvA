@@ -168,6 +168,21 @@ public static partial class RoomSpeechFactScopeRegression
                     ((string)Get(chunk, "Text")).Contains(language == "zh" ? "现在已经开始" : language == "ja" ? "今は" : "now"),
                     "Heard waiting followed by movement has an explicit temporal transition: " + language);
                 rows.Add(new JObject { ["transitionLanguage"] = language, ["text"] = Get(chunk, "Text").ToString() });
+                foreach(string next in new[]{"returning","follow-waiting"}) {
+                    Phase(next);Call(chat,"RefreshRoomSpeechForPlayback",chunk,generation);
+                }
+                string continuous=(string)typeof(ChatSample).GetMethod("ContinuousFollowText",Flags|BindingFlags.Static).Invoke(null,new object[]{language});
+                Require((int)Get(lease,"refreshes")==3 && (string)Get(chunk,"Text")==continuous,
+                    "Normal ongoing follow has a stable task report after three changes: "+language);
+                Phase("moving");
+                Require(Call(chat,"RefreshRoomSpeechForPlayback",chunk,generation).ToString()=="Current",
+                    "Normal follow motion/waiting changes no longer churn synthesis.");
+                foreach(string next in new[]{"follow-paused","follow-recovering","moving","cancelled"}) {
+                    Phase(next);
+                    Require(Call(chat,"RefreshRoomSpeechForPlayback",chunk,generation).ToString()=="Replaced" &&
+                        (next=="moving" || (string)Get(chunk,"Text")!=continuous),
+                        "Pause, recovery, resumption and cancellation remain separately reportable: "+next+"/"+language);
+                }
                 Call(chat, "FinishRoomSpeechPlaybackHistory", "");
             }
 

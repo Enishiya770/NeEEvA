@@ -89,7 +89,8 @@ public partial class ChatSample
             JsonConvert.SerializeObject(new {
                 userTurn = m_WorkEpoch, request = m_ActionConstraints.CurrentUserText,
                 originalInputEvidence = m_LastUserMsg,
-                previousUnfinishedWork = m_PreviousUnfinishedWork,
+                previousUnfinishedWork = TaskContinuationContextPolicy.History(m_PreviousUnfinishedWork),
+                previousWorkStatus = WorkNextIntentProtocol.HistoricalStatus(m_PreviousUnfinishedWork),
                 responses = m_WorkResponses.ToArray(), status = m_WorkStatus,
                 taskSequence = ReadRoomTaskSequence(),
                 attentionState = ReadAttentionState("work-review"),
@@ -201,7 +202,7 @@ public partial class ChatSample
         if (AcceptWorkAutonomousHandoff(decision, sequence)) return false;
         if ((status == "closed" || status == "none") && sequence?["steps"] is JArray steps &&
             System.Linq.Enumerable.Any(System.Linq.Enumerable.OfType<JObject>(steps), s =>
-                (string)s["kind"] != "other" && (string)s["status"] != "completed" && !FailedStepReportDelivered(s) &&
+                (string)s["kind"] != "other" && (string)s["status"] != "completed" && !UnsuccessfulStepReportDelivered(s) &&
                 !((string)s["kind"] == "follow" && (string)s["status"] == "running" &&
                     !System.Linq.Enumerable.Any(System.Linq.Enumerable.OfType<JObject>(steps), later =>
                         System.Linq.Enumerable.Contains(((JArray)later["after"]).Values<string>(), (string)s["id"])))))
